@@ -1,0 +1,1078 @@
+---
+title: "fiaInputs"
+author: "Danelle Laflower"
+date: "2023-05-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(readxl)
+library(xlsx)
+source("Y:/LANDIS/Rcode/landis_source.R")
+stateCodesToInclude <- c(9,23,25,33,36,44,50) # CT Maine MA NH NY RI VT
+statesToInclude <- c("NY","ME","NH","VT","CT","MA","RI")  #STATES
+minINVYR <- 1999
+
+#
+```
+
+#bring in fia data
+#pull possible plots and associated ecoregions
+
+
+### pull in FIA plot and tree data and filter to obtain target plots
+```{r fia prep with new source inputs}
+source("Y:/FIA/Rcode/FIA_ImportAndProcess_notTrees.R")
+source("Y:/FIA/Rcode/fia_source_treesSUBSET.R") #currently New England is the default.  manually set before running
+
+allbioOut <- allbio %>% dplyr::select("CN"=TRE_CN,STATECD,REGIONAL_DRYBIOT, REGIONAL_DRYBIOM)
+plotCondStateVar <- c("STATECD","STATE","plotAreaForest","nsubplotsForest","subplotNames","topSTDAGE")
+subplotCondStateVar <- c("STATECD","STATE","tsubplotAreaForest","topSTDAGE")
+
+ecoVar <- c("ECOSUBCD")
+forestTypeVar <- c("forestTypeGroup","forTypeGroupName")
+fiasp <- fia %>% mutate(genuspec=tolower(genuspec))
+#
+cw <- read.csv("Y:/BigMap/mergedBigMapIC250_filledAltPlotIDcw.csv") %>% rename("SHORT"=filledAltPlotID) #same as above
+
+# fia fvs species crosswalk
+# used to create crosswalk filled in fvs codes manually
+# fiasp %>% filter(genuspec %in% landisspp$GENUSPEC) %>% filter(! SPCD %in% c(136,317,376,377,378)) %>% write.csv("Y:/FIA/fia_FVScw.csv")
+fiafvscw <- read.csv("Y:/FIA/fia_FVScw.csv")
+#
+```
+
+#only run if you want all subplots to constitute a plot
+```{r full plot level summary}
+# join plotCondft here
+ alltreesPrep <- alltrees %>%
+   filter(INVYR>=minINVYR) %>%
+      left_join(states) %>%
+   left_join(allbioOut) %>% #,by=c("CN"="TRE_CN","STATECD"="STATECD")
+   dplyr::select(STATE,STATECD,UNITCD,COUNTYCD,PLOT,PLT_CN,SUBP,INVYR,DIA,CARBON_AG,STATUSCD,REGIONAL_DRYBIOT,TREE) %>% #,TREE,SPCD,DRYBIO_BOLE,DRYBIO_STUMP,DRYBIO_AG,TREE,SPCD,
+
+    unite(concatPlot, STATECD,UNITCD,COUNTYCD,PLOT,sep = "_",remove=FALSE) %>%
+    unite(concatSub,STATECD,UNITCD,COUNTYCD,PLOT,SUBP,sep = "_",remove=FALSE) %>%
+  left_join(plotCondft) %>% 
+   filter(plotAreaForest>=300)
+   # filter(plotAreaForest>=(672.4/2))
+#
+ maTrees <- alltreesPrep %>% 
+     filter(STATE %in% c("MA")) 
+#
+harvPlots <- maTrees %>% 
+  #rename(concatPlot=concat) %>% 
+  filter(STATUSCD==3) %>% 
+  group_by(concatPlot) %>% 
+  mutate(harv1=min(INVYR)) %>% 
+  dplyr::select(concatPlot,
+                STATECD,
+                STATE,
+                PLT_CN,
+                harv1
+                ) %>% 
+  distinct() %>% 
+  group_by(concatPlot,STATECD,STATE,harv1) %>% 
+  summarise(nharv=length(PLT_CN)) %>% 
+  mutate( harvest="yes") 
+# 
+plotAGC1 <- maTrees %>% 
+  #
+  filter(PLOT_STATUS_CD==1) %>% 
+  filter(STATUSCD!=0) %>% #not measured trees
+  #
+  # filter out trees that are not in the target subplots
+  mutate(subplotNames=as.character(subplotNames)) %>% 
+  
+  # IMPORTANT METHODOLOGY NOTE #OKAY FOR MA, BUT CHECK for other areas incase they contain subplots named 101 or greater.
+  filter(str_detect(subplotNames,as.character(SUBP))) %>% 
+ 
+  # drop_na(REGIONAL_DRYBIOT) %>% # don't use because it removes harvested trees
+  mutate(AGCg=CARBON_AG*453.592,
+         AGCMg=AGCg*gramToMegagram,
+         AGBg=REGIONAL_DRYBIOT*453.592,
+         AGBMg=AGBg*gramToMegagram) 
+#
+
+#grouped by forest type # version accounts for dead trees
+plotAGCft <- plotAGC1 %>% 
+  group_by_at(vars(concatPlot,PLT_CN,PLOT_STATUS_CD,INVYR,STATUSCD,plotCondStateVar,forestTypeVar)) %>% 
+  summarise(AGCmerchMg=sum(AGCMg,na.rm=TRUE),
+            AGCMg=sum(AGBMg,na.rm=TRUE)/2,
+            nStems=length(TREE)) %>% 
+  mutate(statusName=ifelse(STATUSCD==1,"live",ifelse(STATUSCD==2,"dead",ifelse(STATUSCD==3,"removed","unk")))) %>% 
+  pivot_wider(id_cols=c(concatPlot,PLT_CN,PLOT_STATUS_CD,INVYR,plotCondStateVar,forestTypeVar),names_from=statusName,values_from=c(AGCMg,AGCmerchMg)) %>% 
+  dplyr::select(concatPlot,PLT_CN,PLOT_STATUS_CD,INVYR,plotCondStateVar,forestTypeVar,plotAGCMg=AGCMg_live,AGCMg_dead,plotAGCmerchMg=AGCmerchMg_live) %>% 
+  # 
+  left_join(harvPlots) %>% 
+  replace_na(list(harvest="no")) %>% 
+  group_by(concatPlot) %>% 
+  arrange(concatPlot,INVYR) %>% 
+  #
+  mutate(firstINVYR=min(INVYR),lastINVYR=max(INVYR)) %>%
+  #filter(INVYR ==firstINVYR |INVYR==lastINVYR) %>% 
+  mutate(yrsBetween=INVYR-lag(INVYR),
+         # GrowthMerch=plotAGCmerchMg-lag(plotAGCmerchMg),
+         # Growth=plotAGCMg-lag(plotAGCMg),
+         # annGrowth=(Growth/yrsBetween),
+         # annGrowthMgHa=annGrowth*(10000/plotAreaForest),
+         AGCMgha=plotAGCMg*(10000/plotAreaForest) ,
+         annGrowthMgHa=(AGCMgha-lag(AGCMgha))/yrsBetween,
+         ageBin=ifelse(topSTDAGE<=20,"0-20",
+                       ifelse(topSTDAGE<=100,"21-100",">100")),
+         ageBin=factor(ageBin,levels=c("0-20","21-100",">100"))
+         ) %>% 
+  mutate(harvTime=ifelse(INVYR<harv1,"preHarv",
+                         ifelse(INVYR==harv1,"harv1Time",
+                                ifelse(INVYR > harv1 & nharv==1,"postHarv",
+                                       ifelse(INVYR== (harv1+yrsBetween) & nharv>=2,"harv2Time",
+                                              ifelse(INVYR > (harv1+yrsBetween) & nharv==2,"postHarv",
+                                                     ifelse(INVYR==harv1+(2*yrsBetween) & nharv>=3,"harv3Time","undefined")))) ) ) ) %>% 
+  group_by(concatPlot) %>% 
+   mutate(nSubplotChange=ifelse(min(nsubplotsForest)!=max(nsubplotsForest),"change","noChange")) 
+####
+
+
+```
+
+
+#subplots as plots filtered to only include full subplots
+```{r use subplots as plots}
+#subplotCondft that only includes full subplots
+# subplots168 <- subpcond1 %>% 
+#   filter(tsubplotAreaForest==168.11) %>% 
+#   unite(UNIQUESUBP,PLT_CN,SUBP,remove=FALSE,sep="") 
+# subplots168ft <- subplots168 %>% 
+#    mutate(forestTypeGroup=ifelse(topFORTYPCD %in% c(100:105),100,
+#                           ifelse(topFORTYPCD %in% c(120:129),120,
+#                            ifelse(topFORTYPCD %in% c(140:142),140,
+#                             ifelse(topFORTYPCD %in% c(150:150),150,
+#                               ifelse(topFORTYPCD %in% c(160:168),160,
+#                                 ifelse(topFORTYPCD %in% c(170:172),170,
+#                                   ifelse(topFORTYPCD %in% c(180:185),180,
+#                                      ifelse(topFORTYPCD %in% c(200:203), 200,
+#                                        ifelse(topFORTYPCD %in% c(220:226),220,
+#                                          ifelse(topFORTYPCD %in% c(240:241),240,
+#                                               ifelse(topFORTYPCD %in% c(260:271),260,
+#                                                   ifelse(topFORTYPCD %in% c(280:281),280,
+#                                                       ifelse(topFORTYPCD %in% c(300:305),300,
+#                                                         ifelse(topFORTYPCD %in% c(320:321),320,
+#                                                            ifelse(topFORTYPCD %in% c(340:342),340,
+#                                                              ifelse(topFORTYPCD %in% c(360:369),360,
+#                                                                ifelse(topFORTYPCD %in% c(370:371),370,
+#                                                                  ifelse(topFORTYPCD %in% c(380:385),380,
+#                                                                      ifelse(topFORTYPCD %in% c(390:391),390,
+#                                                                         ifelse(topFORTYPCD %in% c(400:409),400,
+#                                                                           ifelse(topFORTYPCD %in% c(500:520),500,
+#                                                                             ifelse(topFORTYPCD %in% c(600:609),600,
+#                                                                               ifelse(topFORTYPCD %in% c(700:722),700,
+#                                                                                 ifelse(topFORTYPCD %in% c(800:809),800,
+#                                                                                   ifelse(topFORTYPCD %in% c(900:905),900,
+#                                                                                     ifelse(topFORTYPCD %in% c(910:912),910,
+#                                                                                       ifelse(topFORTYPCD %in% c(920:935),920,
+#                                                                                           ifelse(topFORTYPCD %in% c(940:943),940,
+#                                                                                              ifelse(topFORTYPCD %in% c(960:962),960,                                                                                                                                                                                                                                                                                                                                                                              ifelse(topFORTYPCD %in% c(970:976),970,
+#                                                                                                                                                                                                                                                                                                                  ifelse(topFORTYPCD %in% c(980:989),980,
+#                                                                                                                                                                                                                                                                                                                             ifelse(topFORTYPCD %in%c(990:995),990,
+#                                                                                                                                                                                                                                                                                                                                ifelse(topFORTYPCD ==999,999, 0))))))))))))))))))))))))))))))))) ) %>% 
+#   left_join(ftgroupcw)
+# subplot168Condft <- subplots168ft %>% 
+#   left_join(plots12)
+#
+###### added from above
+```
+
+```{r other prep not currently using}
+# join plotCondft here
+ alltreessubplotPrep <- alltrees %>%
+   filter(INVYR>=minINVYR) %>%
+      left_join(states) %>%
+   left_join(allbioOut) %>% #,by=c("CN"="TRE_CN","STATECD"="STATECD")
+   dplyr::select(STATE,STATECD,UNITCD,COUNTYCD,PLOT,PLT_CN,SUBP,INVYR,DIA,CARBON_AG,STATUSCD,REGIONAL_DRYBIOT,TREE,AGENTCD,CR,CCLCD,CULLCF,CULLBF,BHAGE) %>% #,TREE,SPCD,DRYBIO_BOLE,DRYBIO_STUMP,DRYBIO_AG,TREE,SPCD,
+
+    unite(concatPlot, STATECD,UNITCD,COUNTYCD,PLOT,sep = "_",remove=FALSE) %>%
+    unite(concatSub,STATECD,UNITCD,COUNTYCD,PLOT,SUBP,sep = "_",remove=FALSE) %>%
+  right_join(subplot168Condft) 
+#
+ masubplotTrees <- alltreessubplotPrep %>% 
+     filter(STATE %in% c("MA")) 
+#
+harvsubplotPlots <- masubplotTrees %>% 
+  filter(STATUSCD==3) %>% 
+  group_by(concatPlot) %>% 
+  mutate(harv1=min(INVYR)) %>% 
+  dplyr::select(concatPlot,
+                STATECD,
+                STATE,
+                PLT_CN,
+                harv1
+                ) %>% 
+  distinct() %>% 
+  group_by(concatPlot,STATECD,STATE,harv1) %>% 
+  summarise(nharv=length(PLT_CN)) %>% 
+  mutate( harvest="yes") 
+
+subplotAGC1 <- masubplotTrees %>% 
+  #
+  filter(PLOT_STATUS_CD==1) %>% 
+  filter(STATUSCD!=0) %>% #not measured trees
+  filter(SUBP<=4) %>% 
+  #
+  # drop_na(REGIONAL_DRYBIOT) %>% # don't use because it removes harvested trees
+  mutate(AGCg=CARBON_AG*453.592,
+         AGCMg=AGCg*gramToMegagram,
+         AGBg=REGIONAL_DRYBIOT*453.592,
+         AGBMg=AGBg*gramToMegagram) 
+#
+
+#grouped by forest type # version accounts for dead trees
+subplotAGCft <- subplotAGC1 %>% 
+  group_by_at(vars(concatPlot,PLT_CN,PLOT_STATUS_CD,INVYR,STATUSCD,subplotCondStateVar,forestTypeVar)) %>% 
+  summarise(AGCmerchMg=sum(AGCMg,na.rm=TRUE),
+            AGCMg=sum(AGBMg,na.rm=TRUE)/2,
+            nStems=length(TREE)) %>% 
+  mutate(statusName=ifelse(STATUSCD==1,"live",ifelse(STATUSCD==2,"dead",ifelse(STATUSCD==3,"removed","unk")))) %>% 
+  pivot_wider(id_cols=c(concatPlot,PLT_CN,PLOT_STATUS_CD,INVYR,subplotCondStateVar,forestTypeVar),names_from=statusName,values_from=c(AGCMg,AGCmerchMg)) %>% 
+  dplyr::select(concatPlot,PLT_CN,PLOT_STATUS_CD,INVYR,subplotCondStateVar,forestTypeVar,plotAGCMg=AGCMg_live,AGCMg_dead,plotAGCmerchMg=AGCmerchMg_live) %>% 
+  # 
+  left_join(harvPlots) %>% 
+  replace_na(list(harvest="no")) %>% 
+  group_by(concatPlot) %>% 
+  arrange(concatPlot,INVYR) %>% 
+  #
+  mutate(firstINVYR=min(INVYR),lastINVYR=max(INVYR)) %>%
+  #filter(INVYR ==firstINVYR |INVYR==lastINVYR) %>% 
+  mutate(yrsBetween=INVYR-lag(INVYR),
+         # GrowthMerch=plotAGCmerchMg-lag(plotAGCmerchMg),
+         # Growth=plotAGCMg-lag(plotAGCMg),
+         # annGrowth=(Growth/yrsBetween),
+         # annGrowthMgHa=annGrowth*(10000/plotAreaForest),
+         AGCMgha=plotAGCMg*(10000/tsubplotAreaForest) ,
+         annGrowthMgHa=(AGCMgha-lag(AGCMgha))/yrsBetween,
+         ageBin=ifelse(topSTDAGE<=20,"0-20",
+                       ifelse(topSTDAGE<=100,"21-100",">100")),
+         ageBin=factor(ageBin,levels=c("0-20","21-100",">100"))
+         ) %>% 
+  mutate(harvTime=ifelse(INVYR<harv1,"preHarv",
+                         ifelse(INVYR==harv1,"harv1Time",
+                                ifelse(INVYR > harv1 & nharv==1,"postHarv",
+                                       ifelse(INVYR== (harv1+yrsBetween) & nharv>=2,"harv2Time",
+                                              ifelse(INVYR > (harv1+yrsBetween) & nharv==2,"postHarv",
+                                                     ifelse(INVYR==harv1+(2*yrsBetween) & nharv>=3,"harv3Time","undefined")))) ) ) ) 
+####
+#
+```
+
+```{r trees1short}
+#AGENTCD is cause of death code
+trees1short <- alltrees %>% 
+  filter(INVYR>=1999) %>% 
+    filter(SUBP<=4) %>% #data for subp numbers greater than 4 are coearsed into the 1-4 design and duplicated - so removing 3/3/23
+    dplyr::select(INVYR,CYCLE,SUBCYCLE,STATECD,UNITCD,COUNTYCD,PLOT,PLT_CN,SUBP,TREE,CN,STATUSCD,SPCD,SITREE,PREVDIA,DIA,DIAHTCD,
+                  TPA_UNADJ,CARBON_AG,HT, ACTUALHT,,TREECLCD,AGENTCD,CR,CCLCD,UNCRCD,
+                  DAMAGE_AGENT_CD1,CULLCF,CULLBF,BHAGE) %>% 
+  unite(concatPlot,STATECD,UNITCD,COUNTYCD,PLOT,sep="_",remove=FALSE) %>% 
+  mutate(AGCg=CARBON_AG*453.592,
+         AGCMg=AGCg*gramToMegagram,
+         actHeight=ifelse(ACTUALHT==-Inf,NA,ACTUALHT),
+         sizeClass = ifelse(DIA>=5,"tree","sap"),
+         diacm=DIA*2.54,
+         BAm2=pi*(.5*(diacm)/100)^2,
+         HISTORY=ifelse(STATUSCD==1,1,
+                        ifelse(STATUSCD==2 & !is.na(PREVDIA), 6,
+                               ifelse(((STATUSCD==2 & is.na(PREVDIA))| STATUSCD==3), 8, 999)
+                               ))
+  ) %>% 
+  group_by(concatPlot,PLOT,SUBP,TREE,CN) %>% 
+  arrange(concatPlot,PLOT,SUBP,TREE,CN,INVYR) %>% 
+  mutate(treeBAI=(BAm2-lag(BAm2)/(INVYR-lag(INVYR))),
+         Growth_Cg=(AGCg-lag(AGCg)/(INVYR-lag(INVYR)))) 
+```
+
+
+#MA possibles filtered from subplots
+```{r possibles}
+# plot levels
+ppossibles <- plotCondft %>% filter(STATE=="MA" & 
+                        plotAreaForest>672 & 
+                        PLOT_STATUS_CD==1 & 
+                        ECOSUBCD=="M211Cc" & 
+                        forTypeGroupName=="mapleBirchBeech" & 
+                        topSTDAGE>80)
+# subplot level
+possibles <- subplot168Condft %>% filter(STATE=="MA" & 
+                        tsubplotAreaForest > 168 & 
+                        PLOT_STATUS_CD==1 & 
+                        ECOSUBCD=="M211Cc" & 
+                        forTypeGroupName=="mapleBirchBeech" & 
+                        topSTDAGE>80) %>% 
+    unite(UNIQUESUBP,PLT_CN,SUBP,remove=FALSE,sep="") 
+
+
+#
+ # look at summarized BA for possible target plots, "possibles"  #ppossibles for full plot level
+ subplotout <- trees1short %>% 
+   filter(STATUSCD==1) %>% 
+   left_join(subplot168Condft) %>% #if full plot level, plotContft
+   filter(tsubplotAreaForest== 168.11) %>% 
+   ungroup() %>% 
+   mutate(treeAGCMg=ifelse(DIA>=5,AGCMg,NA),
+          sapAGCMg=ifelse(DIA<5,AGCMg,NA),
+          treeBAm2=ifelse(DIA>=5,BAm2,NA),
+          sapBAm2=ifelse(DIA<5,BAm2,NA)) %>% 
+  group_by(concatPlot,PLT_CN,SUBP,UNIQUESUBP,topSTDAGE) %>% 
+  #group_by(concatPlot,INVYR,PLT_CN,topSTDAGE) %>% #if full plot level
+  summarise(plotTreeBAm2=sum(treeBAm2,na.rm=TRUE),
+            plotSapBAm2=sum(sapBAm2,na.rm=TRUE),
+            plotTreeAGCMg=sum(treeAGCMg,na.rm=TRUE),
+            plotSapAGCMg=sum(sapAGCMg,na.rm=TRUE)) %>% 
+
+   ungroup() %>% 
+   mutate(plotTreeBAm2ha=plotTreeBAm2*(10000/168.11), #10000/672.44 if full plot
+          plotSapBAm2ha=plotSapBAm2*(10000/(1*13.5)),
+          plotTreeAGCMgha=plotTreeAGCMg*(10000/168.11),
+          plotSapAGCMgha=plotSapAGCMg*(10000/(1*13.5)),
+          plotSapBAm2haV2=plotSapBAm2*(74.965282*4)*2.47,
+          plotSapAGCMghaV2=plotSapAGCMg*(74.965282*4)*2.47) %>% 
+   group_by(UNIQUESUBP) %>% 
+          mutate(tBAm2ha=sum(plotTreeBAm2ha,plotSapBAm2ha,na.rm=TRUE),tAGCMgha=sum(plotTreeAGCMgha,plotSapAGCMgha,na.rm=TRUE)) %>%
+   ungroup() %>% 
+   mutate(tBAftac=tBAm2ha*4.356) %>% 
+  #   filter(PLT_CN==247057536010661) %>%  
+    filter(PLT_CN %in% possibles$PLT_CN)
+subplotsWcw <- subplotout %>% 
+  left_join(cw)
+ #
+subplotout %>% 
+  ggplot(aes(x=topSTDAGE,y=tBAftac))+
+  geom_point() +
+  #geom_smooth()+
+  geom_abline() +
+  scale_y_continuous(limits=c(0,NA))
+  # left_join(fiasp)
+
+# #
+```
+
+
+
+```{r pull ecoregions from ULSA 90m rasters for chosen fia plots}
+library(terra)
+eco <- rast("Y:/LANDIS/MA_ulsa_90m_matchedMask/inputFolders/SpatialData/eco_MA90mVccdc.img")
+ecoVal <- as.data.frame(values(eco)) 
+names(ecoVal) <- "ecoVal"
+ic <- rast("Y:/LANDIS/MA_ulsa_90m_matchedMask/inputFolders/SpatialData/IC_MA90mFilledccdc.img")
+icVal <- as.data.frame(values(ic)) 
+names(icVal) <- "mapcode"
+mcSite <- cbind(ecoVal,icVal)
+mcSite6393 <- mcSite %>% filter(mapcode==6393) %>% group_by(ecoVal) %>% tally() %>% arrange(desc(n))
+mcSite6393
+#
+```
+
+#pull in fvs blank database  use below if on server
+```{r fvs blank db not on server}
+standInit <- read_excel(paste0("C:/Users/",whichComputer,"/Dropbox (Harvard University)/danellelaflower/fvs/BlankDatabase.xlsx"),sheet="FVS_StandInit") %>% mutate(VARIANT=as.character(VARIANT)) #Variant as character might not work
+
+names(standInit)
+plotInit <- read_excel(paste0("C:/Users/",whichComputer,"/Dropbox (Harvard University)/danellelaflower/fvs/BlankDatabase.xlsx"),sheet="FVS_PlotInit") %>% mutate(VARIANT=as.character(VARIANT)) #Variant as character might not work
+
+treeInit <- read_excel(paste0("C:/Users/",whichComputer,"/Dropbox (Harvard University)/danellelaflower/fvs/BlankDatabase.xlsx"),sheet="FVS_TreeInit") %>% mutate(TREE_ID=as.character(TREE_ID),SPECIES=as.character(SPECIES))
+#
+```
+
+
+```{r fvs blank db  server}
+standInit <- read_excel(paste0("Y:/REU2023/FVS/BlankDatabase.xlsx"),sheet="FVS_StandInit") %>% mutate(VARIANT=as.character(VARIANT),
+                                                                                                      STAND_ID=as.character(STAND_ID) ) 
+
+names(standInit)
+plotInit <- read_excel(paste0("Y:/REU2023/FVS/BlankDatabase.xlsx"),sheet="FVS_PlotInit") %>% mutate(VARIANT=as.character(VARIANT),
+                                                                                                    STAND_ID=as.character(STAND_ID),
+                                                                                                    STANDPLOT_ID=as.character(STANDPLOT_ID)) 
+
+treeInit <- read_excel(paste0("Y:/REU2023/FVS/BlankDatabase.xlsx"),sheet="FVS_TreeInit") %>% 
+  mutate(TREE_ID=as.character(TREE_ID),
+         SPECIES=as.character(SPECIES),
+          STAND_ID=as.character(STAND_ID),
+          STANDPLOT_ID=as.character(STANDPLOT_ID))
+names(treeInit)
+#
+```
+
+#subplot level plots
+```{r subplots as plots and plots as stands}
+# subplots are 1/24 acre (0.04154 ac)
+# sapling plots are 1/300 acre
+# STAND_ID #from sqlite data= StandInit_cond.Stand_ID = concatenation of: STATECD(4) + INVYR(4) + CYCLE(2) + SUBCYCLE(2) + UNITCD(2) + COUNTYCD(3) + PLOT(5) 
+#
+# trees
+treesPrep1 <- trees1short %>% 
+  left_join(plotCondft) %>% 
+  unite(UNIQUESUBP,PLT_CN,SUBP,remove=FALSE,sep="") %>% 
+    mutate(STATECD=formatC(STATECD,width=4,flag="0"),
+         CYCLE=formatC(CYCLE,width=2,flag="0"),
+         SUBCYCLE=formatC(SUBCYCLE,width=2,flag="0"),
+         UNITCD=formatC(UNITCD,width=2,flag="0"),
+         COUNTYCD=formatC(COUNTYCD,width=3,flag="0"),
+         PLOT=formatC(PLOT,width=5,flag="0")
+         ) %>% 
+  unite(STAND_ID,STATECD,INVYR,CYCLE,SUBCYCLE,UNITCD,COUNTYCD,PLOT,remove=FALSE,sep="") %>% 
+  left_join(fiafvscw) %>% 
+  filter(STATUSCD!=0) %>% 
+  ungroup() %>% 
+
+  group_by(concatPlot,PLOT,SUBP,TREE) %>% 
+  arrange(concatPlot,PLOT,SUBP,TREE,INVYR) %>% 
+  mutate(DG=ifelse((REMPER>=1 & STATUSCD==1 & PREVDIA > 0 & DIA > PREVDIA),(DIA-PREVDIA),NA), #this is not what quick start says but matches sq
+         HeightGrowth=ifelse(REMPER>0 & STATUSCD==1 & !is.na(PREVDIA) & HT>lag(HT), (HT-lag(HT)),NA ),
+         HTTOPK=ifelse(HT-ACTUALHT >0, ACTUALHT,NA),
+         HT_TO_LIVE_CROWN=ifelse(ACTUALHT >0 & UNCRCD>0, (ACTUALHT- ((UNCRCD/100)*ACTUALHT)),NA)) %>% #maybe HtToCrownBase
+  mutate(HTG=ifelse(HeightGrowth>0, HeightGrowth,NA)) %>% 
+  dplyr::select(concatPlot,STAND_ID,PLT_CN,UNIQUESUBP,INVYR,PLOT,SUBP,TREE,SPCD,STATUSCD,FVSsp,
+                DIA,
+                DIAMETER_HT=DIAHTCD,
+                DG,TPA_UNADJ,
+                UNCRCD,
+                ACTUALHT,HT,HTG,HTTOPK,HT_TO_LIVE_CROWN,TREECLCD,AGENTCD,CR,CCLCD,HISTORY,
+                DAMAGE_AGENT_CD1,CULLCF,CULLBF,BHAGE) %>% 
+  rename(PLOT_ID=SUBP,
+         DIAMETER=DIA,
+         DAMAGE1=DAMAGE_AGENT_CD1,
+         MORT_AGENT=AGENTCD, #this doesn't have a column in the treeInit
+         CRRATIO=CR,
+         CRCLASS=CCLCD, #this doesn't have a column in the treeInit
+         DEFECT_CUBIC=CULLCF,
+         DEFECT_BOARD=CULLBF,
+         AGE=BHAGE) %>% 
+  mutate(TREE_ID=paste0(PLOT_ID,TREE),
+                  TREE_COUNT=round(TPA_UNADJ) ) %>% #should this be *4  tried but was very high
+   unite(STANDPLOT_ID,STAND_ID,PLOT_ID,remove=FALSE,sep="_")# %>% 
+   # filter(UNIQUESUBP %in% possibles$UNIQUESUBP) 
+
+plotsWnonLandisspp <- treesPrep1 %>% filter(is.na(FVSsp)) %>% pull(UNIQUESUBP) %>% unique()  
+
+trees <- treesPrep1 %>%
+  filter(!UNIQUESUBP %in% plotsWnonLandisspp) %>% 
+  rename(SPECIES=FVSsp) %>% 
+  dplyr::select(-c(TPA_UNADJ) )
+#
+nkdf <-  read.csv("Y:/REU2023/FVS/01_processedInputData/nuneryAndKeetonFIAplotNumbers.csv") %>%
+  unite(concatPlot,STATECD,UNITCD,COUNTYCD,PLOT)
+  
+nkplotvalues <- nkdf %>%
+  pull(concatPlot)
+
+
+
+nktrees <- trees %>%
+  filter(concatPlot%in%nkplotvalues)
+#how many nk plots have landis-only species?
+table(nktrees$concatPlot)
+
+  # mutate(STATECD=as.integer(cSTATECD),
+  #        UNITCD=as.integer(cUNITCD),
+  #        COUNTYCD=as.integer(cCOUNTYCD),
+  #        PLOT=as.integer(cPLOT))
+nk <- plotCondft %>% 
+   filter(STATECD %in% c(23,33,36,50)) %>% 
+ # filter((STATECD==23 & INVYR==2003) |(STATECD==36 & INVYR==2004 ) | (STATECD==50 & INVYR==2005) | (STATECD==33 & INVYR==2005) )
+ # filter(INVYR %in% c(2002:2006)) %>% #|MEASYEAR %in% c(2003:2005)
+  mutate(cSTATECD=formatC(STATECD,width=4,flag="0"),
+         cCYCLE=formatC(CYCLE,width=2,flag="0"),
+         cSUBCYCLE=formatC(SUBCYCLE,width=2,flag="0"),
+         cUNITCD=formatC(UNITCD,width=2,flag="0"),
+         cCOUNTYCD=formatC(COUNTYCD,width=3,flag="0"),
+         cPLOT=formatC(PLOT,width=5,flag="0")
+         ) %>% 
+   unite(STAND_ID,cSTATECD,INVYR,cCYCLE,cSUBCYCLE,cUNITCD,cCOUNTYCD,cPLOT,remove=FALSE,sep="") %>% 
+  rename(INV_YEAR=INVYR,
+        AGE=topSTDAGE,
+        SITE_INDEX=topSICOND,
+        LATITUDE=LAT,
+        LONGITUDE=LON,
+        ECOREGION = ECOSUBCD, #this is not actually used in the NE variant
+        ELEVFT = ELEV #this is feet #can also add slope and aspect
+        #Max_SDI_FIA=topSDIMAX_RMRS #these are all NAs
+        ) %>% 
+  mutate(         LOCATION=922,
+                  VARIANT="NE",
+                   NUM_PLOTS=1,  #not sure what this should be
+                  
+        BRK_DBH=999, #manually expand trees in tree table
+        INV_PLOT_SIZE= 1 #6/2/2023- using 1 because i expanded at the tree level - i think because there are also saplings tsubplotAreaForest/4047, #m2 to acres
+         #MAX_BA=
+          ) %>% 
+  left_join(nkdf) %>% 
+  dplyr::select(expectedfiaPlotID,STAND_ID,INV_YEAR,nkYear,CYCLE,SUBCYCLE,concatPlot,STATECD,UNITCD,COUNTYCD,PLOT,PLOT_STATUS_CD,ECOREGION,ELEVFT,LATITUDE,LONGITUDE,STATE,plotAreaForest,SITE_INDEX,meanSICOND,topFORTYPCD,AGE,topDist,maxTRTCD1,topASPECT,topSLOPE,forestTypeGroup,cSTATECD,cUNITCD,cCOUNTYCD,cPLOT,LOCATION) %>% 
+  group_by(concatPlot,expectedfiaPlotID) %>% 
+    filter(!is.na(expectedfiaPlotID)) 
+
+# write.csv(nk,"Y:/REU2023/FVS/00_rawData/nunerykeetonPlots.csv",row.names=FALSE)
+saveRDS(nk,"Y:/REU2023/FVS/00_rawData/nunerykeetonPlots.Rds")
+nkcheck2 <- readRDS("Y:/REU2023/FVS/00_rawData/nunerykeetonPlots.Rds")
+#
+possibleIn <- possibles %>% 
+  filter(!UNIQUESUBP %in% plotsWnonLandisspp) %>% 
+  mutate(STATECD=formatC(STATECD,width=4,flag="0"),
+         CYCLE=formatC(CYCLE,width=2,flag="0"),
+         SUBCYCLE=formatC(SUBCYCLE,width=2,flag="0"),
+         UNITCD=formatC(UNITCD,width=2,flag="0"),
+         COUNTYCD=formatC(COUNTYCD,width=3,flag="0"),
+         PLOT=formatC(PLOT,width=5,flag="0")
+         ) %>% 
+   unite(STAND_ID,STATECD,INVYR,CYCLE,SUBCYCLE,UNITCD,COUNTYCD,PLOT,remove=FALSE,sep="") %>% 
+  rename(PLOT_ID=SUBP,
+        INV_YEAR=INVYR,
+        AGE=topSTDAGE,
+        SITE_INDEX=topSICOND,
+        LATITUDE=LAT,
+        LONGITUDE=LON,
+        ECOREGION = ECOSUBCD, #this is not actually used in the NE variant
+        ELEVFT = ELEV #this is feet #can also add slope and aspect
+        #Max_SDI_FIA=topSDIMAX_RMRS #these are all NAs
+        ) %>% 
+  mutate(         LOCATION=922,
+                  VARIANT="NE",
+                   NUM_PLOTS=1,  #not sure what this should be
+                  
+        BRK_DBH=999, #manually expand trees in tree table
+        INV_PLOT_SIZE= 1 #6/2/2023- using 1 because i expanded at the tree level - i think because there are also saplings tsubplotAreaForest/4047, #m2 to acres
+         #MAX_BA=
+          ) %>% 
+  unite(STANDPLOT_ID,STAND_ID,PLOT_ID,remove=FALSE,sep="_") %>% 
+  ungroup() 
+#
+
+stands <- possibleIn %>% 
+  dplyr::select(STAND_ID,
+                INV_YEAR,
+                AGE,
+                SITE_INDEX,
+                LATITUDE,
+                LONGITUDE,
+                LOCATION,
+                VARIANT,
+                NUM_PLOTS,BRK_DBH,INV_PLOT_SIZE
+                ) %>% 
+  distinct()
+  #filter(STAND_ID %in% trees$STAND_ID)
+#
+plots <- possibleIn %>% 
+   dplyr::select(#GROUPS=concatPlot,
+                STAND_ID,
+                PLOT_ID,
+                STANDPLOT_ID,
+                INV_YEAR,
+                AGE,
+                LATITUDE,
+                LONGITUDE,
+                LOCATION,
+                VARIANT,
+                NUM_PLOTS,
+                BRK_DBH,
+                INV_PLOT_SIZE,
+                SITE_INDEX,
+                # MAXBA=  #maximum BA (ft2 per acre)
+                ) 
+#
+#
+standInitOut <- standInit %>% bind_rows(stands) %>% mutate(STAND_ID=as.character(STAND_ID))
+plotInitOut <- plotInit %>% bind_rows(plots) %>% mutate(STAND_ID=as.character(STAND_ID))
+treeInitOut <- treeInit %>% bind_rows(trees) %>% mutate(STAND_ID=as.character(STAND_ID))
+
+```
+
+
+
+
+#write tables
+```{r write excel tables}
+runName <- "MA_subplots_mbbV3"
+library(xlsx) #needed to install 64 bit java for this to work
+write.xlsx(as.data.frame(standInitOut),
+           file= paste0("Y:/REU2023/FVS/01_processedInputData/",runName,".xlsx"),
+           row.names=FALSE,
+           sheetName="FVS_StandInit",
+           showNA = FALSE)
+
+#
+write.xlsx(as.data.frame(plotInitOut),
+           file= paste0("Y:/REU2023/FVS/01_processedInputData/",runName,".xlsx"),
+           row.names=FALSE,
+           sheetName="FVS_PlotInit",
+           showNA = FALSE,
+           append = TRUE)
+#
+write.xlsx(as.data.frame(treeInitOut),
+           file= paste0("Y:/REU2023/FVS/01_processedInputData/",runName,".xlsx"),
+           row.names=FALSE,
+           sheetName="FVS_TreeInit",
+           showNA = FALSE,
+           append = TRUE)
+#
+```
+
+```{r further subset subplot tables}
+# subset 
+trees %>% filter(PLT_CN==304152006489998)%>% left_join(cw) %>% dplyr::select(STAND_ID,PLOT_ID,PLT_CN,PLOT,SHORT) %>% distinct() 
+ssStandID <- trees %>% filter(PLT_CN==304152006489998) %>% dplyr::select(STAND_ID,PLOT_ID) %>% distinct() 
+sstandInitOut <- standInit %>% bind_rows(stands[stands$STAND_ID %in% ssStandID$STAND_ID,]) %>% mutate(STAND_ID=as.character(STAND_ID))
+splotInitOut <- plotInit %>% bind_rows(plots[plots$STAND_ID %in% ssStandID$STAND_ID,]) %>% mutate(STAND_ID=as.character(STAND_ID))
+streeInitOut <- treeInit %>% bind_rows(trees[trees$STAND_ID %in% ssStandID$STAND_ID,]) %>% mutate(STAND_ID=as.character(STAND_ID))
+runName <- "MA_6393_mbbV3"
+library(xlsx) #needed to install 64 bit java for this to work
+write.xlsx(as.data.frame(sstandInitOut),
+           file= paste0("Y:/REU2023/FVS/01_processedInputData/",runName,".xlsx"),
+           row.names=FALSE,
+           sheetName="FVS_StandInit",
+           showNA = FALSE)
+
+#
+write.xlsx(as.data.frame(splotInitOut),
+           file= paste0("Y:/REU2023/FVS/01_processedInputData/",runName,".xlsx"),
+            row.names=FALSE,
+           sheetName="FVS_PlotInit",
+           showNA = FALSE,
+           append = TRUE)
+#
+write.xlsx(as.data.frame(streeInitOut),
+           file= paste0("Y:/REU2023/FVS/01_processedInputData/",runName,".xlsx"),
+            row.names=FALSE,
+           sheetName="FVS_TreeInit",
+           showNA = FALSE,
+           append = TRUE)
+#
+```
+
+
+# read in sqlite fia data
+```{r sqlite}
+library(DBI)
+library(RSQLite)
+con <- dbConnect(RSQLite::SQLite(), "Y:/REU2023/FVS/01_processedInputData/SQLite_FIADB_MA/SQLite_FIADB_MA.db")
+con
+
+dbListTables(con)
+fvsTreeInitPlot <- dbReadTable(con, "FVS_TREEINIT_PLOT" )
+fvsTreeInitCond <- dbReadTable(con,"FVS_TREEINIT_COND")
+sqTrees <- fvsTreeInitPlot %>% 
+    left_join(fvsTreeInitCond) %>% 
+    separate(STANDPLOT_CN,c("PLT_CN","SUBP"),remove=FALSE) %>% 
+    unite(UNIQUESUBP,PLT_CN,SUBP,remove=FALSE,sep="") %>% 
+    mutate(source="sq") %>% 
+  rename(SPCD=SPECIES)
+
+sqPlots <- dbReadTable(con,"FVS_PLOTINIT_PLOT")  %>% 
+    separate(STANDPLOT_CN,c("PLT_CN","SUBP"),remove=FALSE) %>% 
+    unite(UNIQUESUBP,PLT_CN,SUBP,remove=FALSE,sep="") %>% 
+    mutate(source="sq")
+
+sqStandCond <- dbReadTable(con,"FVS_STANDINIT_COND")
+sqStands <- dbReadTable(con,"FVS_STANDINIT_PLOT") %>% 
+  left_join(sqStandCond)  %>% 
+    mutate(source="sq")
+
+
+# dbDisconnect(con)
+sqPlotsPossible <- sqPlots %>% 
+  filter(UNIQUESUBP %in% possibles$UNIQUESUBP) 
+#
+sqPlot6393 <- sqPlotsPossible %>% 
+  filter(PLT_CN==304152006489998)
+sqStand6393 <- sqStands %>% 
+  filter(STAND_CN==304152006489998)
+sqTrees6393 <- sqTrees %>% 
+  filter(PLT_CN==304152006489998)
+  sqPlot6393;splotInitOut
+  
+sqdfplot6393 <- splotInitOut %>% 
+  mutate(source="df") %>% 
+  bind_rows(sqPlot6393) %>% 
+  arrange(STANDPLOT_ID,INV_YEAR) %>% 
+  dplyr::select(PLOT_ID,INV_YEAR,source,everything()) 
+#
+# plot df is missing, REGION, FOREST,ECOREGION,ASPECT,SLOPE,ELEFT,BASAL_AREA_FACTOR,... SAM_WT, DG_TRANS,DG_MEASURE,HTG_TRANS,HTG_MEASURE,MORT_MEASURE,
+# SITE_SPECIES, PHYSIO_REGION,STATE,COUNTY, INVYDAY, INV_MONTH
+# plot df is different for INV_PLOT_SIZE,BRK_DBH, SITE_INDEX
+#
+sqdfstand6393 <- sstandInitOut %>% 
+  mutate(source="df") %>% 
+  bind_rows(sqStand6393) %>% 
+  dplyr::select(INV_YEAR,source,everything()) %>% 
+  arrange(STAND_ID,INV_YEAR,source) 
+
+# stand df is missing REGION,FOREST, ECOREGION, ASPECT, SLOPE,ELEFT,BASAL_AREA_FACTOR,DG_TRANS,DG_MEASURE,HTG_TRANS,HTG_MEASURE,MORT_MEASURE,SITE_SPECIES, PHYSIO_REGION,STATE,COUNTY, INVYDAY, INV_MONTH,SITE_INDEX_BASE_AG,FOREST_TYPE_FIA,
+# stand df is different LOCATION,INV_PLOT_SIZE,BRK_DBH,NUM_PLOTS,SAM_WT
+
+sqdftree6393 <- streeInitOut %>% 
+  mutate(source="df",TREE_ID=as.numeric(TREE_ID),PLT_CN=as.character(PLT_CN),SPCD=as.character(SPCD)) %>% 
+  bind_rows(sqTrees6393) %>% 
+  dplyr::select(UNIQUESUBP,source,INVYR,TREE,STATUSCD,HISTORY,everything()) %>% 
+  arrange(UNIQUESUBP,SPCD,DIAMETER)
+sqdftree6393
+#
+```
+
+
+
+
+
+
+#run as chunk to create the ic text file
+```{r FIA tree- species level plot information}
+#
+ LANDISsfj <-read.table("Y:/LANDIS/INPUT_DATA_REGIONAL/SPECIES_LANDIS_NEW_ENGLAND_jack_pine.txt",sep="\t",skip=2,header=TRUE)
+        LANDISsfj$gesp <- toupper(paste0(substr(LANDISsfj$X..species,1,2),substr(LANDISsfj$X..species,5,6)))
+        sfj <- LANDISsfj[1:34,] %>% rename(genuspec="X..species") %>% mutate(genuspec=toupper(genuspec)) %>% dplyr::select(gesp,longevity=Longevity,shade_Tol.)
+landisspp <-  sfj 
+nkplots <- read.csv("Y:/REU2023/FVS/NK_Plot_IDs_for_REU - Sheet1.csv") %>% 
+  filter(Reported.Years..10.stands.highlighted.are.the.ones.we.ll.be.using. !="") %>% 
+  separate(Concat_Plot,c("state","unit","county","plot"),sep="_") %>% 
+  mutate(county=as.integer(county),
+         plot=as.integer(plot)) %>% 
+  unite(concatPlot,state,unit,county,plot,sep="_")
+
+targPlotsdf <- pltcncw %>% inner_join(nkplots) %>%   #filter(concatPlot %in% nkplots$Concat_Plot ) %>% 
+  group_by(concatPlot) %>% 
+    arrange(concatPlot,INVYR) %>% 
+  slice(1) %>% 
+  rename(SHORT=FIA.Database.StandID)
+
+#prep for landis
+#fill in missing SI and join to site index coef and calculate age----
+lookup2 <- lookup %>% dplyr::select("GENUSPEC","SPCD"=spp_num,"b1","b2","b3","b4","b5") %>% mutate(gesp=toupper(paste0(substr(GENUSPEC,1,2),substr(GENUSPEC,5,6))))
+
+liveTreesImp2 <- alltrees %>% #alltrees
+    dplyr::select(CN,PLT_CN,PLOT,SUBP,STATECD,INVYR,PLOT,SUBP,TREE,STATUSCD,SPCD,DIA,HT,CCLCD,SITREE,TPA_UNADJ,CARBON_AG,CARBON_BG) %>% 
+  # for big map  #not filtering subplot only for bigmap anymore 
+   # filter(SUBP==1) %>% 
+  drop_na(DIA) %>% 
+  filter(INVYR >= 1999) %>% #all earlier years do not have HT or TPA_ADJ
+  filter(STATUSCD==1) %>% 
+
+  right_join(targPlotsdf) %>%    # only keep target plots' data
+  
+  #left_join(ppOrigAREA_FOR2cw) %>% 
+  #replace_na(list(subpArea=168.11340)) %>% 
+  group_by(PLT_CN) %>% 
+  mutate(nsubp=length(unique(SUBP)),
+         subpArea=168.1134,
+         plotArea=nsubp*subpArea) %>% 
+  ungroup() %>% 
+  #filter(PLT_CN %in% old_to_new$LONG) %>% # live trees with PLT_CN in imputed map
+  
+  dplyr::select(CN,PLT_CN,PLOT,SUBP,SHORT,STATECD,INVYR,PLOT,SUBP,subpArea,plotArea,nsubp,TREE,SPCD,DIA,HT,CCLCD,SITREE,TPA_UNADJ,CARBON_AG,CARBON_BG) %>% 
+  mutate(agb_g= 2*(CARBON_AG)*453.592, #carbon pounds to biomass g
+         #agb_gm2 = 2* (CARBON_AG) * (TPA_UNADJ / 4046.86) * 453.592 , #this doesn't work with using only one subplot
+         #AGBMg=CARBON_AG*0.0004535924*2,
+         AGBMg=agb_g*gramToMegagram,
+         #new 8/26/2022 to be able to use more than one subplot
+         AGBMgha=ifelse(DIA >= 5,AGBMg* (10000/plotArea),
+                        ifelse(DIA < 5,AGBMg*(10000/(nsubp*13.49577)),  AGBMg* (10000/plotArea) ) ), 
+         # AGBMgha=ifelse(DIA >= 5,AGBMg* (10000/subpArea),
+         #                ifelse(DIA < 5,AGBMg*(10000/13.49577),  AGBMg* (10000/subpArea) ) ), 
+         agb_gm2=AGBMgha*100) %>% 
+ 
+  left_join(cond1) %>% 
+  left_join(spcdlandisspp) %>% 
+  mutate(gesp2=ifelse(is.na(gesp),"OTHR",gesp),H_assigned=ifelse(is.na(HT),4,HT)) %>% 
+    mutate(SIndex=ifelse(is.na(topSICOND)&topSiteCLCD==6, 40,topSICOND),
+         SIndex=ifelse(is.na(topSICOND)&topSiteCLCD==7,20,topSICOND)) %>% 
+ # mutate(SIndex=ifelse(is.na(SICOND)&SITECLCD==6, 40,SICOND),SIndex=ifelse(is.na(SICOND)&SITECLCD==7,20,SICOND)) %>% 
+  mutate(SIndex=replace_na(SIndex,53)) %>% 
+  left_join(lookup2) %>% #si coef  #(sicoef[,c(3,10,4:8)]) %>%   #
+  mutate(calc_age=round(ifelse(H_assigned <= (b1*SIndex^(b2)),
+                               (log (1-(H_assigned/(b1 * SIndex^(b2)))^(1/(b4*(SIndex^(b5)))))/b3),
+                               (log (1-(((b1*SIndex^(b2))-1)/(b1 * SIndex^(b2)))^(1/(b4*(SIndex^(b5)))))/b3 ) ),0 )) %>% 
+  mutate(calc_age=ifelse(calc_age==0,1,calc_age)) %>% 
+ 
+  # IMPORTANT BINS ARE SET IN OBJECT in call in chunk
+    #mutate(calcAgeCut=cut(calc_age, breaks=c(ageBins, max(calc_age,na.rm=TRUE)+1  ) ) )  
+  mutate(calcAgeCut=cut(calc_age, breaks=c(ageBins, round(max(calc_age,na.rm=TRUE)+1,0)  ) ) )  %>% 
+   filter(!is.na(calc_age)) 
+#
+
+#summary for IC biomass
+tree_dataSummary <- liveTreesImp2 %>% 
+  drop_na(GENUSPEC) %>% 
+  #
+  dplyr::select(PLT_CN,SHORT,everything()) %>% 
+  separate(calcAgeCut,into=c("delete","bin"),sep=c(","), remove=FALSE, convert=TRUE) %>% 
+  mutate(ageBin=as.integer(substr(bin,1, nchar(bin)-1)) ) %>% 
+  mutate(ageBin=replace(ageBin,ageBin > 150,175)) %>% #changed 9/26 from >150
+  # left_join(spcdlandisspp) %>%
+  left_join(landisspp) %>% 
+  mutate(ageBinAdj=ifelse(ageBin<=longevity,ageBin,(longevity-CBS) ) ) %>%
+  group_by(PLT_CN,nsubp,SHORT,ageBinAdj,SPCD,gesp2,GENUSPEC) %>% 
+  summarise(sumCohortAGBgm2act=round(sum(agb_gm2,na.rm=TRUE)),
+            ftc=max(topFORTYPCD),nStems=length(PLT_CN)) %>%
+  arrange(PLT_CN,SPCD,ageBinAdj ) %>% 
+  left_join(forest_type_ref[,c(1,2)],by=c("ftc"="VALUE")) %>% 
+ 
+  #############################  reduce loss from high bio cohorts
+  left_join(sppMaxBio,by=c("gesp2"="gesp")) %>%  #created this table from max single cohort growth simulations
+    replace_na(list("maxBio"= 16721)) %>% #16721 is the mean maxBio for the 25 species simu 
+  mutate(sumCohortAGBgm2adj=ifelse(sumCohortAGBgm2act>maxBio,maxBio,sumCohortAGBgm2act)) %>% 
+  ############################
+  group_by(PLT_CN) %>% 
+  mutate(plotAGBgm2=sum(sumCohortAGBgm2adj),
+         pctPlotBio=sumCohortAGBgm2adj/plotAGBgm2,
+         plotAGBgm2act=sum(sumCohortAGBgm2act),
+         pctPlotBioact=sumCohortAGBgm2act/plotAGBgm2act) %>% 
+  droplevels() 
+tree_dataSummary %>% filter(SHORT==12012)   #tree_dataSummary %>% filter(PLT_CN==102452180010661)
+tree_dataSummary %>% filter(pctPlotBioact!=pctPlotBio)
+tree_dataSummary %>% filter(pctPlotBioact==pctPlotBio)
+#
+#remove rare cohorts
+tree_dataSummaryNoRare <- tree_dataSummary %>% 
+  filter(pctPlotBio>0.05) %>% 
+  group_by(PLT_CN,SHORT) %>% 
+    mutate(AGBgm2noRare=sum(sumCohortAGBgm2adj,na.rm=TRUE),
+           AGBgm2noRareact=sum(sumCohortAGBgm2act,na.rm=TRUE)) %>% #ADDED
+  arrange(SHORT,PLT_CN,desc(sumCohortAGBgm2adj))
+#
+# account for plot with no trees
+treedPlots <- tree_dataSummaryNoRare %>% pull(PLT_CN) %>% unique()
+activeMC <- targPlotsdf %>% filter(PLT_CN %in% treedPlots)
+emptyMC <- targPlotsdf %>% filter(!PLT_CN %in% treedPlots)  %>% filter(SHORT>0) %>% pull(SHORT)
+length(emptyMC)
+(length(emptyMC)/(length(emptyMC)+nrow(activeMC)))*100
+#
+stocking <- plotCond %>% 
+  dplyr::select(PLT_CN,INVYR,concatPlot,ALSTKCD,GSSTKCD)
+#
+##write this out when you create the IC text file
+sppdFormatted <- tree_dataSummaryNoRare %>% 
+  ungroup() %>% 
+  #group_by(concatPlot,PLT_CN,yr,gesp2) %>% 
+  group_by(PLT_CN,SHORT,GENUSPEC,gesp2) %>% 
+  dplyr::summarise(spAGBgm2=sum(sumCohortAGBgm2adj,na.rm=TRUE),
+                   AGBgm2=mean(plotAGBgm2),
+                   spPctBio=sum(pctPlotBio,na.rm=TRUE),
+                   spAGBgm2act=sum(sumCohortAGBgm2act,na.rm=TRUE),
+                   AGBgm2act=mean(plotAGBgm2act),
+                   spPctBioact=sum(pctPlotBioact,na.rm=TRUE)) %>% 
+  group_by(PLT_CN,SHORT) %>% 
+  mutate(nSppOnPlot=length(gesp2)) %>% 
+  rename("gesp"=gesp2) %>% 
+  mutate(source="fia")  %>% 
+  ungroup() %>% 
+  group_by(PLT_CN,SHORT) %>% 
+  arrange(desc(spPctBio)) %>% 
+  slice(1:5) %>% 
+  mutate(AGBgm2=sum(spAGBgm2,na.rm=TRUE))
+#
+#write.csv(sppdFormatted,paste0("Y:/REU2023/LANDIS/fvsCompare/IC_sspdFormattedic_2023-06-20fvsPlots.csv"),row.names=FALSE)
+##write this out when you create the IC text file
+
+# get bio accrual
+targetConcatPlots <- tree_dataSummary %>% left_join(pltcncw) %>% pull(concatPlot) %>% unique()
+#
+```
+
+
+```{r pull plots for testing}
+maRecentPlotsss <- plotCondft %>% 
+  filter(STATE=="MA") %>% 
+  filter(PLT_CN %in% mostRecentPlot$PLT_CN) %>% 
+  filter(plotAreaForest==672.44) %>% 
+  filter(CYCLE>=7) %>% 
+  #group_by(ECOSUBCD) %>%  tally() %>% arrange(desc(n))
+  filter(ECOSUBCD=="221Ac")
+maPossibles <- plotCondft %>% 
+  filter(PLT_CN %in% possibles$PLT_CN)
+#
+# trees
+#TODO set up tree table, expand trees and consider having the 4 subplots as ind plots and the stand as the plot cn
+treesPrep1 <- trees1short %>% 
+  left_join(fiafvscw) %>% 
+  filter(STATUSCD==1) %>% 
+  ungroup() %>% 
+  filter(PLT_CN %in% possibles$PLT_CN) %>% 
+  dplyr::select(PLT_CN,INVYR,PLOT,SUBP,TREE,SPCD,FVSsp,DIA,TPA_UNADJ,HT) %>% 
+  rename(STAND_ID=PLT_CN,
+         TREE_COUNT=TPA_UNADJ,
+         DIAMETER=DIA) %>% 
+  mutate(PLOT_ID=1,
+         TREE_ID=paste0(SUBP,TREE))
+plotsWnonLandisspp <- treesPrep1 %>% filter(is.na(FVSsp)) %>% pull(STAND_ID) %>% unique()  
+trees <- treesPrep1 %>%
+  filter(!STAND_ID %in% plotsWnonLandisspp) %>% 
+  rename(SPECIES=FVSsp) %>% 
+  dplyr::select(-SPCD)
+#
+#stands <- maRecentPlotsss %>% 
+stands <- maPossibles %>% 
+  rename(STAND_ID=PLT_CN,
+        INV_YEAR=INVYR,
+        LATITUDE=LAT,
+        LONGITUDE=LON,
+
+        ELEVFT = ELEV #this is feet #can also add slope and aspect
+
+        
+        ) %>% 
+  mutate(         LOCATION=922,
+                  VARIANT="NE",
+                   NUM_PLOTS=1,
+        BRK_DBH=999, #manually expand trees in tree table
+        INV_PLOT_SIZE=plotAreaForest/4047, #m2 to acres
+         #MAX_BA=
+          ) %>% 
+  ungroup() %>% 
+  dplyr::select(#GROUPS=concatPlot,
+                STAND_ID,
+                INV_YEAR,
+                LATITUDE,
+                LONGITUDE,
+                LOCATION,
+                VARIANT,
+                NUM_PLOTS,BRK_DBH,INV_PLOT_SIZE,SITE_INDEX=topSICOND
+                ) %>% 
+  filter(STAND_ID %in% trees$STAND_ID)
+#
+plots <- maPossibles %>% 
+  rename(STAND_ID=PLT_CN,
+           INV_YEAR=INVYR,
+        LATITUDE=LAT,
+        LONGITUDE=LON,
+        ELEVFT = ELEV, #this is feet #can also add slope and aspect
+        ECOREGION = ECOSUBCD, #this is not actually used in the NE variant
+        
+        ) %>% 
+  mutate(PLOT_ID=1, 
+         LOCATION=922,
+                  VARIANT="NE",
+                   NUM_PLOTS=4,
+        BRK_DBH=999, #manually expand trees in tree table
+        INV_PLOT_SIZE=plotAreaForest/4047, #m2 to acres
+         #MAX_BA=
+          ) %>% 
+  ungroup() %>% 
+  dplyr::select(#GROUPS=concatPlot,
+                STAND_ID,
+                PLOT_ID,
+                INV_YEAR,
+                LATITUDE,
+                LONGITUDE,
+                LOCATION,
+                VARIANT,
+                NUM_PLOTS,
+                BRK_DBH,
+                INV_PLOT_SIZE,
+                SITE_INDEX=topSICOND,
+                # MAXBA=  #maximum BA (ft2 per acre)
+                )  %>% 
+  filter(STAND_ID %in% trees$STAND_ID)
+#
+#
+
+standInitOut <- standInit %>% bind_rows(stands) %>% mutate(STAND_ID=as.character(STAND_ID))
+plotInitOut <- plotInit %>% bind_rows(plots) %>% mutate(STAND_ID=as.character(STAND_ID))
+treeInitOut <- treeInit %>% bind_rows(trees) %>% mutate(STAND_ID=as.character(STAND_ID))
+runName <- "MA_mbb"
+library(xlsx) #needed to install 64 bit java for this to work
+write.xlsx(standInitOut,
+           file= paste0("Y:/REU2023/FVS/01_processedInputData/",runName,".xlsx"),
+           sheetName="FVS_StandInit",
+           showNA = FALSE)
+
+#
+write.xlsx(plotInitOut,
+           file= paste0("Y:/REU2023/FVS/01_processedInputData/",runName,".xlsx"),
+           sheetName="FVS_PlotInit",
+           showNA = FALSE,
+           append = TRUE)
+#
+write.xlsx(treeInitOut,
+           file= paste0("Y:/REU2023/FVS/01_processedInputData/",runName,".xlsx"),
+           sheetName="FVS_TreeInit",
+           showNA = FALSE,
+           append = TRUE)
+#
+```
+
+
+```{r for landis calibration}
+# use for landis calibration plots
+ a <- trees1short %>% left_join(plotCondft) %>% filter(!is.na(meanSICOND)) %>% group_by(SPCD) %>% summarise(maxBAm2=max(BAm2,na.rm=TRUE),lowSI=quantile(meanSICOND,probs=.05),medSI=quantile(meanSICOND,probs=.5),highSI=quantile(meanSICOND,probs=.9))%>% mutate(maxBAft2=maxBAm2*10.76391) 
+ #
+
+ b <- a %>% left_join(fiasp) %>% right_join(landisspp)
+ #
+```
+
+
+```{r max BA and relBA prep with new source inputs}
+
+trees1short <- alltrees %>% 
+  filter(INVYR>=1999) %>% 
+  
+  filter(SUBP<=4) %>% #data for subp numbers greater than 4 are coearsed into the 1-4 design and duplicated - so removing 3/3/23
+  
+  dplyr::select(INVYR,STATECD,UNITCD,COUNTYCD,PLOT,PLT_CN,SUBP,TREE,CN,STATUSCD,SPCD,SITREE,DIA,TPA_UNADJ,CARBON_AG,HT,ACTUALHT,TREECLCD,AGENTCD) %>% 
+  unite(concatPlot,STATECD,UNITCD,COUNTYCD,PLOT,sep="_",remove=FALSE) %>% 
+  mutate(AGCg=CARBON_AG*453.592,
+         AGCMg=AGCg*gramToMegagram,
+         actHeight=ifelse(ACTUALHT==-Inf,NA,ACTUALHT),
+         sizeClass = ifelse(DIA>=5,"tree","sap"),
+         diacm=DIA*2.54,
+         BAm2=pi*(.5*(diacm)/100)^2
+  ) %>% 
+  group_by(concatPlot,PLOT,SUBP,TREE,CN) %>% 
+  arrange(concatPlot,PLOT,SUBP,TREE,CN,INVYR) %>% 
+  mutate(treeBAI=(BAm2-lag(BAm2)/(INVYR-lag(INVYR))),Growth_Cg=(AGCg-lag(AGCg)/(INVYR-lag(INVYR)))) 
+#
+ a <- trees1short %>% left_join(plotCondft) %>% filter(!is.na(meanSICOND)) %>% group_by(SPCD,sizeClass) %>% summarise(maxBAm2=max(BAm2,na.rm=TRUE),lowSI=quantile(meanSICOND,probs=.05),medSI=quantile(meanSICOND,probs=.5),highSI=quantile(meanSICOND,probs=.9))%>% mutate(maxBAft2=maxBAm2*10.76391) 
+#
+ fiasp <- fia %>% mutate(genuspec=tolower(genuspec))
+ b <- a %>% left_join(fiasp) %>% right_join(landisspp)
+ #
+treesout <- trees1short %>% 
+  filter(DIA>=5) %>% 
+  filter(STATUSCD==1) %>% 
+   right_join(plotCondft) %>%
+  ungroup() %>% 
+   group_by(concatPlot,PLT_CN,INVYR) %>% 
+   mutate(plotBAm2=sum(BAm2,na.rm=TRUE)) %>% 
+   ungroup() %>% 
+  group_by(STATE,concatPlot,PLT_CN,INVYR,plotBAm2,SPCD,plotAreaForest) %>% 
+  summarise(spBAm2=round(sum(BAm2,na.rm=TRUE),3)) %>% 
+   mutate(relBA=round(spBAm2/plotBAm2,3),
+          spBAm2ha=spBAm2*(10000/plotAreaForest)) %>% 
+  left_join(fiasp) 
+#
+todf <- treesout %>% 
+  filter(relBA>=0.4) %>% 
+  group_by(STATE,SPCD,gesp) %>% 
+  summarise(meanspBAm2ha=round(mean(spBAm2ha,na.rm=TRUE),2),
+            maxspBAm2ha=round(max(spBAm2ha,na.rm=TRUE),2),
+            nplotswdom=length(gesp),
+            q=c(.05,.5,.95),
+            spBAm2ha=round(quantile(spBAm2ha,c(.05,.5,.95),na.rm=TRUE) ,3)) %>% 
+  filter(nplotswdom>=10) %>% 
+  pivot_wider(id_cols=c(STATE,SPCD,gesp,meanspBAm2ha,maxspBAm2ha,nplotswdom),names_from=q,values_from=spBAm2ha,names_prefix="spBAm2ha_") %>% 
+  #pivot_wider(id_cols=c(SPCD,gesp),values_from=c(meanspBAm2ha,maxspBAm2ha),names_from=STATE)
+  arrange(gesp,STATE)
+  
+todf %>% 
+  filter(STATE=="MA") %>% 
+  ggplot(aes(x=reorder(gesp,spBAm2ha_0.95),y=spBAm2ha_0.95,fill=STATE)) +
+  geom_col(position="dodge")+
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=90,vjust=-.1)) 
+
+#
+
+```
+
+
+```{r pressure, echo=FALSE}
+ # treesout %>% group_by(PLT_CN) %>% summarise(tBAm2ha=sum(BAm2ha,na.rm=TRUE),tAGCMgha=sum(AGCMgha,na.rm=TRUE))
+ # summary( treesout %>% group_by(PLT_CN) %>% summarise(tBAm2ha=sum(BAm2ha,na.rm=TRUE),tAGCMgha=sum(AGCMgha,na.rm=TRUE)))
+
+```
+
