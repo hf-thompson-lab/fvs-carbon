@@ -1,19 +1,22 @@
 ---
-title: Nunery Keeton Revisited
-author: Nikolaus Bates-Haus
-output: html_document
-editor_options: 
-  markdown: 
+title: "Nunery Keeton Revisited"
+author: "Nikolaus Bates-Haus"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  markdown:
     wrap: 72
 ---
 
 ## Introduction
 
-In [@nunery2010], different management regimens were modeled to explore their
-impact on carbon storage. This study used the Forest Vegetation Simulator (FVS)
-to model carbon storage. Other models exist to predict carbon storage; we seek
-to compare FVS with other models to understand their different predictions
-for carbon storage under different management regimens.
+In [@nunery2010], different management regimens were modeled to explore
+their impact on carbon storage. This study used the Forest Vegetation
+Simulator (FVS) to model carbon storage. Other models exist to predict
+carbon storage; we seek to compare FVS with other models to understand
+their different predictions for carbon storage under different
+management regimens.
 
 ## Identifying Stands
 
@@ -23,8 +26,11 @@ In [@nunery2010, Table 1], 32 plots are listed, with the first column,
 subsequently changed, so these codes no longer align with the stand
 identifiers in the FVS tables in the published FIA data.
 
-```{r}
+```{r include=FALSE}
 suppressPackageStartupMessages(library(tidyverse))
+```
+
+```{r}
 nk_table1 <- read_csv(
   "00_rawData/N-K_Table_1.csv",
   col_types = cols(`FIA plot code` = col_character())
@@ -37,19 +43,22 @@ identifiers, we note that plot codes are a concatenation of other
 fields, as described in [@shaw2020, Appendix A], Column list and
 translation logic for records in FVS StandInit and PlotInit tables:
 
-> StandInit_cond table:
-> StandInit_cond.Stand_ID = concatenation of: STATECD(4) + INVYR(4) + CYCLE(2) +
-> SUBCYCLE(2) + UNITCD(2) + COUNTYCD(3) + PLOT(5) + CONDID(1).
+> StandInit_cond table: StandInit_cond.Stand_ID = concatenation of:
+> STATECD(4) + INVYR(4) + CYCLE(2) + SUBCYCLE(2) + UNITCD(2) +
+> COUNTYCD(3) + PLOT(5) + CONDID(1).
 >
-> StandInit_plot table:
-> StandInit_plot.Stand_ID = concatenation of: PLOT.STATECD(4) + PLOT.INVYR(4) +
-> PLOT.CYCLE(2) + PLOT.SUBCYCLE(2) + PLOT.UNITCD(2) + PLOT.COUNTYCD(3) +
-> PLOT.PLOT(5).
-> 
-> PlotInit_plot table:
-> PlotInit_plot.Stand_ID = concatenation of: PLOT.STATECD(4) + PLOT.INVYR(4) +
-> PLOT.CYCLE(2) + PLOT.SUBCYCLE(2) + PLOT.UNITCD(2) + PLOT.COUNTYCD(3) +
-> PLOT.PLOT(5).
+> StandInit_plot table: StandInit_plot.Stand_ID = concatenation of:
+> PLOT.STATECD(4) + PLOT.INVYR(4) + PLOT.CYCLE(2) + PLOT.SUBCYCLE(2) +
+> PLOT.UNITCD(2) + PLOT.COUNTYCD(3) + PLOT.PLOT(5).
+>
+> PlotInit_plot table: PlotInit_plot.Stand_ID = concatenation of:
+> PLOT.STATECD(4) + PLOT.INVYR(4) + PLOT.CYCLE(2) + PLOT.SUBCYCLE(2) +
+> PLOT.UNITCD(2) + PLOT.COUNTYCD(3) + PLOT.PLOT(5).
+
+Earlier methods of computing Stand_ID from FIA data used a 2-character
+STATECD, and omitted CYCLE and SUBCYCLE. Using this information, we can
+parse STATECD, INVYR, UNITCD, COUNTYCD, and PLOT from the
+`FIA plot code` in NK.
 
 ```{r}
 nk_table1_expanded <- nk_table1 |>
@@ -63,8 +72,9 @@ nk_plot_codes <- nk_table1_expanded |>
 knitr::kable(nk_plot_codes)
 ```
 
-In particular, the way INVYR is assigned has changed, so the NK INVYR no
-longer aligns with the inventory years in the FIA data.
+In addition, the way INVYR is assigned has changed, so the NK INVYR no
+longer aligns with the inventory years in the FIA data for 27 of the 32
+plots.
 
 ```{r}
 fia = DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
@@ -97,10 +107,10 @@ cond_grp <- matching_cond |>
 knitr::kable(cond_grp)
 ```
 
-To find corresponding Stand_IDs where INVYR does not align between the two data
-sets, we note that the "Starting stand age" matches
-`FIA.COND.STDAGE`, uniquely identifying all but one of
-the stands used in NK.
+To find corresponding Stand_IDs where INVYR does not align between the
+two data sets, we note that NK's "Starting stand age" matches
+`FIA.COND.STDAGE`, uniquely identifying all but one of the stands used
+in NK.
 
 ```{r}
 nk_plots_with_age <- nk_table1_expanded |>
@@ -125,16 +135,16 @@ knitr::kable(unique_cond)
 ```
 
 Matching on stand age results in a uniquely identified FIA condition for
-each NK plot, except NK plot 2320030901702963, for which both inventory
+each NK plot except NK plot 2320030901702963, for which both inventory
 years 2003 and 2008 match the stand age. Because all other plots match
-stands in inventory years 1999 - 2005, we restrict to inventory years
-\<= 2005, which results in selecting the 2003 inventory year for this
-plot. We observe matching slope, aspect, and BALIVE metrics for these
-stands, which confirms the match.
+stands in inventory years from 1999 to 2005, we restrict to inventory
+years \<= 2005, which results in selecting the 2003 inventory year for
+this condition. We observe that slope, aspect, and BALIVE metrics for
+the selected conditions match those for the corresponding NK plots,
+which confirms the matches.
 
-From these, we are able to construct contemporary Stand_IDs for the FIA
-tables pre-built for FVS. Those IDs, and the number of matching rows
-from the corresponding table, are:
+From these conditions we are able to construct updated Stand_IDs for use
+with the FIA tables pre-built for FVS.
 
 ```{r}
 translated_stands <- unique_cond |>
@@ -153,7 +163,10 @@ translated_stands <- unique_cond |>
 knitr::kable(translated_stands)
 ```
 
-FVS_STANDINIT_PLOT
+We can then fetch those IDs from the FIA-provided FVS tables to
+determine the number of matching rows from each corresponding table,
+confirming that each updated Stand ID corresponds to a unique stand in
+the provided FVS tables.
 
 ```{r}
 fia_fvs_plotinit_plot = tbl(fia, 'FVS_PLOTINIT_PLOT')
@@ -191,28 +204,34 @@ matching_stands <- translated_stands |>
 knitr::kable(matching_stands)
 ```
 
+Note that FIA provides three different means of creating an FVS Stand
+from FIA data: stands created from plots; stands created from
+conditions; and stands created from individual plots within conditions.
+Next we need to determine which of these, if any, corresponds to the
+input used in NK.
 
 ## References
 
-Nunery, Jared & Keeton, William. (2010). Forest carbon storage in the
-northeastern United States: Net effects of harvesting frequency,
-post-harvest retention, and wood products. Forest Ecology and
-Management. 259. 1363-1375. 10.1016/j.foreco.2009.12.029.
+1.  Nunery, Jared & Keeton, William. (2010). Forest carbon storage in
+    the northeastern United States: Net effects of harvesting frequency,
+    post-harvest retention, and wood products. Forest Ecology and
+    Management. 259. 1363-1375. 10.1016/j.foreco.2009.12.029.
 
-Shaw, John & Gagnon, Aaron. (2019). Field Note: A New Conversion of
-Forest Inventory and Analysis Data for Use in the Forest Vegetation
-Simulator. Journal of Forestry. 118. 10.1093/jofore/fvz050.
+2.  Shaw, John & Gagnon, Aaron. (2019). Field Note: A New Conversion of
+    Forest Inventory and Analysis Data for Use in the Forest Vegetation
+    Simulator. Journal of Forestry. 118. 10.1093/jofore/fvz050.
 
-Burrill, Elizabeth A.; DiTommaso, Andrea M.; Turner, Jeffery A.; Pugh,
-Scott A.; Christensen, Glenn; Perry, Carol J.; Lepine, Lucie C.; Walker,
-David M.; Conkling, Barbara L. 2024. The Forest Inventory and Analysis
-Database, FIADB user guides, volume database description (version 9.2),
-nationwide forest inventory (NFI). U.S. Department of Agriculture,
-Forest Service. 1042 p. [Online]. Available at web address:
-<https://www.fs.usda.gov/research/products/dataandtools/datasets/fia-datamart>
+3.  Burrill, Elizabeth A.; DiTommaso, Andrea M.; Turner, Jeffery A.;
+    Pugh, Scott A.; Christensen, Glenn; Perry, Carol J.; Lepine, Lucie
+    C.; Walker, David M.; Conkling, Barbara L. 2024. The Forest
+    Inventory and Analysis Database, FIADB user guides, volume database
+    description (version 9.2), nationwide forest inventory (NFI). U.S.
+    Department of Agriculture, Forest Service. 1042 p. [Online].
+    Available at web address:
+    <https://www.fs.usda.gov/research/products/dataandtools/datasets/fia-datamart>
 
-Shaw, John D. & Gagnon, Aaron. (2020). Quick-Start Guide to Forest
-Inventory Analysis Data in the Forest vegetation Simulator. U.S.
-Department of Agriculture, Forest Service. 25 p. [Online]. Available at
-web address:
-<https://www.fs.usda.gov/fvs/documents/FIA_Data_Quick_Start_Guide_20200914.pdf>
+4.  Shaw, John D. & Gagnon, Aaron. (2020). Quick-Start Guide to Forest
+    Inventory Analysis Data in the Forest vegetation Simulator. U.S.
+    Department of Agriculture, Forest Service. 25 p. [Online]. Available
+    at web address:
+    <https://www.fs.usda.gov/fvs/documents/FIA_Data_Quick_Start_Guide_20200914.pdf>
