@@ -1,0 +1,30 @@
+Treatment,Silviculture type,Harvesting frequency adjustment,Mean square error,F,Significance (p)
+Harvesting frequency × structural retention (interaction),Even-age,−25%,"14,955.30",94.7,0
+,,+/−25%,"17,339.00",103.4,0
+,,No change,71.1,0.4,0.554
+,,0.25,317.4,1.5,0.223
+,,,,,
+,Uneven-age,−25%a,67.8,0.3,0.569
+,,+/−25%a,67.8,0.3,0.569
+,,No change,26.4,0.1,0.716
+,,0.25,67.8,0.3,0.569
+,,,,,
+Harvesting frequency,Even-age,−25%,"17,935.00",113.6,0
+,,+/−25%,"29,779.80",177.6,0
+,,No change,40,0.2,0.658
+,,0.25,2020.6,9.6,0.002
+,,,,,
+,Uneven-age,−25%a,3811.7,18.4,0
+,,+/−25%a,3811.7,18.4,0
+,,No change,1373.4,6.9,0.01
+,,0.25,3811.7,18.4,0
+,,,,,
+Structural retention,Even-age,−25%,"45,037.80",285.2,0
+,,+/−25%,"41,142.10",245.4,0
+,,No change,9674.5,48,0
+,,0.25,7916.2,37.4,0
+,,,,,
+,Uneven-age,−25%a,7402.1,35.6,0
+,,+/−25%a,7402.1,35.6,0
+,,No change,7944,40,0
+,,0.25,7402.1,35.6,0

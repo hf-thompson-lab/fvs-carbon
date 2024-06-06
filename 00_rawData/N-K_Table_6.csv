@@ -1,0 +1,11 @@
+Management scenario,Value (mean ± 95% CI),,,,,
+Empty Cell,Total C with wood products (Mg C/ha),Aboveground live (Mg C/ha),Standing dead (Mg C/ha),Down dead wood (Mg C/ha),Wood products (Mg C/ha),Landfill (Mg C/ha)
+No Management,157 ± 9,140 ± 8,7 ± 0.5,13 ± 1,0 ± 0,0 ± 0
+ITS_HighLow,113 ± 5,83 ± 3,0.6 ± 0.2,9 ± 1,9 ± 1,12 ± 2
+ITS_HighHigh,107 ± 5,75 ± 3,0.3 ± 0.1,9 ± 1,10 ± 1,13 ± 2
+ITS_LowLow,98 ± 5,63 ± 2,0.3 ± 0.1,8 ± 1,11 ± 1,16 ± 2
+ITS_LowHigh,91 ± 4,54 ± 2,0.2 ± 0.04,9 ± 1,12 ± 1,16 ± 3
+Shelterwood_Low,90 ± 5,64 ± 5,0.2 ± 0.1,7 ± 0.4,9 ± 1,10 ± 1
+Shelterwood_High,90 ± 5,65 ± 4,0.2 ± 0.1,7 ± 0.4,8 ± 1,10 ± 1
+Clearcut_Low,74 ± 5,31 ± 3,0.1 ± 0.03,9 ± 1,17 ± 1,8 ± 1
+Clearcut_High,72 ± 5,29 ± 3,0.1 ± 0.04,10 ± 1,15 ± 1,18 ± 2
