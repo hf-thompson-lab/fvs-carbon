@@ -146,6 +146,9 @@ which confirms the matches.
 From these conditions we are able to construct updated Stand_IDs for use
 with the FIA tables pre-built for FVS.
 
+Note that the Stand IDs visible in the FVS UI are different from these;
+the FVS UI Stand ID consists of STATECD(2) + INVYR(2) + COUNTYCD(3) + PLOT(5).
+
 ```{r}
 translated_stands <- unique_cond |>
   mutate(
@@ -154,12 +157,16 @@ translated_stands <- unique_cond |>
     COUNTYCD = as.numeric(COUNTYCD),
     PLOT     = as.numeric(PLOT)
   ) |>
+  mutate(FVS_STAND_ID=sprintf(paste0(
+    '%02d',  '%02d',           '%03d',   '%05d'),
+    STATECD, FIA_INVYR %% 100, COUNTYCD, PLOT
+  )) |>
   mutate(STAND_ID_PLOT=sprintf(paste0(
     '%04d' , '%04d'    , '%02d', '%02d'  , '%02d', '%03d'  , '%05d'),
     STATECD, FIA_INVYR , CYCLE , SUBCYCLE, UNITCD, COUNTYCD, PLOT
   )) |>
   mutate(STAND_ID_COND=paste0(STAND_ID_PLOT, CONDID)) |>
-  select(`FIA plot code`, STAND_ID_PLOT, STAND_ID_COND)
+  select(`FIA plot code`, FVS_STAND_ID, STAND_ID_PLOT, STAND_ID_COND)
 knitr::kable(translated_stands)
 ```
 
@@ -201,14 +208,147 @@ matching_stands <- translated_stands |>
   left_join(matching_standinit_cond_grp, by=join_by(STAND_ID_COND==FVS_STANDINIT_COND)) |>
   left_join(matching_standinit_plot_grp, by=join_by(STAND_ID_PLOT==FVS_STANDINIT_PLOT))
 
+write_csv(matching_stands, "01_processedInputData/N-K_to_FIA.csv")
+
 knitr::kable(matching_stands)
 ```
 
 Note that FIA provides three different means of creating an FVS Stand
-from FIA data: stands created from plots; stands created from
-conditions; and stands created from individual plots within conditions.
+from FIA data (descriptions from the FVS User Interface for the
+respective tables):
+
+-   FVS_StandInit_Plot: Inventory Plots
+-   FVS_PlotInit_Plot: Inventory Subplots
+-   FVS_StandInit_Cond: Conditions
+
 Next we need to determine which of these, if any, corresponds to the
-input used in NK.
+input used in NK. Spoiler: it's FVS_StandInit_Plot!
+
+## Running FVS
+
+### Stands
+
+Stands can be found in the FVS UI by selecting:
+
+-   Inventory Data Tables = FVS_StandInit_Plot
+-   Variants = ne: Northeast
+-   Groups = FIA_Inv_Yr=1999 + State=23
+-   Stands must be in any or all selected groups = All
+-   Find stand(s): = \*00110
+
+Clicking `Find` will then filter to the single matching stand, which can
+be added to the run.
+
+Repeat for each of the above stands.
+
+### Time
+
+FVS will not run prior to the inventory year; it's unclear what N-K did
+to get their chart to go back prior to 2005. We will instead use 2005 as
+the common starting year.
+
+N-K ends in 2164; we adjust this to 2165 to land on a 5-year boundary.
+
+All events in N-K take place on years that are a multiple of 5,
+therefore we select 5 years as the reporting interval.
+
+### Carbon
+
+To set the carbon calculations to be metric (Metric tons of carbon per
+hectare), go to Simulate -\> Components -\> Keywords, and select:
+
+-   Extensions: Fire and Fuels Extension
+-   Keywords: CarbCalc: Set the carbon accounting parameters.
+-   Component title: CarbCalc: Metric
+-   Biomass predictions: 0 = Use FFE biomass predictions
+-   Units: 1 = Metric (metric tons carbon/hectare)
+-   Note: Annual root decay rate (proportion per year) remains at its
+    default value of 0.0425.
+
+Select `Save in run` to apply to `Grp: All_FIA_Plots`.
+
+## Run
+
+The main output will be Carbon and fuels. Stand visualization, Tree lists,
+and Inventory statistics may also be interesting.
+
+## Automation
+
+Do it in code:
+<https://github.com/USDAForestService/ForestVegetationSimulator-Interface/tree/main/rFVS/R>
+
+Instructions:
+<https://github.com/USDAForestService/ForestVegetationSimulator-Interface/wiki/rFVS>
+
+This documents such gems in the interface as:
+
+> fvsGetRestartcode() Provides an R interface to Fortran function
+> fvsGetRestartcode.
+
+But, this example shows that they expect you to create your project in
+the UI, then run it using the API:
+
+```{r eval=FALSE}
+setwd ("<FVS-interface>/rFVS/tests")
+# Note: edit <open-fvs> to reflect your system. This directory string should be wherever 
+# your keyword file and input data are located
+
+# load the R functions using this method (if you don't have the rFVS package)
+sdir = "../R"
+# Note: this directory string should be wherever the rFVS functions are located
+for (rf in dir (sdir)) source (paste(sdir,rf,sep="/"))
+
+# or, if the rFVS package is installed, then just enter
+library(rFVS)
+
+# load the FVS library
+fvsLoad("FVSie", bin="<open-fvs>/trunk/bin")
+# Note: edit <open-fvs> to reflect your system. This directory string should 
+# be wherever your FVS shared libraries are located
+
+# specify the keyword file
+fvsSetCmdLine("--keywordfile=iet01.key")
+
+# Run the simulation as would be done using FVS as a program
+fvsRun()
+```
+
+## Results
+
+```{r}
+AllPlots_Grow <- read_csv(
+    "03_outputs/AllPlots_Grow.csv",
+    col_types = cols(StandID = col_character())
+  ) |>
+  rename(Aboveground_Live = Aboveground_Total_Live) |>
+  rename(Down_Dead = Forest_Down_Dead_Wood) |>
+  mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
+  mutate(NK_Carbon = Aboveground_Live + Aboveground_Dead) |>
+  select(StandID, Year, Total_Stand_Carbon, NK_Carbon, Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
+knitr::kable(AllPlots_Grow)
+```
+
+```{r}
+Avg_Grow <- AllPlots_Grow |>
+  group_by(Year) |>
+  summarize(
+    Total_Carbon=mean(Total_Stand_Carbon),
+    NK_Carbon=mean(NK_Carbon),
+    Aboveground_Live=mean(Aboveground_Live),
+    Aboveground_Dead=mean(Aboveground_Dead),
+    Standing_Dead=mean(Standing_Dead),
+    Down_Dead=mean(Down_Dead),
+    .groups = "keep"
+  ) |>
+  filter(Year >= 2005)
+
+ggplot(
+    data = melt(Avg_Grow, id.vars = "Year"),
+    mapping = aes(x = Year, y = value, color = variable)
+) +
+geom_line() +
+coord_cartesian(xlim = c(2000, 2165), ylim = c(0, 300))
+```
 
 ## References
 
