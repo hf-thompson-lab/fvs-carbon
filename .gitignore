@@ -50,3 +50,6 @@ rsconnect/
 
 # SQLite Database files
 **/*.db
+
+# MacOS Metadata
+.DS_Store
