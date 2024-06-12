@@ -228,13 +228,11 @@ input used in NK. Spoiler: it's FVS_StandInit_Plot!
 
 ### Stands
 
-Stands can be found in the FVS UI by selecting:
+Stands can be found in the FVS UI using FVS_STAND_ID from the table above.
 
 -   Inventory Data Tables = FVS_StandInit_Plot
 -   Variants = ne: Northeast
--   Groups = FIA_Inv_Yr=1999 + State=23
--   Stands must be in any or all selected groups = All
--   Find stand(s): = \*00110
+-   Find stand(s): = 239901700110
 
 Clicking `Find` will then filter to the single matching stand, which can
 be added to the run.
@@ -247,10 +245,12 @@ FVS will not run prior to the inventory year; it's unclear what N-K did
 to get their chart to go back prior to 2005. We will instead use 2005 as
 the common starting year.
 
-N-K ends in 2164; we adjust this to 2165 to land on a 5-year boundary.
+N-K ends in 2164; we adjust this to 2165 so that all cycles are 10 years long.
+Note that FVS does not include the ending year unless it is at the start of a new
+cycle, so we set the common ending year to 2166.
 
-All events in N-K take place on years that are a multiple of 5,
-therefore we select 5 years as the reporting interval.
+All events in N-K take place on 10 year intervals,
+therefore we select 10 years as the reporting interval.
 
 ### Carbon
 
