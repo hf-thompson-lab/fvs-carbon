@@ -208,7 +208,7 @@ matching_stands <- translated_stands |>
   left_join(matching_standinit_cond_grp, by=join_by(STAND_ID_COND==FVS_STANDINIT_COND)) |>
   left_join(matching_standinit_plot_grp, by=join_by(STAND_ID_PLOT==FVS_STANDINIT_PLOT))
 
-write_csv(matching_stands, "01_processedInputData/N-K_to_FIA.csv")
+write_csv(matching_stands, "03_outputs/N-K_to_FIA.csv")
 
 knitr::kable(matching_stands)
 ```
@@ -317,23 +317,29 @@ fvsRun()
 
 ```{r}
 AllPlots_Grow <- read_csv(
-    "03_outputs/AllPlots_Grow.csv",
+    "03_outputs/NoManagement_Carbon_ByPlot.csv",
     col_types = cols(StandID = col_character())
   ) |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
   mutate(NK_Carbon = Aboveground_Live + Aboveground_Dead) |>
-  select(StandID, Year, Total_Stand_Carbon, NK_Carbon, Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
+  mutate(Repro_Carbon = Aboveground_Live + Standing_Dead) |>
+  select(StandID, Year, Total_Stand_Carbon,
+         NK_Carbon, Repro_Carbon,
+         Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
 knitr::kable(AllPlots_Grow)
 ```
 
 ```{r}
+library(reshape2) # for melt()
+
 Avg_Grow <- AllPlots_Grow |>
   group_by(Year) |>
   summarize(
     Total_Carbon=mean(Total_Stand_Carbon),
     NK_Carbon=mean(NK_Carbon),
+    Repro_Carbon=mean(Repro_Carbon),
     Aboveground_Live=mean(Aboveground_Live),
     Aboveground_Dead=mean(Aboveground_Dead),
     Standing_Dead=mean(Standing_Dead),
@@ -342,12 +348,16 @@ Avg_Grow <- AllPlots_Grow |>
   ) |>
   filter(Year >= 2005)
 
+write_csv(Avg_Grow, "03_outputs/NoManagement_Carbon_ByYear.csv")
+
 ggplot(
     data = melt(Avg_Grow, id.vars = "Year"),
     mapping = aes(x = Year, y = value, color = variable)
 ) +
 geom_line() +
-coord_cartesian(xlim = c(2000, 2165), ylim = c(0, 300))
+coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 300)) +
+scale_x_continuous(breaks=seq(2005,2165,20)) +
+scale_y_continuous(breaks=seq(0,300,20))
 ```
 
 ## References
