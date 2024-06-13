@@ -224,6 +224,85 @@ respective tables):
 Next we need to determine which of these, if any, corresponds to the
 input used in NK. Spoiler: it's FVS_StandInit_Plot!
 
+## N-K Figure 2
+
+To validate FVS runs, we reconstruct the table behind Figure 2.
+To do this, we use the tool https://automeris.io/wpd/ which aids in
+estimating the tabular data behind a chart.
+
+The project used to extract the table is in [02_rScripts/AutoMeris-N-K_Fig2.json].
+The tool is imperfect, so we apply some cleanup to produce an approximate table.
+
+```{r}
+N_K_Fig2_NoManagement <- read_csv(
+    "01_processedInputData/N-K_Fig2_NoManagement.csv",
+    col_names = c("Year","NoManagement"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), NoManagement=round(NoManagement))
+N_K_Fig2_ClearcutHigh <- read_csv(
+    "01_processedInputData/N-K_Fig2_ClearcutHigh.csv",
+    col_names = c("Year","ClearcutHigh"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ClearcutHigh=round(ClearcutHigh))
+N_K_Fig2_ClearcutLow <- read_csv(
+    "01_processedInputData/N-K_Fig2_ClearcutLow.csv",
+    col_names = c("Year","ClearcutLow"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ClearcutLow=round(ClearcutLow))
+N_K_Fig2_ShelterwoodHigh <- read_csv(
+    "01_processedInputData/N-K_Fig2_ShelterwoodHigh.csv",
+    col_names = c("Year","ShelterwoodHigh"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ShelterwoodHigh=round(ShelterwoodHigh))
+N_K_Fig2_ShelterwoodLow <- read_csv(
+    "01_processedInputData/N-K_Fig2_ShelterwoodLow.csv",
+    col_names = c("Year","ShelterwoodLow"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ShelterwoodLow=round(ShelterwoodLow))
+N_K_Fig2_ITS_LowHigh <- read_csv(
+    "01_processedInputData/N-K_Fig2_ITS_LowHigh.csv",
+    col_names = c("Year","ITS_LowHigh"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ITS_LowHigh=round(ITS_LowHigh))
+N_K_Fig2_ITS_LowLow <- read_csv(
+    "01_processedInputData/N-K_Fig2_ITS_LowLow.csv",
+    col_names = c("Year","ITS_LowLow"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ITS_LowLow=round(ITS_LowLow))
+N_K_Fig2_ITS_HighHigh <- read_csv(
+    "01_processedInputData/N-K_Fig2_ITS_HighHigh.csv",
+    col_names = c("Year","ITS_HighHigh"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ITS_HighHigh=round(ITS_HighHigh))
+N_K_Fig2_ITS_HighLow <- read_csv(
+    "01_processedInputData/N-K_Fig2_ITS_HighLow.csv",
+    col_names = c("Year","ITS_HighLow"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ITS_HighLow=round(ITS_HighLow))
+
+fig2 <- N_K_Fig2_NoManagement |>
+  full_join(N_K_Fig2_ClearcutHigh, by=join_by(Year)) |>
+  full_join(N_K_Fig2_ClearcutLow, by=join_by(Year)) |>
+  full_join(N_K_Fig2_ShelterwoodHigh, by=join_by(Year)) |>
+  full_join(N_K_Fig2_ShelterwoodLow, by=join_by(Year)) |>
+  full_join(N_K_Fig2_ITS_LowHigh, by=join_by(Year)) |>
+  full_join(N_K_Fig2_ITS_LowLow, by=join_by(Year)) |>
+  full_join(N_K_Fig2_ITS_HighHigh, by=join_by(Year)) |>
+  full_join(N_K_Fig2_ITS_HighLow, by=join_by(Year)) |>
+  arrange(Year)
+
+knitr::kable(fig2)
+```
+
 ## Running FVS
 
 FVS Software with `Release date: 20240401` was used.
@@ -342,7 +421,7 @@ knitr::kable(AllPlots_Grow)
 ```
 
 ```{r}
-library(reshape2) # for melt()
+suppressPackageStartupMessages(library(reshape2)) # for melt()
 
 Avg_Grow <- AllPlots_Grow |>
   group_by(Year) |>
