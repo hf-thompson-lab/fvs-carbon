@@ -230,15 +230,21 @@ To validate FVS runs, we reconstruct the table behind Figure 2.
 To do this, we use the tool https://automeris.io/wpd/ which aids in
 estimating the tabular data behind a chart.
 
-The project used to extract the table is in [02_rScripts/AutoMeris-N-K_Fig2.json].
+The project used to extract the table is in [02_rScripts/AutoMeris_N-K_Fig2.json].
 The tool is imperfect, so we apply some cleanup to produce an approximate table.
+
+Note that all values are approximate. For example, all values should align
+in 2005, but they do not; we ignore this, since small differences are within
+the error bounds for parsing the chart.
 
 ```{r}
 N_K_Fig2_NoManagement <- read_csv(
     "01_processedInputData/N-K_Fig2_NoManagement.csv",
     col_names = c("Year","NoManagement"),
+    # Read columns as double, since that is how they were written
     col_types = "dd"
   ) |>
+  # Round columns to nearest integer, since that is what was intended
   mutate(Year=round(Year), NoManagement=round(NoManagement))
 N_K_Fig2_ClearcutHigh <- read_csv(
     "01_processedInputData/N-K_Fig2_ClearcutHigh.csv",
@@ -289,6 +295,7 @@ N_K_Fig2_ITS_HighLow <- read_csv(
   ) |>
   mutate(Year=round(Year), ITS_HighLow=round(ITS_HighLow))
 
+# Assemble a single table from 2005 - 2165
 fig2 <- N_K_Fig2_NoManagement |>
   full_join(N_K_Fig2_ClearcutHigh, by=join_by(Year)) |>
   full_join(N_K_Fig2_ClearcutLow, by=join_by(Year)) |>
@@ -298,6 +305,10 @@ fig2 <- N_K_Fig2_NoManagement |>
   full_join(N_K_Fig2_ITS_LowLow, by=join_by(Year)) |>
   full_join(N_K_Fig2_ITS_HighHigh, by=join_by(Year)) |>
   full_join(N_K_Fig2_ITS_HighLow, by=join_by(Year)) |>
+  filter(Year>=2005) |>
+  # The last year in Fig2 is 2164; nudge it to 2165
+  # to align with contemporary FVS runs.
+  mutate(Year=if_else(Year==2164,2165,Year)) |>
   arrange(Year)
 
 knitr::kable(fig2)
@@ -435,7 +446,9 @@ Avg_Grow <- AllPlots_Grow |>
     Down_Dead=mean(Down_Dead),
     .groups = "keep"
   ) |>
-  filter(Year >= 2005)
+  filter(Year >= 2005) |>
+  # Join in the NoManagement scenario from fig2 for comparison
+  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year))
 
 write_csv(Avg_Grow, "03_outputs/NoManagement_Carbon_ByYear.csv")
 
@@ -447,6 +460,20 @@ geom_line() +
 coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 300)) +
 scale_x_continuous(breaks=seq(2005,2165,20)) +
 scale_y_continuous(breaks=seq(0,300,20))
+```
+
+Examine residuals:
+```{r}
+Plots_RMSE <- tibble(
+  Total_Carbon = sqrt(mean((Avg_Grow$Total_Carbon - Avg_Grow$NoManagement)^2)),
+  NK_Carbon = sqrt(mean((Avg_Grow$NK_Carbon - Avg_Grow$NoManagement)^2)),
+  Repro_Carbon = sqrt(mean((Avg_Grow$Repro_Carbon - Avg_Grow$NoManagement)^2))
+)
+ggplot(
+    data = melt(Plots_RMSE, id = NULL, variable.name = "Series", value.name = "RMSE"),
+    mapping = aes(x = Series, y = RMSE)
+  ) +
+  geom_col()
 ```
 
 ### By Subplot
@@ -475,7 +502,8 @@ AllSubplots_ByYear <- read_csv(
     Down_Dead=mean(Down_Dead),
     .groups = "keep"
   ) |>
-  filter(Year >= 2005)
+  filter(Year >= 2005) |>
+  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year))
 
 ggplot(
     data = melt(AllSubplots_ByYear, id.vars = "Year"),
@@ -486,6 +514,23 @@ coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 300)) +
 scale_x_continuous(breaks=seq(2005,2165,20)) +
 scale_y_continuous(breaks=seq(0,300,20))
 ```
+
+Examine residuals:
+
+```{r}
+Subplots_RMSE <- tibble(
+  Total_Carbon = sqrt(mean((AllSubplots_ByYear$Total_Carbon - AllSubplots_ByYear$NoManagement)^2)),
+  NK_Carbon = sqrt(mean((AllSubplots_ByYear$NK_Carbon - AllSubplots_ByYear$NoManagement)^2)),
+  Repro_Carbon = sqrt(mean((AllSubplots_ByYear$Repro_Carbon - AllSubplots_ByYear$NoManagement)^2))
+)
+ggplot(
+    data = melt(Subplots_RMSE, id = NULL, variable.name = "Series", value.name = "RMSE"),
+    mapping = aes(x = Series, y = RMSE)
+  ) +
+  geom_col()
+```
+
+
 ### By Condition
 
 360304303966 has 3 conditions
@@ -514,7 +559,8 @@ AllConditions_ByYear <- read_csv(
     Down_Dead=mean(Down_Dead),
     .groups = "keep"
   ) |>
-  filter(Year >= 2005)
+  filter(Year >= 2005) |>
+  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year))
 
 ggplot(
     data = melt(AllConditions_ByYear, id.vars = "Year"),
@@ -524,6 +570,20 @@ geom_line() +
 coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 300)) +
 scale_x_continuous(breaks=seq(2005,2165,20)) +
 scale_y_continuous(breaks=seq(0,300,20))
+```
+Examine residuals:
+
+```{r}
+AllConditions_RMSE <- tibble(
+  Total_Carbon = sqrt(mean((AllConditions_ByYear$Total_Carbon - AllConditions_ByYear$NoManagement)^2)),
+  NK_Carbon = sqrt(mean((AllConditions_ByYear$NK_Carbon - AllConditions_ByYear$NoManagement)^2)),
+  Repro_Carbon = sqrt(mean((AllConditions_ByYear$Repro_Carbon - AllConditions_ByYear$NoManagement)^2))
+)
+ggplot(
+    data = melt(AllConditions_RMSE, id = NULL, variable.name = "Series", value.name = "RMSE"),
+    mapping = aes(x = Series, y = RMSE)
+  ) +
+  geom_col()
 ```
 
 ## References
