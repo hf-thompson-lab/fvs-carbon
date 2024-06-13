@@ -580,7 +580,7 @@ AllConditions_RMSE <- tibble(
   Repro_Carbon = sqrt(mean((AllConditions_ByYear$Repro_Carbon - AllConditions_ByYear$NoManagement)^2))
 )
 ggplot(
-    data = melt(AllConditions_RMSE, id = NULL, variable.name = "Series", value.name = "RMSE"),
+    data = melt(AllConditions_ByYear, id = NULL, variable.name = "Series", value.name = "RMSE"),
     mapping = aes(x = Series, y = RMSE)
   ) +
   geom_col()
