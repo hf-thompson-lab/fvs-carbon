@@ -28,6 +28,7 @@ identifiers in the FVS tables in the published FIA data.
 
 ```{r include=FALSE}
 suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(reshape2)) # for melt()
 ```
 
 ```{r}
@@ -416,44 +417,39 @@ fvsRun()
 ### By Plot
 
 ```{r}
-AllPlots_Grow <- read_csv(
+NoManagement_Carbon_ByPlot <- read_csv(
     "03_outputs/NoManagement_Carbon_ByPlot.csv",
     col_types = cols(StandID = col_character())
   ) |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
-  mutate(NK_Carbon = Aboveground_Live + Aboveground_Dead) |>
-  mutate(Repro_Carbon = Aboveground_Live + Standing_Dead) |>
+  mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
+  mutate(Standing_Carbon = Aboveground_Live + Standing_Dead) |>
   select(StandID, Year, Total_Stand_Carbon,
-         NK_Carbon, Repro_Carbon,
+         Aboveground_Carbon, Standing_Carbon,
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
-knitr::kable(AllPlots_Grow)
+knitr::kable(NoManagement_Carbon_ByPlot)
 ```
 
 ```{r}
-suppressPackageStartupMessages(library(reshape2)) # for melt()
-
-Avg_Grow <- AllPlots_Grow |>
+NoManagement_Carbon_ByPlot_ByYear <- NoManagement_Carbon_ByPlot |>
   group_by(Year) |>
   summarize(
     Total_Carbon=mean(Total_Stand_Carbon),
-    NK_Carbon=mean(NK_Carbon),
-    Repro_Carbon=mean(Repro_Carbon),
-    Aboveground_Live=mean(Aboveground_Live),
-    Aboveground_Dead=mean(Aboveground_Dead),
-    Standing_Dead=mean(Standing_Dead),
-    Down_Dead=mean(Down_Dead),
+    Aboveground_Carbon=mean(Aboveground_Carbon),
+    Standing_Carbon=mean(Standing_Carbon),
     .groups = "keep"
   ) |>
   filter(Year >= 2005) |>
   # Join in the NoManagement scenario from fig2 for comparison
-  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year))
+  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
+  rename(NK_Fig2_NoManagement = NoManagement)
 
-write_csv(Avg_Grow, "03_outputs/NoManagement_Carbon_ByYear.csv")
+write_csv(Avg_Grow, "03_outputs/NoManagement_Carbon_ByPlot_ByYear.csv")
 
 ggplot(
-    data = melt(Avg_Grow, id.vars = "Year"),
+    data = melt(NoManagement_Carbon_ByPlot_ByYear, id.vars = "Year"),
     mapping = aes(x = Year, y = value, color = variable)
 ) +
 geom_line() +
@@ -465,9 +461,15 @@ scale_y_continuous(breaks=seq(0,300,20))
 Examine residuals:
 ```{r}
 Plots_RMSE <- tibble(
-  Total_Carbon = sqrt(mean((Avg_Grow$Total_Carbon - Avg_Grow$NoManagement)^2)),
-  NK_Carbon = sqrt(mean((Avg_Grow$NK_Carbon - Avg_Grow$NoManagement)^2)),
-  Repro_Carbon = sqrt(mean((Avg_Grow$Repro_Carbon - Avg_Grow$NoManagement)^2))
+  Total_Carbon = sqrt(mean(
+    (NoManagement_Carbon_ByPlot_ByYear$Total_Carbon - NoManagement_Carbon_ByPlot_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Aboveground_Carbon = sqrt(mean(
+    (NoManagement_Carbon_ByPlot_ByYear$Aboveground_Carbon - NoManagement_Carbon_ByPlot_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Standing_Carbon = sqrt(mean(
+    (NoManagement_Carbon_ByPlot_ByYear$Standing_Carbon - NoManagement_Carbon_ByPlot_ByYear$NK_Fig2_NoManagement)^2
+  ))
 )
 ggplot(
     data = melt(Plots_RMSE, id = NULL, variable.name = "Series", value.name = "RMSE"),
@@ -479,34 +481,32 @@ ggplot(
 ### By Subplot
 
 ```{r}
-AllSubplots_ByYear <- read_csv(
+NoManagement_Carbon_BySubplot_ByYear <- read_csv(
     "03_outputs/NoManagement_Carbon_BySubplot.csv",
     col_types = cols(StandID = col_character())
   ) |>
+  rename(Total_Carbon = Total_Stand_Carbon) |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
-  mutate(NK_Carbon = Aboveground_Live + Aboveground_Dead) |>
-  mutate(Repro_Carbon = Aboveground_Live + Standing_Dead) |>
-  select(StandID, Year, Total_Stand_Carbon,
-         NK_Carbon, Repro_Carbon,
+  mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
+  mutate(Standing_Carbon = Aboveground_Live + Standing_Dead) |>
+  select(StandID, Year, Total_Carbon,
+         Aboveground_Carbon, Standing_Carbon,
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead) |>
   group_by(Year) |>
   summarize(
-    Total_Carbon=mean(Total_Stand_Carbon),
-    NK_Carbon=mean(NK_Carbon),
-    Repro_Carbon=mean(Repro_Carbon),
-    Aboveground_Live=mean(Aboveground_Live),
-    Aboveground_Dead=mean(Aboveground_Dead),
-    Standing_Dead=mean(Standing_Dead),
-    Down_Dead=mean(Down_Dead),
+    Total_Carbon=mean(Total_Carbon),
+    Aboveground_Carbon=mean(Aboveground_Carbon),
+    Standing_Carbon=mean(Standing_Carbon),
     .groups = "keep"
   ) |>
   filter(Year >= 2005) |>
-  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year))
+  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
+  rename(NK_Fig2_NoManagement = NoManagement)
 
 ggplot(
-    data = melt(AllSubplots_ByYear, id.vars = "Year"),
+    data = melt(NoManagement_Carbon_BySubplot_ByYear, id.vars = "Year"),
     mapping = aes(x = Year, y = value, color = variable)
 ) +
 geom_line() +
@@ -519,9 +519,15 @@ Examine residuals:
 
 ```{r}
 Subplots_RMSE <- tibble(
-  Total_Carbon = sqrt(mean((AllSubplots_ByYear$Total_Carbon - AllSubplots_ByYear$NoManagement)^2)),
-  NK_Carbon = sqrt(mean((AllSubplots_ByYear$NK_Carbon - AllSubplots_ByYear$NoManagement)^2)),
-  Repro_Carbon = sqrt(mean((AllSubplots_ByYear$Repro_Carbon - AllSubplots_ByYear$NoManagement)^2))
+  Total_Carbon = sqrt(mean(
+    (NoManagement_Carbon_BySubplot_ByYear$Total_Carbon - NoManagement_Carbon_BySubplot_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Aboveground_Carbon = sqrt(mean(
+    (NoManagement_Carbon_BySubplot_ByYear$Aboveground_Carbon - NoManagement_Carbon_BySubplot_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Standing_Carbon = sqrt(mean(
+    (NoManagement_Carbon_BySubplot_ByYear$Standing_Carbon - NoManagement_Carbon_BySubplot_ByYear$NK_Fig2_NoManagement)^2
+  ))
 )
 ggplot(
     data = melt(Subplots_RMSE, id = NULL, variable.name = "Series", value.name = "RMSE"),
@@ -533,37 +539,35 @@ ggplot(
 
 ### By Condition
 
-360304303966 has 3 conditions
+Plot 360304303966 has 3 conditions; we include all three.
 
 ```{r}
-AllConditions_ByYear <- read_csv(
+NoManagement_Carbon_ByCondition_ByYear <- read_csv(
     "03_outputs/NoManagement_Carbon_ByCondition.csv",
     col_types = cols(StandID = col_character())
   ) |>
+  rename(Total_Carbon = Total_Stand_Carbon) |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
-  mutate(NK_Carbon = Aboveground_Live + Aboveground_Dead) |>
-  mutate(Repro_Carbon = Aboveground_Live + Standing_Dead) |>
-  select(StandID, Year, Total_Stand_Carbon,
-         NK_Carbon, Repro_Carbon,
+  mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
+  mutate(Standing_Carbon = Aboveground_Live + Standing_Dead) |>
+  select(StandID, Year, Total_Carbon,
+         Aboveground_Carbon, Standing_Carbon,
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead) |>
   group_by(Year) |>
   summarize(
-    Total_Carbon=mean(Total_Stand_Carbon),
-    NK_Carbon=mean(NK_Carbon),
-    Repro_Carbon=mean(Repro_Carbon),
-    Aboveground_Live=mean(Aboveground_Live),
-    Aboveground_Dead=mean(Aboveground_Dead),
-    Standing_Dead=mean(Standing_Dead),
-    Down_Dead=mean(Down_Dead),
+    Total_Carbon=mean(Total_Carbon),
+    Aboveground_Carbon=mean(Aboveground_Carbon),
+    Standing_Carbon=mean(Standing_Carbon),
     .groups = "keep"
   ) |>
   filter(Year >= 2005) |>
-  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year))
+  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
+  rename(NK_Fig2_NoManagement = NoManagement)
 
 ggplot(
-    data = melt(AllConditions_ByYear, id.vars = "Year"),
+    data = melt(NoManagement_Carbon_ByCondition_ByYear, id.vars = "Year"),
     mapping = aes(x = Year, y = value, color = variable)
 ) +
 geom_line() +
@@ -574,13 +578,19 @@ scale_y_continuous(breaks=seq(0,300,20))
 Examine residuals:
 
 ```{r}
-AllConditions_RMSE <- tibble(
-  Total_Carbon = sqrt(mean((AllConditions_ByYear$Total_Carbon - AllConditions_ByYear$NoManagement)^2)),
-  NK_Carbon = sqrt(mean((AllConditions_ByYear$NK_Carbon - AllConditions_ByYear$NoManagement)^2)),
-  Repro_Carbon = sqrt(mean((AllConditions_ByYear$Repro_Carbon - AllConditions_ByYear$NoManagement)^2))
+Conditions_RMSE <- tibble(
+  Total_Carbon = sqrt(mean(
+    (NoManagement_Carbon_ByCondition_ByYear$Total_Carbon - NoManagement_Carbon_ByCondition_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Aboveground_Carbon = sqrt(mean(
+    (NoManagement_Carbon_ByCondition_ByYear$Aboveground_Carbon - NoManagement_Carbon_ByCondition_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Standing_Carbon = sqrt(mean(
+    (NoManagement_Carbon_ByCondition_ByYear$Standing_Carbon - NoManagement_Carbon_ByCondition_ByYear$NK_Fig2_NoManagement)^2
+  ))
 )
 ggplot(
-    data = melt(AllConditions_ByYear, id = NULL, variable.name = "Series", value.name = "RMSE"),
+    data = melt(Conditions_RMSE, id = NULL, variable.name = "Series", value.name = "RMSE"),
     mapping = aes(x = Series, y = RMSE)
   ) +
   geom_col()
