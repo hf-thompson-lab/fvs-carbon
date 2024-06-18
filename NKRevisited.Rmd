@@ -452,6 +452,7 @@ ggplot(
     data = melt(NoManagement_Carbon_ByPlot_ByYear, id.vars = "Year"),
     mapping = aes(x = Year, y = value, color = variable)
   ) +
+  ggtitle("FVS Carbon Projection by FIA Plot") +
   ylab("Carbon (Tonnes / Hectare)") +
   theme(legend.title = element_blank()) +
   geom_line() +
@@ -477,6 +478,7 @@ ggplot(
     data = melt(Plots_RMSE, id = NULL, variable.name = "Series", value.name = "RMSE"),
     mapping = aes(x = Series, y = RMSE)
   ) +
+  ggtitle("FVS Carbon Projection by FIA Plot") +
   geom_col()
 ```
 
@@ -516,6 +518,7 @@ ggplot(
     data = melt(NoManagement_Carbon_BySubplot_ByYear, id.vars = "Year"),
     mapping = aes(x = Year, y = value, color = variable)
   ) +
+  ggtitle("FVS Carbon Projection by FIA Subplot") +
   ylab("Carbon (Tonnes / Hectare)") +
   theme(legend.title = element_blank()) +
   geom_line() +
@@ -542,6 +545,7 @@ ggplot(
     data = melt(Subplots_RMSE, id = NULL, variable.name = "Series", value.name = "RMSE"),
     mapping = aes(x = Series, y = RMSE)
   ) +
+  ggtitle("FVS Carbon Projection by FIA Subplot") +
   geom_col()
 ```
 Note that all RMSE for the subplot projections are significantly worse than for the plot projections.
@@ -579,6 +583,7 @@ ggplot(
     data = melt(NoManagement_Carbon_ByCondition_ByYear, id.vars = "Year"),
     mapping = aes(x = Year, y = value, color = variable)
   ) +
+  ggtitle("FVS Carbon Projection by FIA Condition") +
   ylab("Carbon (Tonnes / Hectare)") +
   theme(legend.title = element_blank()) +
   geom_line() +
@@ -604,6 +609,7 @@ ggplot(
     data = melt(Conditions_RMSE, id = NULL, variable.name = "Series", value.name = "RMSE"),
     mapping = aes(x = Series, y = RMSE)
   ) +
+  ggtitle("FVS Carbon Projection by FIA Condition") +
   geom_col()
 ```
 
