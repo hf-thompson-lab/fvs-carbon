@@ -1,0 +1,7808 @@
+!!title: AllSubplots 
+!!uuid:  2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa 
+!!built: 2024-06-12_17:28:22 
+StdIdent
+239901700110_2             AllSubplots
+StandCN
+52758055010538_2
+MgmtId
+GROW
+InvYear       1999
+TimeInt                 10 
+TimeInt       1        6 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+239901700110_3             AllSubplots
+StandCN
+52758055010538_3
+MgmtId
+GROW
+InvYear       1999
+TimeInt                 10 
+TimeInt       1        6 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+239901700110_4             AllSubplots
+StandCN
+52758055010538_4
+MgmtId
+GROW
+InvYear       1999
+TimeInt                 10 
+TimeInt       1        6 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+239901700110_1             AllSubplots
+StandCN
+52758055010538_1
+MgmtId
+GROW
+InvYear       1999
+TimeInt                 10 
+TimeInt       1        6 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230102501505_2             AllSubplots
+StandCN
+52932795010538_2
+MgmtId
+GROW
+InvYear       2001
+TimeInt                 10 
+TimeInt       1        4 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230102501505_3             AllSubplots
+StandCN
+52932795010538_3
+MgmtId
+GROW
+InvYear       2001
+TimeInt                 10 
+TimeInt       1        4 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230102501505_4             AllSubplots
+StandCN
+52932795010538_4
+MgmtId
+GROW
+InvYear       2001
+TimeInt                 10 
+TimeInt       1        4 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230102501505_1             AllSubplots
+StandCN
+52932795010538_1
+MgmtId
+GROW
+InvYear       2001
+TimeInt                 10 
+TimeInt       1        4 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230101700852_2             AllSubplots
+StandCN
+52886246010538_2
+MgmtId
+GROW
+InvYear       2001
+TimeInt                 10 
+TimeInt       1        4 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230101700852_3             AllSubplots
+StandCN
+52886246010538_3
+MgmtId
+GROW
+InvYear       2001
+TimeInt                 10 
+TimeInt       1        4 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230101700852_1             AllSubplots
+StandCN
+52886246010538_1
+MgmtId
+GROW
+InvYear       2001
+TimeInt                 10 
+TimeInt       1        4 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230101700852_4             AllSubplots
+StandCN
+52886246010538_4
+MgmtId
+GROW
+InvYear       2001
+TimeInt                 10 
+TimeInt       1        4 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230101701013_2             AllSubplots
+StandCN
+52882700010538_2
+MgmtId
+GROW
+InvYear       2001
+TimeInt                 10 
+TimeInt       1        4 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230101701013_3             AllSubplots
+StandCN
+52882700010538_3
+MgmtId
+GROW
+InvYear       2001
+TimeInt                 10 
+TimeInt       1        4 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230101701013_4             AllSubplots
+StandCN
+52882700010538_4
+MgmtId
+GROW
+InvYear       2001
+TimeInt                 10 
+TimeInt       1        4 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230101701013_1             AllSubplots
+StandCN
+52882700010538_1
+MgmtId
+GROW
+InvYear       2001
+TimeInt                 10 
+TimeInt       1        4 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230202502686_2             AllSubplots
+StandCN
+52967848010538_2
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230202502686_3             AllSubplots
+StandCN
+52967848010538_3
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230202502686_4             AllSubplots
+StandCN
+52967848010538_4
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230202502686_1             AllSubplots
+StandCN
+52967848010538_1
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230200702261_2             AllSubplots
+StandCN
+53006570010538_2
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230200702261_3             AllSubplots
+StandCN
+53006570010538_3
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230200702261_4             AllSubplots
+StandCN
+53006570010538_4
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230200702261_1             AllSubplots
+StandCN
+53006570010538_1
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230300703046_2             AllSubplots
+StandCN
+53077724010538_2
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230300703046_3             AllSubplots
+StandCN
+53077724010538_3
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230300703046_4             AllSubplots
+StandCN
+53077724010538_4
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230300703046_1             AllSubplots
+StandCN
+53077724010538_1
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230300703313_2             AllSubplots
+StandCN
+53073309010538_2
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230300703313_3             AllSubplots
+StandCN
+53073309010538_3
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230300703313_4             AllSubplots
+StandCN
+53073309010538_4
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230300703313_1             AllSubplots
+StandCN
+53073309010538_1
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230300703677_1             AllSubplots
+StandCN
+53073921010538_1
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230300703677_2             AllSubplots
+StandCN
+53073921010538_2
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230300703677_3             AllSubplots
+StandCN
+53073921010538_3
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230300703677_4             AllSubplots
+StandCN
+53073921010538_4
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230301702963_2             AllSubplots
+StandCN
+53085116010538_2
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230301702963_3             AllSubplots
+StandCN
+53085116010538_3
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230301702963_4             AllSubplots
+StandCN
+53085116010538_4
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+230301702963_1             AllSubplots
+StandCN
+53085116010538_1
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+330200300163_4             AllSubplots
+StandCN
+55872473010538_4
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+330200300163_1             AllSubplots
+StandCN
+55872473010538_1
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+330200300163_2             AllSubplots
+StandCN
+55872473010538_2
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+330200300163_3             AllSubplots
+StandCN
+55872473010538_3
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+330200700781_1             AllSubplots
+StandCN
+55877717010538_1
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+330200700781_2             AllSubplots
+StandCN
+55877717010538_2
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+330200700781_3             AllSubplots
+StandCN
+55877717010538_3
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+330200700781_4             AllSubplots
+StandCN
+55877717010538_4
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+330200900904_1             AllSubplots
+StandCN
+55883728010538_1
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+330200900904_2             AllSubplots
+StandCN
+55883728010538_2
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+330200900904_3             AllSubplots
+StandCN
+55883728010538_3
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+330200900904_4             AllSubplots
+StandCN
+55883728010538_4
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+330400900018_1             AllSubplots
+StandCN
+55904575010538_1
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+330400900018_2             AllSubplots
+StandCN
+55904575010538_2
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+330400900018_3             AllSubplots
+StandCN
+55904575010538_3
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+330400900018_4             AllSubplots
+StandCN
+55904575010538_4
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360203101088_2             AllSubplots
+StandCN
+53756283010538_2
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360203101088_1             AllSubplots
+StandCN
+53756283010538_1
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360203101088_3             AllSubplots
+StandCN
+53756283010538_3
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360203101088_4             AllSubplots
+StandCN
+53756283010538_4
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360203102851_2             AllSubplots
+StandCN
+53756640010538_2
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360203102851_3             AllSubplots
+StandCN
+53756640010538_3
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360203102851_4             AllSubplots
+StandCN
+53756640010538_4
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360203102851_1             AllSubplots
+StandCN
+53756640010538_1
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360204102456_2             AllSubplots
+StandCN
+53763542010538_2
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360204102456_3             AllSubplots
+StandCN
+53763542010538_3
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360204102456_4             AllSubplots
+StandCN
+53763542010538_4
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360204102456_1             AllSubplots
+StandCN
+53763542010538_1
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360204104669_2             AllSubplots
+StandCN
+53763786010538_2
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360204104669_3             AllSubplots
+StandCN
+53763786010538_3
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360204104669_4             AllSubplots
+StandCN
+53763786010538_4
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360204104669_1             AllSubplots
+StandCN
+53763786010538_1
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360211302486_2             AllSubplots
+StandCN
+53706798010538_2
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360211302486_3             AllSubplots
+StandCN
+53706798010538_3
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360211302486_4             AllSubplots
+StandCN
+53706798010538_4
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360211302486_1             AllSubplots
+StandCN
+53706798010538_1
+MgmtId
+GROW
+InvYear       2002
+TimeInt                 10 
+TimeInt       1        3 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360303506767_2             AllSubplots
+StandCN
+53953992010538_2
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360303506767_3             AllSubplots
+StandCN
+53953992010538_3
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360303506767_4             AllSubplots
+StandCN
+53953992010538_4
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360303506767_1             AllSubplots
+StandCN
+53953992010538_1
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304303762_2             AllSubplots
+StandCN
+53906549010538_2
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304303762_3             AllSubplots
+StandCN
+53906549010538_3
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304303762_4             AllSubplots
+StandCN
+53906549010538_4
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304303762_1             AllSubplots
+StandCN
+53906549010538_1
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304303966_2             AllSubplots
+StandCN
+53906921010538_2
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304303966_3             AllSubplots
+StandCN
+53906921010538_3
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304303966_4             AllSubplots
+StandCN
+53906921010538_4
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304303966_1             AllSubplots
+StandCN
+53906921010538_1
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360303102007_2             AllSubplots
+StandCN
+53937429010538_2
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360303102007_3             AllSubplots
+StandCN
+53937429010538_3
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360303102007_4             AllSubplots
+StandCN
+53937429010538_4
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360303102007_1             AllSubplots
+StandCN
+53937429010538_1
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360303105127_3             AllSubplots
+StandCN
+53937752010538_3
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360303105127_4             AllSubplots
+StandCN
+53937752010538_4
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360303105127_1             AllSubplots
+StandCN
+53937752010538_1
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360303105127_2             AllSubplots
+StandCN
+53937752010538_2
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360303105218_2             AllSubplots
+StandCN
+53935058010538_2
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360303105218_3             AllSubplots
+StandCN
+53935058010538_3
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360303105218_4             AllSubplots
+StandCN
+53935058010538_4
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360303105218_1             AllSubplots
+StandCN
+53935058010538_1
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304102413_2             AllSubplots
+StandCN
+53904252010538_2
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304102413_3             AllSubplots
+StandCN
+53904252010538_3
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304102413_1             AllSubplots
+StandCN
+53904252010538_1
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304102413_4             AllSubplots
+StandCN
+53904252010538_4
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304102703_2             AllSubplots
+StandCN
+53903045010538_2
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304102703_3             AllSubplots
+StandCN
+53903045010538_3
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304102703_1             AllSubplots
+StandCN
+53903045010538_1
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304102703_4             AllSubplots
+StandCN
+53903045010538_4
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304106138_2             AllSubplots
+StandCN
+53956994010538_2
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304106138_3             AllSubplots
+StandCN
+53956994010538_3
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304106138_1             AllSubplots
+StandCN
+53956994010538_1
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360304106138_4             AllSubplots
+StandCN
+53956994010538_4
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360311305029_2             AllSubplots
+StandCN
+53967425010538_2
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360311305029_3             AllSubplots
+StandCN
+53967425010538_3
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360311305029_4             AllSubplots
+StandCN
+53967425010538_4
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+360311305029_1             AllSubplots
+StandCN
+53967425010538_1
+MgmtId
+GROW
+InvYear       2003
+TimeInt                 10 
+TimeInt       1        2 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+500401701120_1             AllSubplots
+StandCN
+55966927010538_1
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+500401701120_2             AllSubplots
+StandCN
+55966927010538_2
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+500401701120_3             AllSubplots
+StandCN
+55966927010538_3
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+500401701120_4             AllSubplots
+StandCN
+55966927010538_4
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+500402300275_1             AllSubplots
+StandCN
+55972201010538_1
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+500402300275_2             AllSubplots
+StandCN
+55972201010538_2
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+500402300275_3             AllSubplots
+StandCN
+55972201010538_3
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+500402300275_4             AllSubplots
+StandCN
+55972201010538_4
+MgmtId
+GROW
+InvYear       2004
+TimeInt                 10 
+TimeInt       1        1 
+TimeInt       18        1 
+NumCycle     18 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+500500900479_1             AllSubplots
+StandCN
+62277003010538_1
+MgmtId
+GROW
+InvYear       2005
+TimeInt                 10 
+TimeInt       17        1 
+NumCycle     17 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+500500900479_2             AllSubplots
+StandCN
+62277003010538_2
+MgmtId
+GROW
+InvYear       2005
+TimeInt                 10 
+TimeInt       17        1 
+NumCycle     17 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+500500900479_3             AllSubplots
+StandCN
+62277003010538_3
+MgmtId
+GROW
+InvYear       2005
+TimeInt                 10 
+TimeInt       17        1 
+NumCycle     17 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+StdIdent
+500500900479_4             AllSubplots
+StandCN
+62277003010538_4
+MgmtId
+GROW
+InvYear       2005
+TimeInt                 10 
+TimeInt       17        1 
+NumCycle     17 
+
+DataBase
+DSNOut
+2ce0f78e-3e5f-4a48-abbc-b6cb73ba98fa.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM  FVS_PlotInit_Plot
+WHERE StandPlot_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE StandPlot_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Subplots
+Process
+
+Stop
