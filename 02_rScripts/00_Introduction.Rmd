@@ -1,0 +1,19 @@
+---
+title: "Nunery Keeton Revisited"
+author: "Nikolaus Bates-Haus"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+# Introduction
+
+In [@nunery2010], different management regimens were modeled to explore
+their impact on carbon storage. This study used the Forest Vegetation
+Simulator (FVS) to model carbon storage. Other models exist to predict
+carbon storage; we seek to compare FVS with other models to understand
+their different predictions for carbon storage under different
+management regimens.

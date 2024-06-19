@@ -1,0 +1,665 @@
+---
+title: "Nunery Keeton Revisited"
+author: "Nikolaus Bates-Haus"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+# Introduction
+
+In [@nunery2010], different management regimens were modeled to explore
+their impact on carbon storage. This study used the Forest Vegetation
+Simulator (FVS) to model carbon storage. Other models exist to predict
+carbon storage; we seek to compare FVS with other models to understand
+their different predictions for carbon storage under different
+management regimens.
+
+# Identifying Stands
+
+In [@nunery2010, Table 1], 32 plots are listed, with the first column,
+"FIA plot code", identifying each plot. As described in [@shaw2019] and
+[@shaw2020], the method used to compute FVS stand identifiers
+subsequently changed, so these codes no longer align with the stand
+identifiers in the FVS tables in the published FIA data.
+
+```{r include=FALSE}
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(reshape2)) # for melt()
+```
+
+```{r}
+nk_table1 <- read_csv(
+  "00_rawData/N-K_Table_1.csv",
+  col_types = cols(`FIA plot code` = col_character())
+)
+knitr::kable(nk_table1, caption = 'Nunery Keeton Table 1')
+```
+
+To re-align NK's plot codes with the FIA published FVS stand
+identifiers, we note that plot codes are a concatenation of other
+fields, as described in [@shaw2020, Appendix A], Column list and
+translation logic for records in FVS StandInit and PlotInit tables:
+
+> StandInit_cond table: StandInit_cond.Stand_ID = concatenation of:
+> STATECD(4) + INVYR(4) + CYCLE(2) + SUBCYCLE(2) + UNITCD(2) +
+> COUNTYCD(3) + PLOT(5) + CONDID(1).
+>
+> StandInit_plot table: StandInit_plot.Stand_ID = concatenation of:
+> PLOT.STATECD(4) + PLOT.INVYR(4) + PLOT.CYCLE(2) + PLOT.SUBCYCLE(2) +
+> PLOT.UNITCD(2) + PLOT.COUNTYCD(3) + PLOT.PLOT(5).
+>
+> PlotInit_plot table: PlotInit_plot.Stand_ID = concatenation of:
+> PLOT.STATECD(4) + PLOT.INVYR(4) + PLOT.CYCLE(2) + PLOT.SUBCYCLE(2) +
+> PLOT.UNITCD(2) + PLOT.COUNTYCD(3) + PLOT.PLOT(5).
+
+Earlier methods of computing Stand_ID from FIA data used a 2-character
+STATECD, and omitted CYCLE and SUBCYCLE. Using this information, we can
+parse STATECD, INVYR, UNITCD, COUNTYCD, and PLOT from the
+`FIA plot code` in NK.
+
+```{r}
+nk_table1_expanded <- nk_table1 |>
+  mutate(STATECD = substr(`FIA plot code`, 1, 2)) |>
+  mutate(INVYR = substr(`FIA plot code`, 3, 6)) |>
+  mutate(UNITCD = substr(`FIA plot code`, 7, 8)) |>
+  mutate(COUNTYCD = substr(`FIA plot code`, 9, 11)) |>
+  mutate(PLOT = substr(`FIA plot code`, 12, 16))
+nk_plot_codes <- nk_table1_expanded |>
+  select(`FIA plot code`, STATECD, INVYR, UNITCD, COUNTYCD, PLOT)
+knitr::kable(nk_plot_codes)
+```
+
+In addition, the way INVYR is assigned has changed, so the NK INVYR no
+longer aligns with the inventory years in the FIA data for 27 of the 32
+plots.
+
+```{r}
+fia = DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
+fia_cond = tbl(fia, 'COND')
+# Note: we're joining tables across data providers so we have to copy one to the other.
+# We do a right join so that we can copy the small table (nk_plot_codes) to
+# the SQLite engine, where it can perform the join, while using the small table
+# to select the output rows.
+# We rename INVYR in NK to NK_INVYR, and in FIA to FIA_INVYR, so that we
+# can compare the two.
+matching_cond <- fia_cond |>
+  rename(FIA_INVYR=INVYR) |>
+  right_join(
+    nk_plot_codes |> rename(NK_INVYR=INVYR),
+    by=join_by(STATECD, UNITCD, COUNTYCD, PLOT),
+    copy=TRUE
+  ) |>
+  collect()
+
+# Group by STATECD, UNITCD, COUNTYCD and PLOT to see how NK INVYR does and
+# doesn't line up with FIA INVYR
+cond_grp <- matching_cond |>
+  mutate(INVYR_MATCHES=ifelse(NK_INVYR==FIA_INVYR, 1, 0)) |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
+  summarize(
+    NUM_INVYR=n(),
+    NUM_INVYR_MATCHES=sum(INVYR_MATCHES),
+    .groups = "keep"
+  )
+knitr::kable(cond_grp)
+```
+
+To find corresponding Stand_IDs where INVYR does not align between the
+two data sets, we note that NK's "Starting stand age" matches
+`FIA.COND.STDAGE`, uniquely identifying all but one of the stands used
+in NK.
+
+```{r}
+nk_plots_with_age <- nk_table1_expanded |>
+  select(`FIA plot code`, STATECD, INVYR, UNITCD, COUNTYCD, PLOT,
+         `Starting stand age`, `Slope (%)`, `Aspect (degrees)`,
+         `Basal area (m2/ha)`) |>
+  rename(NK_INVYR=INVYR)
+fia_cond_with_age <- matching_cond |>
+  select(STATECD, FIA_INVYR, CYCLE, SUBCYCLE, CONDID, UNITCD, COUNTYCD, PLOT,
+         STDAGE, FLDAGE, SLOPE, ASPECT, BALIVE) |>
+  left_join(
+    nk_plots_with_age, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT)
+  )
+unique_cond <- fia_cond_with_age |>
+  filter(
+    NK_INVYR==FIA_INVYR | (
+      NK_INVYR!=FIA_INVYR & `Starting stand age`==STDAGE
+    ),
+    FIA_INVYR<=2005
+  )
+knitr::kable(unique_cond)
+```
+
+Matching on stand age results in a uniquely identified FIA condition for
+each NK plot except NK plot 2320030901702963, for which both inventory
+years 2003 and 2008 match the stand age. Because all other plots match
+stands in inventory years from 1999 to 2005, we restrict to inventory
+years \<= 2005, which results in selecting the 2003 inventory year for
+this condition. We observe that slope, aspect, and BALIVE metrics for
+the selected conditions match those for the corresponding NK plots,
+which confirms the matches.
+
+From these conditions we are able to construct updated Stand_IDs for use
+with the FIA tables pre-built for FVS.
+
+Note that the Stand IDs visible in the FVS UI are different from these;
+the FVS UI Stand ID consists of STATECD(2) + INVYR(2) + COUNTYCD(3) +
+PLOT(5).
+
+```{r}
+translated_stands <- unique_cond |>
+  mutate(
+    STATECD  = as.numeric(STATECD),
+    UNITCD   = as.numeric(UNITCD),
+    COUNTYCD = as.numeric(COUNTYCD),
+    PLOT     = as.numeric(PLOT)
+  ) |>
+  mutate(FVS_STAND_ID=sprintf(paste0(
+    '%02d',  '%02d',           '%03d',   '%05d'),
+    STATECD, FIA_INVYR %% 100, COUNTYCD, PLOT
+  )) |>
+  mutate(STAND_ID_PLOT=sprintf(paste0(
+    '%04d' , '%04d'    , '%02d', '%02d'  , '%02d', '%03d'  , '%05d'),
+    STATECD, FIA_INVYR , CYCLE , SUBCYCLE, UNITCD, COUNTYCD, PLOT
+  )) |>
+  mutate(STAND_ID_COND=paste0(STAND_ID_PLOT, CONDID)) |>
+  select(`FIA plot code`, FVS_STAND_ID, STAND_ID_PLOT, STAND_ID_COND)
+knitr::kable(translated_stands)
+```
+
+We can then fetch those IDs from the FIA-provided FVS tables to
+determine the number of matching rows from each corresponding table,
+confirming that each updated Stand ID corresponds to a unique stand in
+the provided FVS tables.
+
+```{r}
+fia_fvs_plotinit_plot = tbl(fia, 'FVS_PLOTINIT_PLOT')
+matching_plotinit_plot <- fia_fvs_plotinit_plot |>
+  right_join(translated_stands |> rename(STAND_ID=STAND_ID_PLOT),
+    by=join_by(STAND_ID), copy=TRUE) |>
+  collect()
+matching_plotinit_plot_grp <- matching_plotinit_plot |>
+  group_by(STAND_ID) |> summarize(NUM_PLOTS=n(), .groups = "keep") |>
+  rename(FVS_PLOTINIT_PLOT=STAND_ID)
+
+fia_fvs_standinit_cond = tbl(fia, 'FVS_STANDINIT_COND')
+matching_standinit_cond <- fia_fvs_standinit_cond |>
+  right_join(translated_stands |> rename(STAND_ID=STAND_ID_COND),
+    by=join_by(STAND_ID), copy=TRUE) |>
+  collect()
+matching_standinit_cond_grp <- matching_standinit_cond |>
+  group_by(STAND_ID) |> summarize(NUM_CONDS=n(), .groups = "keep") |>
+  rename(FVS_STANDINIT_COND=STAND_ID)
+
+fia_fvs_standinit_plot = tbl(fia, 'FVS_STANDINIT_PLOT')
+matching_standinit_plot <- fia_fvs_standinit_plot |>
+  right_join(translated_stands |> rename(STAND_ID=STAND_ID_PLOT),
+    by=join_by(STAND_ID), copy=TRUE) |>
+  collect()
+matching_standinit_plot_grp <- matching_standinit_plot |>
+  group_by(STAND_ID) |> summarize(NUM_COND_PLOTS=n(), .groups = "keep") |>
+  rename(FVS_STANDINIT_PLOT=STAND_ID)
+
+matching_stands <- translated_stands |>
+  left_join(matching_plotinit_plot_grp, by=join_by(STAND_ID_PLOT==FVS_PLOTINIT_PLOT)) |>
+  left_join(matching_standinit_cond_grp, by=join_by(STAND_ID_COND==FVS_STANDINIT_COND)) |>
+  left_join(matching_standinit_plot_grp, by=join_by(STAND_ID_PLOT==FVS_STANDINIT_PLOT))
+
+write_csv(matching_stands, "03_outputs/N-K_to_FIA.csv")
+
+knitr::kable(matching_stands)
+```
+
+Note that FIA provides three different means of creating an FVS Stand
+from FIA data (descriptions from the FVS User Interface for the
+respective tables):
+
+-   FVS_StandInit_Plot: Inventory Plots
+-   FVS_PlotInit_Plot: Inventory Subplots
+-   FVS_StandInit_Cond: Conditions
+
+Next we need to determine which of these, if any, corresponds to the
+input used in NK. Spoiler: it's FVS_StandInit_Plot!
+
+# Reproducing the NoManagement Scenario
+
+## N-K Figure 2
+
+To validate FVS runs, we reconstruct the table behind Figure 2. To do
+this, we use the tool <https://automeris.io/wpd/> which aids in
+estimating the tabular data behind a chart.
+
+The project used to extract the table is in
+[02_rScripts/AutoMeris_N-K_Fig2.json]. The tool is imperfect, so we
+apply some cleanup to produce an approximate table.
+
+Note that all values are approximate. For example, all values should
+align in 2005, but they do not; we ignore this, since small differences
+are within the error bounds for parsing the chart.
+
+```{r}
+N_K_Fig2_NoManagement <- read_csv(
+    "01_processedInputData/N-K_Fig2_NoManagement.csv",
+    col_names = c("Year","NoManagement"),
+    # Read columns as double, since that is how they were written
+    col_types = "dd"
+  ) |>
+  # Round columns to nearest integer, since that is what was intended
+  mutate(Year=round(Year), NoManagement=round(NoManagement))
+N_K_Fig2_ClearcutHigh <- read_csv(
+    "01_processedInputData/N-K_Fig2_ClearcutHigh.csv",
+    col_names = c("Year","ClearcutHigh"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ClearcutHigh=round(ClearcutHigh))
+N_K_Fig2_ClearcutLow <- read_csv(
+    "01_processedInputData/N-K_Fig2_ClearcutLow.csv",
+    col_names = c("Year","ClearcutLow"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ClearcutLow=round(ClearcutLow))
+N_K_Fig2_ShelterwoodHigh <- read_csv(
+    "01_processedInputData/N-K_Fig2_ShelterwoodHigh.csv",
+    col_names = c("Year","ShelterwoodHigh"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ShelterwoodHigh=round(ShelterwoodHigh))
+N_K_Fig2_ShelterwoodLow <- read_csv(
+    "01_processedInputData/N-K_Fig2_ShelterwoodLow.csv",
+    col_names = c("Year","ShelterwoodLow"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ShelterwoodLow=round(ShelterwoodLow))
+N_K_Fig2_ITS_LowHigh <- read_csv(
+    "01_processedInputData/N-K_Fig2_ITS_LowHigh.csv",
+    col_names = c("Year","ITS_LowHigh"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ITS_LowHigh=round(ITS_LowHigh))
+N_K_Fig2_ITS_LowLow <- read_csv(
+    "01_processedInputData/N-K_Fig2_ITS_LowLow.csv",
+    col_names = c("Year","ITS_LowLow"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ITS_LowLow=round(ITS_LowLow))
+N_K_Fig2_ITS_HighHigh <- read_csv(
+    "01_processedInputData/N-K_Fig2_ITS_HighHigh.csv",
+    col_names = c("Year","ITS_HighHigh"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ITS_HighHigh=round(ITS_HighHigh))
+N_K_Fig2_ITS_HighLow <- read_csv(
+    "01_processedInputData/N-K_Fig2_ITS_HighLow.csv",
+    col_names = c("Year","ITS_HighLow"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ITS_HighLow=round(ITS_HighLow))
+
+# Assemble a single table from 2005 - 2165
+fig2 <- N_K_Fig2_NoManagement |>
+  full_join(N_K_Fig2_ClearcutHigh, by=join_by(Year)) |>
+  full_join(N_K_Fig2_ClearcutLow, by=join_by(Year)) |>
+  full_join(N_K_Fig2_ShelterwoodHigh, by=join_by(Year)) |>
+  full_join(N_K_Fig2_ShelterwoodLow, by=join_by(Year)) |>
+  full_join(N_K_Fig2_ITS_LowHigh, by=join_by(Year)) |>
+  full_join(N_K_Fig2_ITS_LowLow, by=join_by(Year)) |>
+  full_join(N_K_Fig2_ITS_HighHigh, by=join_by(Year)) |>
+  full_join(N_K_Fig2_ITS_HighLow, by=join_by(Year)) |>
+  filter(Year>=2005) |>
+  # The last year in Fig2 is 2164; nudge it to 2165
+  # to align with contemporary FVS runs.
+  mutate(Year=if_else(Year==2164,2165,Year)) |>
+  arrange(Year)
+
+knitr::kable(fig2)
+```
+
+## Configuring FVS
+
+FVS Software with `Release date: 20240401` was used.
+
+FIA data version:
+
+```         
+% sqlite3 SQLite_FIADB_ENTIRE.db 'select * from REF_FIADB_VERSION ORDER BY VERSION DESC limit 1;'
+FIADB_1.9.2.00|RELEASE|THIS IS FIADB VERSION 9.2 PROD|FS_NIMS_FIADB_RMRS|2024-01-23 10:16:14|732862|||
+```
+
+## Stands
+
+Stands can be found in the FVS UI using FVS_STAND_ID from the table
+above.
+
+-   Inventory Data Tables = FVS_StandInit_Plot
+-   Variants = ne: Northeast
+-   Find stand(s): = 239901700110
+
+Clicking `Find` will then filter to the single matching stand, which can
+be added to the run.
+
+Repeat for each of the above stands.
+
+## Time
+
+FVS will not run prior to the inventory year; it's unclear what N-K did
+to get their chart to go back prior to 2005. We will instead use 2005 as
+the common starting year.
+
+N-K ends in 2164; we adjust this to 2165 so that all cycles are 10 years
+long. Note that FVS does not include the ending year unless it is at the
+start of a new cycle, so we set the common ending year to 2166.
+
+All events in N-K take place on 10 year intervals, therefore we select
+10 years as the reporting interval.
+
+## Carbon
+
+To set the carbon calculations to be metric (Metric tons of carbon per
+hectare), go to Simulate -\> Components -\> Keywords, and select:
+
+-   Extensions: Fire and Fuels Extension
+-   Keywords: CarbCalc: Set the carbon accounting parameters.
+-   Component title: CarbCalc: Metric
+-   Biomass predictions: 0 = Use FFE biomass predictions
+-   Units: 1 = Metric (metric tons carbon/hectare)
+-   Note: Annual root decay rate (proportion per year) remains at its
+    default value of 0.0425.
+
+Select `Save in run` to apply to `Grp: All_FIA_Plots`.
+
+## Run
+
+The main output will be Carbon and fuels. Stand visualization, Tree
+lists, and Inventory statistics may also be interesting.
+
+## Automation
+
+Do it in code:
+<https://github.com/USDAForestService/ForestVegetationSimulator-Interface/tree/main/rFVS/R>
+
+Instructions:
+<https://github.com/USDAForestService/ForestVegetationSimulator-Interface/wiki/rFVS>
+
+This documents such gems in the interface as:
+
+> fvsGetRestartcode() Provides an R interface to Fortran function
+> fvsGetRestartcode.
+
+But, this example shows that they expect you to create your project in
+the UI, then run it using the API:
+
+```{r eval=FALSE}
+setwd ("<FVS-interface>/rFVS/tests")
+# Note: edit <open-fvs> to reflect your system. This directory string should be wherever 
+# your keyword file and input data are located
+
+# load the R functions using this method (if you don't have the rFVS package)
+sdir = "../R"
+# Note: this directory string should be wherever the rFVS functions are located
+for (rf in dir (sdir)) source (paste(sdir,rf,sep="/"))
+
+# or, if the rFVS package is installed, then just enter
+library(rFVS)
+
+# load the FVS library
+fvsLoad("FVSie", bin="<open-fvs>/trunk/bin")
+# Note: edit <open-fvs> to reflect your system. This directory string should 
+# be wherever your FVS shared libraries are located
+
+# specify the keyword file
+fvsSetCmdLine("--keywordfile=iet01.key")
+
+# Run the simulation as would be done using FVS as a program
+fvsRun()
+```
+
+## Results
+
+### By Plot
+
+```{r}
+NoManagement_Carbon_ByPlot <- read_csv(
+    "03_outputs/NoManagement_Carbon_ByPlot.csv",
+    col_types = cols(StandID = col_character())
+  ) |>
+  rename(Aboveground_Live = Aboveground_Total_Live) |>
+  rename(Down_Dead = Forest_Down_Dead_Wood) |>
+  mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
+  mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
+  mutate(Standing_Carbon = Aboveground_Live + Standing_Dead) |>
+  select(StandID, Year, Total_Stand_Carbon,
+         Aboveground_Carbon, Standing_Carbon,
+         Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
+knitr::kable(NoManagement_Carbon_ByPlot)
+```
+
+```{r}
+NoManagement_Carbon_ByPlot_ByYear <- NoManagement_Carbon_ByPlot |>
+  group_by(Year) |>
+  summarize(
+    Total_Carbon=mean(Total_Stand_Carbon),
+    Aboveground_Carbon=mean(Aboveground_Carbon),
+    Standing_Carbon=mean(Standing_Carbon),
+    .groups = "keep"
+  ) |>
+  filter(Year >= 2005) |>
+  # Join in the NoManagement scenario from fig2 for comparison
+  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
+  rename(NK_Fig2_NoManagement = NoManagement)
+
+write_csv(NoManagement_Carbon_ByPlot_ByYear, "03_outputs/NoManagement_Carbon_ByPlot_ByYear.csv")
+
+ggplot(
+    data = melt(NoManagement_Carbon_ByPlot_ByYear, id.vars = "Year"),
+    mapping = aes(x = Year, y = value, color = variable)
+  ) +
+  ggtitle("FVS Carbon Projection by FIA Plot") +
+  ylab("Carbon (Tonnes / Hectare)") +
+  theme(legend.title = element_blank()) +
+  geom_line() +
+  coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 300)) +
+  scale_x_continuous(breaks=seq(2005,2165,20)) +
+  scale_y_continuous(breaks=seq(0,300,20))
+```
+
+Examine residuals:
+
+```{r}
+Plots_RMSE <- tibble(
+  Total_Carbon = sqrt(mean(
+    (NoManagement_Carbon_ByPlot_ByYear$Total_Carbon - NoManagement_Carbon_ByPlot_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Aboveground_Carbon = sqrt(mean(
+    (NoManagement_Carbon_ByPlot_ByYear$Aboveground_Carbon - NoManagement_Carbon_ByPlot_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Standing_Carbon = sqrt(mean(
+    (NoManagement_Carbon_ByPlot_ByYear$Standing_Carbon - NoManagement_Carbon_ByPlot_ByYear$NK_Fig2_NoManagement)^2
+  ))
+)
+ggplot(
+    data = melt(Plots_RMSE, id = NULL, variable.name = "Series", value.name = "RMSE"),
+    mapping = aes(x = Series, y = RMSE)
+  ) +
+  ggtitle("FVS Carbon Projection by FIA Plot") +
+  geom_col()
+```
+
+Note that NK describe using Aboveground Carbon for their chart, but the
+best fit is from Standing Carbon, with RMSE \~= 7.
+
+```{r}
+Plots_RMSE |> select(Standing_Carbon)
+```
+
+### By Subplot
+
+```{r}
+NoManagement_Carbon_BySubplot_ByYear <- read_csv(
+    "03_outputs/NoManagement_Carbon_BySubplot.csv",
+    col_types = cols(StandID = col_character())
+  ) |>
+  rename(Total_Carbon = Total_Stand_Carbon) |>
+  rename(Aboveground_Live = Aboveground_Total_Live) |>
+  rename(Down_Dead = Forest_Down_Dead_Wood) |>
+  mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
+  mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
+  mutate(Standing_Carbon = Aboveground_Live + Standing_Dead) |>
+  select(StandID, Year, Total_Carbon,
+         Aboveground_Carbon, Standing_Carbon,
+         Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead) |>
+  group_by(Year) |>
+  summarize(
+    Total_Carbon=mean(Total_Carbon),
+    Aboveground_Carbon=mean(Aboveground_Carbon),
+    Standing_Carbon=mean(Standing_Carbon),
+    .groups = "keep"
+  ) |>
+  filter(Year >= 2005) |>
+  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
+  rename(NK_Fig2_NoManagement = NoManagement)
+
+ggplot(
+    data = melt(NoManagement_Carbon_BySubplot_ByYear, id.vars = "Year"),
+    mapping = aes(x = Year, y = value, color = variable)
+  ) +
+  ggtitle("FVS Carbon Projection by FIA Subplot") +
+  ylab("Carbon (Tonnes / Hectare)") +
+  theme(legend.title = element_blank()) +
+  geom_line() +
+  coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 300)) +
+  scale_x_continuous(breaks=seq(2005,2165,20)) +
+  scale_y_continuous(breaks=seq(0,300,20))
+```
+
+Examine residuals:
+
+```{r}
+Subplots_RMSE <- tibble(
+  Total_Carbon = sqrt(mean(
+    (NoManagement_Carbon_BySubplot_ByYear$Total_Carbon - NoManagement_Carbon_BySubplot_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Aboveground_Carbon = sqrt(mean(
+    (NoManagement_Carbon_BySubplot_ByYear$Aboveground_Carbon - NoManagement_Carbon_BySubplot_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Standing_Carbon = sqrt(mean(
+    (NoManagement_Carbon_BySubplot_ByYear$Standing_Carbon - NoManagement_Carbon_BySubplot_ByYear$NK_Fig2_NoManagement)^2
+  ))
+)
+ggplot(
+    data = melt(Subplots_RMSE, id = NULL, variable.name = "Series", value.name = "RMSE"),
+    mapping = aes(x = Series, y = RMSE)
+  ) +
+  ggtitle("FVS Carbon Projection by FIA Subplot") +
+  geom_col()
+```
+
+Note that all RMSE for the subplot projections are significantly worse
+than for the plot projections.
+
+### By Condition
+
+Plot 360304303966 has 3 conditions; we include all three.
+
+```{r}
+NoManagement_Carbon_ByCondition_ByYear <- read_csv(
+    "03_outputs/NoManagement_Carbon_ByCondition.csv",
+    col_types = cols(StandID = col_character())
+  ) |>
+  rename(Total_Carbon = Total_Stand_Carbon) |>
+  rename(Aboveground_Live = Aboveground_Total_Live) |>
+  rename(Down_Dead = Forest_Down_Dead_Wood) |>
+  mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
+  mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
+  mutate(Standing_Carbon = Aboveground_Live + Standing_Dead) |>
+  select(StandID, Year, Total_Carbon,
+         Aboveground_Carbon, Standing_Carbon,
+         Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead) |>
+  group_by(Year) |>
+  summarize(
+    Total_Carbon=mean(Total_Carbon),
+    Aboveground_Carbon=mean(Aboveground_Carbon),
+    Standing_Carbon=mean(Standing_Carbon),
+    .groups = "keep"
+  ) |>
+  filter(Year >= 2005) |>
+  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
+  rename(NK_Fig2_NoManagement = NoManagement)
+
+ggplot(
+    data = melt(NoManagement_Carbon_ByCondition_ByYear, id.vars = "Year"),
+    mapping = aes(x = Year, y = value, color = variable)
+  ) +
+  ggtitle("FVS Carbon Projection by FIA Condition") +
+  ylab("Carbon (Tonnes / Hectare)") +
+  theme(legend.title = element_blank()) +
+  geom_line() +
+  coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 300)) +
+  scale_x_continuous(breaks=seq(2005,2165,20)) +
+  scale_y_continuous(breaks=seq(0,300,20))
+```
+
+Examine residuals:
+
+```{r}
+Conditions_RMSE <- tibble(
+  Total_Carbon = sqrt(mean(
+    (NoManagement_Carbon_ByCondition_ByYear$Total_Carbon - NoManagement_Carbon_ByCondition_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Aboveground_Carbon = sqrt(mean(
+    (NoManagement_Carbon_ByCondition_ByYear$Aboveground_Carbon - NoManagement_Carbon_ByCondition_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Standing_Carbon = sqrt(mean(
+    (NoManagement_Carbon_ByCondition_ByYear$Standing_Carbon - NoManagement_Carbon_ByCondition_ByYear$NK_Fig2_NoManagement)^2
+  ))
+)
+ggplot(
+    data = melt(Conditions_RMSE, id = NULL, variable.name = "Series", value.name = "RMSE"),
+    mapping = aes(x = Series, y = RMSE)
+  ) +
+  ggtitle("FVS Carbon Projection by FIA Condition") +
+  geom_col()
+```
+
+RMSE for Standing Carbon by Condition is \~8, which is close to that for
+Standing Carbon by Plot, but Standing Carbon by Plot has the lowest
+RMSE:
+
+```{r}
+Conditions_RMSE |> select(Standing_Carbon)
+```
+
+# References
+
+1.  Nunery, Jared & Keeton, William. (2010). Forest carbon storage in
+    the northeastern United States: Net effects of harvesting frequency,
+    post-harvest retention, and wood products. Forest Ecology and
+    Management. 259. 1363-1375. 10.1016/j.foreco.2009.12.029.
+
+2.  Shaw, John & Gagnon, Aaron. (2019). Field Note: A New Conversion of
+    Forest Inventory and Analysis Data for Use in the Forest Vegetation
+    Simulator. Journal of Forestry. 118. 10.1093/jofore/fvz050.
+
+3.  Burrill, Elizabeth A.; DiTommaso, Andrea M.; Turner, Jeffery A.;
+    Pugh, Scott A.; Christensen, Glenn; Perry, Carol J.; Lepine, Lucie
+    C.; Walker, David M.; Conkling, Barbara L. 2024. The Forest
+    Inventory and Analysis Database, FIADB user guides, volume database
+    description (version 9.2), nationwide forest inventory (NFI). U.S.
+    Department of Agriculture, Forest Service. 1042 p. [Online].
+    Available at web address:
+    <https://www.fs.usda.gov/research/products/dataandtools/datasets/fia-datamart>
+
+4.  Shaw, John D. & Gagnon, Aaron. (2020). Quick-Start Guide to Forest
+    Inventory Analysis Data in the Forest vegetation Simulator. U.S.
+    Department of Agriculture, Forest Service. 25 p. [Online]. Available
+    at web address:
+    <https://www.fs.usda.gov/fvs/documents/FIA_Data_Quick_Start_Guide_20200914.pdf>
+
+5.  Ethan P Belair, Mark J Ducey, Patterns in Forest Harvesting in New
+    England and New York: Using FIA Data to Evaluate Silvicultural
+    Outcomes, Journal of Forestry, Volume 116, Issue 3, May 2018, Pages
+    273–282, <https://doi.org/10.1093/jofore/fvx019>
