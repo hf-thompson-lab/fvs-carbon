@@ -16,14 +16,14 @@ suppressPackageStartupMessages(library(reshape2)) # for melt()
 
 # Reproducing the NoManagement Scenario
 
-## N-K Figure 2
+## NK Figure 2
 
 To validate FVS runs, we reconstruct the table behind Figure 2. To do
 this, we use the tool <https://automeris.io/wpd/> which aids in
 estimating the tabular data behind a chart.
 
 The project used to extract the table is in
-[02_rScripts/AutoMeris_N-K_Fig2.json]. The tool is imperfect, so we
+[02_rScripts/AutoMeris_NK_Fig2.json]. The tool is imperfect, so we
 apply some cleanup to produce an approximate table.
 
 Note that all values are approximate. For example, all values should
@@ -31,73 +31,73 @@ align in 2005, but they do not; we ignore this, since small differences
 are within the error bounds for parsing the chart.
 
 ```{r}
-N_K_Fig2_NoManagement <- read_csv(
-    "../01_processedInputData/N-K_Fig2_NoManagement.csv",
+NK_Fig2_NoManagement <- read_csv(
+    "../01_processedInputData/NK_Fig2_NoManagement.csv",
     col_names = c("Year","NoManagement"),
     # Read columns as double, since that is how they were written
     col_types = "dd"
   ) |>
   # Round columns to nearest integer, since that is what was intended
   mutate(Year=round(Year), NoManagement=round(NoManagement))
-N_K_Fig2_ClearcutHigh <- read_csv(
-    "../01_processedInputData/N-K_Fig2_ClearcutHigh.csv",
+NK_Fig2_ClearcutHigh <- read_csv(
+    "../01_processedInputData/NK_Fig2_ClearcutHigh.csv",
     col_names = c("Year","ClearcutHigh"),
     col_types = "dd"
   ) |>
   mutate(Year=round(Year), ClearcutHigh=round(ClearcutHigh))
-N_K_Fig2_ClearcutLow <- read_csv(
-    "../01_processedInputData/N-K_Fig2_ClearcutLow.csv",
+NK_Fig2_ClearcutLow <- read_csv(
+    "../01_processedInputData/NK_Fig2_ClearcutLow.csv",
     col_names = c("Year","ClearcutLow"),
     col_types = "dd"
   ) |>
   mutate(Year=round(Year), ClearcutLow=round(ClearcutLow))
-N_K_Fig2_ShelterwoodHigh <- read_csv(
-    "../01_processedInputData/N-K_Fig2_ShelterwoodHigh.csv",
+NK_Fig2_ShelterwoodHigh <- read_csv(
+    "../01_processedInputData/NK_Fig2_ShelterwoodHigh.csv",
     col_names = c("Year","ShelterwoodHigh"),
     col_types = "dd"
   ) |>
   mutate(Year=round(Year), ShelterwoodHigh=round(ShelterwoodHigh))
-N_K_Fig2_ShelterwoodLow <- read_csv(
-    "../01_processedInputData/N-K_Fig2_ShelterwoodLow.csv",
+NK_Fig2_ShelterwoodLow <- read_csv(
+    "../01_processedInputData/NK_Fig2_ShelterwoodLow.csv",
     col_names = c("Year","ShelterwoodLow"),
     col_types = "dd"
   ) |>
   mutate(Year=round(Year), ShelterwoodLow=round(ShelterwoodLow))
-N_K_Fig2_ITS_LowHigh <- read_csv(
-    "../01_processedInputData/N-K_Fig2_ITS_LowHigh.csv",
+NK_Fig2_ITS_LowHigh <- read_csv(
+    "../01_processedInputData/NK_Fig2_ITS_LowHigh.csv",
     col_names = c("Year","ITS_LowHigh"),
     col_types = "dd"
   ) |>
   mutate(Year=round(Year), ITS_LowHigh=round(ITS_LowHigh))
-N_K_Fig2_ITS_LowLow <- read_csv(
-    "../01_processedInputData/N-K_Fig2_ITS_LowLow.csv",
+NK_Fig2_ITS_LowLow <- read_csv(
+    "../01_processedInputData/NK_Fig2_ITS_LowLow.csv",
     col_names = c("Year","ITS_LowLow"),
     col_types = "dd"
   ) |>
   mutate(Year=round(Year), ITS_LowLow=round(ITS_LowLow))
-N_K_Fig2_ITS_HighHigh <- read_csv(
-    "../01_processedInputData/N-K_Fig2_ITS_HighHigh.csv",
+NK_Fig2_ITS_HighHigh <- read_csv(
+    "../01_processedInputData/NK_Fig2_ITS_HighHigh.csv",
     col_names = c("Year","ITS_HighHigh"),
     col_types = "dd"
   ) |>
   mutate(Year=round(Year), ITS_HighHigh=round(ITS_HighHigh))
-N_K_Fig2_ITS_HighLow <- read_csv(
-    "../01_processedInputData/N-K_Fig2_ITS_HighLow.csv",
+NK_Fig2_ITS_HighLow <- read_csv(
+    "../01_processedInputData/NK_Fig2_ITS_HighLow.csv",
     col_names = c("Year","ITS_HighLow"),
     col_types = "dd"
   ) |>
   mutate(Year=round(Year), ITS_HighLow=round(ITS_HighLow))
 
 # Assemble a single table from 2005 - 2165
-fig2 <- N_K_Fig2_NoManagement |>
-  full_join(N_K_Fig2_ClearcutHigh, by=join_by(Year)) |>
-  full_join(N_K_Fig2_ClearcutLow, by=join_by(Year)) |>
-  full_join(N_K_Fig2_ShelterwoodHigh, by=join_by(Year)) |>
-  full_join(N_K_Fig2_ShelterwoodLow, by=join_by(Year)) |>
-  full_join(N_K_Fig2_ITS_LowHigh, by=join_by(Year)) |>
-  full_join(N_K_Fig2_ITS_LowLow, by=join_by(Year)) |>
-  full_join(N_K_Fig2_ITS_HighHigh, by=join_by(Year)) |>
-  full_join(N_K_Fig2_ITS_HighLow, by=join_by(Year)) |>
+fig2 <- NK_Fig2_NoManagement |>
+  full_join(NK_Fig2_ClearcutHigh, by=join_by(Year)) |>
+  full_join(NK_Fig2_ClearcutLow, by=join_by(Year)) |>
+  full_join(NK_Fig2_ShelterwoodHigh, by=join_by(Year)) |>
+  full_join(NK_Fig2_ShelterwoodLow, by=join_by(Year)) |>
+  full_join(NK_Fig2_ITS_LowHigh, by=join_by(Year)) |>
+  full_join(NK_Fig2_ITS_LowLow, by=join_by(Year)) |>
+  full_join(NK_Fig2_ITS_HighHigh, by=join_by(Year)) |>
+  full_join(NK_Fig2_ITS_HighLow, by=join_by(Year)) |>
   filter(Year>=2005) |>
   # The last year in Fig2 is 2164; nudge it to 2165
   # to align with contemporary FVS runs.
@@ -134,15 +134,15 @@ Repeat for each of the above stands.
 
 ## Time
 
-FVS will not run prior to the inventory year; it's unclear what N-K did
+FVS will not run prior to the inventory year; it's unclear what NK did
 to get their chart to go back prior to 2005. We will instead use 2005 as
 the common starting year.
 
-N-K ends in 2164; we adjust this to 2165 so that all cycles are 10 years
+NK ends in 2164; we adjust this to 2165 so that all cycles are 10 years
 long. Note that FVS does not include the ending year unless it is at the
 start of a new cycle, so we set the common ending year to 2166.
 
-All events in N-K take place on 10 year intervals, therefore we select
+All events in NK take place on 10 year intervals, therefore we select
 10 years as the reporting interval.
 
 ## Carbon

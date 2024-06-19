@@ -24,7 +24,7 @@ identifiers in the FVS tables in the published FIA data.
 
 ```{r}
 nk_table1 <- read_csv(
-  "../00_rawData/N-K_Table_1.csv",
+  "../00_rawData/NK_Table_1.csv",
   col_types = cols(`FIA plot code` = col_character())
 )
 knitr::kable(nk_table1, caption = 'Nunery Keeton Table 1')
@@ -201,7 +201,7 @@ matching_stands <- translated_stands |>
   left_join(matching_standinit_cond_grp, by=join_by(STAND_ID_COND==FVS_STANDINIT_COND)) |>
   left_join(matching_standinit_plot_grp, by=join_by(STAND_ID_PLOT==FVS_STANDINIT_PLOT))
 
-write_csv(matching_stands, "../03_outputs/N-K_to_FIA.csv")
+write_csv(matching_stands, "../03_outputs/NK_to_FIA.csv")
 
 knitr::kable(matching_stands)
 ```
