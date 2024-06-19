@@ -155,6 +155,46 @@ start of a new cycle, so we set the common ending year to 2166.
 All events in NK take place on 10 year intervals, therefore we select
 10 years as the reporting interval.
 
+### Regeneration
+
+NK regeneration rates are in NK Table 4, in seedlings per hectare. 
+
+In addition to scenario-specific regeneration, NK 2.4
+states, "Background regenration rates (intermediate to shade tolerant species
+only), input at 10 year intervals, emulated natural regeneration within stands,
+independent of forest management activities."
+
+```{r}
+table4 <- read_csv("../00_rawData/NK_Table_4.csv")
+
+# Table4 uses scientific names; translate to get FVS Species Code
+fvs_species_codes <-
+  read_csv("../01_processedInputData/FVSne_Overview_Table_3.2.1.csv") |>
+  select("Scientific Name", "Species Code")
+
+# table4 has one column per species. We wish to add observations per species
+# with different types, so pivot the table to have one row per species.
+table4_rot <- table4 |>
+  pivot_longer(cols = !`Management scenario`) |>
+  pivot_wider(names_from = `Management scenario`) |>
+  rename(`Scientific Name`=name) |>
+  left_join(fvs_species_codes, by=join_by(`Scientific Name`))
+
+# Values in NK are seedlings per hectare; FVS needs seedlings per acre
+hectare_to_acre <- 2.471
+table4_rot$Clearcut <- table4_rot$Clearcut * hectare_to_acre
+table4_rot$Shelterwood <- table4_rot$Shelterwood * hectare_to_acre
+table4_rot$`ITS_Low Retention` <- table4_rot$`ITS_Low Retention` * hectare_to_acre
+table4_rot$`ITS_High Retention` <- table4_rot$`ITS_High Retention` * hectare_to_acre
+table4_rot$Background <- table4_rot$Background * hectare_to_acre
+
+
+
+
+
+knitr::kable(table4_rot)
+```
+
 ### Carbon
 
 To set the carbon calculations to be metric (Metric tons of carbon per
