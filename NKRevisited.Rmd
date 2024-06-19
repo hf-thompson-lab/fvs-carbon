@@ -643,3 +643,8 @@ Conditions_RMSE |> select(Standing_Carbon)
     Department of Agriculture, Forest Service. 25 p. [Online]. Available
     at web address:
     <https://www.fs.usda.gov/fvs/documents/FIA_Data_Quick_Start_Guide_20200914.pdf>
+    
+5.  Ethan P Belair, Mark J Ducey, Patterns in Forest Harvesting in New
+    England and New York: Using FIA Data to Evaluate Silvicultural Outcomes,
+    Journal of Forestry, Volume 116, Issue 3, May 2018, Pages 273–282,
+    https://doi.org/10.1093/jofore/fvx019
