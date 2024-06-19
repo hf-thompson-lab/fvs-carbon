@@ -446,7 +446,7 @@ NoManagement_Carbon_ByPlot_ByYear <- NoManagement_Carbon_ByPlot |>
   full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
   rename(NK_Fig2_NoManagement = NoManagement)
 
-write_csv(Avg_Grow, "03_outputs/NoManagement_Carbon_ByPlot_ByYear.csv")
+write_csv(NoManagement_Carbon_ByPlot_ByYear, "03_outputs/NoManagement_Carbon_ByPlot_ByYear.csv")
 
 ggplot(
     data = melt(NoManagement_Carbon_ByPlot_ByYear, id.vars = "Year"),
