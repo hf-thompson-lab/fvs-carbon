@@ -16,7 +16,7 @@ suppressPackageStartupMessages(library(reshape2)) # for melt()
 
 # Reproducing the NoManagement Scenario
 
-## NK Figure 2
+## Reconstructing NK Figure 2
 
 To validate FVS runs, we reconstruct the table behind Figure 2. To do
 this, we use the tool <https://automeris.io/wpd/> which aids in
@@ -128,7 +128,7 @@ FIA data version:
 FIADB_1.9.2.00|RELEASE|THIS IS FIADB VERSION 9.2 PROD|FS_NIMS_FIADB_RMRS|2024-01-23 10:16:14|732862|||
 ```
 
-## Stands
+### Stands
 
 Stands can be found in the FVS UI using FVS_STAND_ID from the table
 above.
@@ -142,7 +142,7 @@ be added to the run.
 
 Repeat for each of the above stands.
 
-## Time
+### Time
 
 FVS will not run prior to the inventory year; it's unclear what NK did
 to get their chart to go back prior to 2005. We will instead use 2005 as
@@ -155,7 +155,7 @@ start of a new cycle, so we set the common ending year to 2166.
 All events in NK take place on 10 year intervals, therefore we select
 10 years as the reporting interval.
 
-## Carbon
+### Carbon
 
 To set the carbon calculations to be metric (Metric tons of carbon per
 hectare), go to Simulate -\> Components -\> Keywords, and select:
@@ -170,7 +170,7 @@ hectare), go to Simulate -\> Components -\> Keywords, and select:
 
 Select `Save in run` to apply to `Grp: All_FIA_Plots`.
 
-## Run
+## Run FVS
 
 The main output will be Carbon and fuels. Stand visualization, Tree
 lists, and Inventory statistics may also be interesting.
