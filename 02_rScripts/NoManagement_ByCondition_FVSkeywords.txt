@@ -1,8 +1,8 @@
-!!title: AllConditions 
+!!title: ByCondition 
 !!uuid:  65d0bed8-45e1-4825-9634-1958f483bc82 
-!!built: 2024-06-12_17:49:25 
+!!built: 2024-06-19_17:58:03 
 StdIdent
-2399017001101              AllConditions
+2399017001101              ByCondition
 StandCN
 71922991010538
 MgmtId
@@ -58,12 +58,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-2301025015051              AllConditions
+2301025015051              ByCondition
 StandCN
 70198348010538
 MgmtId
@@ -119,12 +136,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-2301017008521              AllConditions
+2301017008521              ByCondition
 StandCN
 70166431010538
 MgmtId
@@ -180,12 +214,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-2301017010131              AllConditions
+2301017010131              ByCondition
 StandCN
 70163008010538
 MgmtId
@@ -241,12 +292,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-2302025026861              AllConditions
+2302025026861              ByCondition
 StandCN
 70272019010538
 MgmtId
@@ -302,12 +370,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-2302007022611              AllConditions
+2302007022611              ByCondition
 StandCN
 70214199010538
 MgmtId
@@ -363,12 +448,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-2303007030461              AllConditions
+2303007030461              ByCondition
 StandCN
 70318200010538
 MgmtId
@@ -424,12 +526,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-2303007033131              AllConditions
+2303007033131              ByCondition
 StandCN
 70313799010538
 MgmtId
@@ -485,12 +604,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-2303007036771              AllConditions
+2303007036771              ByCondition
 StandCN
 70314507010538
 MgmtId
@@ -546,12 +682,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-2303017029631              AllConditions
+2303017029631              ByCondition
 StandCN
 70325274010538
 MgmtId
@@ -607,12 +760,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3302003001631              AllConditions
+3302003001631              ByCondition
 StandCN
 62072197010538
 MgmtId
@@ -668,6 +838,23 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 Design                                                      3409.3751
 SPLabel
   All_FIA_Conditions, & 
@@ -675,7 +862,7 @@ SPLabel
 Process
 
 StdIdent
-3302003001631              AllConditions
+3302003001631              ByCondition
 StandCN
 62072197010538
 MgmtId
@@ -731,6 +918,23 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 Design                                                      3409.3751
 SPLabel
   All_FIA_Conditions, & 
@@ -738,7 +942,7 @@ SPLabel
 Process
 
 StdIdent
-3302007007811              AllConditions
+3302007007811              ByCondition
 StandCN
 62075426010538
 MgmtId
@@ -794,12 +998,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3302009009041              AllConditions
+3302009009041              ByCondition
 StandCN
 62080275010538
 MgmtId
@@ -855,12 +1076,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3304009000181              AllConditions
+3304009000181              ByCondition
 StandCN
 62161389010538
 MgmtId
@@ -916,12 +1154,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3602031010881              AllConditions
+3602031010881              ByCondition
 StandCN
 65765751010538
 MgmtId
@@ -977,12 +1232,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3602031028511              AllConditions
+3602031028511              ByCondition
 StandCN
 65766119010538
 MgmtId
@@ -1038,12 +1310,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3602041024561              AllConditions
+3602041024561              ByCondition
 StandCN
 65781826010538
 MgmtId
@@ -1099,12 +1388,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3602041046691              AllConditions
+3602041046691              ByCondition
 StandCN
 65782078010538
 MgmtId
@@ -1160,12 +1466,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3602113024861              AllConditions
+3602113024861              ByCondition
 StandCN
 65795748010538
 MgmtId
@@ -1221,12 +1544,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3603035067671              AllConditions
+3603035067671              ByCondition
 StandCN
 65853791010538
 MgmtId
@@ -1282,12 +1622,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3603043037621              AllConditions
+3603043037621              ByCondition
 StandCN
 65802929010538
 MgmtId
@@ -1343,12 +1700,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3603043039661              AllConditions
+3603043039661              ByCondition
 StandCN
 65803336010538
 MgmtId
@@ -1404,12 +1778,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3603043039662              AllConditions
+3603043039662              ByCondition
 StandCN
 65803338010538
 MgmtId
@@ -1465,12 +1856,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3603043039663              AllConditions
+3603043039663              ByCondition
 StandCN
 65803340010538
 MgmtId
@@ -1526,12 +1934,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3603031020071              AllConditions
+3603031020071              ByCondition
 StandCN
 65848652010538
 MgmtId
@@ -1587,12 +2012,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3603031051271              AllConditions
+3603031051271              ByCondition
 StandCN
 65848986010538
 MgmtId
@@ -1648,12 +2090,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3603031052181              AllConditions
+3603031052181              ByCondition
 StandCN
 65846079010538
 MgmtId
@@ -1709,12 +2168,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3603041024131              AllConditions
+3603041024131              ByCondition
 StandCN
 65800558010538
 MgmtId
@@ -1770,12 +2246,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3603041027031              AllConditions
+3603041027031              ByCondition
 StandCN
 65799285010538
 MgmtId
@@ -1831,12 +2324,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3603041061381              AllConditions
+3603041061381              ByCondition
 StandCN
 65855375010538
 MgmtId
@@ -1892,12 +2402,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-3603113050291              AllConditions
+3603113050291              ByCondition
 StandCN
 65866179010538
 MgmtId
@@ -1953,12 +2480,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-5004017011201              AllConditions
+5004017011201              ByCondition
 StandCN
 62196772010538
 MgmtId
@@ -2014,12 +2558,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-5004023002751              AllConditions
+5004023002751              ByCondition
 StandCN
 62202044010538
 MgmtId
@@ -2075,12 +2636,29 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process
 
 StdIdent
-5005009004791              AllConditions
+5005009004791              ByCondition
 StandCN
 62277005010538
 MgmtId
@@ -2135,6 +2713,23 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
 SPLabel
   All_FIA_Conditions
 Process

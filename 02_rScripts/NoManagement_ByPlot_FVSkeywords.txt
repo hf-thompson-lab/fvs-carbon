@@ -1,12 +1,12 @@
-!!title: AllPlots 
+!!title: ByPlot 
 !!uuid:  da8082a0-0716-4d1b-863f-59551840d720 
-!!built: 2024-06-12_16:52:58 
+!!built: 2024-06-20_09:10:18 
 StdIdent
-239901700110               AllPlots
+239901700110               ByPlot
 StandCN
 52758055010538
 MgmtId
-Grow
+GROW
 InvYear       1999
 TimeInt                 10 
 TimeInt       1        6 
@@ -22,16 +22,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -44,11 +34,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -73,16 +58,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-230102501505               AllPlots
+230102501505               ByPlot
 StandCN
 52932795010538
 MgmtId
-Grow
+GROW
 InvYear       2001
 TimeInt                 10 
 TimeInt       1        4 
@@ -98,16 +99,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -120,11 +111,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -149,16 +135,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-230101700852               AllPlots
+230101700852               ByPlot
 StandCN
 52886246010538
 MgmtId
-Grow
+GROW
 InvYear       2001
 TimeInt                 10 
 TimeInt       1        4 
@@ -174,16 +176,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -196,11 +188,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -225,16 +212,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-230101701013               AllPlots
+230101701013               ByPlot
 StandCN
 52882700010538
 MgmtId
-Grow
+GROW
 InvYear       2001
 TimeInt                 10 
 TimeInt       1        4 
@@ -250,16 +253,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -272,11 +265,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -301,16 +289,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-230202502686               AllPlots
+230202502686               ByPlot
 StandCN
 52967848010538
 MgmtId
-Grow
+GROW
 InvYear       2002
 TimeInt                 10 
 TimeInt       1        3 
@@ -326,16 +330,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -348,11 +342,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -377,16 +366,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-230200702261               AllPlots
+230200702261               ByPlot
 StandCN
 53006570010538
 MgmtId
-Grow
+GROW
 InvYear       2002
 TimeInt                 10 
 TimeInt       1        3 
@@ -402,16 +407,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -424,11 +419,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -453,16 +443,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-230300703046               AllPlots
+230300703046               ByPlot
 StandCN
 53077724010538
 MgmtId
-Grow
+GROW
 InvYear       2003
 TimeInt                 10 
 TimeInt       1        2 
@@ -478,16 +484,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -500,11 +496,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -529,16 +520,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-230300703313               AllPlots
+230300703313               ByPlot
 StandCN
 53073309010538
 MgmtId
-Grow
+GROW
 InvYear       2003
 TimeInt                 10 
 TimeInt       1        2 
@@ -554,16 +561,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -576,11 +573,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -605,16 +597,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-230300703677               AllPlots
+230300703677               ByPlot
 StandCN
 53073921010538
 MgmtId
-Grow
+GROW
 InvYear       2003
 TimeInt                 10 
 TimeInt       1        2 
@@ -630,16 +638,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -652,11 +650,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -681,16 +674,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-230301702963               AllPlots
+230301702963               ByPlot
 StandCN
 53085116010538
 MgmtId
-Grow
+GROW
 InvYear       2003
 TimeInt                 10 
 TimeInt       1        2 
@@ -706,16 +715,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -728,11 +727,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -757,16 +751,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-330200300163               AllPlots
+330200300163               ByPlot
 StandCN
 55872473010538
 MgmtId
-Grow
+GROW
 InvYear       2003
 TimeInt                 10 
 TimeInt       1        2 
@@ -782,16 +792,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -804,11 +804,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -833,16 +828,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-330200700781               AllPlots
+330200700781               ByPlot
 StandCN
 55877717010538
 MgmtId
-Grow
+GROW
 InvYear       2003
 TimeInt                 10 
 TimeInt       1        2 
@@ -858,16 +869,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -880,11 +881,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -909,16 +905,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-330200900904               AllPlots
+330200900904               ByPlot
 StandCN
 55883728010538
 MgmtId
-Grow
+GROW
 InvYear       2002
 TimeInt                 10 
 TimeInt       1        3 
@@ -934,16 +946,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -956,11 +958,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -985,16 +982,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-330400900018               AllPlots
+330400900018               ByPlot
 StandCN
 55904575010538
 MgmtId
-Grow
+GROW
 InvYear       2003
 TimeInt                 10 
 TimeInt       1        2 
@@ -1010,16 +1023,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -1032,11 +1035,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -1061,16 +1059,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-360203101088               AllPlots
+360203101088               ByPlot
 StandCN
 53756283010538
 MgmtId
-Grow
+GROW
 InvYear       2003
 TimeInt                 10 
 TimeInt       1        2 
@@ -1086,16 +1100,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -1108,11 +1112,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -1137,16 +1136,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-360203102851               AllPlots
+360203102851               ByPlot
 StandCN
 53756640010538
 MgmtId
-Grow
+GROW
 InvYear       2002
 TimeInt                 10 
 TimeInt       1        3 
@@ -1162,16 +1177,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -1184,11 +1189,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -1213,16 +1213,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-360204102456               AllPlots
+360204102456               ByPlot
 StandCN
 53763542010538
 MgmtId
-Grow
+GROW
 InvYear       2003
 TimeInt                 10 
 TimeInt       1        2 
@@ -1238,16 +1254,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -1260,11 +1266,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -1289,16 +1290,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-360204104669               AllPlots
+360204104669               ByPlot
 StandCN
 53763786010538
 MgmtId
-Grow
+GROW
 InvYear       2002
 TimeInt                 10 
 TimeInt       1        3 
@@ -1314,16 +1331,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -1336,11 +1343,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -1365,16 +1367,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-360211302486               AllPlots
+360211302486               ByPlot
 StandCN
 53706798010538
 MgmtId
-Grow
+GROW
 InvYear       2002
 TimeInt                 10 
 TimeInt       1        3 
@@ -1390,16 +1408,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -1412,11 +1420,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -1441,16 +1444,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-360303506767               AllPlots
+360303506767               ByPlot
 StandCN
 53953992010538
 MgmtId
-Grow
+GROW
 InvYear       2003
 TimeInt                 10 
 TimeInt       1        2 
@@ -1466,16 +1485,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -1488,11 +1497,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -1517,16 +1521,32 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
 
 StdIdent
-360304303762               AllPlots
+360304303762               ByPlot
 StandCN
 53906549010538
 MgmtId
-Grow
+GROW
 InvYear       2003
 TimeInt                 10 
 TimeInt       1        2 
@@ -1542,16 +1562,6 @@ Computdb          0         1
 MisRpts        2
 End
 
-* FVS_TreeList, FVS_Cutlist 
-Treelist       0                   0
-Cutlist        0                   0
-Atrtlist       0                   0
-Database
-TreeLiDB       2
-CutLiDB        2
-Atrtlidb       2
-End
-
 * FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
 FMIn
 CarbRept        2
@@ -1564,11 +1574,6 @@ Database
 CarbReDB        2
 FuelReDB        2
 FuelsOut        2
-End
-
-Stats
-Database
-InvStats
 End
 
 DelOTab            1
@@ -1593,6 +1598,22 @@ FMIn
 !Exten:fire Title:CarbCalc: Metric
 CarbCalc           0         1    0.0425         9        11
 End
+!Exten:base Title:Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+End
+EndIf
 SPLabel
   All_FIA_Plots
 Process
