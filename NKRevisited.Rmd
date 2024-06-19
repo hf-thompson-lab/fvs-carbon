@@ -9,7 +9,7 @@ editor_options:
     wrap: 72
 ---
 
-## Introduction
+# Introduction
 
 In [@nunery2010], different management regimens were modeled to explore
 their impact on carbon storage. This study used the Forest Vegetation
@@ -18,7 +18,7 @@ carbon storage; we seek to compare FVS with other models to understand
 their different predictions for carbon storage under different
 management regimens.
 
-## Identifying Stands
+# Identifying Stands
 
 In [@nunery2010, Table 1], 32 plots are listed, with the first column,
 "FIA plot code", identifying each plot. As described in [@shaw2019] and
@@ -148,7 +148,8 @@ From these conditions we are able to construct updated Stand_IDs for use
 with the FIA tables pre-built for FVS.
 
 Note that the Stand IDs visible in the FVS UI are different from these;
-the FVS UI Stand ID consists of STATECD(2) + INVYR(2) + COUNTYCD(3) + PLOT(5).
+the FVS UI Stand ID consists of STATECD(2) + INVYR(2) + COUNTYCD(3) +
+PLOT(5).
 
 ```{r}
 translated_stands <- unique_cond |>
@@ -227,16 +228,17 @@ input used in NK. Spoiler: it's FVS_StandInit_Plot!
 
 ## N-K Figure 2
 
-To validate FVS runs, we reconstruct the table behind Figure 2.
-To do this, we use the tool https://automeris.io/wpd/ which aids in
+To validate FVS runs, we reconstruct the table behind Figure 2. To do
+this, we use the tool <https://automeris.io/wpd/> which aids in
 estimating the tabular data behind a chart.
 
-The project used to extract the table is in [02_rScripts/AutoMeris_N-K_Fig2.json].
-The tool is imperfect, so we apply some cleanup to produce an approximate table.
+The project used to extract the table is in
+[02_rScripts/AutoMeris_N-K_Fig2.json]. The tool is imperfect, so we
+apply some cleanup to produce an approximate table.
 
-Note that all values are approximate. For example, all values should align
-in 2005, but they do not; we ignore this, since small differences are within
-the error bounds for parsing the chart.
+Note that all values are approximate. For example, all values should
+align in 2005, but they do not; we ignore this, since small differences
+are within the error bounds for parsing the chart.
 
 ```{r}
 N_K_Fig2_NoManagement <- read_csv(
@@ -315,19 +317,21 @@ fig2 <- N_K_Fig2_NoManagement |>
 knitr::kable(fig2)
 ```
 
-## Running FVS
+# Running FVS
 
 FVS Software with `Release date: 20240401` was used.
 
 FIA data version:
-```
+
+```         
 % sqlite3 SQLite_FIADB_ENTIRE.db 'select * from REF_FIADB_VERSION ORDER BY VERSION DESC limit 1;'
 FIADB_1.9.2.00|RELEASE|THIS IS FIADB VERSION 9.2 PROD|FS_NIMS_FIADB_RMRS|2024-01-23 10:16:14|732862|||
 ```
 
-### Stands
+## Stands
 
-Stands can be found in the FVS UI using FVS_STAND_ID from the table above.
+Stands can be found in the FVS UI using FVS_STAND_ID from the table
+above.
 
 -   Inventory Data Tables = FVS_StandInit_Plot
 -   Variants = ne: Northeast
@@ -338,20 +342,20 @@ be added to the run.
 
 Repeat for each of the above stands.
 
-### Time
+## Time
 
 FVS will not run prior to the inventory year; it's unclear what N-K did
 to get their chart to go back prior to 2005. We will instead use 2005 as
 the common starting year.
 
-N-K ends in 2164; we adjust this to 2165 so that all cycles are 10 years long.
-Note that FVS does not include the ending year unless it is at the start of a new
-cycle, so we set the common ending year to 2166.
+N-K ends in 2164; we adjust this to 2165 so that all cycles are 10 years
+long. Note that FVS does not include the ending year unless it is at the
+start of a new cycle, so we set the common ending year to 2166.
 
-All events in N-K take place on 10 year intervals,
-therefore we select 10 years as the reporting interval.
+All events in N-K take place on 10 year intervals, therefore we select
+10 years as the reporting interval.
 
-### Carbon
+## Carbon
 
 To set the carbon calculations to be metric (Metric tons of carbon per
 hectare), go to Simulate -\> Components -\> Keywords, and select:
@@ -368,10 +372,10 @@ Select `Save in run` to apply to `Grp: All_FIA_Plots`.
 
 ## Run
 
-The main output will be Carbon and fuels. Stand visualization, Tree lists,
-and Inventory statistics may also be interesting.
+The main output will be Carbon and fuels. Stand visualization, Tree
+lists, and Inventory statistics may also be interesting.
 
-## Automation
+# Automation
 
 Do it in code:
 <https://github.com/USDAForestService/ForestVegetationSimulator-Interface/tree/main/rFVS/R>
@@ -412,9 +416,9 @@ fvsSetCmdLine("--keywordfile=iet01.key")
 fvsRun()
 ```
 
-## Results
+# Results
 
-### By Plot
+## By Plot
 
 ```{r}
 NoManagement_Carbon_ByPlot <- read_csv(
@@ -462,6 +466,7 @@ ggplot(
 ```
 
 Examine residuals:
+
 ```{r}
 Plots_RMSE <- tibble(
   Total_Carbon = sqrt(mean(
@@ -482,12 +487,14 @@ ggplot(
   geom_col()
 ```
 
-Note that NK describe using Aboveground Carbon for their chart, but the best fit is from Standing Carbon, with RMSE ~= 7.
+Note that NK describe using Aboveground Carbon for their chart, but the
+best fit is from Standing Carbon, with RMSE \~= 7.
+
 ```{r}
 Plots_RMSE |> select(Standing_Carbon)
 ```
 
-### By Subplot
+## By Subplot
 
 ```{r}
 NoManagement_Carbon_BySubplot_ByYear <- read_csv(
@@ -548,9 +555,11 @@ ggplot(
   ggtitle("FVS Carbon Projection by FIA Subplot") +
   geom_col()
 ```
-Note that all RMSE for the subplot projections are significantly worse than for the plot projections.
 
-### By Condition
+Note that all RMSE for the subplot projections are significantly worse
+than for the plot projections.
+
+## By Condition
 
 Plot 360304303966 has 3 conditions; we include all three.
 
@@ -591,6 +600,7 @@ ggplot(
   scale_x_continuous(breaks=seq(2005,2165,20)) +
   scale_y_continuous(breaks=seq(0,300,20))
 ```
+
 Examine residuals:
 
 ```{r}
@@ -613,12 +623,15 @@ ggplot(
   geom_col()
 ```
 
-RMSE for Standing Carbon by Condition is ~8, which is close to that for Standing Carbon by Plot, but Standing Carbon by Plot has the lowest RMSE:
+RMSE for Standing Carbon by Condition is \~8, which is close to that for
+Standing Carbon by Plot, but Standing Carbon by Plot has the lowest
+RMSE:
+
 ```{r}
 Conditions_RMSE |> select(Standing_Carbon)
 ```
 
-## References
+# References
 
 1.  Nunery, Jared & Keeton, William. (2010). Forest carbon storage in
     the northeastern United States: Net effects of harvesting frequency,
@@ -643,8 +656,8 @@ Conditions_RMSE |> select(Standing_Carbon)
     Department of Agriculture, Forest Service. 25 p. [Online]. Available
     at web address:
     <https://www.fs.usda.gov/fvs/documents/FIA_Data_Quick_Start_Guide_20200914.pdf>
-    
+
 5.  Ethan P Belair, Mark J Ducey, Patterns in Forest Harvesting in New
-    England and New York: Using FIA Data to Evaluate Silvicultural Outcomes,
-    Journal of Forestry, Volume 116, Issue 3, May 2018, Pages 273–282,
-    https://doi.org/10.1093/jofore/fvx019
+    England and New York: Using FIA Data to Evaluate Silvicultural
+    Outcomes, Journal of Forestry, Volume 116, Issue 3, May 2018, Pages
+    273–282, <https://doi.org/10.1093/jofore/fvx019>
