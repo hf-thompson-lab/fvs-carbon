@@ -123,6 +123,13 @@ unique_cond <- fia_cond_with_age |>
     ),
     FIA_INVYR<=2005
   )
+
+nk_to_fia <- unique_cond |>
+  select(`FIA plot code`, NK_INVYR, 
+         STATECD, FIA_INVYR, CYCLE, SUBCYCLE, CONDID, UNITCD, COUNTYCD, PLOT) |>
+  rename(INVYR = FIA_INVYR)
+write_csv(nk_to_fia, "../03_outputs/nk_to_fia.csv")
+
 knitr::kable(unique_cond)
 ```
 
@@ -196,14 +203,14 @@ matching_standinit_plot_grp <- matching_standinit_plot |>
   group_by(STAND_ID) |> summarize(NUM_COND_PLOTS=n(), .groups = "keep") |>
   rename(FVS_STANDINIT_PLOT=STAND_ID)
 
-matching_stands <- translated_stands |>
+nk_to_fvs <- translated_stands |>
   left_join(matching_plotinit_plot_grp, by=join_by(STAND_ID_PLOT==FVS_PLOTINIT_PLOT)) |>
   left_join(matching_standinit_cond_grp, by=join_by(STAND_ID_COND==FVS_STANDINIT_COND)) |>
   left_join(matching_standinit_plot_grp, by=join_by(STAND_ID_PLOT==FVS_STANDINIT_PLOT))
 
-write_csv(matching_stands, "../03_outputs/NK_to_FIA.csv")
+write_csv(matching_stands, "../03_outputs/nk_to_fvs.csv")
 
-knitr::kable(matching_stands)
+knitr::kable(nk_to_fvs)
 ```
 
 Note that FIA provides three different means of creating an FVS Stand
