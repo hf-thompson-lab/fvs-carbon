@@ -86,6 +86,8 @@ matching_cond <- fia_cond |>
   ) |>
   collect()
 
+DBI::dbDisconnect(fia)
+
 # Group by STATECD, UNITCD, COUNTYCD and PLOT to see how NK INVYR does and
 # doesn't line up with FIA INVYR
 cond_grp <- matching_cond |>
@@ -176,6 +178,8 @@ confirming that each updated Stand ID corresponds to a unique stand in
 the provided FVS tables.
 
 ```{r}
+fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+
 fia_fvs_plotinit_plot = tbl(fia, 'FVS_PLOTINIT_PLOT')
 matching_plotinit_plot <- fia_fvs_plotinit_plot |>
   right_join(translated_stands |> rename(STAND_ID=STAND_ID_PLOT),
@@ -199,6 +203,9 @@ matching_standinit_plot <- fia_fvs_standinit_plot |>
   right_join(translated_stands |> rename(STAND_ID=STAND_ID_PLOT),
     by=join_by(STAND_ID), copy=TRUE) |>
   collect()
+
+DBI::dbDisconnect(fia)
+
 matching_standinit_plot_grp <- matching_standinit_plot |>
   group_by(STAND_ID) |> summarize(NUM_COND_PLOTS=n(), .groups = "keep") |>
   rename(FVS_STANDINIT_PLOT=STAND_ID)
