@@ -338,7 +338,7 @@ ggplot(
 Examine residuals:
 
 ```{r}
-Plots_RMSE <- tibble(
+Plots_RMSE <- data.frame(
   Total_Carbon = sqrt(mean(
     (NoManagement_Carbon_ByPlot_ByYear$Total_Carbon - NoManagement_Carbon_ByPlot_ByYear$NK_Fig2_NoManagement)^2
   )),
@@ -407,7 +407,7 @@ ggplot(
 Examine residuals:
 
 ```{r}
-Subplots_RMSE <- tibble(
+Subplots_RMSE <- data.frame(
   Total_Carbon = sqrt(mean(
     (NoManagement_Carbon_BySubplot_ByYear$Total_Carbon - NoManagement_Carbon_BySubplot_ByYear$NK_Fig2_NoManagement)^2
   )),
@@ -474,7 +474,7 @@ ggplot(
 Examine residuals:
 
 ```{r}
-Conditions_RMSE <- tibble(
+Conditions_RMSE <- data.frame(
   Total_Carbon = sqrt(mean(
     (NoManagement_Carbon_ByCondition_ByYear$Total_Carbon - NoManagement_Carbon_ByCondition_ByYear$NK_Fig2_NoManagement)^2
   )),
