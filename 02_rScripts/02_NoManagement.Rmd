@@ -508,7 +508,7 @@ When were the plots re-surveyed?
 
 ```{r}
 nk_to_fia <- read_csv("../03_outputs/nk_to_fia.csv", col_types = "ciiiiiiiii") |>
-  rename(FIA_INVYR=INVYR)
+  select(STATECD, UNITCD, COUNTYCD, PLOT)
 
 fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_cond = tbl(fia, 'COND')
@@ -529,12 +529,20 @@ knitr::kable(matching_cond)
 
 ```{r}
 # Create ordinals for plots
+#numbered_plots <- matching_cond |>
+#  distinct(STATECD, UNITCD, COUNTYCD, PLOT, CONDID.x) |>
+#  mutate(PLOT_NUM = row_number())
+
 numbered_plots <- matching_cond |>
-  distinct(STATECD, UNITCD, COUNTYCD, PLOT, CONDID.x) |>
-  mutate(PLOT_NUM = row_number())
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID) |>
+  summarise(INVYR = min(INVYR), .groups = "keep") |>
+  ungroup() |>
+  arrange(INVYR) |>
+  mutate(PLOT_NUM = row_number()) |>
+  select(PLOT_NUM, STATECD, UNITCD, COUNTYCD, PLOT, CONDID)
 
 inventory_years <- matching_cond |>
-  left_join(numbered_plots, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID.x)) |>
+  left_join(numbered_plots, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID)) |>
   group_by(PLOT_NUM, INVYR)
 
 ggplot(
@@ -631,7 +639,7 @@ Alright, we can combine these three (skip, disturb, harvest) into a single
 table.
 ```{r}
 plot_numbers = numbered_plots |>
-  group_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID.x, .groups = "keep") |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID, .groups = "keep") |>
   summarize(PLOT_NUM = min(PLOT_NUM), .groups = "keep")
   
 
@@ -644,7 +652,7 @@ survey_status <- matching_cond |>
   mutate(SKIPPED = if_else(STATUS == "Skipped", INVYR, NA)) |>
   mutate(HARVESTED = if_else(STATUS == "Harvested", INVYR, NA)) |>
   mutate(DISTURBED = if_else(STATUS == "Disturbed", INVYR, NA)) |>
-  left_join(plot_numbers, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID.x)) |>
+  left_join(plot_numbers, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID)) |>
   select(
     PLOT_NUM, GROWN, HARVESTED, DISTURBED, SKIPPED
   )
@@ -654,15 +662,9 @@ ggplot(
       filter(!is.na(Year)),
     mapping = aes(x = Year, y = PLOT_NUM, shape = Status, color = Status)
   ) +
-  ggtitle("Plot Survey Status") +
+  ggtitle("Plot Inventory Status") +
   theme(legend.title = element_blank()) +
   geom_point()
-
-#knitr::kable(survey_status |> filter(PLOT_NUM == 18))
-#nik <- matching_cond |>
-#  left_join(plot_numbers, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID.x)) |>
-#  filter(!is.na(COND_NONSAMPLE_REASN_CD))
-#knitr::kable(nik)
 ```
 
 
