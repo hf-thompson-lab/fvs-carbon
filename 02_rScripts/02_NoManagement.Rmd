@@ -493,7 +493,7 @@ ggplot(
   geom_col()
 ```
 
-RMSE for Standing Carbon by Condition is \~8, which is close to that for
+RMSE for Standing Carbon by Condition is \~15, which is close to that for
 Standing Carbon by Plot, but Standing Carbon by Plot has the lowest
 RMSE:
 
