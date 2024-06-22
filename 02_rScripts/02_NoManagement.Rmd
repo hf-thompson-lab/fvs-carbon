@@ -533,11 +533,44 @@ knitr::kable(matching_cond)
 #  distinct(STATECD, UNITCD, COUNTYCD, PLOT, CONDID.x) |>
 #  mutate(PLOT_NUM = row_number())
 
-numbered_plots <- matching_cond |>
+invyr1 <- matching_cond |>
   group_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID) |>
-  summarise(INVYR = min(INVYR), .groups = "keep") |>
+  summarize(INVYR1 = min(INVYR), .groups = "keep") |>
   ungroup() |>
-  arrange(INVYR) |>
+  right_join(matching_cond, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID))
+
+invyr2 <- invyr1 |>
+  filter(INVYR > INVYR1) |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID) |>
+  summarize(INVYR2 = min(INVYR), .groups = "keep") |>
+  ungroup() |>
+  right_join(invyr1, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID))
+  
+invyr3 <- invyr2 |>
+  filter(INVYR > INVYR2) |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID) |>
+  summarize(INVYR3 = min(INVYR), .groups = "keep") |>
+  ungroup() |>
+  right_join(invyr2, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID))
+
+invyr4 <- invyr3 |>
+  filter(INVYR > INVYR3) |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID) |>
+  summarize(INVYR4 = min(INVYR), .groups = "keep") |>
+  ungroup() |>
+  right_join(invyr3, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID))
+
+numbered_plots <- invyr4 |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID) |>
+  summarise(
+    INVYR1 = min(INVYR1),
+    INVYR2 = min(INVYR2),
+    INVYR3 = min(INVYR3),
+    INVYR4 = min(INVYR4),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  arrange(INVYR1, INVYR2, INVYR3, INVYR4) |>
   mutate(PLOT_NUM = row_number()) |>
   select(PLOT_NUM, STATECD, UNITCD, COUNTYCD, PLOT, CONDID)
 
@@ -636,7 +669,7 @@ knitr::kable(treated)
 ```
 
 Alright, we can combine these three (skip, disturb, harvest) into a single
-table.
+chart.
 ```{r}
 plot_numbers = numbered_plots |>
   group_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID, .groups = "keep") |>
