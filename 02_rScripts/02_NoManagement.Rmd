@@ -534,34 +534,34 @@ knitr::kable(matching_cond)
 #  mutate(PLOT_NUM = row_number())
 
 invyr1 <- matching_cond |>
-  group_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID) |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
   summarize(INVYR1 = min(INVYR), .groups = "keep") |>
   ungroup() |>
-  right_join(matching_cond, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID))
+  right_join(matching_cond, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
 
 invyr2 <- invyr1 |>
   filter(INVYR > INVYR1) |>
-  group_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID) |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
   summarize(INVYR2 = min(INVYR), .groups = "keep") |>
   ungroup() |>
-  right_join(invyr1, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID))
+  right_join(invyr1, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
   
 invyr3 <- invyr2 |>
   filter(INVYR > INVYR2) |>
-  group_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID) |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
   summarize(INVYR3 = min(INVYR), .groups = "keep") |>
   ungroup() |>
-  right_join(invyr2, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID))
+  right_join(invyr2, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
 
 invyr4 <- invyr3 |>
   filter(INVYR > INVYR3) |>
-  group_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID) |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
   summarize(INVYR4 = min(INVYR), .groups = "keep") |>
   ungroup() |>
-  right_join(invyr3, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID))
+  right_join(invyr3, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
 
 numbered_plots <- invyr4 |>
-  group_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID) |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
   summarise(
     INVYR1 = min(INVYR1),
     INVYR2 = min(INVYR2),
@@ -572,10 +572,10 @@ numbered_plots <- invyr4 |>
   ungroup() |>
   arrange(INVYR1, INVYR2, INVYR3, INVYR4) |>
   mutate(PLOT_NUM = row_number()) |>
-  select(PLOT_NUM, STATECD, UNITCD, COUNTYCD, PLOT, CONDID)
+  select(PLOT_NUM, STATECD, UNITCD, COUNTYCD, PLOT)
 
 inventory_years <- matching_cond |>
-  left_join(numbered_plots, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID)) |>
+  left_join(numbered_plots, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
   group_by(PLOT_NUM, INVYR)
 
 ggplot(
@@ -671,11 +671,6 @@ knitr::kable(treated)
 Alright, we can combine these three (skip, disturb, harvest) into a single
 chart.
 ```{r}
-plot_numbers = numbered_plots |>
-  group_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID, .groups = "keep") |>
-  summarize(PLOT_NUM = min(PLOT_NUM), .groups = "keep")
-  
-
 survey_status <- matching_cond |>
   mutate(STATUS = if_else(COND_NONSAMPLE_REASN_CD > 0, "Skipped", NA)) |>
   mutate(STATUS = if_else(!is.na(TRTCD1) & TRTCD1 > 0, "Harvested", STATUS)) |>
@@ -685,19 +680,26 @@ survey_status <- matching_cond |>
   mutate(SKIPPED = if_else(STATUS == "Skipped", INVYR, NA)) |>
   mutate(HARVESTED = if_else(STATUS == "Harvested", INVYR, NA)) |>
   mutate(DISTURBED = if_else(STATUS == "Disturbed", INVYR, NA)) |>
-  left_join(plot_numbers, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT, CONDID)) |>
+  left_join(numbered_plots, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
   select(
     PLOT_NUM, GROWN, HARVESTED, DISTURBED, SKIPPED
-  )
+  ) |>
+  melt(id.vars = "PLOT_NUM", variable.name="Status", value.name = "Year") |>
+  filter(!is.na(Year)) |>
+  select(PLOT_NUM, Year, Status) |>
+  arrange(PLOT_NUM, Year, Status)
 
+knitr::kable(survey_status)
+```
+
+```{r}
 ggplot(
-    data = melt(survey_status, id.vars = "PLOT_NUM", variable.name="Status", value.name = "Year") |>
-      filter(!is.na(Year)),
+    data = survey_status,
     mapping = aes(x = Year, y = PLOT_NUM, shape = Status, color = Status)
   ) +
   ggtitle("Plot Inventory Status") +
   theme(legend.title = element_blank()) +
-  geom_point()
+  geom_jitter(width = 0.3, height = 0)
 ```
 
 
