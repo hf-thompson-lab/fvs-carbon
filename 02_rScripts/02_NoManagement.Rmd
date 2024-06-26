@@ -410,7 +410,7 @@ Plots_RMSE |> select(Standing_Carbon)
 To confirm that NK used the FVS_StandInit_Plot table, we examine the
 RMSE between projections from other tables and the NK Fig 2 values.
 
-We repeat the above FVS run, but select table FVS_StandInit_Subplot and
+We repeat the above FVS run, but select table FVS_PlotInit_Plot and
 select all subplots using the translated stand IDs. We apply the same
 configuration to all stands as we did for FVS_StandInit_Plot. We load
 and clean the results in the same manner.
@@ -905,4 +905,85 @@ ggplot(
   ggtitle("Plot Inventory Timeline") +
   theme(legend.title = element_blank()) +
   geom_point()
+```
+### Grow-Only Plots
+
+From this, it seems there are a subset of plots that are grow-only for
+all subsequent inventories. We would like to compare the carbon in the FIA
+inventoried plots with the carbon projected by FVS.
+
+We start by identifying those plots that are grow-only.
+
+```{r}
+nk_to_fia <- read_csv("../03_outputs/nk_to_fia.csv",
+    col_types = cols(
+      `FIA plot code` = col_character(),
+      .default = col_number()
+    )
+  )
+
+nk_to_fvs <- read_csv("../03_outputs/nk_to_fvs.csv",
+    col_types = cols(
+      `FIA plot code` = col_character(),
+      FVS_STAND_ID = col_character(),
+      STAND_ID_PLOT = col_character(),
+      STAND_ID_COND = col_character(),
+      .default = col_number()
+    )
+  )
+
+grow_only <- matching_cond |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
+  summarize(
+    COND_STATUS_CD = max(COND_STATUS_CD),
+    TRTCD = max(TRTCD1),
+    DSTRBCD = max(DSTRBCD1),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  filter(COND_STATUS_CD == 1 & TRTCD == 0 & DSTRBCD == 0) |>
+  left_join(numbered_plots, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
+  left_join(nk_to_fia, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
+  left_join(nk_to_fvs, by = join_by(`FIA plot code`))
+  
+knitr::kable(grow_only)
+```
+
+```{r}
+ggplot(
+    data = semi_join(survey_status, grow_only, by = join_by(PLOT_NUM)),
+    mapping = aes(x = Year, y = PLOT_NUM, shape = Status, color = Status)
+  ) +
+  ggtitle("Grow-only Plot Inventory Timeline") +
+  theme(legend.title = element_blank()) +
+  geom_point() +
+  coord_cartesian(xlim = c(1999, 2021), ylim = c(0, 31))
+
+```
+### Computing Carbon
+
+[@fvsstaff2021] Module 2, section Audit 1, describes how to perform a zero-year
+run of FVS. This applies the mapping from FIA to FVS, and can apply
+e.g. the carbon model. We do not apply the regeneration adjustments, since
+we are simply computing carbon from the FIA inventory data.
+We do this for each individual grow-only plot, then
+chart the observed vs. predicted carbon for just these plots.
+
+```{r}
+x <- matching_cond |>
+  semi_join(grow_only, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
+  select(STATECD, UNITCD, COUNTYCD, PLOT, INVYR) |>
+  left_join(
+    nk_to_fia |>
+      select(STATECD, UNITCD, COUNTYCD, PLOT, `FIA plot code`),
+    by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)
+  ) |>
+  left_join(
+    nk_to_fvs |>
+      select(`FIA plot code`, FVS_STAND_ID),
+    by = join_by(`FIA plot code`)
+  ) |>
+  arrange(INVYR, FVS_STAND_ID)
+
+knitr::kable(x)
 ```

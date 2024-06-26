@@ -45,3 +45,8 @@ editor_options:
     CO: U. S. Department of Agriculture, Forest Service, Forest
     Management Service Center. 56p. 
     <https://www.fs.usda.gov/fmsc/ftp/fvs/docs/overviews/FVSne_Overview.pdf>
+
+7. FVS Staff. 2021. FVS Training Guide. Fort Collins,
+    CO: U. S. Department of Agriculture, Forest Service, Forest
+    Management Service Center. 142p. 
+    <https://www.fs.usda.gov/fvs/documents/FVSTrainingGuide-20210930.pdf>
