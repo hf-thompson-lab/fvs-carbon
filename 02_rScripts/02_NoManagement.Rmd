@@ -10,8 +10,14 @@ editor_options:
 ---
 
 ```{r include=FALSE}
+# Pre-load libraries that issue warnings on startup so these
+# warnings don't corrupt the text later.
 suppressPackageStartupMessages(library(tidyverse))
 suppressPackageStartupMessages(library(reshape2)) # for melt()
+suppressPackageStartupMessages(library(RSQLite))
+suppressPackageStartupMessages(library(htmltools))
+suppressPackageStartupMessages(library(rmarkdown))
+suppressPackageStartupMessages(library(dbplyr))
 ```
 
 # Reproducing the NoManagement Scenario
@@ -160,16 +166,26 @@ years as the reporting interval.
 NK regeneration rates are in NK Table 4, in seedlings per hectare.
 
 In addition to scenario-specific regeneration, NK 2.4 states,
-"Background regenration rates (intermediate to shade tolerant species
+"Background regeneration rates (intermediate to shade tolerant species
 only), input at 10 year intervals, emulated natural regeneration within
 stands, independent of forest management activities."
 
+This background regeneration rate is in NK Table 4.
+
 ```{r}
-table4 <- read_csv("../00_rawData/NK_Table_4.csv")
+table4 <- read_csv(
+  "../00_rawData/NK_Table_4.csv",
+  col_types = cols(
+    `Management scenario` = col_character(),
+    .default = col_number(),
+  )
+)
 
 # Table4 uses scientific names; translate to get FVS Species Code
-fvs_species_codes <-
-  read_csv("../01_processedInputData/FVSne_Overview_Table_3.2.1.csv") |>
+fvs_species_codes <- read_csv(
+    "../01_processedInputData/FVSne_Overview_Table_3.2.1.csv",
+    col_types = "iiciccc"
+  ) |>
   select("Scientific Name", "Species Code", "Common Name")
 
 # table4 has one column per species. We wish to add observations per species
@@ -223,7 +239,6 @@ Natural            0        RM       153      100.                             0
 Switch to freeform and add all the rows, fix the titles.
 
 Select `Save in run` to apply to `Grp: All_FIA_Plots`.
-
 
 ### Carbon
 
@@ -290,10 +305,19 @@ fvsRun()
 
 ### By Plot
 
+Read FVS output for carbon storage by plot. FVS column names are a bit
+idiosyncratic, so clean those up.
+
+NK states that Fig 2 sums carbon from aboveground live, standing dead,
+and down dead. For comparison, we also compute standing carbon as
+aboveground live plus standing dead.
+
 ```{r}
 NoManagement_Carbon_ByPlot <- read_csv(
     "../03_outputs/NoManagement_Carbon_ByPlot.csv",
-    col_types = cols(StandID = col_character())
+    col_types = cols(
+      StandID = col_character()
+    )
   ) |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
@@ -305,6 +329,21 @@ NoManagement_Carbon_ByPlot <- read_csv(
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
 knitr::kable(NoManagement_Carbon_ByPlot)
 ```
+
+Plot these against NK Fig 2 "NoManagement" scenario. NK Fig 2 has three
+different scales on the horizontal axis:
+
+1.  From 1995 to 2005, major ticks are every 5 years
+2.  From 2005 to 2155, major ticks are every 10 years
+3.  From 2155 to 2164, major ticks are every 9 years
+
+NK states that data prior to 2005 is projected from mean growth rate. To
+simplify the chart, we omit data prior to 2005, place major tick marks
+every 10 years, and nudge the end date from 2164 to 2165.
+
+Note that NK Fig2 year 2164 shows an anomalous reduction in carbon
+storage in the NoManagement scenario; it might be the right thing to do
+to omit 2164 / 2165 as well.
 
 ```{r}
 NoManagement_Carbon_ByPlot_ByYear <- NoManagement_Carbon_ByPlot |>
@@ -330,12 +369,14 @@ ggplot(
   ylab("Carbon (Tonnes / Hectare)") +
   theme(legend.title = element_blank()) +
   geom_line() +
-  coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 300)) +
+  coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 320)) +
   scale_x_continuous(breaks=seq(2005,2165,20)) +
-  scale_y_continuous(breaks=seq(0,300,20))
+  scale_y_continuous(breaks=seq(0,320,20))
 ```
 
-Examine residuals:
+From the chart it seems evident that standing carbon is the best match
+for the NoManagement scenario in NK Fig 2. We confirm this by computing
+RMS error for the residuals between our FVS runs and the NK Fig 2 data:
 
 ```{r}
 Plots_RMSE <- data.frame(
@@ -365,6 +406,14 @@ Plots_RMSE |> select(Standing_Carbon)
 ```
 
 ### By Subplot
+
+To confirm that NK used the FVS_StandInit_Plot table, we examine the
+RMSE between projections from other tables and the NK Fig 2 values.
+
+We repeat the above FVS run, but select table FVS_StandInit_Subplot and
+select all subplots using the translated stand IDs. We apply the same
+configuration to all stands as we did for FVS_StandInit_Plot. We load
+and clean the results in the same manner.
 
 ```{r}
 NoManagement_Carbon_BySubplot_ByYear <- read_csv(
@@ -399,12 +448,12 @@ ggplot(
   ylab("Carbon (Tonnes / Hectare)") +
   theme(legend.title = element_blank()) +
   geom_line() +
-  coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 300)) +
+  coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 320)) +
   scale_x_continuous(breaks=seq(2005,2165,20)) +
-  scale_y_continuous(breaks=seq(0,300,20))
+  scale_y_continuous(breaks=seq(0,320,20))
 ```
 
-Examine residuals:
+Examine RMSE for the residuals:
 
 ```{r}
 Subplots_RMSE <- data.frame(
@@ -431,7 +480,13 @@ than for the plot projections.
 
 ### By Condition
 
-Plot 360304303966 has 3 conditions; we include all three.
+We repeat the exercise using the FVS_StandInit_Cond table, which creates
+FVS stands for corresponding FIA conditions.
+
+We select all conditions using the translated stand IDs. Note that plot
+360304303966 has 3 conditions; we include all three. We apply the same
+configuration to all stands as we did for FVS_StandInit_Plot. We load
+and clean the results in the same manner.
 
 ```{r}
 NoManagement_Carbon_ByCondition_ByYear <- read_csv(
@@ -466,12 +521,12 @@ ggplot(
   ylab("Carbon (Tonnes / Hectare)") +
   theme(legend.title = element_blank()) +
   geom_line() +
-  coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 300)) +
+  coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 320)) +
   scale_x_continuous(breaks=seq(2005,2165,20)) +
-  scale_y_continuous(breaks=seq(0,300,20))
+  scale_y_continuous(breaks=seq(0,320,20))
 ```
 
-Examine residuals:
+Examine RMSE for the residuals:
 
 ```{r}
 Conditions_RMSE <- data.frame(
@@ -493,26 +548,44 @@ ggplot(
   geom_col()
 ```
 
-RMSE for Standing Carbon by Condition is \~15, which is close to that for
-Standing Carbon by Plot, but Standing Carbon by Plot has the lowest
-RMSE:
+RMSE for Standing Carbon by Condition is \~15, which is close to that
+for Standing Carbon by Plot, but Standing Carbon by Plot has the lowest
+RMSE. Therefore we will use Standing Carbon by Plot for the remainder of
+this analysis.
 
 ```{r}
 Conditions_RMSE |> select(Standing_Carbon)
 ```
+
 ## Carbon Measurement
 
-### Plot surveys
+### Inventory Years
 
 When were the plots re-surveyed?
 
+The FIA COND table lists when inventories were performed and
+observations from those inventories. We can use the above established
+connection between FVS identifiers and FIA COND identifiers to find
+subsequent surveys for the conditions included.
+
 ```{r}
-nk_to_fia <- read_csv("../03_outputs/nk_to_fia.csv", col_types = "ciiiiiiiii") |>
+# Load the translation table we created
+nk_to_fia <- read_csv(
+    "../03_outputs/nk_to_fia.csv",
+    col_types = cols(
+      `FIA plot code` = col_character(),
+      .default = col_integer()
+    )
+  ) |>
+  # Filter to only the columns needed to identify FIA conditions.
   select(STATECD, UNITCD, COUNTYCD, PLOT)
 
+# Load the FIA condition table
 fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_cond = tbl(fia, 'COND')
 
+# Create a dataframe containing the COND rows for all inventories of
+# all conditions used in NK.
 matching_cond <- fia_cond |>
   right_join(
     nk_to_fia,
@@ -527,12 +600,21 @@ DBI::dbDisconnect(fia)
 knitr::kable(matching_cond)
 ```
 
-```{r}
-# Create ordinals for plots
-#numbered_plots <- matching_cond |>
-#  distinct(STATECD, UNITCD, COUNTYCD, PLOT, CONDID.x) |>
-#  mutate(PLOT_NUM = row_number())
+To aid visual analysis, we create arbitrary ordinals for plots; this
+will allow us to chart the conditions for each plot in a single
+horizontal band, against time, to create a visual timeline for plot
+surveys.
 
+```{r}
+# Create ordinals for plots; to do this, we sort plots by:
+# - the first year inventoried, earliest first; then
+# - break ties by the second year inventoried, earliest year first; then
+# - break ties by the third year inventoried, earliest year first; then
+# - break ties by the fourth year inventoried, earliest year first
+# This will put plots surveyed earlier towards the bottom of the chart,
+# creating an "upward and to the right" visual that is generally easier to read.
+
+# Find inventory years
 invyr1 <- matching_cond |>
   group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
   summarize(INVYR1 = min(INVYR), .groups = "keep") |>
@@ -560,6 +642,7 @@ invyr4 <- invyr3 |>
   ungroup() |>
   right_join(invyr3, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
 
+# Compute plot numbers as ordinals according to inventory years
 numbered_plots <- invyr4 |>
   group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
   summarise(
@@ -574,6 +657,7 @@ numbered_plots <- invyr4 |>
   mutate(PLOT_NUM = row_number()) |>
   select(PLOT_NUM, STATECD, UNITCD, COUNTYCD, PLOT)
 
+# Paste plot numbers back on to conditions, then aggregate by plot
 inventory_years <- matching_cond |>
   left_join(numbered_plots, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
   group_by(PLOT_NUM, INVYR)
@@ -585,71 +669,172 @@ ggplot(
   geom_point()
 
 ```
-Some additional fields that are likely to be interesting:
-- DSTRBCD1/2/3 - Disturbance codes - anything except harvest
-Code Description
-0 No visible disturbance.
-10 Insect damage.
-11 Insect damage to understory vegetation.
-12 Insect damage to trees, including seedlings and saplings.
-20 Disease damage.
-21 Disease damage to understory vegetation.
-22 Disease damage to trees, including seedlings and saplings.
-30 Fire damage (from crown and ground fire, either prescribed or natural).
-31 Ground fire damage.
-32 Crown fire damage.
-40 Animal damage.
-41 Beaver (includes flooding caused by beaver).
-42 Porcupine.
-43 Deer/ungulate.
-44 Bear (core optional ).
-45 Rabbit (core optional ).
-46 Domestic animal/livestock (includes grazing).
-50 Weather damage.
-51 Ice.
-52 Wind (includes hurricane, tornado).
-53 Flooding (weather induced).
-54 Drought.
-60 Vegetation (suppression, competition, vines).
-70 Unknown / not sure / other.
-80 Human-induced damage - any significant threshold of human-caused damage
-not described in the DISTURBANCE codes or in the TREATMENT codes.
-90 Geologic disturbances.
-91 Landslide.
-92 Avalanche track.
-93 Volcanic blast zone.
-94 Other geologic event.
-95 Earth movement / avalanches.
 
-- TRTCD1/2/3 - Treatment code - harvest
+### Non-Sampled
 
-Code Description
-00 No observable treatment.
-10 Cutting - The removal of one or more trees from a stand.
-20 Site preparation - Clearing, slash burning, chopping, disking, bedding, or other
-practices clearly intended to prepare a site for either natural or artificial
-regeneration.
-30 Artificial regeneration - Following a disturbance or treatment (usually cutting), a new
-stand where at least 50 percent of the live trees present resulted from planting or
-direct seeding.
-40 Natural regeneration - Following a disturbance or treatment (usually cutting), a new
-stand where at least 50 percent of the live trees present (of any size) were
-established through the growth of existing trees and/or natural seeding or
-sprouting.
-50 Other silvicultural treatment - The use of fertilizers, herbicides, girdling, pruning, or
-other activities (not covered by codes 10-40) designed to improve the commercial
-value of the residual stand; or chaining, which is a practice used on woodlands to
-encourage wildlife forage.
+Survey may be skipped for various reasons captured in
+COND_STATUS_CD and COND_NONSAMPLE_REASN_CD. Codes other than 1 indicate
+that forest was not inventoried in the condition.
+
+Status Code Descriptions are given in [@Burrill2024]:
+
+-   1 Accessible forest land - Land within the population of interest
+    that can be occupied safely and has at least 10 percent canopy cover
+    by live tally trees of any size or has had at least 10 percent
+    canopy cover of live tally species in the past, based on the
+    presence of stumps, snags, or other evidence. To qualify, the area
+    must be at least 1.0 acre in size and 120.0 feet wide. Forest land
+    includes transition zones, such as areas between forest and
+    nonforest lands that meet the minimal tree canopy cover and forest
+    areas adjacent to urban and built-up lands. Roadside, streamside,
+    and shelterbelt strips of trees must have a width of at least 120
+    feet and continuous length of at least 363 feet to qualify as forest
+    land. Unimproved roads and trails, streams, and clearings in forest
+    areas are classified as forest if they are less than 120 feet wide
+    or less than an acre in size. Tree-covered areas in agricultural
+    production settings, such as fruit orchards, or tree-covered areas
+    in urban settings, such as city parks, are not considered forest
+    land.
+-   2 Nonforest land - Land that has less than 10 percent canopy cover
+    of tally tree species of any size and, in the case of afforested
+    land, fewer than 150 established trees per acre; or land that has
+    sufficient canopy cover or stems, but is classified as nonforest
+    land use (see criteria under PRESNFCD). Nonforest includes areas
+    that have sufficient cover or live stems to meet the forest land
+    definition, but do not meet the dimensional requirements. Note:
+    Nonforest land includes "other wooded land" that has at least 5
+    percent, but less than 10 percent, canopy cover of live tally tree
+    species of any size or has had at least 5 percent, but less than 10
+    percent, canopy cover of tally species in the recent past, based on
+    the presence of stumps, snags, or other evidence. Other wooded land
+    is recognized as a subset of nonforest land, and therefore is not
+    currently considered a separate condition class. Other wooded land
+    is not subject to nonforest use(s) that prevent normal tree
+    regeneration and succession, such as regular mowing, intensive
+    grazing, or recreation activities. In addition, other wooded land is
+    classified according to the same nonforest land use rules as forest
+    land (e.g., 6 percent cover in an urban setting is not considered
+    other wooded land). Other wooded land is therefore defined as having
+    \>5 percent and \<10 percent canopy cover at present, or evidence of
+    such in the past, and PRESNFCD = 20, 40, 42, 43 or 45.
+-   3 Noncensus water - Lakes, reservoirs, ponds, and similar bodies of
+    water 1.0 acre to 4.5 acre in size. Rivers, streams, canals, etc.,
+    30.0 feet to 200 feet wide. This definition was used in the 1990
+    census and applied when the data became available. Earlier
+    inventories defined noncensus water differently.
+-   4 Census water - Lakes, reservoirs, ponds, and similar bodies of
+    water 4.5 acre in size and larger; and rivers, streams, canals,
+    etc., more than 200 feet wide.
+-   5 Nonsampled, possibility of forest land - Any portion of a plot
+    within accessible forest land that cannot be sampled is delineated
+    as a separate condition. There is no minimum size requirement. The
+    reason the condition was not sampled is provided in
+    COND_NONSAMPLE_REASN_CD.
+
+Nonsample Reason Code Descriptions are given in [@Burrill2024]:
+
+-   01 Outside U.S. boundary - Condition class is outside the U.S.
+    border.
+-   02 Denied access area - Access to the condition class is denied by
+    the legal owner, or by the owner of the only reasonable route to the
+    condition class.
+-   03 Hazardous situation - Condition class cannot be accessed because
+    of a hazard or danger, for example cliffs, quarries, strip mines,
+    illegal substance plantations, temporary high water, etc.
+-   05 Lost data - The data file was discovered to be corrupt after a
+    panel was completed and submitted for processing. Used for the
+    single condition that is required for this plot. This code is for
+    office use only.
+-   06 Lost plot - Entire plot cannot be found. Used for the single
+    condition that is required for this plot.
+-   07 Wrong location - Previous plot can be found, but its placement is
+    beyond the tolerance limits for plot location. Used for the single
+    condition that is required for this plot.
+-   08 Skipped visit - Entire plot skipped. Used for plots that are not
+    completed prior to the time a panel is finished and submitted for
+    processing. Used for the single condition that is required for this
+    plot. This code is for office use only.
+-   09 Dropped intensified plot - Intensified plot dropped due to a
+    change in grid density. Used for the single condition that is
+    required for this plot. This code used only by units engaged in
+    intensification. This code is for office use only.
+-   10 Other - Condition class not sampled due to a reason other than
+    one of the specific reasons listed.
+-   11 Ocean - Condition falls in ocean water below mean high tide line.
 
 ```{r}
-# Was anybody not surveyed?
-nonsampled <- matching_cond |>
-  filter(COND_NONSAMPLE_REASN_CD > 0) |>
-  select(STATECD, UNITCD, COUNTYCD, PLOT, INVYR, COND_NONSAMPLE_REASN_CD)
-knitr::kable(nonsampled)
+# Were any conditions not sampled during an inventory?
+skipped <- matching_cond |>
+  filter(COND_STATUS_CD > 1) |>
+  select(STATECD, UNITCD, COUNTYCD, PLOT, INVYR, COND_STATUS_CD)
+knitr::kable(skipped)
 ```
 
-Ooh, shoot - Reason 2 is nonforest land; what's up with that?
+### Disturbance
+
+Three fields, DSTRBCD1/2/3, capture Disturbance codes. These indicate
+types of disturbance to the condition other than disturbances related to
+harvest.
+
+Code Descriptions are given in [@Burrill2024]:
+
+-   0 No visible disturbance.
+-   10 Insect damage.
+-   11 Insect damage to understory vegetation.
+-   12 Insect damage to trees, including seedlings and saplings.
+-   20 Disease damage.
+-   21 Disease damage to understory vegetation.
+-   22 Disease damage to trees, including seedlings and saplings.
+-   30 Fire damage (from crown and ground fire, either prescribed or
+    natural).
+-   31 Ground fire damage.
+-   32 Crown fire damage.
+-   40 Animal damage.
+-   41 Beaver (includes flooding caused by beaver).
+-   42 Porcupine.
+-   43 Deer/ungulate.
+-   44 Bear (core optional).
+-   45 Rabbit (core optional).
+-   46 Domestic animal/livestock (includes grazing).
+-   50 Weather damage.
+-   51 Ice.
+-   52 Wind (includes hurricane, tornado).
+-   53 Flooding (weather induced).
+-   54 Drought.
+-   60 Vegetation (suppression, competition, vines).
+-   70 Unknown / not sure / other.
+-   80 Human-induced damage - any significant threshold of human-caused
+    damage not described in the DISTURBANCE codes or in the TREATMENT
+    codes.
+-   90 Geologic disturbances.
+-   91 Landslide.
+-   92 Avalanche track.
+-   93 Volcanic blast zone.
+-   94 Other geologic event.
+-   95 Earth movement / avalanches.
+
+Harvest-related disturbance is captured in the three columns TRTCD1/2/3.
+These capture treatment code describing disturbance related to harvest.
+
+Code Descriptions are given in [@Burrill2024]:
+
+-   00 No observable treatment.
+-   10 Cutting - The removal of one or more trees from a stand.
+-   20 Site preparation - Clearing, slash burning, chopping, disking,
+    bedding, or other practices clearly intended to prepare a site for
+    either natural or artificial regeneration.
+-   30 Artificial regeneration - Following a disturbance or treatment
+    (usually cutting), a new stand where at least 50 percent of the live
+    trees present resulted from planting or direct seeding.
+-   40 Natural regeneration - Following a disturbance or treatment
+    (usually cutting), a new stand where at least 50 percent of the live
+    trees present (of any size) were established through the growth of
+    existing trees and/or natural seeding or sprouting.
+-   50 Other silvicultural treatment - The use of fertilizers,
+    herbicides, girdling, pruning, or other activities (not covered by
+    codes 10-40) designed to improve the commercial value of the
+    residual stand; or chaining, which is a practice used on woodlands
+    to encourage wildlife forage.
 
 
 ```{r}
@@ -668,22 +853,42 @@ treated <- matching_cond |>
 knitr::kable(treated)
 ```
 
-Alright, we can combine these three (skip, disturb, harvest) into a single
-chart.
+### Timeline
+
+We can combine nonsample, disturbance, and harvest to create a single timeline
+that shows plot status since the start of NK.
+
+Note that status is per condition, and we are charting per plot. To accomodate,
+we introduce horizontal offset so that the status of individual conditions
+within a plot is visible in the chart.
+
 ```{r}
 survey_status <- matching_cond |>
-  mutate(STATUS = if_else(COND_NONSAMPLE_REASN_CD > 0, "Skipped", NA)) |>
+
+  # Offset INVYR by CONDID to get horizontal
+  # displacement of conditions in the chart
+  mutate(INVYR = INVYR + (CONDID - 1)/4) |>
+  
+  # Collect the various status indicators into a single STATUS column
+  mutate(STATUS = if_else(COND_STATUS_CD > 1, "Skipped", NA)) |>
   mutate(STATUS = if_else(!is.na(TRTCD1) & TRTCD1 > 0, "Harvested", STATUS)) |>
   mutate(STATUS = if_else(!is.na(DSTRBCD1) & DSTRBCD1 > 0, "Disturbed", STATUS)) |>
   mutate(STATUS = if_else(is.na(STATUS), "Grown", STATUS)) |>
+  
+  # Use the single STATUS column to create separate columns for each status,
+  # where the inventory year is the value for the column
   mutate(GROWN = if_else(STATUS == "Grown", INVYR, NA)) |>
   mutate(SKIPPED = if_else(STATUS == "Skipped", INVYR, NA)) |>
   mutate(HARVESTED = if_else(STATUS == "Harvested", INVYR, NA)) |>
   mutate(DISTURBED = if_else(STATUS == "Disturbed", INVYR, NA)) |>
+  
+  # Add plot numbers
   left_join(numbered_plots, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
   select(
     PLOT_NUM, GROWN, HARVESTED, DISTURBED, SKIPPED
   ) |>
+  
+  # Melt and arrange for ggplot
   melt(id.vars = "PLOT_NUM", variable.name="Status", value.name = "Year") |>
   filter(!is.na(Year)) |>
   select(PLOT_NUM, Year, Status) |>
@@ -697,9 +902,7 @@ ggplot(
     data = survey_status,
     mapping = aes(x = Year, y = PLOT_NUM, shape = Status, color = Status)
   ) +
-  ggtitle("Plot Inventory Status") +
+  ggtitle("Plot Inventory Timeline") +
   theme(legend.title = element_blank()) +
-  geom_jitter(width = 0.3, height = 0)
+  geom_point()
 ```
-
-
