@@ -563,10 +563,10 @@ Conditions_RMSE |> select(Standing_Carbon)
 
 When were the plots re-surveyed?
 
-The FIA COND table lists when inventories were performed and
-observations from those inventories. We can use the above established
-connection between FVS identifiers and FIA COND identifiers to find
-subsequent surveys for the conditions included.
+The FIA PLOT table lists when plots were measured; the FIA COND table lists
+observations from those measurements. We can use the above established
+connection between FVS identifiers and FIA identifiers to find
+subsequent measurement for the plots and conditions included in NK.
 
 ```{r}
 # Load the translation table we created
@@ -580,20 +580,37 @@ nk_to_fia <- read_csv(
   # Filter to only the columns needed to identify FIA conditions.
   select(STATECD, UNITCD, COUNTYCD, PLOT)
 
-# Load the FIA condition table
+# Connect to the FIA tables
 fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_cond = tbl(fia, 'COND')
+fia_plot = tbl(fia, 'PLOT')
 
-# Create a dataframe containing the COND rows for all inventories of
-# all conditions used in NK.
-matching_cond <- fia_cond |>
-  right_join(
-    nk_to_fia,
+# Create a dataframe containing the PLOT rows for all inventories of
+# all plots used in NK.
+matching_plot <- fia_plot |>
+  semi_join(
+    nk_to_fia |> select(STATECD, UNITCD, COUNTYCD, PLOT),
     by=join_by(STATECD, UNITCD, COUNTYCD, PLOT),
     copy=TRUE
   ) |>
   filter(INVYR >= 1999) |>
   collect()
+
+# Create a dataframe containing the COND rows for all inventories of
+# all conditions for all plots used in NK.
+matching_cond <- fia_cond |>
+  semi_join(
+    nk_to_fia,
+    by=join_by(STATECD, UNITCD, COUNTYCD, PLOT),
+    copy=TRUE
+  ) |>
+  filter(INVYR >= 1999) |>
+  # Paste MEASYEAR on to COND, because everything in FVS works off MEASYEAR
+  collect() |>
+  left_join(
+    matching_plot |> select(STATECD, UNITCD, COUNTYCD, PLOT, INVYR, MEASYEAR),
+    by=join_by(STATECD, UNITCD, COUNTYCD, PLOT, INVYR)
+  )
 
 DBI::dbDisconnect(fia)
 
@@ -603,68 +620,68 @@ knitr::kable(matching_cond)
 To aid visual analysis, we create arbitrary ordinals for plots; this
 will allow us to chart the conditions for each plot in a single
 horizontal band, against time, to create a visual timeline for plot
-surveys.
+measurement.
 
 ```{r}
 # Create ordinals for plots; to do this, we sort plots by:
-# - the first year inventoried, earliest first; then
-# - break ties by the second year inventoried, earliest year first; then
+# - the first year measured, earliest first; then
+# - break ties by the second year measured, earliest year first; then
 # - break ties by the third year inventoried, earliest year first; then
 # - break ties by the fourth year inventoried, earliest year first
 # This will put plots surveyed earlier towards the bottom of the chart,
 # creating an "upward and to the right" visual that is generally easier to read.
 
 # Find inventory years
-invyr1 <- matching_cond |>
+year1 <- matching_cond |>
   group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
-  summarize(INVYR1 = min(INVYR), .groups = "keep") |>
+  summarize(YEAR1 = min(MEASYEAR), .groups = "keep") |>
   ungroup() |>
   right_join(matching_cond, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
 
-invyr2 <- invyr1 |>
-  filter(INVYR > INVYR1) |>
+year2 <- year1 |>
+  filter(MEASYEAR > YEAR1) |>
   group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
-  summarize(INVYR2 = min(INVYR), .groups = "keep") |>
+  summarize(YEAR2 = min(MEASYEAR), .groups = "keep") |>
   ungroup() |>
-  right_join(invyr1, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
+  right_join(year1, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
   
-invyr3 <- invyr2 |>
-  filter(INVYR > INVYR2) |>
+year3 <- year2 |>
+  filter(MEASYEAR > YEAR2) |>
   group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
-  summarize(INVYR3 = min(INVYR), .groups = "keep") |>
+  summarize(YEAR3 = min(MEASYEAR), .groups = "keep") |>
   ungroup() |>
-  right_join(invyr2, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
+  right_join(year2, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
 
-invyr4 <- invyr3 |>
-  filter(INVYR > INVYR3) |>
+year4 <- year3 |>
+  filter(MEASYEAR > YEAR3) |>
   group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
-  summarize(INVYR4 = min(INVYR), .groups = "keep") |>
+  summarize(YEAR4 = min(MEASYEAR), .groups = "keep") |>
   ungroup() |>
-  right_join(invyr3, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
+  right_join(year3, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
 
 # Compute plot numbers as ordinals according to inventory years
-numbered_plots <- invyr4 |>
+numbered_plots <- year4 |>
   group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
   summarise(
-    INVYR1 = min(INVYR1),
-    INVYR2 = min(INVYR2),
-    INVYR3 = min(INVYR3),
-    INVYR4 = min(INVYR4),
+    YEAR1 = min(YEAR1),
+    YEAR2 = min(YEAR2),
+    YEAR3 = min(YEAR3),
+    YEAR4 = min(YEAR4),
     .groups = "keep"
   ) |>
   ungroup() |>
-  arrange(INVYR1, INVYR2, INVYR3, INVYR4) |>
+  arrange(YEAR1, YEAR2, YEAR3, YEAR4) |>
   mutate(PLOT_NUM = row_number()) |>
   select(PLOT_NUM, STATECD, UNITCD, COUNTYCD, PLOT)
 
 # Paste plot numbers back on to conditions, then aggregate by plot
 inventory_years <- matching_cond |>
   left_join(numbered_plots, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
-  group_by(PLOT_NUM, INVYR)
+  group_by(PLOT_NUM, MEASYEAR)
 
 ggplot(
     data = inventory_years,
-    mapping = aes(x = INVYR, y = PLOT_NUM)
+    mapping = aes(x = MEASYEAR, y = PLOT_NUM)
   ) +
   geom_point()
 
@@ -766,7 +783,7 @@ Nonsample Reason Code Descriptions are given in [@Burrill2024]:
 # Were any conditions not sampled during an inventory?
 skipped <- matching_cond |>
   filter(COND_STATUS_CD > 1) |>
-  select(STATECD, UNITCD, COUNTYCD, PLOT, INVYR, COND_STATUS_CD)
+  select(STATECD, UNITCD, COUNTYCD, PLOT, MEASYEAR, COND_STATUS_CD)
 knitr::kable(skipped)
 ```
 
@@ -841,7 +858,7 @@ Code Descriptions are given in [@Burrill2024]:
 # Who had disturbance?
 disturbed <- matching_cond |>
   filter(DSTRBCD1 > 0 | DSTRBCD2 > 0 | DSTRBCD3 > 0) |>
-  select(STATECD, UNITCD, COUNTYCD, PLOT, INVYR, DSTRBCD1, DSTRBCD2, DSTRBCD3)
+  select(STATECD, UNITCD, COUNTYCD, PLOT, MEASYEAR, DSTRBCD1, DSTRBCD2, DSTRBCD3)
 knitr::kable(disturbed)
 ```
 
@@ -849,7 +866,7 @@ knitr::kable(disturbed)
 # Who had treatment?
 treated <- matching_cond |>
   filter(TRTCD1 > 0 | TRTCD2 > 0 | TRTCD3 > 0) |>
-  select(STATECD, UNITCD, COUNTYCD, PLOT, INVYR, TRTCD1, TRTCD2, , TRTCD3)
+  select(STATECD, UNITCD, COUNTYCD, PLOT, MEASYEAR, TRTCD1, TRTCD2, , TRTCD3)
 knitr::kable(treated)
 ```
 
@@ -867,7 +884,7 @@ survey_status <- matching_cond |>
 
   # Offset INVYR by CONDID to get horizontal
   # displacement of conditions in the chart
-  mutate(INVYR = INVYR + (CONDID - 1)/4) |>
+  mutate(MEASYEAR = MEASYEAR + (CONDID - 1)/4) |>
   
   # Collect the various status indicators into a single STATUS column
   mutate(STATUS = if_else(COND_STATUS_CD > 1, "Skipped", NA)) |>
@@ -877,10 +894,10 @@ survey_status <- matching_cond |>
   
   # Use the single STATUS column to create separate columns for each status,
   # where the inventory year is the value for the column
-  mutate(GROWN = if_else(STATUS == "Grown", INVYR, NA)) |>
-  mutate(SKIPPED = if_else(STATUS == "Skipped", INVYR, NA)) |>
-  mutate(HARVESTED = if_else(STATUS == "Harvested", INVYR, NA)) |>
-  mutate(DISTURBED = if_else(STATUS == "Disturbed", INVYR, NA)) |>
+  mutate(GROWN = if_else(STATUS == "Grown", MEASYEAR, NA)) |>
+  mutate(SKIPPED = if_else(STATUS == "Skipped", MEASYEAR, NA)) |>
+  mutate(HARVESTED = if_else(STATUS == "Harvested", MEASYEAR, NA)) |>
+  mutate(DISTURBED = if_else(STATUS == "Disturbed", MEASYEAR, NA)) |>
   
   # Add plot numbers
   left_join(numbered_plots, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
@@ -972,7 +989,7 @@ chart the observed vs. predicted carbon for just these plots.
 ```{r}
 x <- matching_cond |>
   semi_join(grow_only, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
-  select(STATECD, UNITCD, COUNTYCD, PLOT, INVYR) |>
+  select(STATECD, UNITCD, COUNTYCD, PLOT, MEASYEAR) |>
   left_join(
     nk_to_fia |>
       select(STATECD, UNITCD, COUNTYCD, PLOT, `FIA plot code`),
@@ -983,7 +1000,77 @@ x <- matching_cond |>
       select(`FIA plot code`, FVS_STAND_ID),
     by = join_by(`FIA plot code`)
   ) |>
-  arrange(INVYR, FVS_STAND_ID)
+  arrange(MEASYEAR, FVS_STAND_ID)
 
 knitr::kable(x)
 ```
+
+```{r}
+knitr::kable(
+  matching_cond |>
+    filter(STATECD == 33 & UNITCD == 2 & COUNTYCD == 3 & PLOT == 163)
+)
+```
+
+```{r}
+fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia_plot = tbl(fia, 'PLOT')
+
+matching_plot <- fia_plot |>
+  semi_join(
+    nk_to_fia |> select(STATECD, UNITCD, COUNTYCD, PLOT),
+    by=join_by(STATECD, UNITCD, COUNTYCD, PLOT),
+    copy=TRUE
+  ) |>
+  collect()
+
+DBI::dbDisconnect(fia)
+```
+```{r}
+knitr::kable(matching_plot)
+
+```
+
+Now plot measured vs projected
+```{r}
+comparable_carbon <- NoManagement_Carbon_ByPlot |>
+  semi_join(grow_only |> rename(StandID = FVS_STAND_ID), by = join_by(StandID)) |>
+  select(StandID, Year, Standing_Carbon)
+knitr::kable(comparable_carbon)
+```
+
+```{r}
+
+# Filter projections to just plots that were measured.
+# Sum for each year.
+
+Projected_Carbon <- NoManagement_Carbon_ByPlot |>
+  semi_join()
+  group_by(Year) |>
+  summarize(
+    Total_Carbon=mean(Total_Stand_Carbon),
+    Aboveground_Carbon=mean(Aboveground_Carbon),
+    Standing_Carbon=mean(Standing_Carbon),
+    .groups = "keep"
+  ) |>
+  filter(Year >= 2005) |>
+  # Join in the NoManagement scenario from fig2 for comparison
+  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
+  rename(NK_Fig2_NoManagement = NoManagement)
+
+write_csv(NoManagement_Carbon_ByPlot_ByYear, "../03_outputs/NoManagement_Carbon_ByPlot_ByYear.csv")
+
+ggplot(
+    data = melt(NoManagement_Carbon_ByPlot_ByYear, id.vars = "Year"),
+    mapping = aes(x = Year, y = value, color = variable)
+  ) +
+  ggtitle("FVS Carbon Projection by FIA Plot") +
+  ylab("Carbon (Tonnes / Hectare)") +
+  theme(legend.title = element_blank()) +
+  geom_line() +
+  coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 320)) +
+  scale_x_continuous(breaks=seq(2005,2165,20)) +
+  scale_y_continuous(breaks=seq(0,320,20))
+
+```
+
