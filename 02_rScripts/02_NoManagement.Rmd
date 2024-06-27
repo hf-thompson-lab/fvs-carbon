@@ -9,7 +9,7 @@ editor_options:
     wrap: 72
 ---
 
-```{r include=FALSE}
+```{r setup, include=FALSE}
 # Pre-load libraries that issue warnings on startup so these
 # warnings don't corrupt the text later.
 suppressPackageStartupMessages(library(tidyverse))
@@ -141,6 +141,7 @@ above.
 
 -   Inventory Data Tables = FVS_StandInit_Plot
 -   Variants = ne: Northeast
+-   Groups: All_FIA_Plots
 -   Find stand(s): = 239901700110
 
 Clicking `Find` will then filter to the single matching stand, which can
@@ -213,12 +214,16 @@ knitr::kable(
 
 In FVS, go to Simulate -\> Components -\> Management From Categories,
 select "Planting & Natural Regeneration" From Components, select
-"Plant/Natural with Partial Estab Model" Component title: "Baseline
-Regen" Schedule the date of disturbance: Schedule by condition Create a
-condition: Every cycle, every even cycle, ... Condition title: Every
-cycle Years before condition can become true again: 0 The modulus of
-cycle number: 1 = every cycle Number of years after condition is found
-true: 0 Sprouting: On
+"Plant/Natural with Partial Estab Model"
+
+- Component title: "Baseline Regen"
+- Schedule the date of disturbance: Schedule by condition
+- Create a condition: Every cycle, every even cycle, ...
+- Condition title: Every cycle
+- Years before condition can become true again: 0
+- The modulus of cycle number: 1 = every cycle
+- Number of years after condition is found true: 0
+- Sprouting: On
 
 Note that this leaves Percent survival at 100, and average age and
 height empty.
@@ -260,46 +265,6 @@ Select `Save in run` to apply to `Grp: All_FIA_Plots`.
 The main output will be Carbon and fuels. Stand visualization, Tree
 lists, and Inventory statistics may also be interesting.
 
-## Automation
-
-Do it in code:
-<https://github.com/USDAForestService/ForestVegetationSimulator-Interface/tree/main/rFVS/R>
-
-Instructions:
-<https://github.com/USDAForestService/ForestVegetationSimulator-Interface/wiki/rFVS>
-
-This documents such gems in the interface as:
-
-> fvsGetRestartcode() Provides an R interface to Fortran function
-> fvsGetRestartcode.
-
-But, this example shows that they expect you to create your project in
-the UI, then run it using the API:
-
-```{r eval=FALSE}
-setwd ("<FVS-interface>/rFVS/tests")
-# Note: edit <open-fvs> to reflect your system. This directory string should be wherever 
-# your keyword file and input data are located
-
-# load the R functions using this method (if you don't have the rFVS package)
-sdir = "../R"
-# Note: this directory string should be wherever the rFVS functions are located
-for (rf in dir (sdir)) source (paste(sdir,rf,sep="/"))
-
-# or, if the rFVS package is installed, then just enter
-library(rFVS)
-
-# load the FVS library
-fvsLoad("FVSie", bin="<open-fvs>/trunk/bin")
-# Note: edit <open-fvs> to reflect your system. This directory string should 
-# be wherever your FVS shared libraries are located
-
-# specify the keyword file
-fvsSetCmdLine("--keywordfile=iet01.key")
-
-# Run the simulation as would be done using FVS as a program
-fvsRun()
-```
 
 ## Carbon Projection
 
@@ -323,9 +288,7 @@ NoManagement_Carbon_ByPlot <- read_csv(
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
   mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
-  mutate(Standing_Carbon = Aboveground_Live + Standing_Dead) |>
-  select(StandID, Year, Total_Stand_Carbon,
-         Aboveground_Carbon, Standing_Carbon,
+  select(StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
 knitr::kable(NoManagement_Carbon_ByPlot)
 ```
@@ -352,6 +315,7 @@ NoManagement_Carbon_ByPlot_ByYear <- NoManagement_Carbon_ByPlot |>
     Total_Carbon=mean(Total_Stand_Carbon),
     Aboveground_Carbon=mean(Aboveground_Carbon),
     Standing_Carbon=mean(Standing_Carbon),
+    Aboveground_Live=mean(Aboveground_Live),
     .groups = "keep"
   ) |>
   filter(Year >= 2005) |>
@@ -359,7 +323,7 @@ NoManagement_Carbon_ByPlot_ByYear <- NoManagement_Carbon_ByPlot |>
   full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
   rename(NK_Fig2_NoManagement = NoManagement)
 
-write_csv(NoManagement_Carbon_ByPlot_ByYear, "../03_outputs/NoManagement_Carbon_ByPlot_ByYear.csv")
+#write_csv(NoManagement_Carbon_ByPlot_ByYear, "../03_outputs/NoManagement_Carbon_ByPlot_ByYear.csv")
 
 ggplot(
     data = melt(NoManagement_Carbon_ByPlot_ByYear, id.vars = "Year"),
@@ -386,8 +350,9 @@ Plots_RMSE <- data.frame(
   Aboveground_Carbon = sqrt(mean(
     (NoManagement_Carbon_ByPlot_ByYear$Aboveground_Carbon - NoManagement_Carbon_ByPlot_ByYear$NK_Fig2_NoManagement)^2
   )),
-  Standing_Carbon = sqrt(mean(
-    (NoManagement_Carbon_ByPlot_ByYear$Standing_Carbon - NoManagement_Carbon_ByPlot_ByYear$NK_Fig2_NoManagement)^2
+  Aboveground_Live = sqrt(mean(
+    (NoManagement_Carbon_ByPlot_ByYear$Aboveground_Live -
+       NoManagement_Carbon_ByPlot_ByYear$NK_Fig2_NoManagement)^2
   ))
 )
 ggplot(
@@ -399,10 +364,10 @@ ggplot(
 ```
 
 Note that NK describe using Aboveground Carbon for their chart, but the
-best fit is from Standing Carbon, with RMSE \~= 12.
+best fit is from Aboveground Live, with RMSE \~= 12.
 
 ```{r}
-Plots_RMSE |> select(Standing_Carbon)
+Plots_RMSE |> select(Aboveground_Live)
 ```
 
 ### By Subplot
@@ -425,15 +390,13 @@ NoManagement_Carbon_BySubplot_ByYear <- read_csv(
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
   mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
-  mutate(Standing_Carbon = Aboveground_Live + Standing_Dead) |>
-  select(StandID, Year, Total_Carbon,
-         Aboveground_Carbon, Standing_Carbon,
+  select(StandID, Year, Total_Carbon, Aboveground_Carbon,
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead) |>
   group_by(Year) |>
   summarize(
     Total_Carbon=mean(Total_Carbon),
     Aboveground_Carbon=mean(Aboveground_Carbon),
-    Standing_Carbon=mean(Standing_Carbon),
+    Aboveground_Live=mean(Aboveground_Live),
     .groups = "keep"
   ) |>
   filter(Year >= 2005) |>
@@ -463,8 +426,8 @@ Subplots_RMSE <- data.frame(
   Aboveground_Carbon = sqrt(mean(
     (NoManagement_Carbon_BySubplot_ByYear$Aboveground_Carbon - NoManagement_Carbon_BySubplot_ByYear$NK_Fig2_NoManagement)^2
   )),
-  Standing_Carbon = sqrt(mean(
-    (NoManagement_Carbon_BySubplot_ByYear$Standing_Carbon - NoManagement_Carbon_BySubplot_ByYear$NK_Fig2_NoManagement)^2
+  Aboveground_Live = sqrt(mean(
+    (NoManagement_Carbon_BySubplot_ByYear$Aboveground_Live - NoManagement_Carbon_BySubplot_ByYear$NK_Fig2_NoManagement)^2
   ))
 )
 ggplot(
@@ -498,15 +461,13 @@ NoManagement_Carbon_ByCondition_ByYear <- read_csv(
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
   mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
-  mutate(Standing_Carbon = Aboveground_Live + Standing_Dead) |>
-  select(StandID, Year, Total_Carbon,
-         Aboveground_Carbon, Standing_Carbon,
+  select(StandID, Year, Total_Carbon, Aboveground_Carbon,
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead) |>
   group_by(Year) |>
   summarize(
     Total_Carbon=mean(Total_Carbon),
     Aboveground_Carbon=mean(Aboveground_Carbon),
-    Standing_Carbon=mean(Standing_Carbon),
+    Aboveground_Live=mean(Aboveground_Live),
     .groups = "keep"
   ) |>
   filter(Year >= 2005) |>
@@ -536,8 +497,8 @@ Conditions_RMSE <- data.frame(
   Aboveground_Carbon = sqrt(mean(
     (NoManagement_Carbon_ByCondition_ByYear$Aboveground_Carbon - NoManagement_Carbon_ByCondition_ByYear$NK_Fig2_NoManagement)^2
   )),
-  Standing_Carbon = sqrt(mean(
-    (NoManagement_Carbon_ByCondition_ByYear$Standing_Carbon - NoManagement_Carbon_ByCondition_ByYear$NK_Fig2_NoManagement)^2
+  Aboveground_Live = sqrt(mean(
+    (NoManagement_Carbon_ByCondition_ByYear$Aboveground_Live - NoManagement_Carbon_ByCondition_ByYear$NK_Fig2_NoManagement)^2
   ))
 )
 ggplot(
@@ -548,13 +509,11 @@ ggplot(
   geom_col()
 ```
 
-RMSE for Standing Carbon by Condition is \~15, which is close to that
-for Standing Carbon by Plot, but Standing Carbon by Plot has the lowest
-RMSE. Therefore we will use Standing Carbon by Plot for the remainder of
-this analysis.
+RMSE for Aboveground Live by Condition is \~13, which is close to that
+for Aboveground Live by Plot.
 
 ```{r}
-Conditions_RMSE |> select(Standing_Carbon)
+Conditions_RMSE |> select(Aboveground_Live)
 ```
 
 ## Carbon Measurement
@@ -578,7 +537,29 @@ nk_to_fia <- read_csv(
     )
   ) |>
   # Filter to only the columns needed to identify FIA conditions.
-  select(STATECD, UNITCD, COUNTYCD, PLOT)
+  select(`FIA plot code`, STATECD, UNITCD, COUNTYCD, PLOT)
+
+# We also want the FVS_STAND_ID for these plots; graft that on
+nk_to_fvs <- read_csv(
+    "../03_outputs/nk_to_fvs.csv",
+    col_types = cols(
+      `FIA plot code` = col_character(),
+      FVS_STAND_ID = col_character(),
+      STAND_ID_PLOT = col_character(),
+      STAND_ID_COND = col_character(),
+      .default = col_integer()
+    )
+  ) |>
+  # Filter to only the columns needed to identify FIA conditions.
+  select(`FIA plot code`, FVS_STAND_ID)
+
+nk_plot_ids <- nk_to_fia |>
+  full_join(nk_to_fvs, by=join_by(`FIA plot code`)) |>
+  # PLOT_ID is state, county, plot - like FVS_STAND_ID with no year
+  mutate(PLOT_ID = sprintf(paste0(
+    '%02d',  '%03d',   '%05d'),
+    STATECD, COUNTYCD, PLOT
+  ))
 
 # Connect to the FIA tables
 fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
@@ -589,7 +570,7 @@ fia_plot = tbl(fia, 'PLOT')
 # all plots used in NK.
 matching_plot <- fia_plot |>
   semi_join(
-    nk_to_fia |> select(STATECD, UNITCD, COUNTYCD, PLOT),
+    nk_plot_ids,
     by=join_by(STATECD, UNITCD, COUNTYCD, PLOT),
     copy=TRUE
   ) |>
@@ -600,7 +581,7 @@ matching_plot <- fia_plot |>
 # all conditions for all plots used in NK.
 matching_cond <- fia_cond |>
   semi_join(
-    nk_to_fia,
+    nk_plot_ids,
     by=join_by(STATECD, UNITCD, COUNTYCD, PLOT),
     copy=TRUE
   ) |>
@@ -932,23 +913,6 @@ inventoried plots with the carbon projected by FVS.
 We start by identifying those plots that are grow-only.
 
 ```{r}
-nk_to_fia <- read_csv("../03_outputs/nk_to_fia.csv",
-    col_types = cols(
-      `FIA plot code` = col_character(),
-      .default = col_number()
-    )
-  )
-
-nk_to_fvs <- read_csv("../03_outputs/nk_to_fvs.csv",
-    col_types = cols(
-      `FIA plot code` = col_character(),
-      FVS_STAND_ID = col_character(),
-      STAND_ID_PLOT = col_character(),
-      STAND_ID_COND = col_character(),
-      .default = col_number()
-    )
-  )
-
 grow_only <- matching_cond |>
   group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
   summarize(
@@ -960,8 +924,7 @@ grow_only <- matching_cond |>
   ungroup() |>
   filter(COND_STATUS_CD == 1 & TRTCD == 0 & DSTRBCD == 0) |>
   left_join(numbered_plots, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
-  left_join(nk_to_fia, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
-  left_join(nk_to_fvs, by = join_by(`FIA plot code`))
+  left_join(nk_plot_ids, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT))
   
 knitr::kable(grow_only)
 ```
@@ -987,90 +950,71 @@ We do this for each individual grow-only plot, then
 chart the observed vs. predicted carbon for just these plots.
 
 ```{r}
-x <- matching_cond |>
+grown_fvs_stands <- matching_cond |>
   semi_join(grow_only, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
   select(STATECD, UNITCD, COUNTYCD, PLOT, MEASYEAR) |>
   left_join(
-    nk_to_fia |>
-      select(STATECD, UNITCD, COUNTYCD, PLOT, `FIA plot code`),
+    nk_plot_ids,
     by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)
   ) |>
-  left_join(
-    nk_to_fvs |>
-      select(`FIA plot code`, FVS_STAND_ID),
-    by = join_by(`FIA plot code`)
-  ) |>
-  arrange(MEASYEAR, FVS_STAND_ID)
+  arrange(MEASYEAR, PLOT_ID)
 
-knitr::kable(x)
-```
-
-```{r}
-knitr::kable(
-  matching_cond |>
-    filter(STATECD == 33 & UNITCD == 2 & COUNTYCD == 3 & PLOT == 163)
-)
-```
-
-```{r}
-fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
-fia_plot = tbl(fia, 'PLOT')
-
-matching_plot <- fia_plot |>
-  semi_join(
-    nk_to_fia |> select(STATECD, UNITCD, COUNTYCD, PLOT),
-    by=join_by(STATECD, UNITCD, COUNTYCD, PLOT),
-    copy=TRUE
-  ) |>
-  collect()
-
-DBI::dbDisconnect(fia)
-```
-```{r}
-knitr::kable(matching_plot)
-
+knitr::kable(grown_fvs_stands)
 ```
 
 Now plot measured vs projected
+
 ```{r}
 comparable_carbon <- NoManagement_Carbon_ByPlot |>
   semi_join(grow_only |> rename(StandID = FVS_STAND_ID), by = join_by(StandID)) |>
-  select(StandID, Year, Standing_Carbon)
+  left_join(nk_plot_ids |> rename(StandID = FVS_STAND_ID), by=join_by(StandID)) |>
+  mutate(Variable = "Projected") |>
+  select(PLOT_ID, Year, Variable, Aboveground_Live) |>
+  arrange(Year, PLOT_ID)
 knitr::kable(comparable_carbon)
 ```
 
+
 ```{r}
-
-# Filter projections to just plots that were measured.
-# Sum for each year.
-
-Projected_Carbon <- NoManagement_Carbon_ByPlot |>
-  semi_join()
-  group_by(Year) |>
-  summarize(
-    Total_Carbon=mean(Total_Stand_Carbon),
-    Aboveground_Carbon=mean(Aboveground_Carbon),
-    Standing_Carbon=mean(Standing_Carbon),
-    .groups = "keep"
-  ) |>
-  filter(Year >= 2005) |>
-  # Join in the NoManagement scenario from fig2 for comparison
-  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
-  rename(NK_Fig2_NoManagement = NoManagement)
-
-write_csv(NoManagement_Carbon_ByPlot_ByYear, "../03_outputs/NoManagement_Carbon_ByPlot_ByYear.csv")
-
 ggplot(
-    data = melt(NoManagement_Carbon_ByPlot_ByYear, id.vars = "Year"),
-    mapping = aes(x = Year, y = value, color = variable)
+    data = comparable_carbon,
+    mapping = aes(x = Year, y = Aboveground_Live, color = PLOT_ID, style = Variable)
   ) +
-  ggtitle("FVS Carbon Projection by FIA Plot") +
-  ylab("Carbon (Tonnes / Hectare)") +
-  theme(legend.title = element_blank()) +
-  geom_line() +
-  coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 320)) +
-  scale_x_continuous(breaks=seq(2005,2165,20)) +
-  scale_y_continuous(breaks=seq(0,320,20))
-
+  geom_point() +
+  coord_cartesian(xlim = c(2000, 2025), ylim = c(0, 300)) +
+  scale_x_continuous(breaks=seq(2000,2025,10))
 ```
 
+```{r}
+FIA_Measured_2002 <- read_csv("../03_outputs/FIA_Measured_2002.csv", 
+    col_types = cols(StandID = col_character()))
+FIA_Measured_2003 <- read_csv("../03_outputs/FIA_Measured_2003.csv", 
+    col_types = cols(StandID = col_character()))
+FIA_Measured_2004 <- read_csv("../03_outputs/FIA_Measured_2004.csv", 
+    col_types = cols(StandID = col_character()))
+
+FIA_Measured <- FIA_Measured_2002 |>
+  union_all(FIA_Measured_2003) |>
+  union_all(FIA_Measured_2004) |>
+  mutate(Aboveground_Live = Aboveground_Total_Live) |>
+  mutate(PLOT_ID = paste0(
+     substring(StandID, 1, 2),
+     substring(StandID, 5, 12)
+  )) |>
+  mutate(Variable = "Measured") |>
+  select(PLOT_ID, Year, Variable, Aboveground_Live)
+```
+
+```{r}
+knitr::kable(FIA_Measured)
+```
+
+```{r}
+ggplot(
+    data = comparable_carbon |> union_all(FIA_Measured),
+    mapping = aes(x = Year, y = Aboveground_Live, color = PLOT_ID, shape = Variable)
+  ) +
+  geom_point() +
+  coord_cartesian(xlim = c(2000, 2025), ylim = c(0, 300)) +
+  scale_x_continuous(breaks=seq(2000,2025,10))
+```
