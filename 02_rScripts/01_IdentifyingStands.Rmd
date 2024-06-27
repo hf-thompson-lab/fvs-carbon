@@ -9,7 +9,7 @@ editor_options:
     wrap: 72
 ---
 
-```{r include=FALSE}
+```{r setup, include=FALSE}
 suppressPackageStartupMessages(library(tidyverse))
 suppressPackageStartupMessages(library(reshape2)) # for melt()
 ```
@@ -215,7 +215,7 @@ nk_to_fvs <- translated_stands |>
   left_join(matching_standinit_cond_grp, by=join_by(STAND_ID_COND==FVS_STANDINIT_COND)) |>
   left_join(matching_standinit_plot_grp, by=join_by(STAND_ID_PLOT==FVS_STANDINIT_PLOT))
 
-write_csv(matching_stands, "../03_outputs/nk_to_fvs.csv")
+write_csv(nk_to_fvs, "../03_outputs/nk_to_fvs.csv")
 
 knitr::kable(nk_to_fvs)
 ```
