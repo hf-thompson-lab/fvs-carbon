@@ -1,0 +1,63 @@
+!!title: Grow_2020 
+!!uuid:  b5ce1fee-d64e-4078-b0b2-a4b3c45ee030 
+!!built: 2024-07-02_16:39:12 
+StdIdent
+332000700781               Grow_2020
+StandCN
+610880114126144
+MgmtId
+A019
+InvYear       2020
+TimeInt                 10 
+NumCycle     1 
+
+DataBase
+DSNOut
+b5ce1fee-d64e-4078-b0b2-a4b3c45ee030.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+Stop

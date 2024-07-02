@@ -993,16 +993,26 @@ ggplot(
 ```
 
 ```{r}
-FIA_Measured_2002 <- read_csv("../03_outputs/FIA_Measured_2002.csv", 
-    col_types = cols(StandID = col_character()))
-FIA_Measured_2003 <- read_csv("../03_outputs/FIA_Measured_2003.csv", 
-    col_types = cols(StandID = col_character()))
-FIA_Measured_2004 <- read_csv("../03_outputs/FIA_Measured_2004.csv", 
-    col_types = cols(StandID = col_character()))
 
-FIA_Measured <- FIA_Measured_2002 |>
-  union_all(FIA_Measured_2003) |>
-  union_all(FIA_Measured_2004) |>
+measyears <- grown_fvs_stands |>
+  select(MEASYEAR) |>
+  group_by(MEASYEAR) |>
+  summarize(.groups = "keep") |>
+  ungroup()
+
+FIA_Measured <- NULL
+for (measyear in measyears)
+  fname <- paste0(
+    "../03_outputs/FIA_Measured_",
+    sprintf("%04d", measyear),
+    ".csv"
+  )
+  FIA_Measured <- bind_rows(
+      FIA_Measured,
+      read_csv(fname, col_types = cols(StandID = col_character()))
+    )
+
+FIA_Measured <- FIA_Measured |>
   mutate(Aboveground_Live = Aboveground_Total_Live) |>
   mutate(PLOT_ID = paste0(
      substring(StandID, 1, 2),
