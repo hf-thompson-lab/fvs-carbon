@@ -1027,8 +1027,27 @@ knitr::kable(FIA_Measured)
 ```
 
 ```{r}
+projected_carbon <- read_csv(
+    "../03_outputs/NoManagement_Carbon_ByPlotYearly.csv",
+    col_types = cols(StandID = col_character())
+  ) |>
+  mutate(Aboveground_Live = Aboveground_Total_Live) |>
+  mutate(PLOT_ID = paste0(
+     substring(StandID, 1, 2),
+     substring(StandID, 5, 12)
+  )) |>
+  mutate(Variable = "Projected") |>
+  select(PLOT_ID, Year, Variable, Aboveground_Live) |>
+  # filter down to only those plots/years that match measurement
+  semi_join(FIA_Measured, by = join_by(PLOT_ID, Year))
+
+knitr::kable(projected_carbon)
+
+```
+
+```{r}
 ggplot(
-    data = comparable_carbon |> union_all(FIA_Measured),
+    data = projected_carbon |> union_all(FIA_Measured),
     mapping = aes(x = Year, y = Aboveground_Live, color = PLOT_ID, shape = Variable)
   ) +
   geom_point(size = 2) +

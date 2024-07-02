@@ -1,0 +1,2436 @@
+!!title: ByPlotYearly 
+!!uuid:  6539063e-8901-438e-a7f4-7528e609eeac 
+!!built: 2024-06-27_16:00:17 
+StdIdent
+239901700110               ByPlotYearly
+StandCN
+52758055010538
+MgmtId
+A009
+InvYear       1999
+TimeInt                 1 
+NumCycle     26 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+230102501505               ByPlotYearly
+StandCN
+52932795010538
+MgmtId
+A009
+InvYear       2001
+TimeInt                 1 
+NumCycle     24 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+230101700852               ByPlotYearly
+StandCN
+52886246010538
+MgmtId
+A009
+InvYear       2001
+TimeInt                 1 
+NumCycle     24 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+230101701013               ByPlotYearly
+StandCN
+52882700010538
+MgmtId
+A009
+InvYear       2001
+TimeInt                 1 
+NumCycle     24 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+230202502686               ByPlotYearly
+StandCN
+52967848010538
+MgmtId
+A009
+InvYear       2002
+TimeInt                 1 
+NumCycle     23 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+230200702261               ByPlotYearly
+StandCN
+53006570010538
+MgmtId
+A009
+InvYear       2002
+TimeInt                 1 
+NumCycle     23 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+230300703046               ByPlotYearly
+StandCN
+53077724010538
+MgmtId
+A009
+InvYear       2003
+TimeInt                 1 
+NumCycle     22 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+230300703313               ByPlotYearly
+StandCN
+53073309010538
+MgmtId
+A009
+InvYear       2003
+TimeInt                 1 
+NumCycle     22 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+230300703677               ByPlotYearly
+StandCN
+53073921010538
+MgmtId
+A009
+InvYear       2003
+TimeInt                 1 
+NumCycle     22 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+230301702963               ByPlotYearly
+StandCN
+53085116010538
+MgmtId
+A009
+InvYear       2003
+TimeInt                 1 
+NumCycle     22 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+330200300163               ByPlotYearly
+StandCN
+55872473010538
+MgmtId
+A009
+InvYear       2003
+TimeInt                 1 
+NumCycle     22 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+330200700781               ByPlotYearly
+StandCN
+55877717010538
+MgmtId
+A009
+InvYear       2003
+TimeInt                 1 
+NumCycle     22 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+330200900904               ByPlotYearly
+StandCN
+55883728010538
+MgmtId
+A009
+InvYear       2002
+TimeInt                 1 
+NumCycle     23 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+330400900018               ByPlotYearly
+StandCN
+55904575010538
+MgmtId
+A009
+InvYear       2003
+TimeInt                 1 
+NumCycle     22 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+360203101088               ByPlotYearly
+StandCN
+53756283010538
+MgmtId
+A009
+InvYear       2003
+TimeInt                 1 
+NumCycle     22 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+360203102851               ByPlotYearly
+StandCN
+53756640010538
+MgmtId
+A009
+InvYear       2002
+TimeInt                 1 
+NumCycle     23 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+360204102456               ByPlotYearly
+StandCN
+53763542010538
+MgmtId
+A009
+InvYear       2003
+TimeInt                 1 
+NumCycle     22 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+360204104669               ByPlotYearly
+StandCN
+53763786010538
+MgmtId
+A009
+InvYear       2002
+TimeInt                 1 
+NumCycle     23 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+360211302486               ByPlotYearly
+StandCN
+53706798010538
+MgmtId
+A009
+InvYear       2002
+TimeInt                 1 
+NumCycle     23 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+360303506767               ByPlotYearly
+StandCN
+53953992010538
+MgmtId
+A009
+InvYear       2003
+TimeInt                 1 
+NumCycle     22 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+360304303762               ByPlotYearly
+StandCN
+53906549010538
+MgmtId
+A009
+InvYear       2003
+TimeInt                 1 
+NumCycle     22 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+360304303966               ByPlotYearly
+StandCN
+53906921010538
+MgmtId
+A009
+InvYear       2003
+TimeInt                 1 
+NumCycle     22 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+360303102007               ByPlotYearly
+StandCN
+53937429010538
+MgmtId
+A009
+InvYear       2004
+TimeInt                 1 
+NumCycle     21 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+360303105127               ByPlotYearly
+StandCN
+53937752010538
+MgmtId
+A009
+InvYear       2004
+TimeInt                 1 
+NumCycle     21 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+360303105218               ByPlotYearly
+StandCN
+53935058010538
+MgmtId
+A009
+InvYear       2003
+TimeInt                 1 
+NumCycle     22 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+360304102413               ByPlotYearly
+StandCN
+53904252010538
+MgmtId
+A009
+InvYear       2003
+TimeInt                 1 
+NumCycle     22 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+360304102703               ByPlotYearly
+StandCN
+53903045010538
+MgmtId
+A009
+InvYear       2004
+TimeInt                 1 
+NumCycle     21 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+360304106138               ByPlotYearly
+StandCN
+53956994010538
+MgmtId
+A009
+InvYear       2004
+TimeInt                 1 
+NumCycle     21 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+360311305029               ByPlotYearly
+StandCN
+53967425010538
+MgmtId
+A009
+InvYear       2003
+TimeInt                 1 
+NumCycle     22 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+500401701120               ByPlotYearly
+StandCN
+55966927010538
+MgmtId
+A009
+InvYear       2004
+TimeInt                 1 
+NumCycle     21 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+500402300275               ByPlotYearly
+StandCN
+55972201010538
+MgmtId
+A009
+InvYear       2004
+TimeInt                 1 
+NumCycle     21 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+StdIdent
+500500900479               ByPlotYearly
+StandCN
+62277003010538
+MgmtId
+A009
+InvYear       2005
+TimeInt                 1 
+NumCycle     20 
+
+DataBase
+DSNOut
+6539063e-8901-438e-a7f4-7528e609eeac.db
+* FVS_Summary, FVS_Compute, Mistletoe
+Summary        2
+Computdb          0         1
+MisRpts        2
+End
+
+* FVS_Carbon, FVS_Hrv_Carbon, FVS_Fuels, FVS_Consumption
+FMIn
+CarbRept        2
+CarbCut
+CarbCalc
+FuelOut         0
+FuelRept
+End
+Database
+CarbReDB        2
+FuelReDB        2
+FuelsOut        2
+End
+
+DelOTab            1
+DelOTab            2
+DelOTab            4
+!Exten:base Title:From: FVS_GroupAddFilesAndKeywords
+Database
+DSNIn
+FVS_Data.db
+StandSQL
+SELECT*
+FROM FVS_StandInit_Plot
+WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+TreeSQL
+SELECT*
+FROM FVS_TreeInit_Plot
+WHERE Stand_CN ='%Stand_CN%'
+EndSQL
+END
+!Exten:base Title:Freeform: Every cycle
+If                 0
+mod(cycle,1) eq 0
+Then
+Estab
+!Exten:strp Title:Baseline Regen
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+
+End
+EndIf
+FMIn
+!Exten:fire Title:CarbCalc: Metric
+CarbCalc           0         1    0.0425         9        11
+End
+SPLabel
+  All_FIA_Plots
+Process
+
+Stop
