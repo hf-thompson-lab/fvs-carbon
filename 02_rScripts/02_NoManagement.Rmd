@@ -950,13 +950,20 @@ We do this for each individual grow-only plot, then
 chart the observed vs. predicted carbon for just these plots.
 
 ```{r}
-grown_fvs_stands <- matching_cond |>
+grown_fvs_stands <- matching_plot |>
   semi_join(grow_only, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
-  select(STATECD, UNITCD, COUNTYCD, PLOT, MEASYEAR) |>
+  select(STATECD, UNITCD, COUNTYCD, PLOT, MEASYEAR, INVYR) |>
   left_join(
     nk_plot_ids,
     by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)
   ) |>
+  # FVS_STAND_ID is for the original plot; update to use the correct year
+  mutate(FVS_STAND_ID = paste0(
+     substring(FVS_STAND_ID, 1, 2),
+     sprintf("%02d", MEASYEAR %% 100),
+     substring(FVS_STAND_ID, 5, 12)
+  )) |>
+
   arrange(MEASYEAR, PLOT_ID)
 
 knitr::kable(grown_fvs_stands)
