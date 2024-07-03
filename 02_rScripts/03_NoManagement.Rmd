@@ -22,107 +22,6 @@ suppressPackageStartupMessages(library(dbplyr))
 
 # Reproducing the NoManagement Scenario
 
-## Reconstructing NK Figure 2
-
-To validate FVS runs, we reconstruct the table behind Figure 2. To do
-this, we use the tool <https://automeris.io/wpd/> which aids in
-estimating the tabular data behind a chart.
-
-The project used to extract the table is in
-[02_rScripts/AutoMeris_NK_Fig2.json]. The tool is imperfect, so we apply
-some cleanup to produce an approximate table.
-
-Note that all values are approximate. For example, all values should
-align in 2005, but they do not; we ignore this, since small differences
-are within the error bounds for parsing the chart.
-
-```{r}
-NK_Fig2_NoManagement <- read_csv(
-    "../01_processedInputData/NK_Fig2_NoManagement.csv",
-    col_names = c("Year","NoManagement"),
-    # Read columns as double, since that is how they were written
-    col_types = "dd"
-  ) |>
-  # Round columns to nearest integer, since that is what was intended
-  mutate(Year=round(Year), NoManagement=round(NoManagement))
-NK_Fig2_ClearcutHigh <- read_csv(
-    "../01_processedInputData/NK_Fig2_ClearcutHigh.csv",
-    col_names = c("Year","ClearcutHigh"),
-    col_types = "dd"
-  ) |>
-  mutate(Year=round(Year), ClearcutHigh=round(ClearcutHigh))
-NK_Fig2_ClearcutLow <- read_csv(
-    "../01_processedInputData/NK_Fig2_ClearcutLow.csv",
-    col_names = c("Year","ClearcutLow"),
-    col_types = "dd"
-  ) |>
-  mutate(Year=round(Year), ClearcutLow=round(ClearcutLow))
-NK_Fig2_ShelterwoodHigh <- read_csv(
-    "../01_processedInputData/NK_Fig2_ShelterwoodHigh.csv",
-    col_names = c("Year","ShelterwoodHigh"),
-    col_types = "dd"
-  ) |>
-  mutate(Year=round(Year), ShelterwoodHigh=round(ShelterwoodHigh))
-NK_Fig2_ShelterwoodLow <- read_csv(
-    "../01_processedInputData/NK_Fig2_ShelterwoodLow.csv",
-    col_names = c("Year","ShelterwoodLow"),
-    col_types = "dd"
-  ) |>
-  mutate(Year=round(Year), ShelterwoodLow=round(ShelterwoodLow))
-NK_Fig2_ITS_LowHigh <- read_csv(
-    "../01_processedInputData/NK_Fig2_ITS_LowHigh.csv",
-    col_names = c("Year","ITS_LowHigh"),
-    col_types = "dd"
-  ) |>
-  mutate(Year=round(Year), ITS_LowHigh=round(ITS_LowHigh))
-NK_Fig2_ITS_LowLow <- read_csv(
-    "../01_processedInputData/NK_Fig2_ITS_LowLow.csv",
-    col_names = c("Year","ITS_LowLow"),
-    col_types = "dd"
-  ) |>
-  mutate(Year=round(Year), ITS_LowLow=round(ITS_LowLow))
-NK_Fig2_ITS_HighHigh <- read_csv(
-    "../01_processedInputData/NK_Fig2_ITS_HighHigh.csv",
-    col_names = c("Year","ITS_HighHigh"),
-    col_types = "dd"
-  ) |>
-  mutate(Year=round(Year), ITS_HighHigh=round(ITS_HighHigh))
-NK_Fig2_ITS_HighLow <- read_csv(
-    "../01_processedInputData/NK_Fig2_ITS_HighLow.csv",
-    col_names = c("Year","ITS_HighLow"),
-    col_types = "dd"
-  ) |>
-  mutate(Year=round(Year), ITS_HighLow=round(ITS_HighLow))
-
-# Assemble a single table from 2005 - 2165
-fig2 <- NK_Fig2_NoManagement |>
-  full_join(NK_Fig2_ClearcutHigh, by=join_by(Year)) |>
-  full_join(NK_Fig2_ClearcutLow, by=join_by(Year)) |>
-  full_join(NK_Fig2_ShelterwoodHigh, by=join_by(Year)) |>
-  full_join(NK_Fig2_ShelterwoodLow, by=join_by(Year)) |>
-  full_join(NK_Fig2_ITS_LowHigh, by=join_by(Year)) |>
-  full_join(NK_Fig2_ITS_LowLow, by=join_by(Year)) |>
-  full_join(NK_Fig2_ITS_HighHigh, by=join_by(Year)) |>
-  full_join(NK_Fig2_ITS_HighLow, by=join_by(Year)) |>
-  filter(Year>=2005) |>
-  # The last year in Fig2 is 2164; nudge it to 2165
-  # to align with contemporary FVS runs.
-  mutate(Year=if_else(Year==2164,2165,Year)) |>
-  arrange(Year)
-
-ggplot(
-    data = melt(fig2, id.vars = "Year"),
-    mapping = aes(x = Year, y = value, color = variable)
-  ) +
-  ggtitle("NK Fig2 Reconstruction") +
-  ylab("Carbon (Tonnes / Hectare)") +
-  theme(legend.title = element_blank()) +
-  geom_line() +
-  coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 200)) +
-  scale_x_continuous(breaks=seq(2005,2165,20)) +
-  scale_y_continuous(breaks=seq(0,200,20))
-```
-
 ## Configuring FVS
 
 FVS Software with `Release date: 20240401` was used.
@@ -309,12 +208,27 @@ storage in the NoManagement scenario; it might be the right thing to do
 to omit 2164 / 2165 as well.
 
 ```{r}
+fig2 <- read_csv(
+  "../03_outputs/nk_fig2_reconstructed.csv",
+  col_types = cols(
+    Year = col_integer(),
+    NoManagement = col_double(),
+    ClearcutHigh = col_double(),
+    ClearcutLow = col_double(),
+    ShelterwoodHigh = col_double(),
+    ShelterwoodLow = col_double(),
+    ITS_LowHigh = col_double(),
+    ITS_LowLow = col_double(),
+    ITS_HighHigh = col_double(),
+    ITS_HighLow = col_double()
+  )
+)
+
 NoManagement_Carbon_ByPlot_ByYear <- NoManagement_Carbon_ByPlot |>
   group_by(Year) |>
   summarize(
     Total_Carbon=mean(Total_Stand_Carbon),
     Aboveground_Carbon=mean(Aboveground_Carbon),
-    Standing_Carbon=mean(Standing_Carbon),
     Aboveground_Live=mean(Aboveground_Live),
     .groups = "keep"
   ) |>
@@ -323,7 +237,7 @@ NoManagement_Carbon_ByPlot_ByYear <- NoManagement_Carbon_ByPlot |>
   full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
   rename(NK_Fig2_NoManagement = NoManagement)
 
-#write_csv(NoManagement_Carbon_ByPlot_ByYear, "../03_outputs/NoManagement_Carbon_ByPlot_ByYear.csv")
+write_csv(NoManagement_Carbon_ByPlot_ByYear, "../03_outputs/NoManagement_Carbon_ByPlot_ByYear.csv")
 
 ggplot(
     data = melt(NoManagement_Carbon_ByPlot_ByYear, id.vars = "Year"),
