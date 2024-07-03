@@ -1086,3 +1086,27 @@ ggplot(
     formula = 'y ~ x'
   )
 ```
+plot predicted vs. observed
+```{r}
+projected_observed <- projected_carbon |>
+  mutate(Projected = Aboveground_Live) |>
+  select(PLOT_ID, Year, Projected) |>
+  full_join(FIA_Measured, by = join_by(PLOT_ID, Year)) |>
+  mutate(Measured = Aboveground_Live) |>
+  select(PLOT_ID, Year, Projected, Measured)
+
+ggplot(
+    data = projected_observed
+  ) +
+  geom_point(
+    size = 2,
+    mapping = aes(x = Measured, y = Projected, color = Year)
+  ) +
+  ggtitle("FVS NoManagement Scenario\nMeasured vs. Projected Carbon (Mg C/ha)") +
+  coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
+  geom_line(
+    data = tibble(x = c(0, 200), y=c(0, 200)),
+    mapping = aes(x = x, y = y)
+  )
+```
+
