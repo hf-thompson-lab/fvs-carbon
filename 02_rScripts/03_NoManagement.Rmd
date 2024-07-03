@@ -1,0 +1,1112 @@
+---
+title: "Nunery Keeton Revisited"
+author: "Nikolaus Bates-Haus"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+# Pre-load libraries that issue warnings on startup so these
+# warnings don't corrupt the text later.
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(reshape2)) # for melt()
+suppressPackageStartupMessages(library(RSQLite))
+suppressPackageStartupMessages(library(htmltools))
+suppressPackageStartupMessages(library(rmarkdown))
+suppressPackageStartupMessages(library(dbplyr))
+```
+
+# Reproducing the NoManagement Scenario
+
+## Reconstructing NK Figure 2
+
+To validate FVS runs, we reconstruct the table behind Figure 2. To do
+this, we use the tool <https://automeris.io/wpd/> which aids in
+estimating the tabular data behind a chart.
+
+The project used to extract the table is in
+[02_rScripts/AutoMeris_NK_Fig2.json]. The tool is imperfect, so we apply
+some cleanup to produce an approximate table.
+
+Note that all values are approximate. For example, all values should
+align in 2005, but they do not; we ignore this, since small differences
+are within the error bounds for parsing the chart.
+
+```{r}
+NK_Fig2_NoManagement <- read_csv(
+    "../01_processedInputData/NK_Fig2_NoManagement.csv",
+    col_names = c("Year","NoManagement"),
+    # Read columns as double, since that is how they were written
+    col_types = "dd"
+  ) |>
+  # Round columns to nearest integer, since that is what was intended
+  mutate(Year=round(Year), NoManagement=round(NoManagement))
+NK_Fig2_ClearcutHigh <- read_csv(
+    "../01_processedInputData/NK_Fig2_ClearcutHigh.csv",
+    col_names = c("Year","ClearcutHigh"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ClearcutHigh=round(ClearcutHigh))
+NK_Fig2_ClearcutLow <- read_csv(
+    "../01_processedInputData/NK_Fig2_ClearcutLow.csv",
+    col_names = c("Year","ClearcutLow"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ClearcutLow=round(ClearcutLow))
+NK_Fig2_ShelterwoodHigh <- read_csv(
+    "../01_processedInputData/NK_Fig2_ShelterwoodHigh.csv",
+    col_names = c("Year","ShelterwoodHigh"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ShelterwoodHigh=round(ShelterwoodHigh))
+NK_Fig2_ShelterwoodLow <- read_csv(
+    "../01_processedInputData/NK_Fig2_ShelterwoodLow.csv",
+    col_names = c("Year","ShelterwoodLow"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ShelterwoodLow=round(ShelterwoodLow))
+NK_Fig2_ITS_LowHigh <- read_csv(
+    "../01_processedInputData/NK_Fig2_ITS_LowHigh.csv",
+    col_names = c("Year","ITS_LowHigh"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ITS_LowHigh=round(ITS_LowHigh))
+NK_Fig2_ITS_LowLow <- read_csv(
+    "../01_processedInputData/NK_Fig2_ITS_LowLow.csv",
+    col_names = c("Year","ITS_LowLow"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ITS_LowLow=round(ITS_LowLow))
+NK_Fig2_ITS_HighHigh <- read_csv(
+    "../01_processedInputData/NK_Fig2_ITS_HighHigh.csv",
+    col_names = c("Year","ITS_HighHigh"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ITS_HighHigh=round(ITS_HighHigh))
+NK_Fig2_ITS_HighLow <- read_csv(
+    "../01_processedInputData/NK_Fig2_ITS_HighLow.csv",
+    col_names = c("Year","ITS_HighLow"),
+    col_types = "dd"
+  ) |>
+  mutate(Year=round(Year), ITS_HighLow=round(ITS_HighLow))
+
+# Assemble a single table from 2005 - 2165
+fig2 <- NK_Fig2_NoManagement |>
+  full_join(NK_Fig2_ClearcutHigh, by=join_by(Year)) |>
+  full_join(NK_Fig2_ClearcutLow, by=join_by(Year)) |>
+  full_join(NK_Fig2_ShelterwoodHigh, by=join_by(Year)) |>
+  full_join(NK_Fig2_ShelterwoodLow, by=join_by(Year)) |>
+  full_join(NK_Fig2_ITS_LowHigh, by=join_by(Year)) |>
+  full_join(NK_Fig2_ITS_LowLow, by=join_by(Year)) |>
+  full_join(NK_Fig2_ITS_HighHigh, by=join_by(Year)) |>
+  full_join(NK_Fig2_ITS_HighLow, by=join_by(Year)) |>
+  filter(Year>=2005) |>
+  # The last year in Fig2 is 2164; nudge it to 2165
+  # to align with contemporary FVS runs.
+  mutate(Year=if_else(Year==2164,2165,Year)) |>
+  arrange(Year)
+
+ggplot(
+    data = melt(fig2, id.vars = "Year"),
+    mapping = aes(x = Year, y = value, color = variable)
+  ) +
+  ggtitle("NK Fig2 Reconstruction") +
+  ylab("Carbon (Tonnes / Hectare)") +
+  theme(legend.title = element_blank()) +
+  geom_line() +
+  coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 200)) +
+  scale_x_continuous(breaks=seq(2005,2165,20)) +
+  scale_y_continuous(breaks=seq(0,200,20))
+```
+
+## Configuring FVS
+
+FVS Software with `Release date: 20240401` was used.
+
+FIA data version:
+
+```         
+% sqlite3 SQLite_FIADB_ENTIRE.db 'select * from REF_FIADB_VERSION ORDER BY VERSION DESC limit 1;'
+FIADB_1.9.2.00|RELEASE|THIS IS FIADB VERSION 9.2 PROD|FS_NIMS_FIADB_RMRS|2024-01-23 10:16:14|732862|||
+```
+
+### Stands
+
+Stands can be found in the FVS UI using FVS_STAND_ID from the table
+above.
+
+-   Inventory Data Tables = FVS_StandInit_Plot
+-   Variants = ne: Northeast
+-   Groups: All_FIA_Plots
+-   Find stand(s): = 239901700110
+
+Clicking `Find` will then filter to the single matching stand, which can
+be added to the run.
+
+Repeat for each of the above stands.
+
+### Time
+
+FVS will not run prior to the inventory year; it's unclear what NK did
+to get their chart to go back prior to 2005. We will instead use 2005 as
+the common starting year.
+
+NK ends in 2164; we adjust this to 2165 so that all cycles are 10 years
+long. Note that FVS does not include the ending year unless it is at the
+start of a new cycle, so we set the common ending year to 2166.
+
+All events in NK take place on 10 year intervals, therefore we select 10
+years as the reporting interval.
+
+### Regeneration
+
+NK regeneration rates are in NK Table 4, in seedlings per hectare.
+
+In addition to scenario-specific regeneration, NK 2.4 states,
+"Background regeneration rates (intermediate to shade tolerant species
+only), input at 10 year intervals, emulated natural regeneration within
+stands, independent of forest management activities."
+
+This background regeneration rate is in NK Table 4.
+
+```{r}
+table4 <- read_csv(
+  "../00_rawData/NK_Table_4.csv",
+  col_types = cols(
+    `Management scenario` = col_character(),
+    .default = col_number(),
+  )
+)
+
+# Table4 uses scientific names; translate to get FVS Species Code
+fvs_species_codes <- read_csv(
+    "../01_processedInputData/FVSne_Overview_Table_3.2.1.csv",
+    col_types = "iiciccc"
+  ) |>
+  select("Scientific Name", "Species Code", "Common Name")
+
+# table4 has one column per species. We wish to add observations per species
+# with different types, so pivot the table to have one row per species.
+table4_rot <- table4 |>
+  pivot_longer(cols = !`Management scenario`) |>
+  pivot_wider(names_from = `Management scenario`) |>
+  rename(`Scientific Name`=name) |>
+  left_join(fvs_species_codes, by=join_by(`Scientific Name`))
+
+# Values in NK are seedlings per hectare; FVS needs seedlings per acre
+hectare_to_acre <- 2.471
+table4_rot$Clearcut <- round(table4_rot$Clearcut * hectare_to_acre)
+table4_rot$Shelterwood <- round(table4_rot$Shelterwood * hectare_to_acre)
+table4_rot$`ITS_Low Retention` <- round(table4_rot$`ITS_Low Retention` * hectare_to_acre)
+table4_rot$`ITS_High Retention` <- round(table4_rot$`ITS_High Retention` * hectare_to_acre)
+table4_rot$Background <- round(table4_rot$Background * hectare_to_acre)
+
+knitr::kable(
+  table4_rot |>
+  select(`Scientific Name`, Background, `Species Code`, `Common Name`) |>
+  arrange(desc(Background))
+)
+```
+
+In FVS, go to Simulate -\> Components -\> Management From Categories,
+select "Planting & Natural Regeneration" From Components, select
+"Plant/Natural with Partial Estab Model"
+
+- Component title: "Baseline Regen"
+- Schedule the date of disturbance: Schedule by condition
+- Create a condition: Every cycle, every even cycle, ...
+- Condition title: Every cycle
+- Years before condition can become true again: 0
+- The modulus of cycle number: 1 = every cycle
+- Number of years after condition is found true: 0
+- Sprouting: On
+
+Note that this leaves Percent survival at 100, and average age and
+height empty.
+
+In freeform, this looks like:
+
+```         
+Estab              0
+Sprout
+Natural            0        SM      1221      100.                             0
+Natural            0        AB       610      100.                             0
+Natural            0        EH       153      100.                             0
+Natural            0        RS       153      100.                             0
+Natural            0        YB       153      100.                             0
+Natural            0        RM       153      100.                             0
+```
+
+Switch to freeform and add all the rows, fix the titles.
+
+Select `Save in run` to apply to `Grp: All_FIA_Plots`.
+
+### Carbon
+
+To set the carbon calculations to be metric (Metric tons of carbon per
+hectare), go to Simulate -\> Components -\> Keywords, and select:
+
+-   Extensions: Fire and Fuels Extension
+-   Keywords: CarbCalc: Set the carbon accounting parameters.
+-   Component title: CarbCalc: Metric
+-   Biomass predictions: 0 = Use FFE biomass predictions
+-   Units: 1 = Metric (metric tons carbon/hectare)
+-   Note: Annual root decay rate (proportion per year) remains at its
+    default value of 0.0425.
+
+Select `Save in run` to apply to `Grp: All_FIA_Plots`.
+
+## Run FVS
+
+The main output will be Carbon and fuels. Stand visualization, Tree
+lists, and Inventory statistics may also be interesting.
+
+
+## Carbon Projection
+
+### By Plot
+
+Read FVS output for carbon storage by plot. FVS column names are a bit
+idiosyncratic, so clean those up.
+
+NK states that Fig 2 sums carbon from aboveground live, standing dead,
+and down dead. For comparison, we also compute standing carbon as
+aboveground live plus standing dead.
+
+```{r}
+NoManagement_Carbon_ByPlot <- read_csv(
+    "../03_outputs/NoManagement_Carbon_ByPlot.csv",
+    col_types = cols(
+      StandID = col_character()
+    )
+  ) |>
+  rename(Aboveground_Live = Aboveground_Total_Live) |>
+  rename(Down_Dead = Forest_Down_Dead_Wood) |>
+  mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
+  mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
+  select(StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
+         Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
+knitr::kable(NoManagement_Carbon_ByPlot)
+```
+
+Plot these against NK Fig 2 "NoManagement" scenario. NK Fig 2 has three
+different scales on the horizontal axis:
+
+1.  From 1995 to 2005, major ticks are every 5 years
+2.  From 2005 to 2155, major ticks are every 10 years
+3.  From 2155 to 2164, major ticks are every 9 years
+
+NK states that data prior to 2005 is projected from mean growth rate. To
+simplify the chart, we omit data prior to 2005, place major tick marks
+every 10 years, and nudge the end date from 2164 to 2165.
+
+Note that NK Fig2 year 2164 shows an anomalous reduction in carbon
+storage in the NoManagement scenario; it might be the right thing to do
+to omit 2164 / 2165 as well.
+
+```{r}
+NoManagement_Carbon_ByPlot_ByYear <- NoManagement_Carbon_ByPlot |>
+  group_by(Year) |>
+  summarize(
+    Total_Carbon=mean(Total_Stand_Carbon),
+    Aboveground_Carbon=mean(Aboveground_Carbon),
+    Standing_Carbon=mean(Standing_Carbon),
+    Aboveground_Live=mean(Aboveground_Live),
+    .groups = "keep"
+  ) |>
+  filter(Year >= 2005) |>
+  # Join in the NoManagement scenario from fig2 for comparison
+  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
+  rename(NK_Fig2_NoManagement = NoManagement)
+
+#write_csv(NoManagement_Carbon_ByPlot_ByYear, "../03_outputs/NoManagement_Carbon_ByPlot_ByYear.csv")
+
+ggplot(
+    data = melt(NoManagement_Carbon_ByPlot_ByYear, id.vars = "Year"),
+    mapping = aes(x = Year, y = value, color = variable)
+  ) +
+  ggtitle("FVS Carbon Projection by FIA Plot") +
+  ylab("Carbon (Tonnes / Hectare)") +
+  theme(legend.title = element_blank()) +
+  geom_line() +
+  coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 320)) +
+  scale_x_continuous(breaks=seq(2005,2165,20)) +
+  scale_y_continuous(breaks=seq(0,320,20))
+```
+
+From the chart it seems evident that standing carbon is the best match
+for the NoManagement scenario in NK Fig 2. We confirm this by computing
+RMS error for the residuals between our FVS runs and the NK Fig 2 data:
+
+```{r}
+Plots_RMSE <- data.frame(
+  Total_Carbon = sqrt(mean(
+    (NoManagement_Carbon_ByPlot_ByYear$Total_Carbon - NoManagement_Carbon_ByPlot_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Aboveground_Carbon = sqrt(mean(
+    (NoManagement_Carbon_ByPlot_ByYear$Aboveground_Carbon - NoManagement_Carbon_ByPlot_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Aboveground_Live = sqrt(mean(
+    (NoManagement_Carbon_ByPlot_ByYear$Aboveground_Live -
+       NoManagement_Carbon_ByPlot_ByYear$NK_Fig2_NoManagement)^2
+  ))
+)
+ggplot(
+    data = melt(Plots_RMSE, id = NULL, variable.name = "Series", value.name = "RMSE"),
+    mapping = aes(x = Series, y = RMSE)
+  ) +
+  ggtitle("FVS Carbon Projection by FIA Plot") +
+  geom_col()
+```
+
+Note that NK describe using Aboveground Carbon for their chart, but the
+best fit is from Aboveground Live, with RMSE \~= 12.
+
+```{r}
+Plots_RMSE |> select(Aboveground_Live)
+```
+
+### By Subplot
+
+To confirm that NK used the FVS_StandInit_Plot table, we examine the
+RMSE between projections from other tables and the NK Fig 2 values.
+
+We repeat the above FVS run, but select table FVS_PlotInit_Plot and
+select all subplots using the translated stand IDs. We apply the same
+configuration to all stands as we did for FVS_StandInit_Plot. We load
+and clean the results in the same manner.
+
+```{r}
+NoManagement_Carbon_BySubplot_ByYear <- read_csv(
+    "../03_outputs/NoManagement_Carbon_BySubplot.csv",
+    col_types = cols(StandID = col_character())
+  ) |>
+  rename(Total_Carbon = Total_Stand_Carbon) |>
+  rename(Aboveground_Live = Aboveground_Total_Live) |>
+  rename(Down_Dead = Forest_Down_Dead_Wood) |>
+  mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
+  mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
+  select(StandID, Year, Total_Carbon, Aboveground_Carbon,
+         Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead) |>
+  group_by(Year) |>
+  summarize(
+    Total_Carbon=mean(Total_Carbon),
+    Aboveground_Carbon=mean(Aboveground_Carbon),
+    Aboveground_Live=mean(Aboveground_Live),
+    .groups = "keep"
+  ) |>
+  filter(Year >= 2005) |>
+  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
+  rename(NK_Fig2_NoManagement = NoManagement)
+
+ggplot(
+    data = melt(NoManagement_Carbon_BySubplot_ByYear, id.vars = "Year"),
+    mapping = aes(x = Year, y = value, color = variable)
+  ) +
+  ggtitle("FVS Carbon Projection by FIA Subplot") +
+  ylab("Carbon (Tonnes / Hectare)") +
+  theme(legend.title = element_blank()) +
+  geom_line() +
+  coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 320)) +
+  scale_x_continuous(breaks=seq(2005,2165,20)) +
+  scale_y_continuous(breaks=seq(0,320,20))
+```
+
+Examine RMSE for the residuals:
+
+```{r}
+Subplots_RMSE <- data.frame(
+  Total_Carbon = sqrt(mean(
+    (NoManagement_Carbon_BySubplot_ByYear$Total_Carbon - NoManagement_Carbon_BySubplot_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Aboveground_Carbon = sqrt(mean(
+    (NoManagement_Carbon_BySubplot_ByYear$Aboveground_Carbon - NoManagement_Carbon_BySubplot_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Aboveground_Live = sqrt(mean(
+    (NoManagement_Carbon_BySubplot_ByYear$Aboveground_Live - NoManagement_Carbon_BySubplot_ByYear$NK_Fig2_NoManagement)^2
+  ))
+)
+ggplot(
+    data = melt(Subplots_RMSE, id = NULL, variable.name = "Series", value.name = "RMSE"),
+    mapping = aes(x = Series, y = RMSE)
+  ) +
+  ggtitle("FVS Carbon Projection by FIA Subplot") +
+  geom_col()
+```
+
+Note that all RMSE for the subplot projections are significantly worse
+than for the plot projections.
+
+### By Condition
+
+We repeat the exercise using the FVS_StandInit_Cond table, which creates
+FVS stands for corresponding FIA conditions.
+
+We select all conditions using the translated stand IDs. Note that plot
+360304303966 has 3 conditions; we include all three. We apply the same
+configuration to all stands as we did for FVS_StandInit_Plot. We load
+and clean the results in the same manner.
+
+```{r}
+NoManagement_Carbon_ByCondition_ByYear <- read_csv(
+    "../03_outputs/NoManagement_Carbon_ByCondition.csv",
+    col_types = cols(StandID = col_character())
+  ) |>
+  rename(Total_Carbon = Total_Stand_Carbon) |>
+  rename(Aboveground_Live = Aboveground_Total_Live) |>
+  rename(Down_Dead = Forest_Down_Dead_Wood) |>
+  mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
+  mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
+  select(StandID, Year, Total_Carbon, Aboveground_Carbon,
+         Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead) |>
+  group_by(Year) |>
+  summarize(
+    Total_Carbon=mean(Total_Carbon),
+    Aboveground_Carbon=mean(Aboveground_Carbon),
+    Aboveground_Live=mean(Aboveground_Live),
+    .groups = "keep"
+  ) |>
+  filter(Year >= 2005) |>
+  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
+  rename(NK_Fig2_NoManagement = NoManagement)
+
+ggplot(
+    data = melt(NoManagement_Carbon_ByCondition_ByYear, id.vars = "Year"),
+    mapping = aes(x = Year, y = value, color = variable)
+  ) +
+  ggtitle("FVS Carbon Projection by FIA Condition") +
+  ylab("Carbon (Tonnes / Hectare)") +
+  theme(legend.title = element_blank()) +
+  geom_line() +
+  coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 320)) +
+  scale_x_continuous(breaks=seq(2005,2165,20)) +
+  scale_y_continuous(breaks=seq(0,320,20))
+```
+
+Examine RMSE for the residuals:
+
+```{r}
+Conditions_RMSE <- data.frame(
+  Total_Carbon = sqrt(mean(
+    (NoManagement_Carbon_ByCondition_ByYear$Total_Carbon - NoManagement_Carbon_ByCondition_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Aboveground_Carbon = sqrt(mean(
+    (NoManagement_Carbon_ByCondition_ByYear$Aboveground_Carbon - NoManagement_Carbon_ByCondition_ByYear$NK_Fig2_NoManagement)^2
+  )),
+  Aboveground_Live = sqrt(mean(
+    (NoManagement_Carbon_ByCondition_ByYear$Aboveground_Live - NoManagement_Carbon_ByCondition_ByYear$NK_Fig2_NoManagement)^2
+  ))
+)
+ggplot(
+    data = melt(Conditions_RMSE, id = NULL, variable.name = "Series", value.name = "RMSE"),
+    mapping = aes(x = Series, y = RMSE)
+  ) +
+  ggtitle("FVS Carbon Projection by FIA Condition") +
+  geom_col()
+```
+
+RMSE for Aboveground Live by Condition is \~13, which is close to that
+for Aboveground Live by Plot.
+
+```{r}
+Conditions_RMSE |> select(Aboveground_Live)
+```
+
+## Carbon Measurement
+
+### Inventory Years
+
+When were the plots re-surveyed?
+
+The FIA PLOT table lists when plots were measured; the FIA COND table lists
+observations from those measurements. We can use the above established
+connection between FVS identifiers and FIA identifiers to find
+subsequent measurement for the plots and conditions included in NK.
+
+```{r}
+# Load the translation table we created
+nk_to_fia <- read_csv(
+    "../03_outputs/nk_to_fia.csv",
+    col_types = cols(
+      `FIA plot code` = col_character(),
+      .default = col_integer()
+    )
+  ) |>
+  # Filter to only the columns needed to identify FIA conditions.
+  select(`FIA plot code`, STATECD, UNITCD, COUNTYCD, PLOT)
+
+# We also want the FVS_STAND_ID for these plots; graft that on
+nk_to_fvs <- read_csv(
+    "../03_outputs/nk_to_fvs.csv",
+    col_types = cols(
+      `FIA plot code` = col_character(),
+      FVS_STAND_ID = col_character(),
+      STAND_ID_PLOT = col_character(),
+      STAND_ID_COND = col_character(),
+      .default = col_integer()
+    )
+  ) |>
+  # Filter to only the columns needed to identify FIA conditions.
+  select(`FIA plot code`, FVS_STAND_ID)
+
+nk_plot_ids <- nk_to_fia |>
+  full_join(nk_to_fvs, by=join_by(`FIA plot code`)) |>
+  # PLOT_ID is state, county, plot - like FVS_STAND_ID with no year
+  mutate(PLOT_ID = sprintf(paste0(
+    '%02d',  '%03d',   '%05d'),
+    STATECD, COUNTYCD, PLOT
+  ))
+
+# Connect to the FIA tables
+fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia_cond = tbl(fia, 'COND')
+fia_plot = tbl(fia, 'PLOT')
+
+# Create a dataframe containing the PLOT rows for all inventories of
+# all plots used in NK.
+matching_plot <- fia_plot |>
+  semi_join(
+    nk_plot_ids,
+    by=join_by(STATECD, UNITCD, COUNTYCD, PLOT),
+    copy=TRUE
+  ) |>
+  filter(INVYR >= 1999) |>
+  collect()
+
+# Create a dataframe containing the COND rows for all inventories of
+# all conditions for all plots used in NK.
+matching_cond <- fia_cond |>
+  semi_join(
+    nk_plot_ids,
+    by=join_by(STATECD, UNITCD, COUNTYCD, PLOT),
+    copy=TRUE
+  ) |>
+  filter(INVYR >= 1999) |>
+  # Paste MEASYEAR on to COND, because everything in FVS works off MEASYEAR
+  collect() |>
+  left_join(
+    matching_plot |> select(STATECD, UNITCD, COUNTYCD, PLOT, INVYR, MEASYEAR),
+    by=join_by(STATECD, UNITCD, COUNTYCD, PLOT, INVYR)
+  )
+
+DBI::dbDisconnect(fia)
+
+knitr::kable(matching_cond)
+```
+
+To aid visual analysis, we create arbitrary ordinals for plots; this
+will allow us to chart the conditions for each plot in a single
+horizontal band, against time, to create a visual timeline for plot
+measurement.
+
+```{r}
+# Create ordinals for plots; to do this, we sort plots by:
+# - the first year measured, earliest first; then
+# - break ties by the second year measured, earliest year first; then
+# - break ties by the third year inventoried, earliest year first; then
+# - break ties by the fourth year inventoried, earliest year first
+# This will put plots surveyed earlier towards the bottom of the chart,
+# creating an "upward and to the right" visual that is generally easier to read.
+
+# Find inventory years
+year1 <- matching_cond |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
+  summarize(YEAR1 = min(MEASYEAR), .groups = "keep") |>
+  ungroup() |>
+  right_join(matching_cond, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
+
+year2 <- year1 |>
+  filter(MEASYEAR > YEAR1) |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
+  summarize(YEAR2 = min(MEASYEAR), .groups = "keep") |>
+  ungroup() |>
+  right_join(year1, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
+  
+year3 <- year2 |>
+  filter(MEASYEAR > YEAR2) |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
+  summarize(YEAR3 = min(MEASYEAR), .groups = "keep") |>
+  ungroup() |>
+  right_join(year2, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
+
+year4 <- year3 |>
+  filter(MEASYEAR > YEAR3) |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
+  summarize(YEAR4 = min(MEASYEAR), .groups = "keep") |>
+  ungroup() |>
+  right_join(year3, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
+
+# Compute plot numbers as ordinals according to inventory years
+numbered_plots <- year4 |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
+  summarise(
+    YEAR1 = min(YEAR1),
+    YEAR2 = min(YEAR2),
+    YEAR3 = min(YEAR3),
+    YEAR4 = min(YEAR4),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  arrange(YEAR1, YEAR2, YEAR3, YEAR4) |>
+  mutate(PLOT_NUM = row_number()) |>
+  select(PLOT_NUM, STATECD, UNITCD, COUNTYCD, PLOT)
+
+# Paste plot numbers back on to conditions, then aggregate by plot
+inventory_years <- matching_cond |>
+  left_join(numbered_plots, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
+  group_by(PLOT_NUM, MEASYEAR)
+
+ggplot(
+    data = inventory_years,
+    mapping = aes(x = MEASYEAR, y = PLOT_NUM)
+  ) +
+  geom_point()
+
+```
+
+### Non-Sampled
+
+Survey may be skipped for various reasons captured in
+COND_STATUS_CD and COND_NONSAMPLE_REASN_CD. Codes other than 1 indicate
+that forest was not inventoried in the condition.
+
+Status Code Descriptions are given in [@Burrill2024]:
+
+-   1 Accessible forest land - Land within the population of interest
+    that can be occupied safely and has at least 10 percent canopy cover
+    by live tally trees of any size or has had at least 10 percent
+    canopy cover of live tally species in the past, based on the
+    presence of stumps, snags, or other evidence. To qualify, the area
+    must be at least 1.0 acre in size and 120.0 feet wide. Forest land
+    includes transition zones, such as areas between forest and
+    nonforest lands that meet the minimal tree canopy cover and forest
+    areas adjacent to urban and built-up lands. Roadside, streamside,
+    and shelterbelt strips of trees must have a width of at least 120
+    feet and continuous length of at least 363 feet to qualify as forest
+    land. Unimproved roads and trails, streams, and clearings in forest
+    areas are classified as forest if they are less than 120 feet wide
+    or less than an acre in size. Tree-covered areas in agricultural
+    production settings, such as fruit orchards, or tree-covered areas
+    in urban settings, such as city parks, are not considered forest
+    land.
+-   2 Nonforest land - Land that has less than 10 percent canopy cover
+    of tally tree species of any size and, in the case of afforested
+    land, fewer than 150 established trees per acre; or land that has
+    sufficient canopy cover or stems, but is classified as nonforest
+    land use (see criteria under PRESNFCD). Nonforest includes areas
+    that have sufficient cover or live stems to meet the forest land
+    definition, but do not meet the dimensional requirements. Note:
+    Nonforest land includes "other wooded land" that has at least 5
+    percent, but less than 10 percent, canopy cover of live tally tree
+    species of any size or has had at least 5 percent, but less than 10
+    percent, canopy cover of tally species in the recent past, based on
+    the presence of stumps, snags, or other evidence. Other wooded land
+    is recognized as a subset of nonforest land, and therefore is not
+    currently considered a separate condition class. Other wooded land
+    is not subject to nonforest use(s) that prevent normal tree
+    regeneration and succession, such as regular mowing, intensive
+    grazing, or recreation activities. In addition, other wooded land is
+    classified according to the same nonforest land use rules as forest
+    land (e.g., 6 percent cover in an urban setting is not considered
+    other wooded land). Other wooded land is therefore defined as having
+    \>5 percent and \<10 percent canopy cover at present, or evidence of
+    such in the past, and PRESNFCD = 20, 40, 42, 43 or 45.
+-   3 Noncensus water - Lakes, reservoirs, ponds, and similar bodies of
+    water 1.0 acre to 4.5 acre in size. Rivers, streams, canals, etc.,
+    30.0 feet to 200 feet wide. This definition was used in the 1990
+    census and applied when the data became available. Earlier
+    inventories defined noncensus water differently.
+-   4 Census water - Lakes, reservoirs, ponds, and similar bodies of
+    water 4.5 acre in size and larger; and rivers, streams, canals,
+    etc., more than 200 feet wide.
+-   5 Nonsampled, possibility of forest land - Any portion of a plot
+    within accessible forest land that cannot be sampled is delineated
+    as a separate condition. There is no minimum size requirement. The
+    reason the condition was not sampled is provided in
+    COND_NONSAMPLE_REASN_CD.
+
+Nonsample Reason Code Descriptions are given in [@Burrill2024]:
+
+-   01 Outside U.S. boundary - Condition class is outside the U.S.
+    border.
+-   02 Denied access area - Access to the condition class is denied by
+    the legal owner, or by the owner of the only reasonable route to the
+    condition class.
+-   03 Hazardous situation - Condition class cannot be accessed because
+    of a hazard or danger, for example cliffs, quarries, strip mines,
+    illegal substance plantations, temporary high water, etc.
+-   05 Lost data - The data file was discovered to be corrupt after a
+    panel was completed and submitted for processing. Used for the
+    single condition that is required for this plot. This code is for
+    office use only.
+-   06 Lost plot - Entire plot cannot be found. Used for the single
+    condition that is required for this plot.
+-   07 Wrong location - Previous plot can be found, but its placement is
+    beyond the tolerance limits for plot location. Used for the single
+    condition that is required for this plot.
+-   08 Skipped visit - Entire plot skipped. Used for plots that are not
+    completed prior to the time a panel is finished and submitted for
+    processing. Used for the single condition that is required for this
+    plot. This code is for office use only.
+-   09 Dropped intensified plot - Intensified plot dropped due to a
+    change in grid density. Used for the single condition that is
+    required for this plot. This code used only by units engaged in
+    intensification. This code is for office use only.
+-   10 Other - Condition class not sampled due to a reason other than
+    one of the specific reasons listed.
+-   11 Ocean - Condition falls in ocean water below mean high tide line.
+
+```{r}
+# Were any conditions not sampled during an inventory?
+skipped <- matching_cond |>
+  filter(COND_STATUS_CD > 1) |>
+  select(STATECD, UNITCD, COUNTYCD, PLOT, MEASYEAR, COND_STATUS_CD)
+knitr::kable(skipped)
+```
+
+### Disturbance
+
+Three fields, DSTRBCD1/2/3, capture Disturbance codes. These indicate
+types of disturbance to the condition other than disturbances related to
+harvest.
+
+Code Descriptions are given in [@Burrill2024]:
+
+-   0 No visible disturbance.
+-   10 Insect damage.
+-   11 Insect damage to understory vegetation.
+-   12 Insect damage to trees, including seedlings and saplings.
+-   20 Disease damage.
+-   21 Disease damage to understory vegetation.
+-   22 Disease damage to trees, including seedlings and saplings.
+-   30 Fire damage (from crown and ground fire, either prescribed or
+    natural).
+-   31 Ground fire damage.
+-   32 Crown fire damage.
+-   40 Animal damage.
+-   41 Beaver (includes flooding caused by beaver).
+-   42 Porcupine.
+-   43 Deer/ungulate.
+-   44 Bear (core optional).
+-   45 Rabbit (core optional).
+-   46 Domestic animal/livestock (includes grazing).
+-   50 Weather damage.
+-   51 Ice.
+-   52 Wind (includes hurricane, tornado).
+-   53 Flooding (weather induced).
+-   54 Drought.
+-   60 Vegetation (suppression, competition, vines).
+-   70 Unknown / not sure / other.
+-   80 Human-induced damage - any significant threshold of human-caused
+    damage not described in the DISTURBANCE codes or in the TREATMENT
+    codes.
+-   90 Geologic disturbances.
+-   91 Landslide.
+-   92 Avalanche track.
+-   93 Volcanic blast zone.
+-   94 Other geologic event.
+-   95 Earth movement / avalanches.
+
+Harvest-related disturbance is captured in the three columns TRTCD1/2/3.
+These capture treatment code describing disturbance related to harvest.
+
+Code Descriptions are given in [@Burrill2024]:
+
+-   00 No observable treatment.
+-   10 Cutting - The removal of one or more trees from a stand.
+-   20 Site preparation - Clearing, slash burning, chopping, disking,
+    bedding, or other practices clearly intended to prepare a site for
+    either natural or artificial regeneration.
+-   30 Artificial regeneration - Following a disturbance or treatment
+    (usually cutting), a new stand where at least 50 percent of the live
+    trees present resulted from planting or direct seeding.
+-   40 Natural regeneration - Following a disturbance or treatment
+    (usually cutting), a new stand where at least 50 percent of the live
+    trees present (of any size) were established through the growth of
+    existing trees and/or natural seeding or sprouting.
+-   50 Other silvicultural treatment - The use of fertilizers,
+    herbicides, girdling, pruning, or other activities (not covered by
+    codes 10-40) designed to improve the commercial value of the
+    residual stand; or chaining, which is a practice used on woodlands
+    to encourage wildlife forage.
+
+
+```{r}
+# Who had disturbance?
+disturbed <- matching_cond |>
+  filter(DSTRBCD1 > 0 | DSTRBCD2 > 0 | DSTRBCD3 > 0) |>
+  select(STATECD, UNITCD, COUNTYCD, PLOT, MEASYEAR, DSTRBCD1, DSTRBCD2, DSTRBCD3)
+knitr::kable(disturbed)
+```
+
+```{r}
+# Who had treatment?
+treated <- matching_cond |>
+  filter(TRTCD1 > 0 | TRTCD2 > 0 | TRTCD3 > 0) |>
+  select(STATECD, UNITCD, COUNTYCD, PLOT, MEASYEAR, TRTCD1, TRTCD2, , TRTCD3)
+knitr::kable(treated)
+```
+
+### Timeline
+
+We can combine nonsample, disturbance, and harvest to create a single timeline
+that shows plot status since the start of NK.
+
+Note that status is per condition, and we are charting per plot. To accomodate,
+we introduce horizontal offset so that the status of individual conditions
+within a plot is visible in the chart.
+
+```{r}
+survey_status <- matching_cond |>
+
+  # Offset INVYR by CONDID to get horizontal
+  # displacement of conditions in the chart
+  mutate(MEASYEAR = MEASYEAR + (CONDID - 1)/4) |>
+  
+  # Collect the various status indicators into a single STATUS column
+  mutate(STATUS = if_else(COND_STATUS_CD > 1, "Skipped", NA)) |>
+  mutate(STATUS = if_else(!is.na(TRTCD1) & TRTCD1 > 0, "Harvested", STATUS)) |>
+  mutate(STATUS = if_else(!is.na(DSTRBCD1) & DSTRBCD1 > 0, "Disturbed", STATUS)) |>
+  mutate(STATUS = if_else(is.na(STATUS), "Grown", STATUS)) |>
+  
+  # Use the single STATUS column to create separate columns for each status,
+  # where the inventory year is the value for the column
+  mutate(GROWN = if_else(STATUS == "Grown", MEASYEAR, NA)) |>
+  mutate(SKIPPED = if_else(STATUS == "Skipped", MEASYEAR, NA)) |>
+  mutate(HARVESTED = if_else(STATUS == "Harvested", MEASYEAR, NA)) |>
+  mutate(DISTURBED = if_else(STATUS == "Disturbed", MEASYEAR, NA)) |>
+  
+  # Add plot numbers
+  left_join(numbered_plots, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
+  select(
+    PLOT_NUM, GROWN, HARVESTED, DISTURBED, SKIPPED
+  ) |>
+  
+  # Melt and arrange for ggplot
+  melt(id.vars = "PLOT_NUM", variable.name="Status", value.name = "Year") |>
+  filter(!is.na(Year)) |>
+  select(PLOT_NUM, Year, Status) |>
+  arrange(PLOT_NUM, Year, Status)
+
+knitr::kable(survey_status)
+```
+
+```{r}
+ggplot(
+    data = survey_status,
+    mapping = aes(x = Year, y = PLOT_NUM, shape = Status, color = Status)
+  ) +
+  ggtitle("Plot Inventory Timeline") +
+  theme(legend.title = element_blank()) +
+  geom_point()
+```
+### Grow-Only Plots
+
+From this, it seems there are a subset of plots that are grow-only for
+all subsequent inventories. We would like to compare the carbon in the FIA
+inventoried plots with the carbon projected by FVS.
+
+We start by identifying those plots that are grow-only.
+
+```{r}
+grow_only <- matching_cond |>
+  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
+  summarize(
+    COND_STATUS_CD = max(COND_STATUS_CD),
+    TRTCD = max(TRTCD1),
+    DSTRBCD = max(DSTRBCD1),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  filter(COND_STATUS_CD == 1 & TRTCD == 0 & DSTRBCD == 0) |>
+  left_join(numbered_plots, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
+  left_join(nk_plot_ids, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT))
+  
+knitr::kable(grow_only)
+```
+
+```{r}
+ggplot(
+    data = semi_join(survey_status, grow_only, by = join_by(PLOT_NUM)),
+    mapping = aes(x = Year, y = PLOT_NUM, shape = Status, color = Status)
+  ) +
+  ggtitle("Grow-only Plot Inventory Timeline") +
+  theme(legend.title = element_blank()) +
+  geom_point() +
+  coord_cartesian(xlim = c(1999, 2021), ylim = c(0, 31))
+
+```
+### Computing Carbon
+
+[@fvsstaff2021] Module 2, section Audit 1, describes how to perform a zero-year
+run of FVS. This applies the mapping from FIA to FVS, and can apply
+e.g. the carbon model. We do not apply the regeneration adjustments, since
+we are simply computing carbon from the FIA inventory data.
+We do this for each individual grow-only plot, then
+chart the observed vs. predicted carbon for just these plots.
+
+```{r}
+grown_fvs_stands <- matching_plot |>
+  semi_join(grow_only, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
+  select(STATECD, UNITCD, COUNTYCD, PLOT, MEASYEAR, INVYR) |>
+  left_join(
+    nk_plot_ids,
+    by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)
+  ) |>
+  # FVS_STAND_ID is for the original plot; update to use the correct year
+  mutate(FVS_STAND_ID = paste0(
+     substring(FVS_STAND_ID, 1, 2),
+     sprintf("%02d", INVYR %% 100),
+     substring(FVS_STAND_ID, 5, 12)
+  )) |>
+
+  arrange(MEASYEAR, PLOT_ID)
+
+knitr::kable(grown_fvs_stands)
+```
+
+Now plot measured vs projected
+
+```{r}
+comparable_carbon <- NoManagement_Carbon_ByPlot |>
+  semi_join(grow_only |> rename(StandID = FVS_STAND_ID), by = join_by(StandID)) |>
+  left_join(nk_plot_ids |> rename(StandID = FVS_STAND_ID), by=join_by(StandID)) |>
+  mutate(Variable = "Projected") |>
+  select(PLOT_ID, Year, Variable, Aboveground_Live) |>
+  arrange(Year, PLOT_ID)
+knitr::kable(comparable_carbon)
+```
+
+
+```{r}
+ggplot(
+    data = comparable_carbon,
+    mapping = aes(x = Year, y = Aboveground_Live, color = PLOT_ID, style = Variable)
+  ) +
+  geom_point() +
+  coord_cartesian(xlim = c(2000, 2025), ylim = c(0, 300)) +
+  scale_x_continuous(breaks=seq(2000,2025,10))
+```
+
+```{r}
+
+measyears <- grown_fvs_stands |>
+  select(MEASYEAR) |>
+  group_by(MEASYEAR) |>
+  summarize(.groups = "keep") |>
+  ungroup()
+
+FIA_Measured <- NULL
+for (measyear in measyears)
+  fname <- paste0(
+    "../03_outputs/FIA_Measured_",
+    sprintf("%04d", measyear),
+    ".csv"
+  )
+  FIA_Measured <- bind_rows(
+      FIA_Measured,
+      read_csv(fname, col_types = cols(StandID = col_character()))
+    )
+
+FIA_Measured <- FIA_Measured |>
+  mutate(Aboveground_Live = Aboveground_Total_Live) |>
+  mutate(PLOT_ID = paste0(
+     substring(StandID, 1, 2),
+     substring(StandID, 5, 12)
+  )) |>
+  mutate(Variable = "Measured") |>
+  select(PLOT_ID, Year, Variable, Aboveground_Live)
+```
+
+```{r}
+knitr::kable(FIA_Measured)
+```
+
+```{r}
+projected_carbon <- read_csv(
+    "../03_outputs/NoManagement_Carbon_ByPlotYearly.csv",
+    col_types = cols(StandID = col_character())
+  ) |>
+  mutate(Aboveground_Live = Aboveground_Total_Live) |>
+  mutate(PLOT_ID = paste0(
+     substring(StandID, 1, 2),
+     substring(StandID, 5, 12)
+  )) |>
+  mutate(Variable = "Projected") |>
+  select(PLOT_ID, Year, Variable, Aboveground_Live) |>
+  # filter down to only those plots/years that match measurement
+  semi_join(FIA_Measured, by = join_by(PLOT_ID, Year))
+
+knitr::kable(projected_carbon)
+
+```
+
+```{r}
+ggplot(
+    data = projected_carbon |> union_all(FIA_Measured),
+    mapping = aes(x = Year, y = Aboveground_Live, color = PLOT_ID, shape = Variable)
+  ) +
+  geom_point(size = 2) +
+  scale_shape_manual(values = c("Measured" = 3, "Projected" = 21)) +
+  coord_cartesian(xlim = c(2000, 2025), ylim = c(0, 300)) +
+  scale_x_continuous(breaks=seq(2000,2025,10)) +
+  ggtitle("Measured vs. Projected Carbon: FVS NoManagement") +
+  ylab("Carbon (Tonnes / Hectare)")
+```
+
+Let's look at error:
+```{r}
+projection_error <- projected_carbon |>
+  mutate(Projected = Aboveground_Live) |>
+  select(PLOT_ID, Year, Projected) |>
+  full_join(FIA_Measured, by = join_by(PLOT_ID, Year)) |>
+  mutate(Measured = Aboveground_Live) |>
+  mutate(Error = Projected - Measured) |>
+  select(PLOT_ID, Year, Error)
+
+ggplot(
+    data = projection_error
+  ) +
+  geom_point(
+    size = 2,
+    mapping = aes(x = Year, y = Error, color = PLOT_ID)
+  ) +
+  coord_cartesian(xlim = c(2000, 2025), ylim = c(-100, 100)) +
+  scale_x_continuous(breaks=seq(2000,2025,10)) +
+  ggtitle("Measured vs. Projected Carbon Error: FVS NoManagement") +
+  ylab("Carbon (Tonnes / Hectare)") +
+  geom_smooth(
+    data=projection_error |> select(Year, Error),
+    method=lm,
+    mapping = aes(x=Year, y=Error),
+    formula = 'y ~ x'
+  )
+```
+plot predicted vs. observed
+```{r}
+projected_observed <- projected_carbon |>
+  mutate(Projected = Aboveground_Live) |>
+  select(PLOT_ID, Year, Projected) |>
+  full_join(FIA_Measured, by = join_by(PLOT_ID, Year)) |>
+  mutate(Measured = Aboveground_Live) |>
+  select(PLOT_ID, Year, Projected, Measured)
+
+ggplot(
+    data = projected_observed
+  ) +
+  geom_point(
+    size = 2,
+    mapping = aes(x = Measured, y = Projected, color = Year)
+  ) +
+  ggtitle("FVS NoManagement Scenario\nMeasured vs. Projected Carbon (Mg C/ha)") +
+  coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
+  geom_line(
+    data = tibble(x = c(0, 200), y=c(0, 200)),
+    mapping = aes(x = x, y = y)
+  )
+```
+
