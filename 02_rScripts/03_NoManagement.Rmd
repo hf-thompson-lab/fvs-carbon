@@ -1002,19 +1002,27 @@ ggplot(
 ```
 plot predicted vs. observed
 ```{r}
+first_measure_year <- FIA_Measured |>
+  group_by(PLOT_ID) |>
+  summarize(first_measure_year = min(Year), .groups = "keep") |>
+  select(PLOT_ID, first_measure_year) |>
+  ungroup()
+
 projected_observed <- projected_carbon |>
   mutate(Projected = Aboveground_Live) |>
   select(PLOT_ID, Year, Projected) |>
   full_join(FIA_Measured, by = join_by(PLOT_ID, Year)) |>
+  full_join(first_measure_year, by = join_by(PLOT_ID)) |>
   mutate(Measured = Aboveground_Live) |>
-  select(PLOT_ID, Year, Projected, Measured)
+  mutate(Years = Year - first_measure_year) |>
+  select(PLOT_ID, Years, Projected, Measured)
 
 ggplot(
     data = projected_observed
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = Measured, y = Projected, color = Year)
+    mapping = aes(x = Measured, y = Projected, color = Years)
   ) +
   ggtitle("FVS NoManagement Scenario\nMeasured vs. Projected Carbon (Mg C/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
