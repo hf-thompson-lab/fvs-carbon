@@ -46,7 +46,11 @@ editor_options:
     Management Service Center. 56p. 
     <https://www.fs.usda.gov/fmsc/ftp/fvs/docs/overviews/FVSne_Overview.pdf>
 
-7. FVS Staff. 2021. FVS Training Guide. Fort Collins,
+7.  FVS Staff. 2021. FVS Training Guide. Fort Collins,
     CO: U. S. Department of Agriculture, Forest Service, Forest
     Management Service Center. 142p. 
     <https://www.fs.usda.gov/fvs/documents/FVSTrainingGuide-20210930.pdf>
+    
+8.  Herbert, C.; Fried, J.S.; Butsic, V. Validation of Forest Vegetation
+    Simulator Model Finds Overprediction of Carbon Growth in California.
+    Forests 2023, 14, 604. https://doi.org/10.3390/f14030604
