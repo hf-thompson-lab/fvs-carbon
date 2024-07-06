@@ -18,6 +18,7 @@ suppressPackageStartupMessages(library(RSQLite))
 suppressPackageStartupMessages(library(htmltools))
 suppressPackageStartupMessages(library(rmarkdown))
 suppressPackageStartupMessages(library(dbplyr))
+suppressPackageStartupMessages(library(measurements))
 ```
 
 # Reproducing the NoManagement Scenario
@@ -97,12 +98,16 @@ table4_rot <- table4 |>
   left_join(fvs_species_codes, by=join_by(`Scientific Name`))
 
 # Values in NK are seedlings per hectare; FVS needs seedlings per acre
-hectare_to_acre <- 2.471
-table4_rot$Clearcut <- round(table4_rot$Clearcut * hectare_to_acre)
-table4_rot$Shelterwood <- round(table4_rot$Shelterwood * hectare_to_acre)
-table4_rot$`ITS_Low Retention` <- round(table4_rot$`ITS_Low Retention` * hectare_to_acre)
-table4_rot$`ITS_High Retention` <- round(table4_rot$`ITS_High Retention` * hectare_to_acre)
-table4_rot$Background <- round(table4_rot$Background * hectare_to_acre)
+table4_rot$Clearcut <-
+  round(conv_unit(table4_rot$Clearcut, 'hectare', 'acre'))
+table4_rot$Shelterwood <-
+  round(conv_unit(table4_rot$Shelterwood, 'hectare', 'acre'))
+table4_rot$`ITS_Low Retention` <-
+  round(conv_unit(table4_rot$`ITS_Low Retention`, 'hectare', 'acre'))
+table4_rot$`ITS_High Retention` <-
+  round(conv_unit(table4_rot$`ITS_High Retention`, 'hectare', 'acre'))
+table4_rot$Background <-
+  round(conv_unit(table4_rot$Background, 'hectare', 'acre'))
 
 knitr::kable(
   table4_rot |>
@@ -322,7 +327,7 @@ ggplot(
     mapping = aes(x = Year, y = value, color = variable)
   ) +
   ggtitle("FVS Carbon Projection by FIA Subplot") +
-  ylab("Carbon (Tonnes / Hectare)") +
+  ylab("Carbon (Mg/ha)") +
   theme(legend.title = element_blank()) +
   geom_line() +
   coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 320)) +
@@ -393,7 +398,7 @@ ggplot(
     mapping = aes(x = Year, y = value, color = variable)
   ) +
   ggtitle("FVS Carbon Projection by FIA Condition") +
-  ylab("Carbon (Tonnes / Hectare)") +
+  ylab("Carbon (Mg/ha)") +
   theme(legend.title = element_blank()) +
   geom_line() +
   coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 320)) +
