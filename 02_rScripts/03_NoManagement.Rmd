@@ -472,7 +472,7 @@ nk_to_fia <- read_csv(
     )
   ) |>
   # Filter to only the columns needed to identify FIA conditions.
-  select(`FIA plot code`, STATECD, UNITCD, COUNTYCD, PLOT)
+  select(`FIA plot code`, STATECD, COUNTYCD, PLOT)
 
 # We also want the FVS_STAND_ID for these plots; graft that on
 nk_to_fvs <- read_csv(
@@ -509,7 +509,7 @@ fia_ref_forest_type = tbl(fia, 'REF_FOREST_TYPE') |>
 matching_plot <- fia_plot |>
   semi_join(
     nk_plot_ids,
-    by=join_by(STATECD, UNITCD, COUNTYCD, PLOT),
+    by=join_by(STATECD, COUNTYCD, PLOT),
     copy=TRUE
   ) |>
   filter(INVYR >= 1999) |>
@@ -520,7 +520,7 @@ matching_plot <- fia_plot |>
 matching_cond <- fia_cond |>
   semi_join(
     nk_plot_ids,
-    by=join_by(STATECD, UNITCD, COUNTYCD, PLOT),
+    by=join_by(STATECD, COUNTYCD, PLOT),
     copy=TRUE
   ) |>
   filter(INVYR >= 1999) |>
@@ -530,14 +530,14 @@ matching_cond <- fia_cond |>
   # Paste MEASYEAR on to COND, because everything in FVS works off MEASYEAR
   collect() |>
   left_join(
-    matching_plot |> select(STATECD, UNITCD, COUNTYCD, PLOT, INVYR, MEASYEAR),
-    by=join_by(STATECD, UNITCD, COUNTYCD, PLOT, INVYR)
+    matching_plot |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
+    by=join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
 
 matching_tree <- fia_tree |>
   semi_join(
     nk_plot_ids,
-    by = join_by(STATECD, UNITCD, COUNTYCD, PLOT),
+    by = join_by(STATECD, COUNTYCD, PLOT),
     copy = TRUE
   ) |>
   filter(INVYR >= 1999) |>
@@ -564,35 +564,35 @@ measurement.
 
 # Find inventory years
 year1 <- matching_cond |>
-  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
   summarize(YEAR1 = min(MEASYEAR), .groups = "keep") |>
   ungroup() |>
-  right_join(matching_cond, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
+  right_join(matching_cond, by=join_by(STATECD, COUNTYCD, PLOT))
 
 year2 <- year1 |>
   filter(MEASYEAR > YEAR1) |>
-  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
   summarize(YEAR2 = min(MEASYEAR), .groups = "keep") |>
   ungroup() |>
-  right_join(year1, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
+  right_join(year1, by=join_by(STATECD, COUNTYCD, PLOT))
   
 year3 <- year2 |>
   filter(MEASYEAR > YEAR2) |>
-  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
   summarize(YEAR3 = min(MEASYEAR), .groups = "keep") |>
   ungroup() |>
-  right_join(year2, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
+  right_join(year2, by=join_by(STATECD, COUNTYCD, PLOT))
 
 year4 <- year3 |>
   filter(MEASYEAR > YEAR3) |>
-  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
   summarize(YEAR4 = min(MEASYEAR), .groups = "keep") |>
   ungroup() |>
-  right_join(year3, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT))
+  right_join(year3, by=join_by(STATECD, COUNTYCD, PLOT))
 
 # Compute plot numbers as ordinals according to inventory years
 numbered_plots <- year4 |>
-  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
   summarise(
     YEAR1 = min(YEAR1),
     YEAR2 = min(YEAR2),
@@ -603,11 +603,11 @@ numbered_plots <- year4 |>
   ungroup() |>
   arrange(YEAR1, YEAR2, YEAR3, YEAR4) |>
   mutate(PLOT_NUM = row_number()) |>
-  select(PLOT_NUM, STATECD, UNITCD, COUNTYCD, PLOT)
+  select(PLOT_NUM, STATECD, COUNTYCD, PLOT)
 
 # Paste plot numbers back on to conditions, then aggregate by plot
 inventory_years <- matching_cond |>
-  left_join(numbered_plots, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
+  left_join(numbered_plots, by=join_by(STATECD, COUNTYCD, PLOT)) |>
   group_by(PLOT_NUM, MEASYEAR)
 
 ggplot(
@@ -714,7 +714,7 @@ Nonsample Reason Code Descriptions are given in [@Burrill2024]:
 # Were any conditions not sampled during an inventory?
 skipped <- matching_cond |>
   filter(COND_STATUS_CD > 1) |>
-  select(STATECD, UNITCD, COUNTYCD, PLOT, MEASYEAR, COND_STATUS_CD)
+  select(STATECD, COUNTYCD, PLOT, MEASYEAR, COND_STATUS_CD)
 knitr::kable(skipped)
 ```
 
@@ -789,7 +789,7 @@ Code Descriptions are given in [@Burrill2024]:
 # Who had disturbance?
 disturbed <- matching_cond |>
   filter(DSTRBCD1 > 0 | DSTRBCD2 > 0 | DSTRBCD3 > 0) |>
-  select(STATECD, UNITCD, COUNTYCD, PLOT, MEASYEAR, DSTRBCD1, DSTRBCD2, DSTRBCD3)
+  select(STATECD, COUNTYCD, PLOT, MEASYEAR, DSTRBCD1, DSTRBCD2, DSTRBCD3)
 knitr::kable(disturbed)
 ```
 
@@ -797,7 +797,7 @@ knitr::kable(disturbed)
 # Who had treatment?
 treated <- matching_cond |>
   filter(TRTCD1 > 0 | TRTCD2 > 0 | TRTCD3 > 0) |>
-  select(STATECD, UNITCD, COUNTYCD, PLOT, MEASYEAR, TRTCD1, TRTCD2, , TRTCD3)
+  select(STATECD, COUNTYCD, PLOT, MEASYEAR, TRTCD1, TRTCD2, , TRTCD3)
 knitr::kable(treated)
 ```
 
@@ -831,7 +831,7 @@ survey_status <- matching_cond |>
   mutate(DISTURBED = if_else(STATUS == "Disturbed", MEASYEAR, NA)) |>
   
   # Add plot numbers
-  left_join(numbered_plots, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
+  left_join(numbered_plots, by = join_by(STATECD, COUNTYCD, PLOT)) |>
   select(
     PLOT_NUM, GROWN, HARVESTED, DISTURBED, SKIPPED
   ) |>
@@ -866,7 +866,7 @@ We start by identifying those plots that are grow-only.
 
 ```{r}
 grow_only <- matching_cond |>
-  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
   summarize(
     COND_STATUS_CD = max(COND_STATUS_CD),
     TRTCD = max(TRTCD1),
@@ -875,8 +875,8 @@ grow_only <- matching_cond |>
   ) |>
   ungroup() |>
   filter(COND_STATUS_CD == 1 & TRTCD == 0 & DSTRBCD == 0) |>
-  left_join(numbered_plots, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
-  left_join(nk_plot_ids, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT))
+  left_join(numbered_plots, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  left_join(nk_plot_ids, by = join_by(STATECD, COUNTYCD, PLOT))
   
 knitr::kable(grow_only)
 ```
@@ -903,17 +903,17 @@ chart the observed vs. predicted carbon for just these plots.
 
 ```{r}
 grown_fvs_stands <- matching_plot |>
-  semi_join(grow_only, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
-  select(STATECD, UNITCD, COUNTYCD, PLOT, MEASYEAR, INVYR) |>
+  semi_join(grow_only, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  select(STATECD, COUNTYCD, PLOT, MEASYEAR, INVYR) |>
   left_join(
     nk_plot_ids,
-    by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)
+    by = join_by(STATECD, COUNTYCD, PLOT)
   ) |>
   left_join(
     matching_cond |>
       filter(CONDID == 1) |>
-      select(STATECD, UNITCD, COUNTYCD, PLOT, INVYR, FORTYPE),
-    by = join_by(STATECD, UNITCD, COUNTYCD, PLOT, INVYR)
+      select(STATECD, COUNTYCD, PLOT, INVYR, FORTYPE),
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   ) |>
   # FVS_STAND_ID is for the original plot; update to use the correct year
   mutate(FVS_STAND_ID = paste0(
@@ -1174,11 +1174,11 @@ of depending on FVS's carbon calculation.
 
 ```{r}
 fia_carbon <- matching_tree |>
-  semi_join(grow_only, by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)) |>
-  select(STATECD, UNITCD, COUNTYCD, PLOT, CONDID, INVYR, CARBON_AG) |>
+  semi_join(grow_only, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  select(STATECD, COUNTYCD, PLOT, CONDID, INVYR, CARBON_AG) |>
   left_join(
     nk_plot_ids,
-    by = join_by(STATECD, UNITCD, COUNTYCD, PLOT)
+    by = join_by(STATECD, COUNTYCD, PLOT)
   )
 
 ```
