@@ -498,8 +498,10 @@ nk_plot_ids <- nk_to_fia |>
 
 # Connect to the FIA tables
 fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
-fia_cond = tbl(fia, 'COND')
 fia_plot = tbl(fia, 'PLOT')
+fia_cond = tbl(fia, 'COND')
+fia_subplot = tbl(fia, 'SUBPLOT')
+fia_subp_cond = tbl(fia, 'SUBP_COND')
 fia_tree = tbl(fia, 'TREE')
 fia_ref_forest_type = tbl(fia, 'REF_FOREST_TYPE') |>
   select(VALUE, MEANING)
@@ -507,23 +509,23 @@ fia_ref_forest_type = tbl(fia, 'REF_FOREST_TYPE') |>
 # Create a dataframe containing the PLOT rows for all inventories of
 # all plots used in NK.
 matching_plot <- fia_plot |>
+  filter(INVYR >= 1999) |>
   semi_join(
     nk_plot_ids,
     by=join_by(STATECD, COUNTYCD, PLOT),
     copy=TRUE
   ) |>
-  filter(INVYR >= 1999) |>
   collect()
 
 # Create a dataframe containing the COND rows for all inventories of
 # all conditions for all plots used in NK.
 matching_cond <- fia_cond |>
+  filter(INVYR >= 1999) |>
   semi_join(
     nk_plot_ids,
     by=join_by(STATECD, COUNTYCD, PLOT),
     copy=TRUE
   ) |>
-  filter(INVYR >= 1999) |>
   # Dereference forest type codes
   left_join(fia_ref_forest_type, by = join_by(FORTYPCD == VALUE)) |>
   rename(FORTYPE = MEANING) |>
@@ -534,13 +536,35 @@ matching_cond <- fia_cond |>
     by=join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
 
+# Create a dataframe containing the SUBP_COND rows for all inventories of
+# all subplot / condition intersections used in NK.
+# Add condition and subplot status on for convenience.
+matching_subp_cond <- fia_subp_cond |>
+  filter(INVYR >= 1999) |>
+  semi_join(
+    nk_plot_ids,
+    by=join_by(STATECD, COUNTYCD, PLOT),
+    copy=TRUE
+  ) |>
+  # Put COND_STATUS_CD on SUBP_COND for convenience
+  left_join(
+    fia_cond |> select(STATECD, COUNTYCD, PLOT, CONDID, INVYR, COND_STATUS_CD),
+    by = join_by(STATECD, COUNTYCD, PLOT, CONDID, INVYR)
+  ) |>
+  # Put SUBP_STATUS_CD on SUBP_COND for convenience
+  left_join(
+    fia_subplot |> select(STATECD, COUNTYCD, PLOT, SUBP, INVYR, SUBP_STATUS_CD),
+    by = join_by(STATECD, COUNTYCD, PLOT, SUBP, INVYR)
+  ) |>
+  collect()
+
 matching_tree <- fia_tree |>
+  filter(INVYR >= 1999) |>
   semi_join(
     nk_plot_ids,
     by = join_by(STATECD, COUNTYCD, PLOT),
     copy = TRUE
   ) |>
-  filter(INVYR >= 1999) |>
   collect()
 
 DBI::dbDisconnect(fia)
@@ -1172,13 +1196,100 @@ ggplot(
 FIA has carbon in the tree table, in CARBON_AG; we can use this instead
 of depending on FVS's carbon calculation.
 
+Method:
+
+*  Determine how much of each plot we will use the inventory
+**  Remove plots, subplots, and conditions that are not inventoried forest
+*  Determine scale factor for each plot
+**  A full plot is 4 subplots of 24^2*pi square feet each; scale this
+    according to how much we're using
+* scale the carbon in each trees for the area we're using to get carbon per acre
+* sum across all trees
+
 ```{r}
-fia_carbon <- matching_tree |>
-  semi_join(grow_only, by = join_by(STATECD, COUNTYCD, PLOT)) |>
-  select(STATECD, COUNTYCD, PLOT, CONDID, INVYR, CARBON_AG) |>
+subplot_area <- conv_unit(24^2 * pi, 'ft2', 'm2') # subplot area in square meters
+useful_subp_cond <- matching_subp_cond |>
+  semi_join(
+    grow_only,
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
+  filter(SUBP <= 4) |> # FIA introduces estimation plots with ID > 4; ignore those
+  filter(COND_STATUS_CD == 1) |> # Only use measured, forested conditions
+  filter(SUBP_STATUS_CD == 1) # Only use measured, forested subplots
+
+useful_area <- useful_subp_cond |>
+  group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
+  summarize(SUBPLOTS_INCLUDED = sum(SUBPCOND_PROP), .groups = "keep") |>
+  ungroup() |>
+  mutate(PLOT_AREA = SUBPLOTS_INCLUDED * subplot_area)
+# TODO: Maybe filter out plots below a certain total area?
+#       Example: a full plot is 672.4535 ha; filter out anything below
+#       89.2% of that
+
+knitr::kable(useful_area)
+```
+
+Carbon
+
+```{r}
+useful_trees <- matching_tree |>
+  filter(!is.na(CARBON_AG)) |>
+  semi_join(
+    useful_subp_cond,
+    by = join_by(STATECD, COUNTYCD, PLOT, SUBP, CONDID, INVYR)
+  ) |>
+  left_join(
+    useful_area,
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+  )
+
+m2_per_hectare <- conv_unit(1, 'hectare', 'm2')
+
+# We have inventoried trees in PLOT_AREA m2; scale to 1 ha
+carbon_per_plot <- useful_trees |>
+  # Note: FIA says that CARBON_AG needs to be scaled by TPA_UNADJ to get to
+  # carbon per acre.
+  mutate(CARBON_AG_METRIC = m2_per_hectare * conv_unit(CARBON_AG, 'lbs', 'Mg') / PLOT_AREA) |>
+  group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
+  summarize(CARBON_AG_METRIC = sum(CARBON_AG_METRIC), .groups = "keep") |>
+  ungroup() |>
   left_join(
     nk_plot_ids,
     by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
+  left_join(
+    matching_plot |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
+    by=join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
 
+
+knitr::kable(carbon_per_plot)
+
+```
+
+```{r}
+ffe_fia <- FIA_Measured |>
+  mutate(FFE = Aboveground_Live) |>
+  rename(`Forest Type` = FORTYPE) |>
+  select(PLOT_ID, Year, FFE, `Forest Type`) |>
+  full_join(carbon_per_plot |> mutate(Year = MEASYEAR), by = join_by(PLOT_ID, Year)) |>
+  mutate(FIA = CARBON_AG_METRIC) |>
+  full_join(first_measure_year, by = join_by(PLOT_ID)) |>
+  mutate(Years = Year - first_measure_year) |>
+  select(PLOT_ID, Years, FFE, FIA, `Forest Type`)
+
+ggplot(
+    data = ffe_fia
+  ) +
+  geom_point(
+    size = 2,
+    mapping = aes(x = FFE, y = FIA, color = Years, shape = `Forest Type`)
+  ) +
+  ggtitle("FVS Carbon Calculation\nFFE vs. FIA Carbon (Mg/ha)") +
+  coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
+  geom_line(
+    data = tibble(x = c(0, 200), y=c(0, 200)),
+    mapping = aes(x = x, y = y)
+  )
+#knitr::kable(ffe_fia)
 ```
