@@ -29,9 +29,16 @@ FVS Software with `Release date: 20240401` was used.
 
 FIA data version:
 
-```         
-% sqlite3 SQLite_FIADB_ENTIRE.db 'SELECT * FROM REF_FIADB_VERSION ORDER BY VERSION DESC LIMIT 1;'
-FIADB_1.9.2.00|RELEASE|THIS IS FIADB VERSION 9.2 PROD|FS_NIMS_FIADB_RMRS|2024-01-23 10:16:14|732862|||
+```{r}
+fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia_ref_fiadb_version <- tbl(fia, 'REF_FIADB_VERSION')
+version <- fia_ref_fiadb_version |>
+  filter(INSTALL_TYPE == 'RELEASE') |>
+  arrange(desc(CREATED_DATE)) |>
+  head(1) |>
+  collect()
+DBI::dbDisconnect(fia)
+knitr::kable(version)
 ```
 
 ### Stands
