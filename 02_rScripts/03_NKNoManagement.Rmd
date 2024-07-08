@@ -185,8 +185,8 @@ Read FVS output for carbon storage by plot. FVS column names are a bit
 idiosyncratic, so clean those up.
 
 NK states that Fig 2 sums carbon from aboveground live, standing dead,
-and down dead. For comparison, we also compute standing carbon as
-aboveground live plus standing dead.
+and down dead. We plot this, as well as just aboveground live and stand total
+carbon for comparison.
 
 ```{r}
 NoManagement_Carbon_ByPlot <- read_csv(
@@ -264,7 +264,7 @@ ggplot(
   scale_y_continuous(breaks=seq(0,320,20))
 ```
 
-From the chart it seems evident that standing carbon is the best match
+From the chart it seems evident that aboveground live carbon is the best match
 for the NoManagement scenario in NK Fig 2. We confirm this by computing
 RMS error for the residuals between our FVS runs and the NK Fig 2 data:
 
@@ -289,8 +289,8 @@ ggplot(
   geom_col()
 ```
 
-Note that NK describe using Aboveground Carbon for their chart, but the
-best fit is from Aboveground Live, with RMSE \~= 12.
+Note that NK describe using Aboveground Carbon, including both live and dead,
+for their chart, but the best fit is from Aboveground Live, with RMSE \~= 12.
 
 ```{r}
 Plots_RMSE |> select(Aboveground_Live)
@@ -441,3 +441,6 @@ for Aboveground Live by Plot.
 ```{r}
 Conditions_RMSE |> select(Aboveground_Live)
 ```
+Because many FIA attributes are tied to condition (e.g. site index, stand age, etc.), and the RMSE
+of condition is almost as low as that of plot, we perform the remainder of this analysis using
+condition.
