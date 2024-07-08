@@ -9,7 +9,19 @@ editor_options:
     wrap: 72
 ---
 
-## Carbon Calculation
+```{r setup, include=FALSE}
+# Pre-load libraries that issue warnings on startup so these
+# warnings don't corrupt the text later.
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(reshape2)) # for melt()
+suppressPackageStartupMessages(library(RSQLite))
+suppressPackageStartupMessages(library(htmltools))
+suppressPackageStartupMessages(library(rmarkdown))
+suppressPackageStartupMessages(library(dbplyr))
+suppressPackageStartupMessages(library(measurements))
+```
+
+# Carbon Calculation
 
 [@Herbert2023] use FIA measurement of biomass to determine carbon. FIA also
 provides above-groud carbon in the TREE table, in CARBON_AG. This metric is,
@@ -19,7 +31,7 @@ extension (FFE-FVS), which contains a Carbon Submodel, to compute
 carbon. We compare FFE carbon calculation with Jenkins and FIA carbon calculation
 at the end of this section.
 
-### Inventory Years
+## Inventory Years
 
 When were the plots re-surveyed?
 
@@ -208,6 +220,8 @@ ggplot(
 
 ```
 
+## Plot Status
+
 ### Non-Sampled
 
 Survey may be skipped for various reasons captured in
@@ -286,6 +300,17 @@ Code Descriptions are given in [@Burrill2024]:
 -   94 Other geologic event.
 -   95 Earth movement / avalanches.
 
+
+```{r}
+# Who had disturbance?
+disturbed <- matching_cond |>
+  filter(DSTRBCD1 > 0 | DSTRBCD2 > 0 | DSTRBCD3 > 0) |>
+  select(STATECD, COUNTYCD, PLOT, MEASYEAR, DSTRBCD1, DSTRBCD2, DSTRBCD3)
+knitr::kable(disturbed)
+```
+
+### Harvest
+
 Harvest-related disturbance is captured in the three columns TRTCD1/2/3.
 These capture treatment code describing disturbance related to harvest.
 
@@ -297,14 +322,6 @@ Code Descriptions are given in [@Burrill2024]:
 -   30 Artificial regeneration
 -   40 Natural regeneration
 -   50 Other silvicultural treatment
-
-```{r}
-# Who had disturbance?
-disturbed <- matching_cond |>
-  filter(DSTRBCD1 > 0 | DSTRBCD2 > 0 | DSTRBCD3 > 0) |>
-  select(STATECD, COUNTYCD, PLOT, MEASYEAR, DSTRBCD1, DSTRBCD2, DSTRBCD3)
-knitr::kable(disturbed)
-```
 
 ```{r}
 # Who had treatment?
@@ -405,7 +422,7 @@ ggplot(
   coord_cartesian(xlim = c(1999, 2021), ylim = c(0, 31))
 
 ```
-### Computing Carbon
+## Carbon Accounting
 
 [@fvsstaff2021] Module 2, section Audit 1, describes how to perform a zero-year
 run of FVS. This applies the mapping from FIA plot to FVS stand, then grows the stand
@@ -415,6 +432,8 @@ e.g. the carbon model. We do not apply the regeneration adjustments, since
 we are simply computing carbon from the FIA inventory data.
 We do this for each individual grow-only plot, then
 chart the observed vs. predicted carbon for just these plots.
+
+### FFE
 
 ```{r}
 grown_fvs_stands <- matching_plot |>
@@ -651,7 +670,7 @@ ggplot(
   )
 ```
 
-### FFE vs Jenkins
+### Jenkins
 
 FVS provides two ways to compute carbon: FFE and Jenkins
 
@@ -682,7 +701,7 @@ ggplot(
   )
 ```
 
-### FIA Carbon
+### FIA via Expansion
 
 FIA has carbon in the tree table, in CARBON_AG; we can sum this per stand
 and compute a per-hectare value.
