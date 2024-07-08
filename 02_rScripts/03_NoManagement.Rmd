@@ -442,16 +442,15 @@ for Aboveground Live by Plot.
 Conditions_RMSE |> select(Aboveground_Live)
 ```
 
-## Carbon Measurement
+## Carbon Calculation
 
-[@Herbert2023] use FIA measurement of biomass to determine carbon. The data
-used is from table GFND_LYR_FNCTL_GRP; FIA notes that "Currently, this table is
-populated only by the PNWRS FIA work unit (SURVEY. RSCD = 27)."
-
-We can instead use the FVS Fire and Fuels extension (FFE-FVS), which contains
-a Carbon Submodel, to compute
-carbon directly from FIA data. This has the added benefit of ensuring consistent
-calculation for measured and projected carbon.
+[@Herbert2023] use FIA measurement of biomass to determine carbon. FIA also
+provides above-groud carbon in the TREE table, in CARBON_AG. This metric is,
+of course, not available on plots that FVS grows. For consistent carbon
+calculation on both measured and grown plots, we can use the FVS Fire and Fuels
+extension (FFE-FVS), which contains a Carbon Submodel, to compute
+carbon. We compare FFE carbon calculation with Jenkins and FIA carbon calculation
+at the end of this section.
 
 ### Inventory Years
 
@@ -650,89 +649,24 @@ that forest was not inventoried in the condition.
 
 Status Code Descriptions are given in [@Burrill2024]:
 
--   1 Accessible forest land - Land within the population of interest
-    that can be occupied safely and has at least 10 percent canopy cover
-    by live tally trees of any size or has had at least 10 percent
-    canopy cover of live tally species in the past, based on the
-    presence of stumps, snags, or other evidence. To qualify, the area
-    must be at least 1.0 acre in size and 120.0 feet wide. Forest land
-    includes transition zones, such as areas between forest and
-    nonforest lands that meet the minimal tree canopy cover and forest
-    areas adjacent to urban and built-up lands. Roadside, streamside,
-    and shelterbelt strips of trees must have a width of at least 120
-    feet and continuous length of at least 363 feet to qualify as forest
-    land. Unimproved roads and trails, streams, and clearings in forest
-    areas are classified as forest if they are less than 120 feet wide
-    or less than an acre in size. Tree-covered areas in agricultural
-    production settings, such as fruit orchards, or tree-covered areas
-    in urban settings, such as city parks, are not considered forest
-    land.
--   2 Nonforest land - Land that has less than 10 percent canopy cover
-    of tally tree species of any size and, in the case of afforested
-    land, fewer than 150 established trees per acre; or land that has
-    sufficient canopy cover or stems, but is classified as nonforest
-    land use (see criteria under PRESNFCD). Nonforest includes areas
-    that have sufficient cover or live stems to meet the forest land
-    definition, but do not meet the dimensional requirements. Note:
-    Nonforest land includes "other wooded land" that has at least 5
-    percent, but less than 10 percent, canopy cover of live tally tree
-    species of any size or has had at least 5 percent, but less than 10
-    percent, canopy cover of tally species in the recent past, based on
-    the presence of stumps, snags, or other evidence. Other wooded land
-    is recognized as a subset of nonforest land, and therefore is not
-    currently considered a separate condition class. Other wooded land
-    is not subject to nonforest use(s) that prevent normal tree
-    regeneration and succession, such as regular mowing, intensive
-    grazing, or recreation activities. In addition, other wooded land is
-    classified according to the same nonforest land use rules as forest
-    land (e.g., 6 percent cover in an urban setting is not considered
-    other wooded land). Other wooded land is therefore defined as having
-    \>5 percent and \<10 percent canopy cover at present, or evidence of
-    such in the past, and PRESNFCD = 20, 40, 42, 43 or 45.
--   3 Noncensus water - Lakes, reservoirs, ponds, and similar bodies of
-    water 1.0 acre to 4.5 acre in size. Rivers, streams, canals, etc.,
-    30.0 feet to 200 feet wide. This definition was used in the 1990
-    census and applied when the data became available. Earlier
-    inventories defined noncensus water differently.
--   4 Census water - Lakes, reservoirs, ponds, and similar bodies of
-    water 4.5 acre in size and larger; and rivers, streams, canals,
-    etc., more than 200 feet wide.
--   5 Nonsampled, possibility of forest land - Any portion of a plot
-    within accessible forest land that cannot be sampled is delineated
-    as a separate condition. There is no minimum size requirement. The
-    reason the condition was not sampled is provided in
-    COND_NONSAMPLE_REASN_CD.
+-   1 Accessible forest land
+-   2 Nonforest land
+-   3 Noncensus water
+-   4 Census water
+-   5 Nonsampled, possibility of forest land
 
 Nonsample Reason Code Descriptions are given in [@Burrill2024]:
 
--   01 Outside U.S. boundary - Condition class is outside the U.S.
-    border.
--   02 Denied access area - Access to the condition class is denied by
-    the legal owner, or by the owner of the only reasonable route to the
-    condition class.
--   03 Hazardous situation - Condition class cannot be accessed because
-    of a hazard or danger, for example cliffs, quarries, strip mines,
-    illegal substance plantations, temporary high water, etc.
--   05 Lost data - The data file was discovered to be corrupt after a
-    panel was completed and submitted for processing. Used for the
-    single condition that is required for this plot. This code is for
-    office use only.
--   06 Lost plot - Entire plot cannot be found. Used for the single
-    condition that is required for this plot.
--   07 Wrong location - Previous plot can be found, but its placement is
-    beyond the tolerance limits for plot location. Used for the single
-    condition that is required for this plot.
--   08 Skipped visit - Entire plot skipped. Used for plots that are not
-    completed prior to the time a panel is finished and submitted for
-    processing. Used for the single condition that is required for this
-    plot. This code is for office use only.
--   09 Dropped intensified plot - Intensified plot dropped due to a
-    change in grid density. Used for the single condition that is
-    required for this plot. This code used only by units engaged in
-    intensification. This code is for office use only.
--   10 Other - Condition class not sampled due to a reason other than
-    one of the specific reasons listed.
--   11 Ocean - Condition falls in ocean water below mean high tide line.
+-   01 Outside U.S. boundary
+-   02 Denied access area
+-   03 Hazardous situation
+-   05 Lost data
+-   06 Lost plot
+-   07 Wrong location
+-   08 Skipped visit
+-   09 Dropped intensified plot
+-   10 Other
+-   11 Ocean
 
 ```{r}
 # Were any conditions not sampled during an inventory?
@@ -791,23 +725,11 @@ These capture treatment code describing disturbance related to harvest.
 Code Descriptions are given in [@Burrill2024]:
 
 -   00 No observable treatment.
--   10 Cutting - The removal of one or more trees from a stand.
--   20 Site preparation - Clearing, slash burning, chopping, disking,
-    bedding, or other practices clearly intended to prepare a site for
-    either natural or artificial regeneration.
--   30 Artificial regeneration - Following a disturbance or treatment
-    (usually cutting), a new stand where at least 50 percent of the live
-    trees present resulted from planting or direct seeding.
--   40 Natural regeneration - Following a disturbance or treatment
-    (usually cutting), a new stand where at least 50 percent of the live
-    trees present (of any size) were established through the growth of
-    existing trees and/or natural seeding or sprouting.
--   50 Other silvicultural treatment - The use of fertilizers,
-    herbicides, girdling, pruning, or other activities (not covered by
-    codes 10-40) designed to improve the commercial value of the
-    residual stand; or chaining, which is a practice used on woodlands
-    to encourage wildlife forage.
-
+-   10 Cutting
+-   20 Site preparation
+-   30 Artificial regeneration
+-   40 Natural regeneration
+-   50 Other silvicultural treatment
 
 ```{r}
 # Who had disturbance?
@@ -919,7 +841,9 @@ ggplot(
 ### Computing Carbon
 
 [@fvsstaff2021] Module 2, section Audit 1, describes how to perform a zero-year
-run of FVS. This applies the mapping from FIA to FVS, and can apply
+run of FVS. This applies the mapping from FIA plot to FVS stand, then grows the stand
+for zero years, which keeps the trees as they are in the FIA plot. This does however
+produce all the FVS output data structures for the stand, which enables application of
 e.g. the carbon model. We do not apply the regeneration adjustments, since
 we are simply computing carbon from the FIA inventory data.
 We do this for each individual grow-only plot, then
@@ -1193,8 +1117,8 @@ ggplot(
 
 ### FIA Carbon
 
-FIA has carbon in the tree table, in CARBON_AG; we can use this instead
-of depending on FVS's carbon calculation.
+FIA has carbon in the tree table, in CARBON_AG; we can sum this per stand
+and compute a per-hectare value.
 
 Method:
 
@@ -1203,17 +1127,18 @@ Method:
 *  Determine scale factor for each plot
 **  A full plot is 4 subplots of 24^2*pi square feet each; scale this
     according to how much we're using
-* scale the carbon in each trees for the area we're using to get carbon per acre
+* scale the carbon in each tree for the area we're using to get carbon per acre
 * sum across all trees
 
 ```{r}
 subplot_area <- conv_unit(24^2 * pi, 'ft2', 'm2') # subplot area in square meters
+
 useful_subp_cond <- matching_subp_cond |>
   semi_join(
     grow_only,
     by = join_by(STATECD, COUNTYCD, PLOT)
   ) |>
-  filter(SUBP <= 4) |> # FIA introduces estimation plots with ID > 4; ignore those
+  filter(SUBP <= 4) |> # FIA introduces estimation subplots with ID > 4; ignore those
   filter(COND_STATUS_CD == 1) |> # Only use measured, forested conditions
   filter(SUBP_STATUS_CD == 1) # Only use measured, forested subplots
 
@@ -1223,7 +1148,7 @@ useful_area <- useful_subp_cond |>
   ungroup() |>
   mutate(PLOT_AREA = SUBPLOTS_INCLUDED * subplot_area)
 # TODO: Maybe filter out plots below a certain total area?
-#       Example: a full plot is 672.4535 ha; filter out anything below
+#       Example: a full plot is 672.4535 m2; filter out anything below
 #       89.2% of that
 
 knitr::kable(useful_area)
@@ -1248,15 +1173,17 @@ m2_per_hectare <- conv_unit(1, 'hectare', 'm2')
 # We have inventoried trees in PLOT_AREA m2; scale to 1 ha
 carbon_per_plot <- useful_trees |>
   # Note: FIA says that CARBON_AG needs to be scaled by TPA_UNADJ to get to
-  # carbon per acre.
+  # carbon per acre. That is a different approach to computing carbon.
   mutate(CARBON_AG_METRIC = m2_per_hectare * conv_unit(CARBON_AG, 'lbs', 'Mg') / PLOT_AREA) |>
   group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
   summarize(CARBON_AG_METRIC = sum(CARBON_AG_METRIC), .groups = "keep") |>
   ungroup() |>
+  # Join to get PLOT_IDs
   left_join(
     nk_plot_ids,
     by = join_by(STATECD, COUNTYCD, PLOT)
   ) |>
+  # Join to get MEASYEAR
   left_join(
     matching_plot |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
     by=join_by(STATECD, COUNTYCD, PLOT, INVYR)
