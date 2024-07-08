@@ -155,7 +155,7 @@ with the FIA tables pre-built for FVS.
 
 Note that the Stand IDs visible in the FVS UI are different from these;
 the FVS UI Stand ID consists of STATECD(2) + INVYR(2) + COUNTYCD(3) +
-PLOT(5).
+PLOT(5), and if using FVS_STANDINIT_COND, then also + CONDID(1).
 
 ```{r}
 translated_stands <- unique_cond |>
@@ -235,4 +235,4 @@ respective tables):
 -   FVS_StandInit_Cond: Conditions
 
 Next we need to determine which of these, if any, corresponds to the
-input used in NK. Spoiler: it's FVS_StandInit_Plot!
+input used in NK.
