@@ -23,22 +23,22 @@ suppressPackageStartupMessages(library(measurements))
 
 # Carbon Calculation
 
-[@Herbert2023] use FIA measurement of biomass to determine carbon. FIA also
-provides above-groud carbon in the TREE table, in CARBON_AG. This metric is,
-of course, not available on plots that FVS grows. For consistent carbon
-calculation on both measured and grown plots, we can use the FVS Fire and Fuels
-extension (FFE-FVS), which contains a Carbon Submodel, to compute
-carbon. We compare FFE carbon calculation with Jenkins and FIA carbon calculation
-at the end of this section.
+[@Herbert2023] use FIA measurement of biomass to determine carbon. FIA
+also provides above-groud carbon in the TREE table, in CARBON_AG. This
+metric is, of course, not available on plots that FVS grows. For
+consistent carbon calculation on both measured and grown plots, we can
+use the FVS Fire and Fuels extension (FFE-FVS), which contains a Carbon
+Submodel, to compute carbon. We compare FFE carbon calculation with
+Jenkins and FIA carbon calculation at the end of this section.
 
 ## Inventory Years
 
 When were the plots re-surveyed?
 
-The FIA PLOT table lists when plots were measured; the FIA COND table lists
-observations from those measurements. We can use the above established
-connection between FVS identifiers and FIA identifiers to find
-subsequent measurement for the plots and conditions included in NK.
+The FIA PLOT table lists when plots were measured; the FIA COND table
+lists observations from those measurements. We can use the above
+established connection between FVS identifiers and FIA identifiers to
+find subsequent measurement for the plots and conditions included in NK.
 
 ```{r}
 # Load the translation table we created
@@ -224,9 +224,9 @@ ggplot(
 
 ### Non-Sampled
 
-Survey may be skipped for various reasons captured in
-COND_STATUS_CD and COND_NONSAMPLE_REASN_CD. Codes other than 1 indicate
-that forest was not inventoried in the condition.
+Survey may be skipped for various reasons captured in COND_STATUS_CD and
+COND_NONSAMPLE_REASN_CD. Codes other than 1 indicate that forest was not
+inventoried in the condition.
 
 Status Code Descriptions are given in [@Burrill2024]:
 
@@ -300,7 +300,6 @@ Code Descriptions are given in [@Burrill2024]:
 -   94 Other geologic event.
 -   95 Earth movement / avalanches.
 
-
 ```{r}
 # Who had disturbance?
 disturbed <- matching_cond |>
@@ -333,12 +332,12 @@ knitr::kable(treated)
 
 ### Timeline
 
-We can combine nonsample, disturbance, and harvest to create a single timeline
-that shows plot status since the start of NK.
+We can combine nonsample, disturbance, and harvest to create a single
+timeline that shows plot status since the start of NK.
 
-Note that status is per condition, and we are charting per plot. To accomodate,
-we introduce horizontal offset so that the status of individual conditions
-within a plot is visible in the chart.
+Note that status is per condition, and we are charting per plot. To
+accomodate, we introduce horizontal offset so that the status of
+individual conditions within a plot is visible in the chart.
 
 ```{r}
 survey_status <- matching_cond |>
@@ -384,13 +383,18 @@ ggplot(
   theme(legend.title = element_blank()) +
   geom_point()
 ```
+
 ### Grow-Only Plots
 
-[@Herbert2023] says "Where stands were coded as having ≥25% of the trees or sample area affected by insects, disease, weather damage, or geologic disturbances damage between inventory visits, we coded a binary, non-fire disturbance attribute to have available as an explanatory factor but did not drop them from the analysis set."
+[@Herbert2023] says "Where stands were coded as having ≥25% of the trees
+or sample area affected by insects, disease, weather damage, or geologic
+disturbances damage between inventory visits, we coded a binary,
+non-fire disturbance attribute to have available as an explanatory
+factor but did not drop them from the analysis set."
 
 From this, it seems there are a subset of plots that are grow-only for
-all subsequent inventories. We would like to compare the carbon in the FIA
-inventoried plots with the carbon projected by FVS.
+all subsequent inventories. We would like to compare the carbon in the
+FIA inventoried plots with the carbon projected by FVS.
 
 We start by identifying those plots that are grow-only.
 
@@ -422,16 +426,18 @@ ggplot(
   coord_cartesian(xlim = c(1999, 2021), ylim = c(0, 31))
 
 ```
+
 ## Carbon Accounting
 
-[@fvsstaff2021] Module 2, section Audit 1, describes how to perform a zero-year
-run of FVS. This applies the mapping from FIA plot to FVS stand, then grows the stand
-for zero years, which keeps the trees as they are in the FIA plot. This does however
-produce all the FVS output data structures for the stand, which enables application of
-e.g. the carbon model. We do not apply the regeneration adjustments, since
-we are simply computing carbon from the FIA inventory data.
-We do this for each individual grow-only plot, then
-chart the observed vs. predicted carbon for just these plots.
+[@fvsstaff2021] Module 2, section Audit 1, describes how to perform a
+zero-year run of FVS. This applies the mapping from FIA plot to FVS
+stand, then grows the stand for zero years, which keeps the trees as
+they are in the FIA plot. This does however produce all the FVS output
+data structures for the stand, which enables application of e.g. the
+carbon model. We do not apply the regeneration adjustments, since we are
+simply computing carbon from the FIA inventory data. We do this for each
+individual grow-only plot, then chart the observed vs. predicted carbon
+for just these plots.
 
 ### FFE
 
@@ -472,7 +478,6 @@ comparable_carbon <- NoManagement_Carbon_ByPlot |>
   arrange(Year, PLOT_ID)
 knitr::kable(comparable_carbon)
 ```
-
 
 ```{r}
 ggplot(
@@ -545,6 +550,7 @@ FIA_Measured_Jenkins <- FIA_Measured_Jenkins |>
 ```{r}
 knitr::kable(FIA_Measured)
 ```
+
 ```{r}
 knitr::kable(FIA_Measured_Jenkins)
 ```
@@ -583,6 +589,7 @@ ggplot(
 ```
 
 Let's look at error:
+
 ```{r}
 projection_error <- projected_carbon |>
   mutate(Projected = Aboveground_Live) |>
@@ -620,6 +627,7 @@ first_measure_year <- FIA_Measured |>
 ```
 
 RMSE
+
 ```{r}
 projection_rmse <- projection_error |>
   left_join(first_measure_year, by = join_by(PLOT_ID)) |>
@@ -643,6 +651,7 @@ ggplot(data = projection_rmse) +
 ```
 
 plot predicted vs. observed
+
 ```{r}
 
 projected_observed <- projected_carbon |>
@@ -703,18 +712,20 @@ ggplot(
 
 ### FIA via Expansion
 
-FIA has carbon in the tree table, in CARBON_AG; we can sum this per stand
-and compute a per-hectare value.
+FIA has carbon in the tree table, in CARBON_AG; we can sum this per
+stand and compute a per-hectare value.
 
 Method:
 
-*  Determine how much of each plot we will use the inventory
-**  Remove plots, subplots, and conditions that are not inventoried forest
-*  Determine scale factor for each plot
-**  A full plot is 4 subplots of 24^2*pi square feet each; scale this
-    according to how much we're using
-* scale the carbon in each tree for the area we're using to get carbon per acre
-* sum across all trees
+-   Determine how much of each plot we will use the inventory \*\*
+    Remove plots, subplots, and conditions that are not inventoried
+    forest
+-   Determine scale factor for each plot \*\* A full plot is 4 subplots
+    of 24\^2\*pi square feet each; scale this according to how much
+    we're using
+-   scale the carbon in each tree for the area we're using to get carbon
+    per acre
+-   sum across all trees
 
 ```{r}
 subplot_area <- conv_unit(24^2 * pi, 'ft2', 'm2') # subplot area in square meters
