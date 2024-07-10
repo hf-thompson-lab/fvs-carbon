@@ -96,39 +96,47 @@ create_graph() |>
   ) |>
   add_edge(from = "FVS 20-Year\nProjection", to = "FVS 20-Year\nOutput") |>
   
-  # FFE-FVS - Fire and Fuels Extension computes carbon
+  # FVS FFE - Fire and Fuels Extension computes carbon
   add_node(
-    label = "FFE-FVS",
+    label = "FVS FFE",
     type = "process",
     node_data = node_data(provider = "FVS")
   ) |>
-  add_edge(from = "FVS 0-Year\nOutput", to = "FFE-FVS") |>
-  add_edge(from = "FVS 20-Year\nOutput", to = "FFE-FVS") |>
+  add_edge(from = "FVS 0-Year\nOutput", to = "FVS FFE") |>
+  add_edge(from = "FVS 20-Year\nOutput", to = "FVS FFE") |>
   add_node(
     label = "FFE 0-Year\nCarbon",
     type = "data",
     node_data = node_data(provider="FVS")
   ) |>
-  add_edge(from = "FFE-FVS", to = "FFE 0-Year\nCarbon") |>
+  add_edge(from = "FVS FFE", to = "FFE 0-Year\nCarbon") |>
   add_node(
     label = "FFE 20-Year\nCarbon",
     type = "data",
     node_data = node_data(provider="FVS")
   ) |>
-  add_edge(from = "FFE-FVS", to = "FFE 20-Year\nCarbon") |>
+  add_edge(from = "FVS FFE", to = "FFE 20-Year\nCarbon") |>
   
+  # FVS-Jenkins - Fire and Fuels Extension Jenkins method
+  add_node(
+    label = "FVS Jenkins",
+    type = "process",
+    node_data = node_data(provider = "FVS")
+  ) |>
+  add_edge(from = "FVS 0-Year\nOutput", to = "FVS Jenkins") |>
+  add_edge(from = "FVS 20-Year\nOutput", to = "FVS Jenkins") |>
   add_node(
     label = "Jenkins 0-Year\nCarbon",
     type = "data",
     node_data = node_data(provider="FVS")
   ) |>
-  add_edge(from = "FFE-FVS", to = "Jenkins 0-Year\nCarbon") |>
+  add_edge(from = "FVS Jenkins", to = "Jenkins 0-Year\nCarbon") |>
   add_node(
     label = "Jenkins 20-Year\nCarbon",
     type = "data",
     node_data = node_data(provider="FVS")
   ) |>
-  add_edge(from = "FFE-FVS", to = "Jenkins 20-Year\nCarbon") |>
+  add_edge(from = "FVS Jenkins", to = "Jenkins 20-Year\nCarbon") |>
 
   
   # Harvard Forest does our own carbon computation directly from FIA
