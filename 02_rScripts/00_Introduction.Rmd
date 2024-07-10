@@ -50,6 +50,20 @@ create_graph() |>
   ) |>
   add_edge(from = "FIA2FVS", to = "FVS Stand") |>
   
+  # FIA has a TPA-based carbon accounting method
+  add_node(
+    label = "FIA TPA\nCarbon Calc",
+    type = "process",
+    node_data = node_data(provider = "FIA")
+  ) |>
+  add_edge(from = "FIADB", to = "FIA TPA\nCarbon Calc") |>
+  add_node(
+    label = "TPA 0-year\nCarbon",
+    type = "data",
+    node_data = node_data(provider = "FIA")
+  ) |>
+  add_edge(from = "FIA TPA\nCarbon Calc", to = "TPA 0-year\nCarbon") |>
+  
   # =============
   # FVS-provided stuff
   # =============
@@ -91,17 +105,31 @@ create_graph() |>
   add_edge(from = "FVS 0-Year\nOutput", to = "FFE-FVS") |>
   add_edge(from = "FVS 20-Year\nOutput", to = "FFE-FVS") |>
   add_node(
-    label = "FVS 0-Year\nCarbon",
+    label = "FFE 0-Year\nCarbon",
     type = "data",
     node_data = node_data(provider="FVS")
   ) |>
-  add_edge(from = "FFE-FVS", to = "FVS 0-Year\nCarbon") |>
+  add_edge(from = "FFE-FVS", to = "FFE 0-Year\nCarbon") |>
   add_node(
-    label = "FVS 20-Year\nCarbon",
+    label = "FFE 20-Year\nCarbon",
     type = "data",
     node_data = node_data(provider="FVS")
   ) |>
-  add_edge(from = "FFE-FVS", to = "FVS 20-Year\nCarbon") |>
+  add_edge(from = "FFE-FVS", to = "FFE 20-Year\nCarbon") |>
+  
+  add_node(
+    label = "Jenkins 0-Year\nCarbon",
+    type = "data",
+    node_data = node_data(provider="FVS")
+  ) |>
+  add_edge(from = "FFE-FVS", to = "Jenkins 0-Year\nCarbon") |>
+  add_node(
+    label = "Jenkins 20-Year\nCarbon",
+    type = "data",
+    node_data = node_data(provider="FVS")
+  ) |>
+  add_edge(from = "FFE-FVS", to = "Jenkins 20-Year\nCarbon") |>
+
   
   # Harvard Forest does our own carbon computation directly from FIA
   add_node(
