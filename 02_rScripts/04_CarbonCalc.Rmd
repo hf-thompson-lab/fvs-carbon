@@ -28,8 +28,16 @@ also provides above-groud carbon in the TREE table, in CARBON_AG. This
 metric is, of course, not available on plots that FVS grows. For
 consistent carbon calculation on both measured and grown plots, we can
 use the FVS Fire and Fuels extension (FFE-FVS), which contains a Carbon
+
 Submodel, to compute carbon. We compare these different approaches to
 carbon calculation at the end of this section.
+
+## Inventory Years
+
+The FIA PLOT table lists when plots were measured; the FIA COND table
+lists observations from those measurements. We can use the above
+established connection between FVS identifiers and FIA identifiers to
+find subsequent measurement for the plots and conditions included in NK.
 
 ```{r}
 # Load in-memory versions of various FIA tables, filtered to just
@@ -361,6 +369,10 @@ knitr::kable(treated)
 
 We can combine nonsample, disturbance, and harvest to create a single
 timeline that shows plot status since the start of NK.
+
+Note that status is per condition, and we are charting per plot. To
+accomodate, we introduce horizontal offset so that the status of
+individual conditions within a plot is visible in the chart.
 
 ```{r}
 stand_status <- matching_cond |>
