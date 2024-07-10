@@ -895,19 +895,19 @@ ffe_fia <- FIA_Measured |>
   rename(`Forest Type` = FORTYPE) |>
   select(STAND_ID, Year, FFE, `Forest Type`) |>
   full_join(carbon_per_plot |> mutate(Year = MEASYEAR), by = join_by(STAND_ID, Year)) |>
-  mutate(FIA = CARBON_AG_METRIC) |>
+  mutate(HF = CARBON_AG_METRIC) |>
   full_join(first_measure_year, by = join_by(STAND_ID)) |>
   mutate(Years = Year - first_measure_year) |>
-  select(STAND_ID, Years, FFE, FIA, `Forest Type`)
+  select(STAND_ID, Years, FFE, HF, `Forest Type`)
 
 ggplot(
     data = ffe_fia
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = FFE, y = FIA, color = Years, shape = `Forest Type`)
+    mapping = aes(x = FFE, y = HF, color = Years, shape = `Forest Type`)
   ) +
-  ggtitle("FVS Carbon Calculation\nFFE vs. FIA Carbon (Mg/ha)") +
+  ggtitle("FVS Carbon Calculation\nFFE vs. HF Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_line(
     data = tibble(x = c(0, 200), y=c(0, 200)),
