@@ -441,6 +441,3 @@ for Aboveground Live by Plot.
 ```{r}
 Conditions_RMSE |> select(Aboveground_Live)
 ```
-Because many FIA attributes are tied to condition (e.g. site index, stand age, etc.), and the RMSE
-of condition is almost as low as that of plot, we perform the remainder of this analysis using
-condition.
