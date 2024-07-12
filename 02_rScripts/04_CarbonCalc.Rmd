@@ -28,6 +28,8 @@ also provides above-groud carbon in the TREE table, in CARBON_AG. This
 metric is, of course, not available on plots that FVS grows. For
 consistent carbon calculation on both measured and grown plots, we can
 use the FVS Fire and Fuels extension (FFE-FVS), which contains a Carbon
+Submodel, to compute carbon. We compare FFE carbon calculation with
+Jenkins and FIA carbon calculation at the end of this section.
 
 Submodel, to compute carbon. We compare these different approaches to
 carbon calculation at the end of this section.
