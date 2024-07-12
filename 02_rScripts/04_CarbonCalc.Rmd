@@ -810,21 +810,27 @@ ggplot(
   )
 ```
 
-### FIA via Expansion
+### Spatial from FIA
 
 FIA has carbon in the tree table, in CARBON_AG; we can sum this per
 stand and compute a per-hectare value.
 
 Method:
 
--   Determine how much of each plot we will use the inventory \*\*
-    Remove plots, subplots, and conditions that are not inventoried
-    forest
--   Determine scale factor for each plot \*\* A full plot is 4 subplots
-    of 24\^2\*pi square feet each; scale this according to how much
-    we're using
+-   Determine how much of each plot we will use the inventory
+
+    -  Remove plots, subplots, and conditions that are not inventoried
+       forest
+
+-   Determine scale factor for each plot
+
+    -  A full plot is 4 subplots
+       of 24\^2\*pi square feet each; scale this according to how much
+       we're using
+
 -   scale the carbon in each tree for the area we're using to get carbon
     per acre
+
 -   sum across all trees
 
 ```{r}
@@ -848,12 +854,6 @@ useful_area <- useful_subp_cond |>
 #       Example: a full plot is 672.4535 m2; filter out anything below
 #       89.2% of that
 
-knitr::kable(useful_area)
-```
-
-Carbon
-
-```{r}
 useful_trees <- matching_tree |>
   filter(!is.na(CARBON_AG)) |>
   semi_join(
@@ -868,7 +868,7 @@ useful_trees <- matching_tree |>
 m2_per_hectare <- conv_unit(1, 'hectare', 'm2')
 
 # We have inventoried trees in PLOT_AREA m2; scale to 1 ha
-carbon_per_plot <- useful_trees |>
+hf_carbon_per_plot <- useful_trees |>
   # Note: FIA says that CARBON_AG needs to be scaled by TPA_UNADJ to get to
   # carbon per acre. That is a different approach to computing carbon.
   mutate(CARBON_AG_METRIC = m2_per_hectare * conv_unit(CARBON_AG, 'lbs', 'Mg') / PLOT_AREA) |>
@@ -887,23 +887,23 @@ carbon_per_plot <- useful_trees |>
   )
 
 
-knitr::kable(carbon_per_plot)
+knitr::kable(hf_carbon_per_plot)
 
 ```
 
 ```{r}
-ffe_fia <- FIA_Measured |>
+ffe_hf <- FIA_Measured |>
   mutate(FFE = Aboveground_Live) |>
   rename(`Forest Type` = FORTYPE) |>
   select(STAND_ID, Year, FFE, `Forest Type`) |>
-  full_join(carbon_per_plot |> mutate(Year = MEASYEAR), by = join_by(STAND_ID, Year)) |>
+  full_join(hf_carbon_per_plot |> mutate(Year = MEASYEAR), by = join_by(STAND_ID, Year)) |>
   mutate(HF = CARBON_AG_METRIC) |>
   full_join(first_measure_year, by = join_by(STAND_ID)) |>
   mutate(Years = Year - first_measure_year) |>
   select(STAND_ID, Years, FFE, HF, `Forest Type`)
 
 ggplot(
-    data = ffe_fia
+    data = ffe_hf
   ) +
   geom_point(
     size = 2,
@@ -916,4 +916,112 @@ ggplot(
     mapping = aes(x = x, y = y)
   )
 #knitr::kable(ffe_fia)
+```
+### TPA from FIA
+
+FIA provides TREE.TPA_UNADJ which is the expansion factor to use for an individual
+tree to get its carbon per unit area contribution. CARBON_AG is pounds per tree,
+so CARBON_AG * TPA_UNADJ is pounds per acre. Multiply by constants to convert
+from pounds per acre to Mg / ha.
+
+```{r}
+m2_per_hectare <- conv_unit(1, 'hectare', 'm2')
+
+expected_plot_area <- 4 * subplot_area
+
+tpa_carbon_per_plot <- matching_tree |>
+  semi_join(
+    grow_only_stands,
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
+  semi_join(
+    useful_subp_cond,
+    by = join_by(STATECD, COUNTYCD, PLOT, SUBP, CONDID, INVYR)
+  ) |>
+  left_join(
+    useful_area,
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+  ) |>
+  filter(!is.na(CARBON_AG) & !is.na(TPA_UNADJ)) |>
+  mutate(CPA = CARBON_AG * TPA_UNADJ) |>
+  mutate(CPHA =
+           conv_unit(CARBON_AG, "lbs", "Mg") *
+           # NB: converting acre-1 to ha-1 is a reverse-unit conversion
+           conv_unit(TPA_UNADJ, "hectare", "acre")
+  ) |>
+  mutate(CARBON_AG_METRIC = CPHA * PLOT_AREA / expected_plot_area) |>
+  group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
+  summarize(CARBON_AG_METRIC = sum(CARBON_AG_METRIC), .groups = "keep") |>
+  ungroup() |>
+  # Join to get STAND_IDs
+  left_join(
+    nk_plot_ids,
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
+  # Join to get MEASYEAR
+  left_join(
+    matching_plot |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
+    by=join_by(STATECD, COUNTYCD, PLOT, INVYR)
+  )
+
+
+knitr::kable(tpa_carbon_per_plot)
+
+```
+
+```{r}
+ffe_tpa <- FIA_Measured |>
+  mutate(FFE = Aboveground_Live) |>
+  rename(`Forest Type` = FORTYPE) |>
+  select(STAND_ID, Year, FFE, `Forest Type`) |>
+  full_join(tpa_carbon_per_plot |> mutate(Year = MEASYEAR), by = join_by(STAND_ID, Year)) |>
+  rename(TPA = CARBON_AG_METRIC) |>
+  full_join(first_measure_year, by = join_by(STAND_ID)) |>
+  mutate(Years = Year - first_measure_year) |>
+  select(STAND_ID, Years, FFE, TPA, `Forest Type`)
+
+ggplot(
+    data = ffe_tpa
+  ) +
+  geom_point(
+    size = 2,
+    mapping = aes(x = FFE, y = TPA, color = Years, shape = `Forest Type`)
+  ) +
+  ggtitle("FVS Carbon Calculation\nFFE vs. TPA Carbon (Mg/ha)") +
+  coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
+  geom_line(
+    data = tibble(x = c(0, 200), y=c(0, 200)),
+    mapping = aes(x = x, y = y)
+  )
+```
+
+Compare spatial vs. tpa
+
+```{r}
+hf_tpa <- FIA_Measured |>
+  rename(`Forest Type` = FORTYPE) |>
+  select(STAND_ID, Year, `Forest Type`) |>
+  full_join(tpa_carbon_per_plot |> mutate(Year = MEASYEAR), by = join_by(STAND_ID, Year)) |>
+  rename(TPA = CARBON_AG_METRIC) |>
+  full_join(hf_carbon_per_plot |> mutate(Year = MEASYEAR), by = join_by(STAND_ID, Year)) |>
+  rename(HF = CARBON_AG_METRIC) |>
+  full_join(first_measure_year, by = join_by(STAND_ID)) |>
+  mutate(Years = Year - first_measure_year) |>
+  select(STAND_ID, Years, HF, TPA, `Forest Type`)
+
+ggplot(
+    data = hf_tpa
+  ) +
+  geom_point(
+    size = 2,
+    mapping = aes(x = HF, y = TPA, color = Years, shape = `Forest Type`)
+  ) +
+  ggtitle("FVS Carbon Calculation\nHF vs. TPA Carbon (Mg/ha)") +
+  coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
+  geom_line(
+    data = tibble(x = c(0, 200), y=c(0, 200)),
+    mapping = aes(x = x, y = y)
+  )
+
+
 ```
