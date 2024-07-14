@@ -575,16 +575,16 @@ measyears <- grown_fvs_stands |>
   summarize(.groups = "keep") |>
   ungroup()
 
-FIA_Measured <- NULL
-FIA_Measured_Jenkins <- NULL
+FVS_Carbon <- NULL
+FVS_Carbon_Jenkins <- NULL
 for (measyear in measyears)
   fname <- paste0(
     "../03_outputs/Grow_",
     sprintf("%04d", measyear),
     "_FVS_Carbon.csv"
   )
-  FIA_Measured <- bind_rows(
-      FIA_Measured,
+  FVS_Carbon <- bind_rows(
+      FVS_Carbon,
       read_csv(fname, col_types = cols(StandID = col_character()))
     )
   fname <- paste0(
@@ -592,12 +592,12 @@ for (measyear in measyears)
     sprintf("%04d", measyear),
     "_FVS_Carbon_Jenkins.csv"
   )
-  FIA_Measured_Jenkins <- bind_rows(
-      FIA_Measured_Jenkins,
+  FVS_Carbon_Jenkins <- bind_rows(
+      FVS_Carbon_Jenkins,
       read_csv(fname, col_types = cols(StandID = col_character()))
     )
 
-FIA_Measured <- FIA_Measured |>
+FVS_Carbon <- FVS_Carbon |>
   mutate(STAND_ID = paste0(
      substring(StandID, 1, 2),
      substring(StandID, 5, 12)
@@ -611,7 +611,7 @@ FIA_Measured <- FIA_Measured |>
   ) |>
   select(STAND_ID, Year, Variable, Aboveground_Live, STDAGE, FORTYPE)
 
-FIA_Measured_Jenkins <- FIA_Measured_Jenkins |>
+FVS_Carbon_Jenkins <- FVS_Carbon_Jenkins |>
   mutate(STAND_ID = paste0(
      substring(StandID, 1, 2),
      substring(StandID, 5, 12)
@@ -627,11 +627,11 @@ FIA_Measured_Jenkins <- FIA_Measured_Jenkins |>
 ```
 
 ```{r}
-knitr::kable(FIA_Measured)
+knitr::kable(FVS_Carbon)
 ```
 
 ```{r}
-knitr::kable(FIA_Measured_Jenkins)
+knitr::kable(FVS_Carbon_Jenkins)
 ```
 
 ```{r}
@@ -647,7 +647,7 @@ projected_carbon <- read_csv(
   mutate(Variable = "Projected") |>
   select(STAND_ID, Year, Variable, Aboveground_Live) |>
   # filter down to only those plots/years that match measurement
-  semi_join(FIA_Measured, by = join_by(STAND_ID, Year))
+  semi_join(FVS_Carbon, by = join_by(STAND_ID, Year))
 
 knitr::kable(projected_carbon)
 
@@ -656,7 +656,7 @@ knitr::kable(projected_carbon)
 ```{r}
 ggplot(
     data = projected_carbon |>
-      union_all(FIA_Measured |> select(STAND_ID, Year, Variable, Aboveground_Live)),
+      union_all(FVS_Carbon |> select(STAND_ID, Year, Variable, Aboveground_Live)),
     mapping = aes(x = Year, y = Aboveground_Live, color = STAND_ID, shape = Variable)
   ) +
   geom_point(size = 2) +
@@ -673,7 +673,7 @@ Let's look at error:
 projection_error <- projected_carbon |>
   mutate(Projected = Aboveground_Live) |>
   select(STAND_ID, Year, Projected) |>
-  full_join(FIA_Measured, by = join_by(STAND_ID, Year)) |>
+  full_join(FVS_Carbon, by = join_by(STAND_ID, Year)) |>
   mutate(Measured = Aboveground_Live) |>
   mutate(Error = Projected - Measured) |>
   select(STAND_ID, STDAGE, Year, Error)
@@ -698,7 +698,7 @@ ggplot(
 ```
 
 ```{r}
-first_measure_year <- FIA_Measured |>
+first_measure_year <- FVS_Carbon |>
   group_by(STAND_ID) |>
   summarize(first_measure_year = min(Year), .groups = "keep") |>
   select(STAND_ID, first_measure_year) |>
@@ -757,7 +757,7 @@ plot predicted vs. observed
 projected_observed <- projected_carbon |>
   mutate(Projected = Aboveground_Live) |>
   select(STAND_ID, Year, Projected) |>
-  full_join(FIA_Measured, by = join_by(STAND_ID, Year)) |>
+  full_join(FVS_Carbon, by = join_by(STAND_ID, Year)) |>
   rename(`Forest Type` = FORTYPE) |>
   full_join(first_measure_year, by = join_by(STAND_ID)) |>
   mutate(Measured = Aboveground_Live) |>
@@ -785,11 +785,11 @@ FVS provides two ways to compute carbon: FFE and Jenkins
 
 ```{r}
 
-ffe_jenkins <- FIA_Measured |>
+ffe_jenkins <- FVS_Carbon |>
   mutate(FFE = Aboveground_Live) |>
   rename(`Forest Type` = FORTYPE) |>
   select(STAND_ID, Year, FFE, `Forest Type`) |>
-  full_join(FIA_Measured_Jenkins, by = join_by(STAND_ID, Year)) |>
+  full_join(FVS_Carbon_Jenkins, by = join_by(STAND_ID, Year)) |>
   mutate(Jenkins = Aboveground_Live) |>
   full_join(first_measure_year, by = join_by(STAND_ID)) |>
   mutate(Years = Year - first_measure_year) |>
@@ -892,7 +892,7 @@ knitr::kable(hf_carbon_per_plot)
 ```
 
 ```{r}
-ffe_hf <- FIA_Measured |>
+ffe_hf <- FVS_Carbon |>
   mutate(FFE = Aboveground_Live) |>
   rename(`Forest Type` = FORTYPE) |>
   select(STAND_ID, Year, FFE, `Forest Type`) |>
@@ -970,7 +970,7 @@ knitr::kable(tpa_carbon_per_plot)
 ```
 
 ```{r}
-ffe_tpa <- FIA_Measured |>
+ffe_tpa <- FVS_Carbon |>
   mutate(FFE = Aboveground_Live) |>
   rename(`Forest Type` = FORTYPE) |>
   select(STAND_ID, Year, FFE, `Forest Type`) |>
@@ -998,7 +998,7 @@ ggplot(
 Compare spatial vs. tpa
 
 ```{r}
-hf_tpa <- FIA_Measured |>
+hf_tpa <- FVS_Carbon |>
   rename(`Forest Type` = FORTYPE) |>
   select(STAND_ID, Year, `Forest Type`) |>
   full_join(tpa_carbon_per_plot |> mutate(Year = MEASYEAR), by = join_by(STAND_ID, Year)) |>
