@@ -579,18 +579,18 @@ FIA_Measured <- NULL
 FIA_Measured_Jenkins <- NULL
 for (measyear in measyears)
   fname <- paste0(
-    "../03_outputs/FIA_Measured_",
+    "../03_outputs/Grow_",
     sprintf("%04d", measyear),
-    ".csv"
+    "_FVS_Carbon.csv"
   )
   FIA_Measured <- bind_rows(
       FIA_Measured,
       read_csv(fname, col_types = cols(StandID = col_character()))
     )
   fname <- paste0(
-    "../03_outputs/FIA_Measured_",
+    "../03_outputs/Grow_",
     sprintf("%04d", measyear),
-    "_Jenkins.csv"
+    "_FVS_Carbon_Jenkins.csv"
   )
   FIA_Measured_Jenkins <- bind_rows(
       FIA_Measured_Jenkins,
