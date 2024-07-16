@@ -577,6 +577,7 @@ measyears <- grown_fvs_stands |>
 
 FVS_Carbon <- NULL
 FVS_Carbon_Jenkins <- NULL
+FVS_Summary2_East <- NULL
 for (measyear in measyears)
   fname <- paste0(
     "../03_outputs/Grow_",
@@ -594,6 +595,15 @@ for (measyear in measyears)
   )
   FVS_Carbon_Jenkins <- bind_rows(
       FVS_Carbon_Jenkins,
+      read_csv(fname, col_types = cols(StandID = col_character()))
+    )
+  fname <- paste0(
+    "../03_outputs/Grow_",
+    sprintf("%04d", measyear),
+    "_FVS_Summary2_East.csv"
+  )
+  FVS_Summary2_East <- bind_rows(
+      FVS_Summary2_East,
       read_csv(fname, col_types = cols(StandID = col_character()))
     )
 
@@ -624,6 +634,24 @@ FVS_Carbon_Jenkins <- FVS_Carbon_Jenkins |>
     by = join_by(STAND_ID, Year == MEASYEAR)
   ) |>
   select(STAND_ID, Year, Variable, Aboveground_Live, STDAGE, FORTYPE)
+
+FVS_Summary2_East <- FVS_Summary2_East |>
+  # Summary can be generated as single row with both growth and removals, or
+  # as separate grown and removed rows. Filter out removal rows by removing
+  # rows with no TopHt.
+  filter(!is.na(TopHt)) |>
+  mutate(STAND_ID = paste0(
+     substring(StandID, 1, 2),
+     substring(StandID, 5, 12)
+  )) |>
+  inner_join(
+    grown_fvs_stands |> select(STAND_ID, MEASYEAR, STDAGE, FORTYPE),
+    by = join_by(STAND_ID, Year == MEASYEAR)
+  ) |>
+  mutate(Variable = "Measured") |>
+  select(STAND_ID, Year, Variable, BA, STDAGE, FORTYPE) |>
+  arrange(STAND_ID, Year)
+
 ```
 
 ```{r}
@@ -633,6 +661,11 @@ knitr::kable(FVS_Carbon)
 ```{r}
 knitr::kable(FVS_Carbon_Jenkins)
 ```
+
+```{r}
+knitr::kable(FVS_Summary2_East)
+```
+
 
 ```{r}
 projected_carbon <- read_csv(
@@ -1025,3 +1058,102 @@ ggplot(
 
 
 ```
+
+### Basal Area
+
+FIA provides COND.BALIVE, which is (FIADB User Guide):
+
+> Basal area per acre of live trees. Basal area in square feet per acre of all live trees 1.0
+inch d.b.h./d.r.c. sampled in the condition. Populated for forest conditions.
+
+FVS provides FVS_Summary2_East.BA, which is (Essential FVS 4.3.1.4.1):
+
+> basal area per acre after thinning
+
+which we presume to be square feet per acre for standing live trees only.
+
+```{r}
+fia_cond_balive <- matching_cond |>
+  semi_join(grow_only_stands, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  select(STATECD, COUNTYCD, PLOT, MEASYEAR, BALIVE) |>
+  # BALIVE is square feet per acre; convert to square meters per hectare
+  mutate(BALIVE_METRIC = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare")) |>
+  left_join(nk_plot_ids, by = join_by(STATECD, COUNTYCD, PLOT))
+
+knitr::kable(fia_cond_balive)
+```
+
+
+
+
+```{r}
+fvs_measured_ba <- FVS_Summary2_East |>
+  left_join(nk_plot_ids, by = join_by(STAND_ID)) |>
+  mutate(BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare"))
+
+knitr::kable(fvs_measured_ba)
+```
+
+```{r}
+fia_fvs_ba <- fia_cond_balive |>
+  rename(Year = MEASYEAR, FIA = BALIVE_METRIC) |>
+  full_join(fvs_measured_ba, by = join_by(STAND_ID, Year)) |>
+  rename(`Forest Type` = FORTYPE) |>
+  rename(FVS = BA_METRIC) |>
+  full_join(first_measure_year, by = join_by(STAND_ID)) |>
+  select(STAND_ID, Year, FIA, FVS, `Forest Type`)
+
+ggplot(
+    data = fia_fvs_ba
+  ) +
+  geom_point(
+    size = 2,
+    mapping = aes(x = FIA, y = FVS, color = Year, shape = `Forest Type`)
+  ) +
+  ggtitle("Basal Area\nFIA vs. FVS (m2 / ha)") +
+  coord_cartesian(xlim = c(0, 60), ylim = c(0, 60)) +
+  geom_line(
+    data = tibble(x = c(0, 60), y=c(0, 60)),
+    mapping = aes(x = x, y = y)
+  )
+```
+
+```{r}
+NoManagement_ByPlotYearly_Summary2 <-
+  read_csv("../03_outputs/NoManagement_ByPlotYearly_Summary2.csv", 
+    col_types = cols(StandID = col_character())) |>
+  mutate(STAND_ID = paste0(
+     substring(StandID, 1, 2),
+     substring(StandID, 5, 12)
+  )) |>
+  mutate(BA_METRIC = conv_multiunit(BA, 'ft2 / acre', 'm2 / hectare')) |>
+  select(STAND_ID, Year, BA_METRIC)
+
+knitr::kable(NoManagement_ByPlotYearly_Summary2)
+```
+
+```{r}
+fvs_fvs_ba <- NoManagement_ByPlotYearly_Summary2 |>
+  rename(Projected = BA_METRIC) |>
+  inner_join(fvs_measured_ba, by = join_by(STAND_ID, Year)) |>
+  rename(`Forest Type` = FORTYPE) |>
+  rename(Measured = BA_METRIC) |>
+  full_join(first_measure_year, by = join_by(STAND_ID)) |>
+  mutate(Years = Year - first_measure_year) |>
+  select(STAND_ID, Years, Projected, Measured, `Forest Type`)
+
+ggplot(
+    data = fvs_fvs_ba
+  ) +
+  geom_point(
+    size = 2,
+    mapping = aes(x = Measured, y = Projected, color = Years, shape = `Forest Type`)
+  ) +
+  ggtitle("Basal Area\nFVS Measured vs. Projected (m2 / ha)") +
+  coord_cartesian(xlim = c(0, 60), ylim = c(0, 60)) +
+  geom_line(
+    data = tibble(x = c(0, 60), y=c(0, 60)),
+    mapping = aes(x = x, y = y)
+  )
+```
+
