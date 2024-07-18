@@ -627,14 +627,14 @@ compare_ffe <- fvs_stand_measured_ffe |>
   ) |>
   rename(Projected = Aboveground_Live) |>
   left_join(stand_first_measured, by = join_by(STAND_ID)) |>
-  mutate(`Years Projected` = Year - first_measure_year)
+  mutate(`Projection Years` = Year - first_measure_year)
 
 ggplot(
     data = compare_ffe
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = Measured, y = Projected, color = `Years Projected`, shape = `Forest Type`)
+    mapping = aes(x = Measured, y = Projected, color = `Projection Years`, shape = `Forest Type`)
   ) +
   ggtitle("Grow-Only Stands\nFFE Measured vs. Projected Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
