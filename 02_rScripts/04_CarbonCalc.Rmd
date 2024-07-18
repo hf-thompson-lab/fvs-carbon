@@ -31,21 +31,26 @@ use the FVS Fire and Fuels extension (FFE-FVS), which contains a Carbon
 Submodel, to compute carbon. We compare FFE carbon calculation with
 Jenkins and FIA carbon calculation at the end of this section.
 
-Submodel, to compute carbon. We compare these different approaches to
-carbon calculation at the end of this section.
+## Stand Inventories
 
-## Inventory Years
+FIA has two notions of when a plot is inventoried:
+
+*  Inventory year (INVYR): the nominal year for which an inventory is
+   conducted. This is the "official" year, and is used to identify observations.
+
+*  Measure Year (MEASYEAR): the actual year in which a plot was measured.
+   For anything sensitive to real-world time, such as growth, this is the
+   time measurement that matters. Note that MEASYEAR may be less than, equal
+   to, or greater than INVYR.
 
 The FIA PLOT table lists when plots were measured; the FIA COND table
 lists observations from those measurements. We can use the above
 established connection between FVS identifiers and FIA identifiers to
 find subsequent measurement for the plots and conditions included in NK.
 
-```{r}
-# Load in-memory versions of various FIA tables, filtered to just
-# those rows that match the plots used in NK.
+Create a single crosswalk between NK, FIA and FVS identifiers.
 
-# Load the translation table we created
+```{r}
 nk_to_fia <- read_csv(
     "../03_outputs/nk_to_fia.csv",
     col_types = cols(
@@ -53,10 +58,8 @@ nk_to_fia <- read_csv(
       .default = col_integer()
     )
   ) |>
-  # Filter to only the columns needed to identify FIA conditions.
   select(`FIA plot code`, STATECD, COUNTYCD, PLOT, CONDID)
 
-# We also want the FVS_STAND_ID for these plots; graft that on
 nk_to_fvs <- read_csv(
     "../03_outputs/nk_to_fvs.csv",
     col_types = cols(
@@ -67,117 +70,59 @@ nk_to_fvs <- read_csv(
       .default = col_integer()
     )
   ) |>
-  # Filter to only the columns needed to identify FIA conditions.
   select(`FIA plot code`, FVS_STAND_ID)
 
-nk_plot_ids <- nk_to_fia |>
+stand_id_crosswalk <- nk_to_fia |>
   full_join(nk_to_fvs, by=join_by(`FIA plot code`)) |>
-  # STAND_ID is state, county, plot, cond - like FVS_STAND_ID with no year
+  # STAND_ID is state, county, plot - like FVS_STAND_ID with no year
   mutate(STAND_ID = sprintf(paste0(
     '%02d',  '%03d',   '%05d'),
     STATECD, COUNTYCD, PLOT
   ))
 
-# Connect to the FIA tables
+remove(nk_to_fia)
+remove(nk_to_fvs)
+```
+
+Given the NK plot IDs, we can find the matching FIA plots.
+
+```{r}
 fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_plot = tbl(fia, 'PLOT')
-fia_cond = tbl(fia, 'COND')
-fia_subplot = tbl(fia, 'SUBPLOT')
-fia_subp_cond = tbl(fia, 'SUBP_COND')
-fia_tree = tbl(fia, 'TREE')
-fia_ref_forest_type = tbl(fia, 'REF_FOREST_TYPE') |>
-  select(VALUE, MEANING)
 
-# Create a dataframe containing the PLOT rows for all inventories of
-# all plots used in NK.
 matching_plot <- fia_plot |>
   filter(INVYR >= 1999) |>
   semi_join(
-    nk_plot_ids,
+    stand_id_crosswalk,
     by=join_by(STATECD, COUNTYCD, PLOT),
     copy=TRUE
-  ) |>
-  collect()
-
-# Create a dataframe containing the COND rows for all inventories of
-# all conditions for all plots used in NK.
-matching_cond <- fia_cond |>
-  filter(INVYR >= 1999) |>
-  semi_join(
-    nk_plot_ids,
-    # Omitting CONDID in the join will not filter out any conditions
-    by=join_by(STATECD, COUNTYCD, PLOT),
-    copy=TRUE
-  ) |>
-  # Dereference forest type codes
-  left_join(fia_ref_forest_type, by = join_by(FORTYPCD == VALUE)) |>
-  rename(FORTYPE = MEANING) |>
-  # Paste MEASYEAR on to COND, because everything in FVS works off MEASYEAR
-  collect() |>
-  left_join(
-    matching_plot |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
-    by=join_by(STATECD, COUNTYCD, PLOT, INVYR)
-  )
-
-# Create a dataframe containing the SUBP_COND rows for all inventories of
-# all subplot / condition intersections used in NK.
-# Add condition and subplot status on for convenience.
-matching_subp_cond <- fia_subp_cond |>
-  filter(INVYR >= 1999) |>
-  semi_join(
-    nk_plot_ids,
-    # Omitting CONDID in the join will not filter out any conditions
-    by=join_by(STATECD, COUNTYCD, PLOT),
-    copy=TRUE
-  ) |>
-  # Put COND_STATUS_CD on SUBP_COND for convenience
-  left_join(
-    fia_cond |> select(STATECD, COUNTYCD, PLOT, CONDID, INVYR, COND_STATUS_CD),
-    by = join_by(STATECD, COUNTYCD, PLOT, CONDID, INVYR)
-  ) |>
-  # Put SUBP_STATUS_CD on SUBP_COND for convenience
-  left_join(
-    fia_subplot |> select(STATECD, COUNTYCD, PLOT, SUBP, INVYR, SUBP_STATUS_CD),
-    by = join_by(STATECD, COUNTYCD, PLOT, SUBP, INVYR)
-  ) |>
-  collect()
-
-# Create a dataframe containing the TREE rows for all inventories of
-# all conditions for all subplots for all plots used in NK.
-matching_tree <- fia_tree |>
-  filter(INVYR >= 1999) |>
-  semi_join(
-    nk_plot_ids,
-    # Omitting CONDID in the join will not filter out any conditions
-    # Omitting SUBP in the join will not filter out any subplots
-    by = join_by(STATECD, COUNTYCD, PLOT),
-    copy = TRUE
   ) |>
   collect()
 
 DBI::dbDisconnect(fia)
+
+remove(fia, fia_plot)
 ```
 
-## Inventory Years
-
-The FIA PLOT table lists when plots were measured; the FIA COND table
-lists observations from those measurements. We can use the above
-established connection between FVS identifiers and FIA identifiers to
-find subsequent measurement for the plots included in NK.
+### Remeasurement Timeline
 
 To aid visual analysis, we create arbitrary ordinals for plots;
 this will allow us to chart each plot in a single
-horizontal band, against time, to create a visual timeline for plot
+horizontal band, against time, to create a visual timeline of plot
 measurement.
 
+To create these ordinals, we sort plots by:
+
+1.  The first year measured, earliest first; then
+2.  Break ties by the second year measured, earliest year first; then
+3.  Break ties by the third year measured, earliest year first; then
+4.  Break ties by the fourth year measured, earliest year first
+5.  Assign stand number as dense rank row number.
+
+This will put plots surveyed earlier towards the bottom of the chart,
+creating an "upward and to the right" visual that is generally easy to read.
+
 ```{r}
-# Create ordinals for plots; to do this, we sort plots by:
-# - the first year measured, earliest first; then
-# - break ties by the second year measured, earliest year first; then
-# - break ties by the third year inventoried, earliest year first; then
-# - break ties by the fourth year inventoried, earliest year first
-# This will put plots surveyed earlier towards the bottom of the chart,
-# creating an "upward and to the right" visual that is generally easier to read.
 year1 <- matching_plot |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   summarize(YEAR1 = min(MEASYEAR), .groups = "keep") |>
@@ -206,7 +151,7 @@ year4 <- year3 |>
   right_join(year3, by=join_by(STATECD, COUNTYCD, PLOT))
 
 # Compute stand numbers as ordinals according to inventory years
-numbered_stands <- year4 |>
+stand_num <- year4 |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   summarise(
     YEAR1 = min(YEAR1),
@@ -220,45 +165,75 @@ numbered_stands <- year4 |>
   mutate(STAND_NUM = row_number()) |>
   select(STAND_NUM, STATECD, COUNTYCD, PLOT)
 
+remove(year1, year2, year3, year4)
+
 # Paste stand numbers back on to plots
-stand_inventory <- matching_plot |>
-  left_join(numbered_stands, by=join_by(STATECD, COUNTYCD, PLOT)) |>
-  group_by(STAND_NUM, MEASYEAR)
+stand_inventories <- matching_plot |>
+  left_join(stand_num, by=join_by(STATECD, COUNTYCD, PLOT)) |>
+  group_by(STAND_NUM, MEASYEAR) |>
+  rename(Year = MEASYEAR)
 
 ggplot(
-    data = stand_inventory,
-    mapping = aes(x = MEASYEAR, y = STAND_NUM)
+    data = stand_inventories,
+    mapping = aes(x = Year, y = STAND_NUM)
   ) +
   geom_point()
-
 ```
-
-## Plot Status
 
 ### Changing Conditions
 
 Conditions are numbered according to where they appear in
 the plot for a given inventory. As such, the same physical condition 
 can receive a different number in different inventories. For example,
-if the condition at the center of subplot 1 changes, then
-the characteristics of condition 1 will change, even if there are
-portions of the plot that are still in what used to be condition 1. To
+if the condition at the center of subplot 1 changes from inventory A to inventory B, then
+the characteristics of the condition numbered 1 will be different between the two inventories, even if there are
+portions of the plot that still match what used to be condition 1. To
 assign stand ordinals actually correctly, we would need to align
-conditions by non-volatile characteristics, such as forest type and stand
-age. As there are only a few plots with multiple conditions, we omit
-multi-condition plots from this analysis.
+conditions by characteristics such as azimuth, forest type and stand
+age. Because there are only a few plots with multiple conditions, we simplify
+this analysis by omitting multi-condition plots.
 
 ```{r}
-multi_cond <- matching_cond |>
-  group_by(STATECD, COUNTYCD, PLOT) |>
-  summarize(NUM_COND = n_distinct(CONDID), .groups = "keep") |>
-  ungroup()
+fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia_cond = tbl(fia, 'COND')
+fia_ref_forest_type = tbl(fia, 'REF_FOREST_TYPE') |>
+  select(VALUE, MEANING)
 
-knitr::kable(multi_cond |> filter(NUM_COND > 1))
+matching_cond <- fia_cond |>
+  filter(INVYR >= 1999) |>
+  semi_join(
+    stand_id_crosswalk,
+    # Omitting CONDID in the join will not filter out any conditions
+    by=join_by(STATECD, COUNTYCD, PLOT),
+    copy=TRUE
+  ) |>
+  # Dereference forest type codes
+  left_join(fia_ref_forest_type, by = join_by(FORTYPCD == VALUE)) |>
+  rename(FORTYPE = MEANING) |>
+  # Paste MEASYEAR on to COND, because everything in FVS works off MEASYEAR
+  collect() |>
+  left_join(
+    matching_plot |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
+    by=join_by(STATECD, COUNTYCD, PLOT, INVYR)
+  )
+
+DBI::dbDisconnect(fia)
+
+remove(fia, fia_cond, fia_ref_forest_type)
+
+# We are interested in plots that have more than one condition in any
+# inventory year. Therefore we group by plot, and count the number of
+# distinct conditions across all inventory years.
+# This will not flag cases when a plot with a single condition changes
+# condition type, e.g. when a plot is harvested.
+matching_cond_multi <- matching_cond |>
+  select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR) |>
+  mutate(MULTI_FLAG = CONDID > 1)
+
+knitr::kable(matching_cond_multi |> filter(MULTI_FLAG))
 ```
 
-
-### Non-Sampled
+### Skipped
 
 Survey may be skipped for various reasons captured on the condition 
 in COND_STATUS_CD and COND_NONSAMPLE_REASN_CD. Codes other than 1 indicate
@@ -285,12 +260,15 @@ Nonsample Reason Code Descriptions are given in [@Burrill2024]:
 -   10 Other
 -   11 Ocean
 
+We want to remove plots that are skipped for any reason.
+
 ```{r}
-# Were any conditions not sampled during an inventory?
-skipped <- matching_cond |>
-  filter(COND_STATUS_CD > 1) |>
-  select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, COND_STATUS_CD, COND_NONSAMPLE_REASN_CD)
-knitr::kable(skipped)
+# Were any stands not sampled during an inventory?
+matching_cond_skipped <- matching_cond |>
+  select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, COND_STATUS_CD, COND_NONSAMPLE_REASN_CD) |>
+  mutate(SKIPPED_FLAG = COND_STATUS_CD > 1)
+
+knitr::kable(matching_cond_skipped |> filter(SKIPPED_FLAG))
 ```
 
 ### Disturbance
@@ -338,13 +316,14 @@ Code Descriptions are given in [@Burrill2024]:
 
 ```{r}
 # Who had disturbance?
-disturbed <- matching_cond |>
-  filter(DSTRBCD1 > 0 | DSTRBCD2 > 0 | DSTRBCD3 > 0) |>
-  select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, DSTRBCD1, DSTRBCD2, DSTRBCD3)
-knitr::kable(disturbed)
+matching_cond_disturbed <- matching_cond |>
+  select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, DSTRBCD1, DSTRBCD2, DSTRBCD3) |>
+  mutate(DISTURBED_FLAG = DSTRBCD1 > 0 | DSTRBCD2 > 0 | DSTRBCD3 > 0)
+
+knitr::kable(matching_cond_disturbed |> filter(DISTURBED_FLAG))
 ```
 
-### Harvest
+### Treatment
 
 Harvest-related disturbance is captured in the three columns TRTCD1/2/3.
 These capture treatment code describing disturbance related to harvest.
@@ -360,72 +339,87 @@ Code Descriptions are given in [@Burrill2024]:
 
 ```{r}
 # Who had treatment?
-treated <- matching_cond |>
-  filter(TRTCD1 > 0 | TRTCD2 > 0 | TRTCD3 > 0) |>
-  select(STATECD, COUNTYCD, PLOT, MEASYEAR, CONDID, TRTCD1, TRTCD2, , TRTCD3)
-knitr::kable(treated)
+matching_cond_treated <- matching_cond |>
+  select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, TRTCD1, TRTCD2, TRTCD3) |>
+  mutate(TREATED_FLAG = TRTCD1 > 0 | TRTCD2 > 0 | TRTCD3 > 0)
+
+knitr::kable(matching_cond_treated |> filter(TREATED_FLAG))
 ```
 
 
 ### Timeline
 
-We can combine nonsample, disturbance, and harvest to create a single
-timeline that shows plot status since the start of NK.
+We can combine mult-condition, skipped, disturbed, and harvested statuses
+to create a single timeline that shows plot status since the start of NK.
 
-Note that status is per condition, and we are charting per plot. To
-accomodate, we introduce horizontal offset so that the status of
+Note that the various status are per condition, and we are charting per plot. To
+accommodate, we introduce horizontal offset for conditions so that the status of
 individual conditions within a plot is visible in the chart.
 
 ```{r}
-stand_status <- matching_cond |>
+matching_cond_status <- matching_cond |>
   
-  # Add multi-condition status indicator
-  left_join(multi_cond, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  # Merge all the matching_cond_<status> tables
+  left_join(
+    matching_cond_multi |> select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, MULTI_FLAG),
+    by = join_by(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR)
+  ) |>
+  left_join(
+    matching_cond_skipped |> select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, SKIPPED_FLAG),
+    by = join_by(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR)
+  ) |>
+  left_join(
+    matching_cond_disturbed |> select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, DISTURBED_FLAG),
+    by = join_by(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR)
+  ) |>
+  left_join(
+    matching_cond_treated |> select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, TREATED_FLAG),
+    by = join_by(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR)
+  ) |>
 
   # Collect the various status indicators into a single STATUS column
   mutate(STATUS = NA) |>
-  mutate(STATUS = if_else(NUM_COND > 1, "Multi-Condition", STATUS)) |>
-  mutate(STATUS = if_else(COND_STATUS_CD > 1, "Skipped", STATUS)) |>
-  mutate(STATUS = if_else(!is.na(DSTRBCD1) & DSTRBCD1 > 0, "Disturbed", STATUS)) |>
-  mutate(STATUS = if_else(!is.na(TRTCD1) & TRTCD1 > 0, "Harvested", STATUS)) |>
-  mutate(STATUS = if_else(is.na(STATUS), "Grown", STATUS)) |>
+  mutate(STATUS = if_else(MULTI_FLAG, "Multi-Condition", STATUS)) |>
+  mutate(STATUS = if_else(SKIPPED_FLAG, "Skipped", STATUS)) |>
+  mutate(STATUS = if_else(DISTURBED_FLAG, "Disturbed", STATUS)) |>
+  mutate(STATUS = if_else(TREATED_FLAG, "Treated", STATUS)) |>
+  mutate(STATUS = if_else(is.na(STATUS), "Grown", STATUS))
+
+stand_inventory_status <- matching_cond_status |>
   
   # To facilitate visual display, nudge MEASYEAR by condition
+  # max(CONDID) == 3, so nudge by 1/4 per CONDID.
   mutate(MEASYEAR = MEASYEAR + (CONDID - 1)/4) |>
   
   # Use the single STATUS column to create separate columns for each status,
-  # where the inventory year is the value for the column
+  # where the measurement year is the value for the column
   mutate(GROWN = if_else(STATUS == "Grown", MEASYEAR, NA)) |>
   mutate(SKIPPED = if_else(STATUS == "Skipped", MEASYEAR, NA)) |>
-  mutate(HARVESTED = if_else(STATUS == "Harvested", MEASYEAR, NA)) |>
+  mutate(TREATED = if_else(STATUS == "Treated", MEASYEAR, NA)) |>
   mutate(DISTURBED = if_else(STATUS == "Disturbed", MEASYEAR, NA)) |>
   mutate(MULTI_COND = if_else(STATUS == "Multi-Condition", MEASYEAR, NA)) |>
   
   # Add stand numbers
-  left_join(numbered_stands, by = join_by(STATECD, COUNTYCD, PLOT)) |>
-  select(
-    STAND_NUM, GROWN, HARVESTED, DISTURBED, SKIPPED, MULTI_COND
-  ) |>
-  
+  left_join(stand_num, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  select(STAND_NUM, GROWN, TREATED, DISTURBED, SKIPPED, MULTI_COND) |>
+
   # Melt and arrange for ggplot
   melt(id.vars = "STAND_NUM", variable.name="Status", value.name = "Year") |>
   filter(!is.na(Year)) |>
   select(STAND_NUM, Year, Status) |>
   arrange(STAND_NUM, Year, Status)
 
-knitr::kable(stand_status)
-```
-
-```{r}
 ggplot(
-    data = stand_status,
+    data = stand_inventory_status,
     mapping = aes(x = Year, y = STAND_NUM, shape = Status, color = Status)
   ) +
   ggtitle("Stand Inventory Timeline") +
   geom_point()
 ```
+> TODO nik: Plot 23 is multi-condition, but none of the conditions is flagged
+> as such. Figure that out and fix it.
 
-### Grow-Only Plots
+### Grow-Only Stands
 
 [@Herbert2023] says "Where stands were coded as having ≥25% of the trees
 or sample area affected by insects, disease, weather damage, or geologic
@@ -433,51 +427,47 @@ disturbances damage between inventory visits, we coded a binary,
 non-fire disturbance attribute to have available as an explanatory
 factor but did not drop them from the analysis set."
 
-From this, it seems there are a subset of plots that are grow-only for
+There are a subset of plots that are grow-only for
 all subsequent inventories. We would like to compare the carbon in the
-FIA inventoried plots with the carbon projected by FVS.
+FIA inventories for the grow-only plots with the carbon projected by FVS.
 
-We start by identifying those plots that are grow-only. We need all
-conditions in the plot to be grow-only for all inventory years, since
+We start by identifying those plots that are grow in all conditions in all years.
+We need all conditions in the plot to be grow-only for all inventory years, since
 FIA and FVS may diverge in their understanding of condition composition
 of plots over time.
 
 ```{r}
-rhs <- matching_cond |>
-  # Group to the plot level, not the cond level.
+rhs <- matching_cond_status |>
+  mutate(GROWN_FLAG = !MULTI_FLAG & !SKIPPED_FLAG & !DISTURBED_FLAG & !TREATED_FLAG) |>
   group_by(STATECD, COUNTYCD, PLOT) |>
-  # Across all status indicators, "higher-numbered "undisturbed" is the lowest status number,
-  # so we can find disturbed stands by taking the max() of status across inventories.
   summarize(
-    COND_STATUS_CD = max(COND_STATUS_CD),
-    TRTCD = max(TRTCD1),
-    DSTRBCD = max(DSTRBCD1),
+    GROWN_FLAG = all(GROWN_FLAG),
     .groups = "keep"
   ) |>
   ungroup() |>
-  left_join(multi_cond, by = join_by(STATECD, COUNTYCD, PLOT)) |>
-  filter(COND_STATUS_CD == 1 & TRTCD == 0 & DSTRBCD == 0 & NUM_COND == 1)
+  filter(GROWN_FLAG)
 
-grow_only_stands <- matching_plot |>
+stand_grow_only <- matching_plot |>
   semi_join(rhs, by = join_by(STATECD, COUNTYCD, PLOT)) |>
-  left_join(numbered_stands, by = join_by(STATECD, COUNTYCD, PLOT)) |>
-  left_join(nk_plot_ids, by = join_by(STATECD, COUNTYCD, PLOT))
+  left_join(stand_num, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  left_join(stand_id_crosswalk, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  # Add STDAGE and FORTYPE, because they'll be useful later
+  left_join(
+    matching_cond |> 
+      select(STATECD, COUNTYCD, PLOT, FORTYPE, STDAGE, MEASYEAR),
+    by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR)
+  )
 
 # rhs is just for the RHS of the semi_join
 rm(rhs)
   
-knitr::kable(grow_only_stands)
-```
-
-```{r}
 ggplot(
-    data = semi_join(stand_status, grow_only_stands, by = join_by(STAND_NUM)),
+    data = semi_join(stand_inventory_status, stand_grow_only, by = join_by(STAND_NUM)),
     mapping = aes(x = Year, y = STAND_NUM, shape = Status, color = Status)
   ) +
   ggtitle("Grow-only Stand Inventory Timeline") +
   geom_point() +
   coord_cartesian(xlim = c(1999, 2021), ylim = c(0, 31))
-
 ```
 
 ## Carbon Accounting
@@ -487,10 +477,10 @@ zero-year run of FVS. This applies the mapping from FIA plot to FVS
 stand, then grows the stand for zero years, which keeps the trees as
 they are in the FIA plot. This does however produce all the FVS output
 data structures for the stand, which enables application of e.g. the
-carbon model. We do not apply the regeneration adjustments, since we are
+FFE carbon model. We do not apply the regeneration adjustments, since we are
 simply computing carbon from the FIA inventory data. We do this for each
-individual grow-only plot, then chart the observed vs. predicted carbon
-for just these plots.
+individual grow-only plot in each measurement year, then chart the observed
+vs. predicted carbon for these plots.
 
 Note that plots change over time, and FIA's way of dealing with this is
 to change the conditions over time. FVS does not change conditions as a
@@ -501,93 +491,191 @@ conditions over time. For both projected and measured carbon, we use all
 conditions in the plot as inventoried, to compare carbon projection vs.
 measurement for the entire plot land area.
 
-### FFE
+### Running FVS
 
+We need two outputs from FVS to compare:
+
+1. Projected growth for all grow-only stands for the time window 2000 - 2024
+   with a 1-year time step.
+2. Carbon calculation for each stand for each year in which it was measured.
+
+The first is accomplished with a single run of FVS with a 1-year timestep. Note
+that this will have observations for each stand for years in which that stand
+was not measured; we will filter those out later.
+
+The second is accomplished by creating a 0-year FVS run for each year in which
+a stand was measured, and running all stands measured in that year.
+
+First, determine the years in which at least one plot was measured:
 ```{r}
-grown_fvs_stands <- matching_plot |>
-  semi_join(grow_only_stands, by = join_by(STATECD, COUNTYCD, PLOT)) |>
-  select(STATECD, COUNTYCD, PLOT, MEASYEAR, INVYR) |>
-  left_join(
-    matching_cond |>
-      select(STATECD, COUNTYCD, PLOT, INVYR, CONDID, FORTYPE, STDAGE, SISP),
-    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
-  ) |>
-
-  # Re-compute FVS_STAND_ID to use the correct year
-  mutate(FVS_STAND_ID=sprintf(paste0(
-    '%02d' , '%02d'      , '%03d'  , '%05d'),
-    STATECD, INVYR %% 100, COUNTYCD, PLOT
-  )) |>
-  # Re-compute STAND_ID, which omits the year
-  mutate(STAND_ID=sprintf(paste0(
-    '%02d' , '%03d'  , '%05d'),
-    STATECD, COUNTYCD, PLOT
-  )) |>
-
-  arrange(MEASYEAR, STAND_ID)
-
-knitr::kable(grown_fvs_stands)
-```
-
-Now plot measured vs projected
-
-```{r}
-NoManagement_Carbon_ByPlotYearly <- read_csv(
-    "../03_outputs/NoManagement_Carbon_ByPlotYearly.csv",
-    col_types = cols(StandID = col_character())
-  )
-knitr::kable(numbered_stands)
-```
-
-```{r}
-
-comparable_carbon <- NoManagement_Carbon_ByPlotYearly |>
-  inner_join(grown_fvs_stands |> rename(StandID = FVS_STAND_ID), by = join_by(StandID)) |>
-  left_join(
-    nk_plot_ids |>
-      rename(StandID = FVS_STAND_ID) |>
-      select(StandID, `FIA plot code`, STAND_ID),
-    by=join_by(StandID)
-  ) |>
-  left_join(numbered_stands, by = join_by(STATECD, COUNTYCD, PLOT)) |>
-  mutate(Variable = "Projected") |>
-  rename(Aboveground_Live = Aboveground_Total_Live) |>
-  select(STAND_NUM, STDAGE, Year, Variable, Aboveground_Live) |>
-  arrange(Year, STAND_NUM)
-knitr::kable(comparable_carbon)
-```
-
-```{r}
-ggplot(
-    data = comparable_carbon,
-    mapping = aes(x = Year, y = Aboveground_Live, color = STAND_NUM, style = Variable)
-  ) +
-  geom_point() +
-  coord_cartesian(xlim = c(2000, 2025), ylim = c(0, 300)) +
-  scale_x_continuous(breaks=seq(2000,2025,10))
-```
-
-```{r}
-
-measyears <- grown_fvs_stands |>
-  select(MEASYEAR) |>
+measyears <- stand_grow_only |>
   group_by(MEASYEAR) |>
   summarize(.groups = "keep") |>
   ungroup()
 
+knitr::kable(measyears)
+```
+
+Next, we want to run FVS for each of those years, including the stands that were measured
+in each year. Since FVS stand ID includes the measure year, we need to calculate
+the FVS_STAND_IDs to use for the run.
+
+```{r}
+fvs_stand_grow_only <- stand_grow_only |>
+  # Compute FVS_STAND_ID to use the correct year
+  mutate(FVS_STAND_ID=sprintf(paste0(
+    '%02d' , '%02d'         , '%03d'  , '%05d'),
+    STATECD, MEASYEAR %% 100, COUNTYCD, PLOT
+  )) |>
+  # Compute STAND_ID, which omits the year
+  mutate(STAND_ID=sprintf(paste0(
+    '%02d' , '%03d'  , '%05d'),
+    STATECD, COUNTYCD, PLOT
+  )) |>
+  select(STATECD, COUNTYCD, PLOT, MEASYEAR, STDAGE, FORTYPE, FVS_STAND_ID, STAND_ID) |>
+  arrange(MEASYEAR, STAND_ID)
+
+knitr::kable(fvs_stand_grow_only)
+```
+
+### FFE-FFE
+
+FFE-FVS is the Fire and Fuels extension for FVS. It provides two methods of
+computing carbon: FFE and Jenkins. The default is FFE; we start by comparing
+FFE Carbon for measured vs. projected stands.
+
+This gives us a plot of measured carbon over time.
+
+> TODO nik: Grow_ should be something to indicate that we're not growing,
+> and instead just converting FIA data to FVS data.
+
+```{r}
 FVS_Carbon <- NULL
-FVS_Carbon_Jenkins <- NULL
-FVS_Summary2_East <- NULL
+
 for (measyear in measyears)
-  fname <- paste0(
-    "../03_outputs/Grow_",
-    sprintf("%04d", measyear),
-    "_FVS_Carbon.csv"
-  )
+  fname <- paste0("../03_outputs/Grow_", sprintf("%04d", measyear), "_FVS_Carbon.csv")
   FVS_Carbon <- bind_rows(
       FVS_Carbon,
       read_csv(fname, col_types = cols(StandID = col_character()))
     )
+
+
+fvs_stand_measured_ffe <- FVS_Carbon |>
+  mutate(STAND_ID = paste0(
+     substring(StandID, 1, 2),
+     substring(StandID, 5, 12)
+  )) |>
+  semi_join(fvs_stand_grow_only, by = join_by(STAND_ID)) |>
+  mutate(Aboveground_Live = Aboveground_Total_Live) |>
+  left_join(
+    fvs_stand_grow_only |> select(STAND_ID, MEASYEAR, STDAGE, FORTYPE),
+    by = join_by(STAND_ID, Year == MEASYEAR)
+  ) |>
+  select(STAND_ID, Year, Aboveground_Live, STDAGE, FORTYPE)
+
+remove(FVS_Carbon, fname, measyear)
+
+ggplot(
+    data = fvs_stand_measured_ffe,
+    mapping = aes(x = Year, y = Aboveground_Live, color = STAND_ID)
+  ) +
+  geom_point() +
+  coord_cartesian(xlim = c(2000, 2025), ylim = c(0, 300)) +
+  scale_x_continuous(breaks=seq(2000,2025,10)) +
+  ggtitle("Grow-Only Stands\nFFE Measured Carbon (Mg / ha)")
+```
+
+We then run FVS on all grow-only stands from the start year with a one-year timestep to
+get projected FFE carbon.
+
+```{r}
+fvs_stand_projected_ffe <- read_csv(
+    "../03_outputs/NoManagement_Carbon_ByPlotYearly.csv",
+    col_types = cols(StandID = col_character())
+  ) |>
+  left_join(stand_id_crosswalk, by = join_by(StandID == FVS_STAND_ID)) |>
+  semi_join(fvs_stand_grow_only, by = join_by(STAND_ID)) |>
+  rename(Aboveground_Live = Aboveground_Total_Live) |>
+  select(STAND_ID, Year, Aboveground_Live)
+
+ggplot(
+    data = fvs_stand_projected_ffe,
+    mapping = aes(x = Year, y = Aboveground_Live, color = STAND_ID)
+  ) +
+  geom_point() +
+  coord_cartesian(xlim = c(2000, 2025), ylim = c(0, 300)) +
+  scale_x_continuous(breaks=seq(2000,2025,10)) +
+  ggtitle("Grow-Only Stands\nFFE Projected Carbon (Mg / ha)")
+```
+
+We can then plot the measured vs. projected carbon.
+
+```{r}
+stand_first_measured <- stand_inventories |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  summarize(first_measure_year = min(Year), .groups = "keep") |>
+  ungroup() |>
+  left_join(stand_id_crosswalk, by = join_by(STATECD, COUNTYCD, PLOT))
+
+compare_ffe <- fvs_stand_measured_ffe |>
+  rename(`Forest Type` = FORTYPE) |>
+  rename(`Stand Age` = STDAGE) |>
+  rename(Measured = Aboveground_Live) |>
+  left_join(
+    fvs_stand_projected_ffe |> select(STAND_ID, Year, Aboveground_Live),
+    by = join_by(STAND_ID, Year)
+  ) |>
+  rename(Projected = Aboveground_Live) |>
+  left_join(stand_first_measured, by = join_by(STAND_ID)) |>
+  mutate(`Years Projected` = Year - first_measure_year)
+
+ggplot(
+    data = compare_ffe
+  ) +
+  geom_point(
+    size = 2,
+    mapping = aes(x = Measured, y = Projected, color = `Years Projected`, shape = `Forest Type`)
+  ) +
+  ggtitle("Grow-Only Stands\nFFE Measured vs. Projected Carbon (Mg/ha)") +
+  coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
+  geom_line(
+    data = tibble(x = c(0, 200), y=c(0, 200)),
+    mapping = aes(x = x, y = y)
+  )
+```
+
+Same, but color by stand age
+
+```{r}
+ggplot(
+    data = compare_ffe
+  ) +
+  geom_point(
+    size = 2,
+    mapping = aes(x = Measured, y = Projected, color = `Stand Age`, shape = `Forest Type`)
+  ) +
+  ggtitle("Grow-Only Stands\nFFE Measured vs. Projected Carbon (Mg/ha)") +
+  coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
+  geom_line(
+    data = tibble(x = c(0, 200), y=c(0, 200)),
+    mapping = aes(x = x, y = y)
+  )
+```
+
+### FFE-Jenkins
+
+The second method of computing carbon provided by FFE-FVS is Jenkins. Compare
+measured vs. projected carbon using FFE Jenkins.
+
+To gather measured carbon using the Jenkins method, we must re-run FVS,
+adding the Jenkins keyword for the fire and fuels extension.
+
+For measured carbon, we re-run all the plots during the years they are measured.
+
+```{r}
+FVS_Carbon_Jenkins <- NULL
+
+for (measyear in measyears)
   fname <- paste0(
     "../03_outputs/Grow_",
     sprintf("%04d", measyear),
@@ -597,243 +685,55 @@ for (measyear in measyears)
       FVS_Carbon_Jenkins,
       read_csv(fname, col_types = cols(StandID = col_character()))
     )
-  fname <- paste0(
-    "../03_outputs/Grow_",
-    sprintf("%04d", measyear),
-    "_FVS_Summary2_East.csv"
-  )
-  FVS_Summary2_East <- bind_rows(
-      FVS_Summary2_East,
-      read_csv(fname, col_types = cols(StandID = col_character()))
-    )
 
-FVS_Carbon <- FVS_Carbon |>
+fvs_stand_measured_jenkins <- FVS_Carbon_Jenkins |>
   mutate(STAND_ID = paste0(
      substring(StandID, 1, 2),
      substring(StandID, 5, 12)
   )) |>
-  semi_join(grown_fvs_stands, by = join_by(STAND_ID)) |>
+  semi_join(fvs_stand_grow_only, by = join_by(STAND_ID)) |>
   mutate(Aboveground_Live = Aboveground_Total_Live) |>
-  mutate(Variable = "Measured") |>
   left_join(
-    grown_fvs_stands |> select(STAND_ID, MEASYEAR, STDAGE, FORTYPE),
+    fvs_stand_grow_only |> select(STAND_ID, MEASYEAR, STDAGE, FORTYPE),
     by = join_by(STAND_ID, Year == MEASYEAR)
   ) |>
-  select(STAND_ID, Year, Variable, Aboveground_Live, STDAGE, FORTYPE)
+  select(STAND_ID, Year, Aboveground_Live, STDAGE, FORTYPE)
 
-FVS_Carbon_Jenkins <- FVS_Carbon_Jenkins |>
-  mutate(STAND_ID = paste0(
-     substring(StandID, 1, 2),
-     substring(StandID, 5, 12)
-  )) |>
-  semi_join(grown_fvs_stands, by = join_by(STAND_ID)) |>
-  mutate(Aboveground_Live = Aboveground_Total_Live) |>
-  mutate(Variable = "Measured") |>
-  left_join(
-    grown_fvs_stands |> select(STAND_ID, MEASYEAR, STDAGE, FORTYPE),
-    by = join_by(STAND_ID, Year == MEASYEAR)
-  ) |>
-  select(STAND_ID, Year, Variable, Aboveground_Live, STDAGE, FORTYPE)
-
-FVS_Summary2_East <- FVS_Summary2_East |>
-  # Summary can be generated as single row with both growth and removals, or
-  # as separate grown and removed rows. Filter out removal rows by removing
-  # rows with no TopHt.
-  filter(!is.na(TopHt)) |>
-  mutate(STAND_ID = paste0(
-     substring(StandID, 1, 2),
-     substring(StandID, 5, 12)
-  )) |>
-  inner_join(
-    grown_fvs_stands |> select(STAND_ID, MEASYEAR, STDAGE, FORTYPE),
-    by = join_by(STAND_ID, Year == MEASYEAR)
-  ) |>
-  mutate(Variable = "Measured") |>
-  select(STAND_ID, Year, Variable, BA, STDAGE, FORTYPE) |>
-  arrange(STAND_ID, Year)
-
-```
-
-```{r}
-knitr::kable(FVS_Carbon)
-```
-
-```{r}
-knitr::kable(FVS_Carbon_Jenkins)
-```
-
-```{r}
-knitr::kable(FVS_Summary2_East)
-```
+remove(FVS_Carbon_Jenkins, fname, measyear)
 
 
-```{r}
-projected_carbon <- read_csv(
-    "../03_outputs/NoManagement_Carbon_ByPlotYearly.csv",
-    col_types = cols(StandID = col_character())
-  ) |>
-  mutate(Aboveground_Live = Aboveground_Total_Live) |>
-  mutate(STAND_ID = paste0(
-     substring(StandID, 1, 2),
-     substring(StandID, 5, 12)
-  )) |>
-  mutate(Variable = "Projected") |>
-  select(STAND_ID, Year, Variable, Aboveground_Live) |>
-  # filter down to only those plots/years that match measurement
-  semi_join(FVS_Carbon, by = join_by(STAND_ID, Year))
-
-knitr::kable(projected_carbon)
-
-```
-
-```{r}
 ggplot(
-    data = projected_carbon |>
-      union_all(FVS_Carbon |> select(STAND_ID, Year, Variable, Aboveground_Live)),
-    mapping = aes(x = Year, y = Aboveground_Live, color = STAND_ID, shape = Variable)
+    data = fvs_stand_measured_jenkins,
+    mapping = aes(x = Year, y = Aboveground_Live, color = STAND_ID)
   ) +
-  geom_point(size = 2) +
-  scale_shape_manual(values = c("Measured" = 3, "Projected" = 21)) +
+  geom_point() +
   coord_cartesian(xlim = c(2000, 2025), ylim = c(0, 300)) +
   scale_x_continuous(breaks=seq(2000,2025,10)) +
-  ggtitle("Measured vs. Projected Carbon: FVS NoManagement") +
-  ylab("Carbon (Tonnes / Hectare)")
-```
-
-Let's look at error:
-
-```{r}
-projection_error <- projected_carbon |>
-  mutate(Projected = Aboveground_Live) |>
-  select(STAND_ID, Year, Projected) |>
-  full_join(FVS_Carbon, by = join_by(STAND_ID, Year)) |>
-  mutate(Measured = Aboveground_Live) |>
-  mutate(Error = Projected - Measured) |>
-  select(STAND_ID, STDAGE, Year, Error)
-
-ggplot(
-    data = projection_error
-  ) +
-  geom_point(
-    size = 2,
-    mapping = aes(x = Year, y = Error, color = STAND_ID)
-  ) +
-  coord_cartesian(xlim = c(2000, 2025), ylim = c(-100, 100)) +
-  scale_x_continuous(breaks=seq(2000,2025,10)) +
-  ggtitle("Measured vs. Projected Carbon Error: FVS NoManagement") +
-  ylab("Carbon (Tonnes / Hectare)") +
-  geom_smooth(
-    data=projection_error |> select(Year, Error),
-    method=lm,
-    mapping = aes(x=Year, y=Error),
-    formula = 'y ~ x'
-  )
-```
-
-```{r}
-first_measure_year <- FVS_Carbon |>
-  group_by(STAND_ID) |>
-  summarize(first_measure_year = min(Year), .groups = "keep") |>
-  select(STAND_ID, first_measure_year) |>
-  ungroup()
-```
-
-RMSE
-
-```{r}
-rmse_by_years <- projection_error |>
-  left_join(first_measure_year, by = join_by(STAND_ID)) |>
-#  mutate(Years = floor((Year - first_measure_year) / 5) * 5) |>
-  mutate(Years = Year - first_measure_year) |>
-  select(STAND_ID, Years, Error) |>
-  group_by(Years) |>
-  summarize(RMSE = sqrt(mean(Error^2)), .groups = "keep") |>
-  ungroup()
-
-ggplot(data = rmse_by_years) +
-  ggtitle("FVS NoManagement\nMeasured vs. Projected RMSE") +
-  geom_point(size = 2, mapping = aes(x = Years, y = RMSE)) +
-  geom_smooth(
-    data=rmse_by_years |> select(Years, RMSE),
-    method=lm,
-    mapping = aes(x=Years, y=RMSE),
-    formula = 'y ~ x'
-  )
+  ggtitle("Grow-Only Stands\nJenkins Measured Carbon (Mg / ha)")
 
 ```
 
-Same, but by stand age
-
-```{r}
-rmse_by_stdage <- projection_error |>
-  select(STAND_ID, STDAGE, Error) |>
-  group_by(STDAGE) |>
-  summarize(RMSE = sqrt(mean(Error^2)), .groups = "keep") |>
-  ungroup()
-
-ggplot(data = rmse_by_stdage) +
-  ggtitle("FVS NoManagement\nMeasured vs. Projected RMSE") +
-  geom_point(size = 2, mapping = aes(x = STDAGE, y = RMSE)) +
-  geom_smooth(
-    data=rmse_by_stdage |> select(STDAGE, RMSE),
-    method=lm,
-    mapping = aes(x=STDAGE, y=RMSE),
-    formula = 'y ~ x'
-  )
-
-```
-
-plot predicted vs. observed
+We can get a good assessment of how FFE and Jenkins calculations compare
+just by comparing measured FFE and Jenkins computed carbon.
 
 ```{r}
 
-projected_observed <- projected_carbon |>
-  mutate(Projected = Aboveground_Live) |>
-  select(STAND_ID, Year, Projected) |>
-  full_join(FVS_Carbon, by = join_by(STAND_ID, Year)) |>
-  rename(`Forest Type` = FORTYPE) |>
-  full_join(first_measure_year, by = join_by(STAND_ID)) |>
-  mutate(Measured = Aboveground_Live) |>
-  mutate(Years = Year - first_measure_year) |>
-  select(STAND_ID, Years, Projected, Measured, `Forest Type`)
-
-ggplot(
-    data = projected_observed
-  ) +
-  geom_point(
-    size = 2,
-    mapping = aes(x = Measured, y = Projected, color = Years, shape = `Forest Type`)
-  ) +
-  ggtitle("FVS NoManagement Scenario\nMeasured vs. Projected Carbon (Mg/ha)") +
-  coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
-  geom_line(
-    data = tibble(x = c(0, 200), y=c(0, 200)),
-    mapping = aes(x = x, y = y)
-  )
-```
-
-### Jenkins
-
-FVS provides two ways to compute carbon: FFE and Jenkins
-
-```{r}
-
-ffe_jenkins <- FVS_Carbon |>
+compare_ffe_jenkins <- fvs_stand_measured_ffe |>
   mutate(FFE = Aboveground_Live) |>
   rename(`Forest Type` = FORTYPE) |>
-  select(STAND_ID, Year, FFE, `Forest Type`) |>
-  full_join(FVS_Carbon_Jenkins, by = join_by(STAND_ID, Year)) |>
+  rename(`Stand Age` = STDAGE) |>
+  select(STAND_ID, Year, FFE, `Stand Age`, `Forest Type`) |>
+  full_join(fvs_stand_measured_jenkins, by = join_by(STAND_ID, Year)) |>
   mutate(Jenkins = Aboveground_Live) |>
-  full_join(first_measure_year, by = join_by(STAND_ID)) |>
-  mutate(Years = Year - first_measure_year) |>
-  select(STAND_ID, Years, FFE, Jenkins, `Forest Type`)
+  left_join(stand_first_measured, by = join_by(STAND_ID)) |>
+  select(STAND_ID, Year, FFE, Jenkins, `Stand Age`, `Forest Type`)
 
 ggplot(
-    data = ffe_jenkins
+    data = compare_ffe_jenkins
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = FFE, y = Jenkins, color = Years, shape = `Forest Type`)
+    mapping = aes(x = FFE, y = Jenkins, color = Year, shape = `Forest Type`)
   ) +
   ggtitle("FVS Carbon Calculation\nFFE vs. Jenkins Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
@@ -843,7 +743,28 @@ ggplot(
   )
 ```
 
-### Spatial from FIA
+From this, it appears the Jenkins over-projects compared to FFE.
+
+Same plot, but colored by stand age:
+
+```{r}
+ggplot(
+    data = compare_ffe_jenkins
+  ) +
+  geom_point(
+    size = 2,
+    mapping = aes(x = FFE, y = Jenkins, color = `Stand Age`, shape = `Forest Type`)
+  ) +
+  ggtitle("FVS Carbon Calculation\nFFE vs. Jenkins Carbon (Mg/ha)") +
+  coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
+  geom_line(
+    data = tibble(x = c(0, 200), y=c(0, 200)),
+    mapping = aes(x = x, y = y)
+  )
+
+```
+
+### FIA Spatial
 
 FIA has carbon in the tree table, in CARBON_AG; we can sum this per
 stand and compute a per-hectare value.
@@ -854,6 +775,9 @@ Method:
 
     -  Remove plots, subplots, and conditions that are not inventoried
        forest
+       
+    -  We are only including plots that are fully forested, with a single
+       condition, so this is not relevant here.
 
 -   Determine scale factor for each plot
 
@@ -866,161 +790,158 @@ Method:
 
 -   sum across all trees
 
+Fetch all the trees for the grow-only plots:
+
 ```{r}
-subplot_area <- conv_unit(24^2 * pi, 'ft2', 'm2') # subplot area in square meters
+fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia_tree = tbl(fia, 'TREE')
 
-useful_subp_cond <- matching_subp_cond |>
+# Create a dataframe containing the TREE rows for all inventories of
+# all conditions for all subplots for all plots used in NK.
+matching_tree <- fia_tree |>
+  filter(INVYR >= 1999) |>
+  # Only live trees
+  filter(STATUSCD == 1) |>
   semi_join(
-    grow_only_stands,
-    by = join_by(STATECD, COUNTYCD, PLOT)
+    stand_grow_only,
+    # Fetch all conditions, all subplots
+    by = join_by(STATECD, COUNTYCD, PLOT),
+    copy = TRUE
   ) |>
-  filter(SUBP <= 4) |> # FIA introduces estimation subplots with ID > 4; ignore those
-  filter(COND_STATUS_CD == 1) |> # Only use measured, forested conditions
-  filter(SUBP_STATUS_CD == 1) # Only use measured, forested subplots
+  collect()
 
-useful_area <- useful_subp_cond |>
+DBI::dbDisconnect(fia)
+
+remove(fia, fia_tree)
+```
+
+For each tree, convert its carbon to carbon per acre, then to carbon per hectare.
+To convert CARBON_AG, which is pounds, to carbon per acre, we observe that a
+plot is 1/6 acre; replicating the plot 6 times gets us a full acre, so we
+multiply the carbon in each tree by 6 to get lbs/acre of carbon.
+
+```{r}
+stand_measured_spatial <- matching_tree |>
+  select(STATECD, COUNTYCD, PLOT, SUBP, CONDID, TREE, INVYR, CARBON_AG) |>
+  mutate(CARBON_PER_ACRE = 6 * CARBON_AG) |>
+  mutate(CARBON_METRIC = conv_multiunit(CARBON_PER_ACRE, "lbs / acre", "Mg / hectare")) |>
   group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
-  summarize(SUBPLOTS_INCLUDED = sum(SUBPCOND_PROP), .groups = "keep") |>
-  ungroup() |>
-  mutate(PLOT_AREA = SUBPLOTS_INCLUDED * subplot_area)
-# TODO: Maybe filter out plots below a certain total area?
-#       Example: a full plot is 672.4535 m2; filter out anything below
-#       89.2% of that
-
-useful_trees <- matching_tree |>
-  filter(!is.na(CARBON_AG)) |>
-  semi_join(
-    useful_subp_cond,
-    by = join_by(STATECD, COUNTYCD, PLOT, SUBP, CONDID, INVYR)
-  ) |>
-  left_join(
-    useful_area,
-    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
-  )
-
-m2_per_hectare <- conv_unit(1, 'hectare', 'm2')
-
-# We have inventoried trees in PLOT_AREA m2; scale to 1 ha
-hf_carbon_per_plot <- useful_trees |>
-  # Note: FIA says that CARBON_AG needs to be scaled by TPA_UNADJ to get to
-  # carbon per acre. That is a different approach to computing carbon.
-  mutate(CARBON_AG_METRIC = m2_per_hectare * conv_unit(CARBON_AG, 'lbs', 'Mg') / PLOT_AREA) |>
-  group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
-  summarize(CARBON_AG_METRIC = sum(CARBON_AG_METRIC), .groups = "keep") |>
+  summarize(CARBON_METRIC = sum(CARBON_METRIC), .groups = "keep") |>
   ungroup() |>
   # Join to get STAND_IDs
   left_join(
-    nk_plot_ids,
+    stand_id_crosswalk,
     by = join_by(STATECD, COUNTYCD, PLOT)
   ) |>
-  # Join to get MEASYEAR
+  # Join to get MEASYEAR, FORTYPE, and STDAGE
   left_join(
     matching_plot |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
     by=join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
 
-
-knitr::kable(hf_carbon_per_plot)
-
+knitr::kable(stand_measured_spatial)
 ```
 
 ```{r}
-ffe_hf <- FVS_Carbon |>
+compare_ffe_spatial <- fvs_stand_measured_ffe |>
   mutate(FFE = Aboveground_Live) |>
   rename(`Forest Type` = FORTYPE) |>
-  select(STAND_ID, Year, FFE, `Forest Type`) |>
-  full_join(hf_carbon_per_plot |> mutate(Year = MEASYEAR), by = join_by(STAND_ID, Year)) |>
-  mutate(HF = CARBON_AG_METRIC) |>
-  full_join(first_measure_year, by = join_by(STAND_ID)) |>
-  mutate(Years = Year - first_measure_year) |>
-  select(STAND_ID, Years, FFE, HF, `Forest Type`)
+  rename(`Stand Age` = STDAGE) |>
+  select(STAND_ID, Year, FFE, `Stand Age`, `Forest Type`) |>
+  full_join(stand_measured_spatial, by = join_by(STAND_ID, Year == MEASYEAR)) |>
+  mutate(Spatial = CARBON_METRIC) |>
+  select(STAND_ID, Year, FFE, Spatial, `Stand Age`, `Forest Type`)
 
 ggplot(
-    data = ffe_hf
+    data = compare_ffe_spatial
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = FFE, y = HF, color = Years, shape = `Forest Type`)
+    mapping = aes(x = FFE, y = Spatial, color = Year, shape = `Forest Type`)
   ) +
-  ggtitle("FVS Carbon Calculation\nFFE vs. HF Carbon (Mg/ha)") +
+  ggtitle("Carbon Calculation\nFFE vs. Spatial Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_line(
     data = tibble(x = c(0, 200), y=c(0, 200)),
     mapping = aes(x = x, y = y)
   )
-#knitr::kable(ffe_fia)
 ```
-### TPA from FIA
+
+Same, but colored by stand age
+
+```{r}
+ggplot(
+    data = compare_ffe_spatial
+  ) +
+  geom_point(
+    size = 2,
+    mapping = aes(x = FFE, y = Spatial, color = `Stand Age`, shape = `Forest Type`)
+  ) +
+  ggtitle("Carbon Calculation\nFFE vs. Spatial Carbon (Mg/ha)") +
+  coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
+  geom_line(
+    data = tibble(x = c(0, 200), y=c(0, 200)),
+    mapping = aes(x = x, y = y)
+  )
+```
+
+### FIA TPA
 
 FIA provides TREE.TPA_UNADJ which is the expansion factor to use for an individual
-tree to get its carbon per unit area contribution. CARBON_AG is pounds per tree,
-so CARBON_AG * TPA_UNADJ is pounds per acre. Multiply by constants to convert
-from pounds per acre to Mg / ha.
+tree to get its carbon per acre contribution. CARBON_AG is pounds per tree,
+so CARBON_AG * TPA_UNADJ is pounds per acre.
+
+We have filtered to fully forested plots with a single condition, so the method
+does not need to accommodate partially forested plots, or varying conditions.
+
+Method:
+
+- For each tree, compute CARBON_AG * TPA_UNADJ, then convert to Mg/ha.
+
+- Sum for all trees in the plot
+
 
 ```{r}
-m2_per_hectare <- conv_unit(1, 'hectare', 'm2')
-
-expected_plot_area <- 4 * subplot_area
-
-tpa_carbon_per_plot <- matching_tree |>
-  semi_join(
-    grow_only_stands,
-    by = join_by(STATECD, COUNTYCD, PLOT)
-  ) |>
-  semi_join(
-    useful_subp_cond,
-    by = join_by(STATECD, COUNTYCD, PLOT, SUBP, CONDID, INVYR)
-  ) |>
-  left_join(
-    useful_area,
-    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
-  ) |>
-  filter(!is.na(CARBON_AG) & !is.na(TPA_UNADJ)) |>
-  mutate(CPA = CARBON_AG * TPA_UNADJ) |>
-  mutate(CPHA =
-           conv_unit(CARBON_AG, "lbs", "Mg") *
-           # NB: converting acre-1 to ha-1 is a reverse-unit conversion
-           conv_unit(TPA_UNADJ, "hectare", "acre")
-  ) |>
-  mutate(CARBON_AG_METRIC = CPHA * PLOT_AREA / expected_plot_area) |>
+stand_measured_tpa <- matching_tree |>
+  select(STATECD, COUNTYCD, PLOT, SUBP, CONDID, TREE, INVYR, CARBON_AG, TPA_UNADJ) |>
+  mutate(CARBON_PER_ACRE = CARBON_AG * TPA_UNADJ) |>
+  mutate(CARBON_METRIC = conv_multiunit(CARBON_PER_ACRE, "lbs / acre", "Mg / hectare")) |>
   group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
-  summarize(CARBON_AG_METRIC = sum(CARBON_AG_METRIC), .groups = "keep") |>
+  summarize(CARBON_METRIC = sum(CARBON_METRIC), .groups = "keep") |>
   ungroup() |>
   # Join to get STAND_IDs
   left_join(
-    nk_plot_ids,
+    stand_id_crosswalk,
     by = join_by(STATECD, COUNTYCD, PLOT)
   ) |>
-  # Join to get MEASYEAR
+  # Join to get MEASYEAR, FORTYPE, and STDAGE
   left_join(
     matching_plot |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
     by=join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
 
-
-knitr::kable(tpa_carbon_per_plot)
-
+knitr::kable(stand_measured_spatial)
 ```
 
+
 ```{r}
-ffe_tpa <- FVS_Carbon |>
+compare_ffe_tpa <- fvs_stand_measured_ffe |>
   mutate(FFE = Aboveground_Live) |>
   rename(`Forest Type` = FORTYPE) |>
-  select(STAND_ID, Year, FFE, `Forest Type`) |>
-  full_join(tpa_carbon_per_plot |> mutate(Year = MEASYEAR), by = join_by(STAND_ID, Year)) |>
-  rename(TPA = CARBON_AG_METRIC) |>
-  full_join(first_measure_year, by = join_by(STAND_ID)) |>
-  mutate(Years = Year - first_measure_year) |>
-  select(STAND_ID, Years, FFE, TPA, `Forest Type`)
+  rename(`Stand Age` = STDAGE) |>
+  select(STAND_ID, Year, FFE, `Stand Age`, `Forest Type`) |>
+  full_join(stand_measured_tpa, by = join_by(STAND_ID, Year == MEASYEAR)) |>
+  mutate(TPA = CARBON_METRIC) |>
+  select(STAND_ID, Year, FFE, TPA, `Stand Age`, `Forest Type`)
 
 ggplot(
-    data = ffe_tpa
+    data = compare_ffe_tpa
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = FFE, y = TPA, color = Years, shape = `Forest Type`)
+    mapping = aes(x = FFE, y = TPA, color = Year, shape = `Forest Type`)
   ) +
-  ggtitle("FVS Carbon Calculation\nFFE vs. TPA Carbon (Mg/ha)") +
+  ggtitle("Carbon Calculation\nFFE vs. TPA Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_line(
     data = tibble(x = c(0, 200), y=c(0, 200)),
@@ -1028,28 +949,47 @@ ggplot(
   )
 ```
 
-Compare spatial vs. tpa
+Same, but color by stand age
 
 ```{r}
-hf_tpa <- FVS_Carbon |>
-  rename(`Forest Type` = FORTYPE) |>
-  select(STAND_ID, Year, `Forest Type`) |>
-  full_join(tpa_carbon_per_plot |> mutate(Year = MEASYEAR), by = join_by(STAND_ID, Year)) |>
-  rename(TPA = CARBON_AG_METRIC) |>
-  full_join(hf_carbon_per_plot |> mutate(Year = MEASYEAR), by = join_by(STAND_ID, Year)) |>
-  rename(HF = CARBON_AG_METRIC) |>
-  full_join(first_measure_year, by = join_by(STAND_ID)) |>
-  mutate(Years = Year - first_measure_year) |>
-  select(STAND_ID, Years, HF, TPA, `Forest Type`)
-
 ggplot(
-    data = hf_tpa
+    data = compare_ffe_tpa
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = HF, y = TPA, color = Years, shape = `Forest Type`)
+    mapping = aes(x = FFE, y = TPA, color = `Stand Age`, shape = `Forest Type`)
   ) +
-  ggtitle("FVS Carbon Calculation\nHF vs. TPA Carbon (Mg/ha)") +
+  ggtitle("Carbon Calculation\nFFE vs. TPA Carbon (Mg/ha)") +
+  coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
+  geom_line(
+    data = tibble(x = c(0, 200), y=c(0, 200)),
+    mapping = aes(x = x, y = y)
+  )
+```
+
+These look very similar to the spatial approach; plot them against each other
+to directly compare spatial vs. tpa
+
+```{r}
+compare_tpa_spatial <- fvs_stand_grow_only |>
+  rename(`Forest Type` = FORTYPE) |>
+  rename(`Stand Age` = STDAGE) |>
+  select(STAND_ID, MEASYEAR, `Stand Age`, `Forest Type`) |>
+  left_join(stand_measured_tpa, by = join_by(STAND_ID, MEASYEAR)) |>
+  rename(TPA = CARBON_METRIC) |>
+  left_join(stand_measured_spatial, by = join_by(STAND_ID, MEASYEAR)) |>
+  rename(Spatial = CARBON_METRIC) |>
+  rename(Year = MEASYEAR) |>
+  select(STAND_ID, Year, Spatial, TPA, `Stand Age`, `Forest Type`)
+
+ggplot(
+    data = compare_tpa_spatial
+  ) +
+  geom_point(
+    size = 2,
+    mapping = aes(x = Spatial, y = TPA, color = Year, shape = `Forest Type`)
+  ) +
+  ggtitle("FVS Carbon Calculation\nSpatial vs. TPA Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_line(
     data = tibble(x = c(0, 200), y=c(0, 200)),
@@ -1059,58 +999,101 @@ ggplot(
 
 ```
 
-### Basal Area
+Same, but color by stand age
 
-FIA provides COND.BALIVE, which is (FIADB User Guide):
+```{r}
+ggplot(
+    data = compare_tpa_spatial
+  ) +
+  geom_point(
+    size = 2,
+    mapping = aes(x = Spatial, y = TPA, color = `Stand Age`, shape = `Forest Type`)
+  ) +
+  ggtitle("Carbon Calculation\nSpatial vs. TPA Carbon (Mg/ha)") +
+  coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
+  geom_line(
+    data = tibble(x = c(0, 200), y=c(0, 200)),
+    mapping = aes(x = x, y = y)
+  )
+```
+
+## Basal Area
+
+From this, we can see that FVS FFE over-projects carbon storage, and FVS Jenkins
+over-projects even more. We can compare the measured vs. projected basal area
+to get some idea whether the over-projection is part of the growth model or
+a characteristic of the carbon calculation.
+
+### Measured Basal Area
+
+FIA provides basal area in COND.BALIVE, which is, per the FIADB User Guide:
 
 > Basal area per acre of live trees. Basal area in square feet per acre of all live trees 1.0
 inch d.b.h./d.r.c. sampled in the condition. Populated for forest conditions.
 
-FVS provides FVS_Summary2_East.BA, which is (Essential FVS 4.3.1.4.1):
+```{r}
+stand_measured_balive <- matching_cond |>
+  semi_join(stand_grow_only, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  select(STATECD, COUNTYCD, PLOT, MEASYEAR, BALIVE) |>
+  # BALIVE is square feet per acre; convert to square meters per hectare
+  mutate(BALIVE_METRIC = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare")) |>
+  left_join(stand_id_crosswalk, by = join_by(STATECD, COUNTYCD, PLOT))
+
+knitr::kable(stand_measured_balive)
+```
+
+FVS provides basal area in FVS_Summary2_East.BA, which is, per Essential FVS
+section 4.3.1.4.1:
 
 > basal area per acre after thinning
 
 which we presume to be square feet per acre for standing live trees only.
 
 ```{r}
-fia_cond_balive <- matching_cond |>
-  semi_join(grow_only_stands, by = join_by(STATECD, COUNTYCD, PLOT)) |>
-  select(STATECD, COUNTYCD, PLOT, MEASYEAR, BALIVE) |>
-  # BALIVE is square feet per acre; convert to square meters per hectare
-  mutate(BALIVE_METRIC = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare")) |>
-  left_join(nk_plot_ids, by = join_by(STATECD, COUNTYCD, PLOT))
+FVS_Summary2_East <- NULL
 
-knitr::kable(fia_cond_balive)
+for (measyear in measyears)
+  fname <- paste0("../03_outputs/Grow_", sprintf("%04d", measyear), "_FVS_Summary2_East.csv")
+  FVS_Summary2_East <- bind_rows(
+      FVS_Summary2_East,
+      read_csv(fname, col_types = cols(StandID = col_character()))
+    )
+
+fvs_stand_measured_ba <- FVS_Summary2_East |>
+  mutate(STAND_ID = paste0(
+     substring(StandID, 1, 2),
+     substring(StandID, 5, 12)
+  )) |>
+  inner_join(
+    fvs_stand_grow_only |> select(STAND_ID, MEASYEAR, STDAGE, FORTYPE),
+    by = join_by(STAND_ID, Year == MEASYEAR)
+  ) |>
+  mutate(BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
+  select(STAND_ID, Year, BA, BA_METRIC, STDAGE, FORTYPE)
+
+remove(FVS_Summary2_East, fname, measyear)
+
+knitr::kable(fvs_stand_measured_ba)
 ```
 
-
-
-
 ```{r}
-fvs_measured_ba <- FVS_Summary2_East |>
-  left_join(nk_plot_ids, by = join_by(STAND_ID)) |>
-  mutate(BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare"))
-
-knitr::kable(fvs_measured_ba)
-```
-
-```{r}
-fia_fvs_ba <- fia_cond_balive |>
-  rename(Year = MEASYEAR, FIA = BALIVE_METRIC) |>
-  full_join(fvs_measured_ba, by = join_by(STAND_ID, Year)) |>
+compare_fvs_ba_fia_balive <- stand_measured_balive |>
+  rename(Year = MEASYEAR) |>
+  rename(`FIA BALIVE` = BALIVE_METRIC) |>
+  full_join(fvs_stand_measured_ba, by = join_by(STAND_ID, Year)) |>
+  rename(`FVS BA` = BA_METRIC) |>
   rename(`Forest Type` = FORTYPE) |>
-  rename(FVS = BA_METRIC) |>
-  full_join(first_measure_year, by = join_by(STAND_ID)) |>
-  select(STAND_ID, Year, FIA, FVS, `Forest Type`)
+  rename(`Stand Age` = STDAGE) |>
+  select(STAND_ID, Year, `FIA BALIVE`, `FVS BA`, `Forest Type`, `Stand Age`)
 
 ggplot(
-    data = fia_fvs_ba
+    data = compare_fvs_ba_fia_balive
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = FIA, y = FVS, color = Year, shape = `Forest Type`)
+    mapping = aes(x = `FIA BALIVE`, y = `FVS BA`, color = `Stand Age`, shape = `Forest Type`)
   ) +
-  ggtitle("Basal Area\nFIA vs. FVS (m2 / ha)") +
+  ggtitle("Measured Basal Area\nFIA BALIVE vs. FVS BA (m2 / ha)") +
   coord_cartesian(xlim = c(0, 60), ylim = c(0, 60)) +
   geom_line(
     data = tibble(x = c(0, 60), y=c(0, 60)),
@@ -1118,36 +1101,52 @@ ggplot(
   )
 ```
 
+This shows that FVS and FIA approach to measuring basal area often aligns, but
+there are cases when they do not align.
+
+> TODO nik: what are the cases where these don't align? Looks like 6 points.
+
+### Projected Basal Area
+
+FVS also predicts basal area, and we can compare FVS projected with FVS measured.
+This will give us insight just into the growth model of FVS independent of
+carbon calculation.
+
 ```{r}
-NoManagement_ByPlotYearly_Summary2 <-
+FVS_NoManagement_ByPlotYearly_Summary2 <-
   read_csv("../03_outputs/NoManagement_ByPlotYearly_Summary2.csv", 
-    col_types = cols(StandID = col_character())) |>
+    col_types = cols(StandID = col_character()))
+
+fvs_stand_projected_ba <- FVS_NoManagement_ByPlotYearly_Summary2 |>
   mutate(STAND_ID = paste0(
      substring(StandID, 1, 2),
      substring(StandID, 5, 12)
   )) |>
-  mutate(BA_METRIC = conv_multiunit(BA, 'ft2 / acre', 'm2 / hectare')) |>
-  select(STAND_ID, Year, BA_METRIC)
+  mutate(BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
+  select(STAND_ID, Year, BA, BA_METRIC)
 
-knitr::kable(NoManagement_ByPlotYearly_Summary2)
+remove(FVS_NoManagement_ByPlotYearly_Summary2)
+
+knitr::kable(fvs_stand_projected_ba)
 ```
 
 ```{r}
-fvs_fvs_ba <- NoManagement_ByPlotYearly_Summary2 |>
-  rename(Projected = BA_METRIC) |>
-  inner_join(fvs_measured_ba, by = join_by(STAND_ID, Year)) |>
-  rename(`Forest Type` = FORTYPE) |>
+compare_fvs_ba_measured_projected <- fvs_stand_measured_ba |>
   rename(Measured = BA_METRIC) |>
-  full_join(first_measure_year, by = join_by(STAND_ID)) |>
-  mutate(Years = Year - first_measure_year) |>
-  select(STAND_ID, Years, Projected, Measured, `Forest Type`)
+  inner_join(fvs_stand_projected_ba, by = join_by(STAND_ID, Year)) |>
+  rename(Projected = BA_METRIC) |>
+  rename(`Stand Age` = STDAGE) |>
+  rename(`Forest Type` = FORTYPE) |>
+  inner_join(stand_first_measured, by = join_by(STAND_ID)) |>
+  mutate(`Projection Years` = Year - first_measure_year) |>
+  select(STAND_ID, Year, `Projection Years`, Measured, Projected, `Stand Age`, `Forest Type`)
 
 ggplot(
-    data = fvs_fvs_ba
+    data = compare_fvs_ba_measured_projected
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = Measured, y = Projected, color = Years, shape = `Forest Type`)
+    mapping = aes(x = Measured, y = Projected, color = `Projection Years`, shape = `Forest Type`)
   ) +
   ggtitle("Basal Area\nFVS Measured vs. Projected (m2 / ha)") +
   coord_cartesian(xlim = c(0, 60), ylim = c(0, 60)) +
