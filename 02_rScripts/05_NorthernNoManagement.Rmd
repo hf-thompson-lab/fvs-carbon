@@ -1,0 +1,92 @@
+---
+title: "Nunery Keeton Revisited"
+author: "Nikolaus Bates-Haus"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+# Pre-load libraries that issue warnings on startup so these
+# warnings don't corrupt the text later.
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(reshape2)) # for melt()
+suppressPackageStartupMessages(library(RSQLite))
+suppressPackageStartupMessages(library(htmltools))
+suppressPackageStartupMessages(library(rmarkdown))
+suppressPackageStartupMessages(library(dbplyr))
+suppressPackageStartupMessages(library(measurements))
+```
+
+## Overview
+
+Find all FIA plots in the northeastern region that are grow-only.
+
+Northeastern region:
+
+*  SURVEY.RCSD == 24
+
+Grow-only is described previously:
+
+*  Only one condition: max(FIA.COND.CONDID) == 1
+*  Survey was not skipped: COND.COND_STATUS_CD == 1
+*  Plot was not disturbed: COND.DSTRBCD1 == 0 & COND.DSTRBCD2 == 0 & COND.DSTRBCD3 == 0
+*  Plot was not treated: COND.TRTCD1 == 0 & TRTCD2 == 0 & TRTCD3 == 0
+
+```{r}
+fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia_cond <- tbl(fia, 'COND')
+fia_plot <- tbl(fia, 'PLOT') |>
+  # Narrow and rename columns to facilitate join
+  select(CN, SRV_CN) |>
+  rename(PLT_CN = CN)
+fia_survey <- tbl(fia, 'SURVEY') |>
+  # Narrow and rename columns to facilitate join
+  select(CN, RSCD) |>
+  rename(SRV_CN = CN)
+
+plot_grow_only <- fia_cond |>
+  filter(INVYR >= 1999) |>
+  left_join(fia_plot, by = join_by(PLT_CN)) |>
+  left_join(fia_survey, by = join_by(SRV_CN)) |>
+  filter(RSCD == 24) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  summarize(
+    CONDID = max(CONDID, na.rm = TRUE),
+    COND_STATUS_CD = max(COND_STATUS_CD, na.rm = TRUE),
+    DSTRBCD1 = max(DSTRBCD1, na.rm = TRUE),
+    DSTRBCD2 = max(DSTRBCD2, na.rm = TRUE),
+    DSTRBCD3 = max(DSTRBCD3, na.rm = TRUE),
+    TRTCD1 = max(TRTCD1, na.rm = TRUE),
+    TRTCD2 = max(TRTCD2, na.rm = TRUE),
+    TRTCD3 = max(TRTCD3, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  filter(CONDID == 1) |>
+  filter(COND_STATUS_CD == 1) |>
+  filter(
+    (is.na(DSTRBCD1) | DSTRBCD1 == 0) & 
+    (is.na(DSTRBCD2) | DSTRBCD2 == 0) &
+    (is.na(DSTRBCD3) | DSTRBCD3 == 0)
+  ) |>
+  filter(
+    (is.na(TRTCD1) | TRTCD1 == 0) &
+    (is.na(TRTCD2) | TRTCD2 == 0) &
+    (is.na(TRTCD3) | TRTCD3 == 0)
+  ) |>
+  select(STATECD, COUNTYCD, PLOT) |>
+  collect()
+
+DBI::dbDisconnect(fia)
+remove(fia, fia_cond, fia_plot, fia_survey)
+
+length(plot_grow_only$PLOT)
+```
+
+This filters to 4299 plots, most of which will have multiple inventories.
+
+Build 
