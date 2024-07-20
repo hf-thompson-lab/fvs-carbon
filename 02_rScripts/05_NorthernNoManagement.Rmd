@@ -21,7 +21,7 @@ suppressPackageStartupMessages(library(dbplyr))
 suppressPackageStartupMessages(library(measurements))
 ```
 
-## Overview
+## Grow-Only Plots in the Northeast
 
 Find all FIA plots in the northeastern region that are grow-only.
 
@@ -88,5 +88,85 @@ length(plot_grow_only$PLOT)
 ```
 
 This filters to 4299 plots, most of which will have multiple inventories.
+ 
+### FIA Carbon and BALIVE
 
-Build 
+We can gather BALIVE and CARBON_AG for these plots over time.
+
+```{r}
+fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+
+measyear <- tbl(fia, 'PLOT') |>
+  select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR)
+
+forest_type <- tbl(fia, 'REF_FOREST_TYPE') |>
+  select(VALUE, MEANING) |>
+  rename(FORTYPCD = VALUE) |>
+  rename(FORTYPE = MEANING)
+
+tree_stats <- tbl(fia, 'TREE') |>
+  group_by(STATECD, COUNTYCD, PLOT, CONDID, INVYR) |>
+  summarize(
+    CARBON_AG = sum(CARBON_AG),
+    CPA = sum(CARBON_AG * TPA_UNADJ),
+    .groups = "keep"
+  )
+
+stand_stats <- tbl(fia, 'COND') |>
+  select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, FORTYPCD) |>
+  filter(INVYR >= 1999) |>
+  semi_join(plot_grow_only, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
+  group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
+  summarize(
+    BALIVE = sum(BALIVE),
+    FORTYPCD = max(FORTYPCD),
+    STDAGE = max(STDAGE),
+    .groups = "keep"
+  ) |>
+  left_join(measyear, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+  left_join(tree_stats, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+  left_join(forest_type, by = join_by(FORTYPCD)) |>
+  rename(`Forest Type` = FORTYPE) |>
+  mutate(FORTYPCD = floor(FORTYPCD / 10) * 10) |>
+  left_join(forest_type, by = join_by(FORTYPCD)) |>
+  rename(`Forest Type Group` = FORTYPE) |>
+  collect() |>
+  mutate(BALIVE_METRIC = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare")) |>
+  mutate(CARBON_METRIC = conv_multiunit(CPA, "lbs / acre", "Mg / hectare"))
+
+DBI::dbDisconnect(fia)
+remove(fia, measyear, forest_type, tree_stats)
+```
+
+Look at BA over time
+
+```{r}
+ggplot(
+    data = stand_stats |> filter(STDAGE > 0),
+    mapping = aes(x = STDAGE, y = BALIVE_METRIC)
+  ) +
+  geom_point(alpha = 0.25) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nFIA Measured basal area (m2 / ha)")
+```
+
+```{r}
+seen_types <- stand_stats |>
+  filter(!is.na(CARBON_AG)) |>
+  group_by(`Forest Type`) |>
+  summarize(
+    CARBON_AG_METRIC = sum(conv_unit(CARBON_AG, "lbs", "Mg")),
+    .groups = "keep"
+  )
+
+seen_types |>
+  ggplot(
+    aes(y = fct_reorder(`Forest Type`, CARBON_AG_METRIC), x = CARBON_AG_METRIC)
+#    aes(x = CARBON_AG_METRIC, y = `Forest Type`)
+  ) +
+  scale_x_log10() +
+  geom_col() +
+  ggtitle("Total Carbon by Forest Type (Mg)") +
+  ylab("Forest Type") +
+  xlab("Carbon")
+```
