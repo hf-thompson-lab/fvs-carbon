@@ -319,3 +319,9 @@ Process
 
 Stop
 ```
+
+#### Generation
+
+```{r}
+# Gather stand IDs and CNs
+```
