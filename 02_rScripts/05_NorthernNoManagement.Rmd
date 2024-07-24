@@ -23,7 +23,10 @@ suppressPackageStartupMessages(library(measurements))
 
 ## Grow-Only Plots in the Northeast
 
-Find all FIA plots in the northeastern region that are grow-only.
+Find all FIA plots in the northeastern region that are grow-only, that have
+a measurement year between 1999 and 2004. We select 1999 becasue FIA changed
+to the 4-subplot structure in 1999; we select 2004 so that we will have
+at least 20 years of growth.
 
 Northeastern region:
 
@@ -41,7 +44,7 @@ fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_cond <- tbl(fia, 'COND')
 fia_plot <- tbl(fia, 'PLOT') |>
   # Narrow and rename columns to facilitate join
-  select(CN, SRV_CN) |>
+  select(CN, SRV_CN, MEASYEAR) |>
   rename(PLT_CN = CN)
 fia_survey <- tbl(fia, 'SURVEY') |>
   # Narrow and rename columns to facilitate join
@@ -55,6 +58,7 @@ plot_grow_only <- fia_cond |>
   filter(RSCD == 24) |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   summarize(
+    FIRST_MEASYEAR = min(MEASYEAR, na.rm = TRUE),
     CONDID = max(CONDID, na.rm = TRUE),
     COND_STATUS_CD = max(COND_STATUS_CD, na.rm = TRUE),
     DSTRBCD1 = max(DSTRBCD1, na.rm = TRUE),
@@ -66,6 +70,7 @@ plot_grow_only <- fia_cond |>
     .groups = "keep"
   ) |>
   ungroup() |>
+  filter(FIRST_MEASYEAR <= 2004) |>
   filter(CONDID == 1) |>
   filter(COND_STATUS_CD == 1) |>
   filter(
@@ -87,7 +92,7 @@ remove(fia, fia_cond, fia_plot, fia_survey)
 length(plot_grow_only$PLOT)
 ```
 
-This filters to 4299 plots, most of which will have multiple inventories.
+This filters to 2609 plots, most of which will have multiple inventories.
  
 ### FIA Carbon and BALIVE
 
@@ -107,8 +112,8 @@ forest_type <- tbl(fia, 'REF_FOREST_TYPE') |>
 tree_stats <- tbl(fia, 'TREE') |>
   group_by(STATECD, COUNTYCD, PLOT, CONDID, INVYR) |>
   summarize(
-    CARBON_AG = sum(CARBON_AG),
-    CPA = sum(CARBON_AG * TPA_UNADJ),
+    CARBON_AG = sum(CARBON_AG, na.rm = TRUE),
+    CPA = sum(CARBON_AG * TPA_UNADJ, na.rm = TRUE),
     .groups = "keep"
   )
 
@@ -118,9 +123,9 @@ stand_stats <- tbl(fia, 'COND') |>
   semi_join(plot_grow_only, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
   group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
   summarize(
-    BALIVE = sum(BALIVE),
-    FORTYPCD = max(FORTYPCD),
-    STDAGE = max(STDAGE),
+    BALIVE = sum(BALIVE, na.rm = TRUE),
+    FORTYPCD = max(FORTYPCD, na.rm = TRUE),
+    STDAGE = max(STDAGE, na.rm = TRUE),
     .groups = "keep"
   ) |>
   left_join(measyear, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
@@ -151,8 +156,18 @@ ggplot(
 ```
 
 ```{r}
+latest_measyear <- stand_stats |>
+  filter(!is.na(CARBON_AG)) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  summarize(
+    MEASYEAR = max(MEASYEAR),
+    .groups = "keep"
+  ) |>
+  ungroup()
+
 seen_types <- stand_stats |>
   filter(!is.na(CARBON_AG)) |>
+  semi_join(latest_measyear, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR)) |>
   group_by(`Forest Type`) |>
   summarize(
     CARBON_AG_METRIC = sum(conv_unit(CARBON_AG, "lbs", "Mg")),
