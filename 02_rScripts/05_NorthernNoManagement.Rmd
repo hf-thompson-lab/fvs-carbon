@@ -177,7 +177,6 @@ seen_types <- stand_stats |>
 seen_types |>
   ggplot(
     aes(y = fct_reorder(`Forest Type`, CARBON_AG_METRIC), x = CARBON_AG_METRIC)
-#    aes(x = CARBON_AG_METRIC, y = `Forest Type`)
   ) +
   scale_x_log10() +
   geom_col() +
