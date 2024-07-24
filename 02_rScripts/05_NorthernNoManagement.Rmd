@@ -130,6 +130,7 @@ stand_stats <- tbl(fia, 'COND') |>
   ) |>
   left_join(measyear, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
   left_join(tree_stats, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+  filter(!is.na(CARBON_AG)) |>
   left_join(forest_type, by = join_by(FORTYPCD)) |>
   rename(`Forest Type` = FORTYPE) |>
   mutate(FORTYPCD = floor(FORTYPCD / 10) * 10) |>
@@ -157,7 +158,6 @@ ggplot(
 
 ```{r}
 latest_measyear <- stand_stats |>
-  filter(!is.na(CARBON_AG)) |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   summarize(
     MEASYEAR = max(MEASYEAR),
@@ -166,7 +166,6 @@ latest_measyear <- stand_stats |>
   ungroup()
 
 seen_types <- stand_stats |>
-  filter(!is.na(CARBON_AG)) |>
   semi_join(latest_measyear, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR)) |>
   group_by(`Forest Type`) |>
   summarize(
@@ -272,7 +271,7 @@ At the end of all stands, the Stop keyword tells FVS to exit cleanly.
 
 ```
 StdIdent
-230202502686        Grow_2002
+230202502686        NoManagement
 StandCN
 52967848010538
 MgmtId
@@ -303,7 +302,7 @@ SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'
 EndSQL
 
 DSNOut
-Grow_2002.db
+FVS_Out.db
 
 Summary            2
 Computdb           0         1
@@ -321,6 +320,117 @@ Stop
 
 #### Generation
 
+Gather stand IDs and CNs for keywordfile generation.
+
 ```{r}
-# Gather stand IDs and CNs
+first_measyear <- stand_stats |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  summarize(
+    INVYR = min(INVYR),
+    MEASYEAR = min(MEASYEAR, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+
+fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia_fvs_standinit_plot <- tbl(fia, 'FVS_StandInit_Plot') |>
+  select(STAND_CN, STAND_ID)
+
+keywordfile_stands <- tbl(fia, 'PLOT') |>
+  select(CN, STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR) |>
+  filter(INVYR >= 1999) |>
+  rename(STAND_CN = CN) |>
+  semi_join(first_measyear, by = join_by(STATECD, COUNTYCD, PLOT, INVYR), copy = TRUE) |>
+  left_join(fia_fvs_standinit_plot, by = join_by(STAND_CN)) |>
+  collect()
+
+DBI::dbDisconnect(fia)
+remove(fia, fia_fvs_standinit_plot)
 ```
+
+A function to generate a keywordfile section from information about a stand.
+
+> TODO nik: All FVS files should probably be named by:
+> -  Title; NoManagement
+> -  MgmtId; NONE
+> -  Partition
+> -  File type
+> So,
+> NoManagement_NONE_part1.key
+> NoManagement_NONE_part1.db
+> etc.
+
+```{r}
+keywordfile_section <- function(StandID, StandCN, MeasYear, Partition) {
+  MeasYear <- as.integer(MeasYear)
+  paste0(
+"StdIdent\n",
+StandID, "        NoManagement\n",
+"StandCN\n",
+StandCN, "\n",
+"MgmtId\n",
+"NONE\n",
+"InvYear   ", sprintf('%10s', MeasYear), "\n",
+"TimeInt            0         1\n",
+"NumCycle  ", sprintf('%10d', 2025 - MeasYear), "\n",
+"FMIn\n",
+"CarbRept           2\n",
+"CarbCut            2\n",
+"CarbCalc           0         1    0.0425         9        11\n",
+"FuelOut            2\n",
+"FuelRept           2\n",
+"End\n",
+"Database\n",
+"DSNIn\n",
+"SQLite_FIADB_ENTIRE.db\n",
+"StandSQL\n",
+"SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'\n",
+"EndSQL\n",
+"TreeSQL\n",
+"SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'\n",
+"EndSQL\n",
+"DSNOut\n",
+"FVS_Out_", Partition, ".db\n",
+"Summary            2\n",
+"Computdb           0         1\n",
+"MisRpts            2\n",
+"CarbReDB           2\n",
+"FuelReDB           2\n",
+"FuelsOut           2\n",
+"End\n",
+"Process\n"
+  )
+}
+
+```
+
+Generate a keywordfile per partition, distributing across partitions using
+STAND_ID. 
+
+```{r}
+for (partition in 1:8) {
+  filename <- paste0("NONE_partition_", partition, ".key")
+  write_lines(
+    apply(
+      keywordfile_stands |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
+      1,
+      function(row) {
+        keywordfile_section(row['STAND_ID'], row['STAND_CN'], row['MEASYEAR'], partition)
+      }
+    ),
+    filename
+  )
+  write_lines("Stop", filename, append = TRUE)
+}
+```
+
+Run FVS.
+
+```{r}
+# TODO nik: Run FVS from in R.
+# Batch file to run FVS in parallel:
+# for %%p in (NONE_Partition_*.key) do start \FVS\FVSbin\FVSne.exe --keywordfile=%%p
+```
+
+
