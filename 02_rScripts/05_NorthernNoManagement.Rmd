@@ -170,3 +170,137 @@ seen_types |>
   ylab("Forest Type") +
   xlab("Carbon")
 ```
+
+## Run FVS
+
+### Generate Keyfile
+
+An FVS run is scripted by a keyfile. The keyfile describes how to run the
+model and extensions, including where to read input, all parameters to
+control processing, and where to write output.
+
+The keyfile is structured by stand; each stand is a separate run of the
+model.
+
+To run in parallel, a separate keyfile must be generated for each partition
+to be run in parallel. Each partition must send its output to a separate
+location, and these can be assembled into a single output as a post-
+processing step.
+
+#### Stand Identification
+
+For each stand, we need:
+
+-  StdIdent: Stand Identifier, from fia.FVS_STANDINIT_PLOT.FVS_STAND_ID
+-  StandCN: Stand control number, from fia.PLOT.CN
+-  MgmtId: Management ID, for no treatment, this is NONE
+
+#### Time
+
+We will run the model from first measurement year to 2024, with a 1-year timestep.
+
+-  InvYear: Inventory Year, this is the first fia.PLOT.MEASYEAR
+-  TimeInt: Time Interval, set this to 1 for all timesteps
+-  NumCycle: Number of cycles to run, 2024 - InvYear
+
+#### Input
+
+There are two inputs, Stand and Tree. Both are configured to use a database
+query.
+
+Within a Database subsection:
+
+-  DSNIn: Data Source Name (DSN) for input; SQLite filename
+-  StandSQL: SQL query to fetch a stand, given %Stand_CN%
+-  TreeSQL: SQL query to fetch all trees for a stand, given %Stand_CN%
+
+#### Fire and Fuels
+
+Carbon is calculated by the fire and fuels extension.
+
+-  FMIn: Starts configuration of Fire and Fuels extension
+-  CarbRept: Carbon Report; save to database (2)
+-  CarbCut: Harvested Carbon Report; disable (0)
+-  CarbCalc: Carbon calculation; metric (1)
+-  FuelOut: Fuel Output, disable (0)
+-  FuelRept: Fuel Report, disable (0)
+
+Fire and Fuels also interacts with the database extension; it provides additional
+Database keywords to configure Fire and Fuels output to the database.
+
+Within a Database section:
+
+-  CarbReDB: FVS_Carbon and FVS_Hrv_Carbon tables: database (2)
+-  FuelReDB: FVS_Consumption table: database (2)
+-  FuelsOut: FVS_Fuels table: database (2)
+
+#### Output
+
+We use database output; it is easiest to work with. Many output options take
+a parameter that is 0 to disable output, 1 for file output, 2 for database
+output, and 3 for both file and database output.
+
+Within a Database section:
+
+-  DSNOut: Data Source Name (DSN) for output; SQLite filename
+-  Summary: Configure FVS_Summary; use version 2
+-  Computdb: Configure FVS_Compute; disable
+-  MisRpts: Configure Mistletoe reports; disable
+
+#### Processing Order
+
+Each stand has its own section of the keyword file, including everything from
+StdIdent to Process. Each stand is processed before moving to the next stand.
+
+At the end of all stands, the Stop keyword tells FVS to exit cleanly.
+
+#### Example
+
+```
+StdIdent
+230202502686        Grow_2002
+StandCN
+52967848010538
+MgmtId
+NONE
+InvYear         2002
+TimeInt            0         1
+NumCycle           1
+
+FMIn
+CarbRept           2
+CarbCut            2
+CarbCalc           0         1    0.0425         9        11
+FuelOut            2
+FuelRept           2
+End
+
+Database
+
+DSNIn
+SQLite_FIADB_ENTIRE.db
+
+StandSQL
+SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+
+TreeSQL
+SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'
+EndSQL
+
+DSNOut
+Grow_2002.db
+
+Summary            2
+Computdb           0         1
+MisRpts            2
+CarbReDB           2
+FuelReDB           2
+FuelsOut           2
+
+END
+
+Process
+
+Stop
+```
