@@ -25,9 +25,17 @@ suppressPackageStartupMessages(library(maps))
 ## Grow-Only Plots in the Northeast
 
 Find all FIA plots in the northeastern region that are grow-only, that have
-a measurement year between 1999 and 2004. We select 1999 becasue FIA changed
+a measurement year between 1999 and 2004, and have at least two measurements
+between 1999 and 2024. We select 1999 becasue FIA changed
 to the 4-subplot structure in 1999; we select 2004 so that we will have
-at least 20 years of growth.
+at least 20 years of growth. We require two measurements so that we can compare
+projected vs. actual growth between measurements.
+
+Survey filters:
+
+*  PLOT.MEASYEAR > 1999
+*  min(PLOT.MEASYEAR) <= 2004
+*  min(PLOT.INVYR) != max(PLOT.INVYR)
 
 Northeastern region:
 
@@ -40,6 +48,7 @@ Grow-only is described previously:
 *  Plot was not disturbed: COND.DSTRBCD1 == 0 & COND.DSTRBCD2 == 0 & COND.DSTRBCD3 == 0
 *  Plot was not treated: COND.TRTCD1 == 0 & TRTCD2 == 0 & TRTCD3 == 0
 
+Functions for these filters
 ```{r}
 northeastern_plots_filter <- function(.data) {
   # Region or Station code (RSCD) consolidated multiple regions
@@ -110,7 +119,11 @@ single_condition_plots_filter <- function(.data) {
     filter(max(CONDID, na.rm = TRUE) == 1) |>
     ungroup()
 }
+```
 
+Execute the filters to create a list of matching plots.
+
+```{r}
 fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_cond <- tbl(fia, 'COND') |>
   select(
@@ -152,27 +165,33 @@ This filters to 2008 plots.
 
 Where are these plots?
 
+Fetch plots with measyear, invyr, latitude, longitude, and state information.
+
 ```{r}
-# Get the list of states for the northern region
 fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+
+# Survey has the research station code
 fia_survey <- tbl(fia, 'SURVEY') |>
-  # Narrow and rename columns to facilitate join
   select(CN, RSCD) |>
   rename(SRV_CN = CN)
+
+# plot has invyr, measyr, lat and lon
 fia_plot <- tbl(fia, 'PLOT') |>
   # Narrow and rename columns to facilitate join
   select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, SRV_CN, LAT, LON)
+
+# research station has state name and abbreviation
 fia_ref_research_station <- tbl(fia, 'REF_RESEARCH_STATION') |>
   select(STATECD, STATE_NAME, STATE_ABBR)
 
 plot_location <- fia_plot |>
   semi_join(plot_grow_only, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
+  left_join(fia_survey, by = join_by(SRV_CN)) |>
+  left_join(fia_ref_research_station, by = join_by(STATECD)) |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   # Pick just the first inventory year
   filter(min_rank(INVYR) == 1) |> 
   ungroup() |>
-  left_join(fia_survey, by = join_by(SRV_CN)) |>
-  left_join(fia_ref_research_station, by = join_by(STATECD)) |>
   collect() |>
   rename(
     long = LON,
@@ -184,6 +203,8 @@ DBI::dbDisconnect(fia)
 remove(fia, fia_plot, fia_survey, fia_ref_research_station)
 ```
 
+How many plots are in each state?
+
 ```{r}
 state_plot_counts <- plot_location |>
   group_by(STATE_NAME) |>
@@ -193,6 +214,8 @@ state_plot_counts <- plot_location |>
 knitr::kable(state_plot_counts)
 ```
 
+Show the plots on a map.
+
 ```{r}
 northeastern_states <- plot_location |>
   distinct(STATE_NAME) |>
@@ -201,7 +224,7 @@ map_states <- map_data('state', northeastern_states$region)
 
 ggplot(map_states, aes(long, lat, group = group)) +
   geom_polygon(fill = "white", color = "black") + 
-  geom_point(data = plot_location, color = "blue") +
+  geom_point(data = plot_location, color = alpha("blue", alpha = 0.5)) +
   coord_quickmap()
 ```
 
