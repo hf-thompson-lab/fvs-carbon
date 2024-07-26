@@ -112,7 +112,11 @@ single_condition_plots_filter <- function(.data) {
 }
 
 fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
-fia_cond <- tbl(fia, 'COND')
+fia_cond <- tbl(fia, 'COND') |>
+  select(
+    STATECD, COUNTYCD, PLOT, PLT_CN, CONDID, INVYR,
+    COND_STATUS_CD, DSTRBCD1, DSTRBCD2, DSTRBCD3, TRTCD1, TRTCD2, TRTCD3
+  )
 fia_plot <- tbl(fia, 'PLOT') |>
   # Narrow and rename columns to facilitate join
   select(CN, SRV_CN, MEASYEAR) |>
