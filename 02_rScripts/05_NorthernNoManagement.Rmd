@@ -19,6 +19,7 @@ suppressPackageStartupMessages(library(htmltools))
 suppressPackageStartupMessages(library(rmarkdown))
 suppressPackageStartupMessages(library(dbplyr))
 suppressPackageStartupMessages(library(measurements))
+suppressPackageStartupMessages(library(maps))
 ```
 
 ## Grow-Only Plots in the Northeast
@@ -30,7 +31,7 @@ at least 20 years of growth.
 
 Northeastern region:
 
-*  SURVEY.RCSD == 24
+*  SURVEY.RSCD == 24
 
 Grow-only is described previously:
 
@@ -40,6 +41,76 @@ Grow-only is described previously:
 *  Plot was not treated: COND.TRTCD1 == 0 & TRTCD2 == 0 & TRTCD3 == 0
 
 ```{r}
+northeastern_plots_filter <- function(.data) {
+  # Region or Station code (RSCD) consolidated multiple regions
+  # into region 24, Northeastern Research Station (NERS).
+  .data |> filter(RSCD == 24)
+}
+
+modern_plots_filter <- function(.data) {
+  # The 4-sublpot structure was introduced for INVYR 1999
+  # Filter out individual inventories prior to 1999
+  .data |> filter(INVYR >= 1999)
+}
+
+longstanding_plots_filter <- function(.data) {
+  # Plots that were measured prior to 2005
+  # Filter out the entire plot if it was not surveyed prior to 2004
+  .data |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    filter(min(MEASYEAR, na.rm = TRUE) <= 2004) |>
+    ungroup()
+}
+
+multiple_inventory_plots_filter <- function(.data) {
+  # Filter out the entire plot if it only had a single inventory
+  .data |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    filter(min(INVYR, na.rm = TRUE) != max(INVYR, na.rm = TRUE)) |>
+    ungroup()
+}
+
+forested_plots_filter <- function(.data) {
+  # Condition status is forested
+  # Filter out the entire plot if it was not forested for the entire period
+  .data |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    filter(max(COND_STATUS_CD, na.rm = TRUE) == 1) |>
+    ungroup()
+}
+
+undisturbed_plots_filter <- function(.data) {
+  # Filter out the entire plot if it was disturbed in any year
+  .data |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    filter(
+      (is.na(max(DSTRBCD1, na.rm = TRUE)) | max(DSTRBCD1, na.rm = TRUE) == 0) & 
+      (is.na(max(DSTRBCD2, na.rm = TRUE)) | max(DSTRBCD2, na.rm = TRUE) == 0) &
+      (is.na(max(DSTRBCD3, na.rm = TRUE)) | max(DSTRBCD3, na.rm = TRUE) == 0)
+    ) |>
+    ungroup()
+}
+
+untreated_plots_filter <- function(.data) {
+  # Filter out the entire plot if it was treated in any year
+  .data |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    filter(
+      (is.na(max(TRTCD1, na.rm = TRUE)) | max(TRTCD1, na.rm = TRUE) == 0) &
+      (is.na(max(TRTCD2, na.rm = TRUE)) | max(TRTCD2, na.rm = TRUE) == 0) &
+      (is.na(max(TRTCD3, na.rm = TRUE)) | max(TRTCD3, na.rm = TRUE) == 0)
+    ) |>
+    ungroup()
+}
+
+single_condition_plots_filter <- function(.data) {
+  # Filter out the entire plot if it ever had more than one condition
+  .data |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    filter(max(CONDID, na.rm = TRUE) == 1) |>
+    ungroup()
+}
+
 fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_cond <- tbl(fia, 'COND')
 fia_plot <- tbl(fia, 'PLOT') |>
@@ -52,38 +123,17 @@ fia_survey <- tbl(fia, 'SURVEY') |>
   rename(SRV_CN = CN)
 
 plot_grow_only <- fia_cond |>
-  filter(INVYR >= 1999) |>
   left_join(fia_plot, by = join_by(PLT_CN)) |>
   left_join(fia_survey, by = join_by(SRV_CN)) |>
-  filter(RSCD == 24) |>
-  group_by(STATECD, COUNTYCD, PLOT) |>
-  summarize(
-    FIRST_MEASYEAR = min(MEASYEAR, na.rm = TRUE),
-    CONDID = max(CONDID, na.rm = TRUE),
-    COND_STATUS_CD = max(COND_STATUS_CD, na.rm = TRUE),
-    DSTRBCD1 = max(DSTRBCD1, na.rm = TRUE),
-    DSTRBCD2 = max(DSTRBCD2, na.rm = TRUE),
-    DSTRBCD3 = max(DSTRBCD3, na.rm = TRUE),
-    TRTCD1 = max(TRTCD1, na.rm = TRUE),
-    TRTCD2 = max(TRTCD2, na.rm = TRUE),
-    TRTCD3 = max(TRTCD3, na.rm = TRUE),
-    .groups = "keep"
-  ) |>
-  ungroup() |>
-  filter(FIRST_MEASYEAR <= 2004) |>
-  filter(CONDID == 1) |>
-  filter(COND_STATUS_CD == 1) |>
-  filter(
-    (is.na(DSTRBCD1) | DSTRBCD1 == 0) & 
-    (is.na(DSTRBCD2) | DSTRBCD2 == 0) &
-    (is.na(DSTRBCD3) | DSTRBCD3 == 0)
-  ) |>
-  filter(
-    (is.na(TRTCD1) | TRTCD1 == 0) &
-    (is.na(TRTCD2) | TRTCD2 == 0) &
-    (is.na(TRTCD3) | TRTCD3 == 0)
-  ) |>
-  select(STATECD, COUNTYCD, PLOT) |>
+  northeastern_plots_filter() |>
+  modern_plots_filter() |>
+  longstanding_plots_filter() |>
+  multiple_inventory_plots_filter() |>
+  forested_plots_filter() |>
+  undisturbed_plots_filter() |>
+  untreated_plots_filter() |>
+  single_condition_plots_filter() |>
+  distinct(STATECD, COUNTYCD, PLOT) |>
   collect()
 
 DBI::dbDisconnect(fia)
@@ -92,8 +142,65 @@ remove(fia, fia_cond, fia_plot, fia_survey)
 length(plot_grow_only$PLOT)
 ```
 
-This filters to 2609 plots, most of which will have multiple inventories.
+This filters to 2008 plots.
  
+### Locations
+
+Where are these plots?
+
+```{r}
+# Get the list of states for the northern region
+fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia_survey <- tbl(fia, 'SURVEY') |>
+  # Narrow and rename columns to facilitate join
+  select(CN, RSCD) |>
+  rename(SRV_CN = CN)
+fia_plot <- tbl(fia, 'PLOT') |>
+  # Narrow and rename columns to facilitate join
+  select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, SRV_CN, LAT, LON)
+fia_ref_research_station <- tbl(fia, 'REF_RESEARCH_STATION') |>
+  select(STATECD, STATE_NAME, STATE_ABBR)
+
+plot_location <- fia_plot |>
+  semi_join(plot_grow_only, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  # Pick just the first inventory year
+  filter(min_rank(INVYR) == 1) |> 
+  ungroup() |>
+  left_join(fia_survey, by = join_by(SRV_CN)) |>
+  left_join(fia_ref_research_station, by = join_by(STATECD)) |>
+  collect() |>
+  rename(
+    long = LON,
+    lat = LAT
+  ) |>
+  mutate(group = sprintf('%02d%03d%05d', STATECD, COUNTYCD, PLOT))
+
+DBI::dbDisconnect(fia)
+remove(fia, fia_plot, fia_survey, fia_ref_research_station)
+```
+
+```{r}
+state_plot_counts <- plot_location |>
+  group_by(STATE_NAME) |>
+  summarize(COUNT = n()) |>
+  ungroup() |>
+  arrange(desc(COUNT))
+knitr::kable(state_plot_counts)
+```
+
+```{r}
+northeastern_states <- plot_location |>
+  distinct(STATE_NAME) |>
+  mutate(region = str_to_lower(STATE_NAME))
+map_states <- map_data('state', northeastern_states$region)
+
+ggplot(map_states, aes(long, lat, group = group)) +
+  geom_polygon(fill = "white", color = "black") + 
+  geom_point(data = plot_location, color = "blue") +
+  coord_quickmap()
+```
+
 ### FIA Carbon and BALIVE
 
 We can gather BALIVE and CARBON_AG for these plots over time.
