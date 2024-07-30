@@ -153,7 +153,7 @@ plot_grow_only <- fia_cond |>
   distinct(STATECD, COUNTYCD, PLOT) |>
   collect()
 
-DBI::dbDisconnect(fia)
+dbDisconnect(fia)
 remove(fia, fia_cond, fia_plot, fia_survey)
 
 length(plot_grow_only$PLOT)
@@ -199,7 +199,7 @@ plot_location <- fia_plot |>
   ) |>
   mutate(group = sprintf('%02d%03d%05d', STATECD, COUNTYCD, PLOT))
 
-DBI::dbDisconnect(fia)
+dbDisconnect(fia)
 remove(fia, fia_plot, fia_survey, fia_ref_research_station)
 ```
 
@@ -262,6 +262,7 @@ stand_stats <- tbl(fia, 'COND') |>
     STDAGE = max(STDAGE, na.rm = TRUE),
     .groups = "keep"
   ) |>
+  ungroup() |>
   left_join(measyear, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
   left_join(tree_stats, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
   filter(!is.na(CARBON_AG)) |>
@@ -274,7 +275,7 @@ stand_stats <- tbl(fia, 'COND') |>
   mutate(BALIVE_METRIC = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare")) |>
   mutate(CARBON_METRIC = conv_multiunit(CPA, "lbs / acre", "Mg / hectare"))
 
-DBI::dbDisconnect(fia)
+dbDisconnect(fia)
 remove(fia, measyear, forest_type, tree_stats)
 ```
 
@@ -479,7 +480,7 @@ keywordfile_stands <- tbl(fia, 'PLOT') |>
   left_join(fia_fvs_standinit_plot, by = join_by(STAND_CN)) |>
   collect()
 
-DBI::dbDisconnect(fia)
+dbDisconnect(fia)
 remove(fia, fia_fvs_standinit_plot)
 ```
 
@@ -565,7 +566,98 @@ for (partition in 1:8) {
 ```{r}
 # TODO nik: Run FVS from in R.
 # Batch file to run FVS in parallel:
-# for %%p in (NONE_Partition_*.key) do start \FVS\FVSbin\FVSne.exe --keywordfile=%%p
+# for %%p in (FVS_Northeastern_NONE_*.key) do start \FVS\FVSbin\FVSne.exe --keywordfile=%%p
 ```
 
+## Assemble Results
 
+Load the output from all FVS partitions into a single dataframe
+
+```{r}
+FVS_Carbon <- NULL
+FVS_Summary2_East <- NULL
+
+for (partition in 1:8) {
+  fvs_out_db <- DBI::dbConnect(
+    RSQLite::SQLite(),
+    paste0('../03_outputs/FVS_Northeastern_NONE_', partition, '.db')
+  )
+  fvs_carbon_tbl = tbl(fvs_out_db, 'FVS_Carbon') |>
+    mutate(Partition = partition)
+  fvs_summary2_east_tbl = tbl(fvs_out_db, 'FVS_Summary2_East') |>
+    mutate(Partition = partition)
+
+  FVS_Carbon <- bind_rows(FVS_Carbon, fvs_carbon_tbl |> collect())
+  FVS_Summary2_East <- bind_rows(FVS_Summary2_East, fvs_summary2_east_tbl |> collect())
+  
+  dbDisconnect(fvs_out_db)
+}
+
+remove(fvs_out_db, fvs_carbon_tbl, fvs_summary2_east_tbl)
+```
+
+Filter projections to corresponding observations
+
+```{r}
+projected_carbon_tmp <- FVS_Carbon |>
+  # TODO nik: why do these stands get multiple, identical cases?
+  filter(CaseID != '3dd9a3f0-57e9-4739-8fd7-58e45bbc3896') |>
+  filter(CaseID != '1a3f3b16-7f96-4aa4-a415-0d79fd555acc') |>
+  select(StandID, Year, Aboveground_Total_Live) |>
+  rename(Projected_Carbon = Aboveground_Total_Live)
+
+projected_ba_tmp <- FVS_Summary2_East |>
+  filter(CaseID != '3dd9a3f0-57e9-4739-8fd7-58e45bbc3896') |>
+  filter(CaseID != '1a3f3b16-7f96-4aa4-a415-0d79fd555acc') |>
+  select(StandID, Year, BA) |>
+  rename(Projected_BA = BA)
+
+projected_tmp <- projected_carbon_tmp |>
+  full_join(projected_ba_tmp, by = join_by(StandID, Year)) |>
+  mutate(STAND_ID = paste0(
+     substring(StandID, 1, 2),
+     substring(StandID, 5, 12)
+  )) |>
+  select(STAND_ID, Year, Projected_Carbon, Projected_BA)
+
+first_measyear_tmp <- first_measyear |>
+  select(STATECD, COUNTYCD, PLOT, MEASYEAR) |>
+  rename(First_Year = MEASYEAR)
+
+projected_vs_measured <- stand_stats |>
+  left_join(first_measyear_tmp, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  mutate(STAND_ID = sprintf(paste0(
+    '%02d',  '%03d',   '%05d'),
+    STATECD, COUNTYCD, PLOT
+  )) |>
+  rename(Year = MEASYEAR) |>
+  rename(Measured_BA = BALIVE_METRIC) |>
+  rename(Measured_Carbon = CARBON_METRIC) |>
+  select(
+    STAND_ID, Year, First_Year,
+    STDAGE, `Forest Type`, `Forest Type Group`,
+    Measured_BA, Measured_Carbon
+  ) |>
+  mutate(`Projection Years` = Year - First_Year) |>
+  left_join(projected_tmp, by = join_by(STAND_ID, Year))
+
+remove(projected_carbon_tmp, projected_ba_tmp, projected_tmp, first_measyear_tmp)
+```
+
+plot 'em
+
+```{r}
+
+ggplot(
+    data = projected_vs_measured
+  ) +
+  geom_point(
+    size = 2,
+    alpha = 0.25,
+    mapping = aes(x = Measured_Carbon, y = Projected_Carbon, color = `Projection Years`)
+  ) +
+  geom_abline(intercept = 0, slope = 1) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nFFE Measured vs. Projected Carbon (Mg/ha)") +
+  coord_cartesian(xlim = c(0, 200), ylim = c(0, 200))
+```
