@@ -279,6 +279,25 @@ dbDisconnect(fia)
 remove(fia, measyear, forest_type, tree_stats)
 ```
 
+Re-plot location with forest type
+
+```{r}
+plot_location_tmp <- plot_location |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  filter(INVYR == min(INVYR, na.rm = TRUE)) |>
+  ungroup() |>
+  select(STATECD, COUNTYCD, PLOT, long, lat, group)
+
+plot_location_type <- stand_stats |>
+  select(STATECD, COUNTYCD, PLOT, INVYR, `Forest Type`, `Forest Type Group`) |>
+  left_join(plot_location_tmp, by = join_by(STATECD, COUNTYCD, PLOT))
+
+ggplot(map_states, aes(long, lat, group = group)) +
+  geom_polygon(fill = "white", color = "black") + 
+  geom_point(plot_location_type, mapping = aes(long, lat, group = group, color = `Forest Type Group`)) +
+  coord_quickmap()
+```
+
 Look at BA over time
 
 ```{r}
