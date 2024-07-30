@@ -436,7 +436,7 @@ SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'
 EndSQL
 
 DSNOut
-FVS_Out.db
+FVS_NoManagement_NONE.db
 
 Summary            2
 Computdb           0         1
@@ -486,13 +486,14 @@ remove(fia, fia_fvs_standinit_plot)
 A function to generate a keywordfile section from information about a stand.
 
 > TODO nik: All FVS files should probably be named by:
-> -  Title; NoManagement
+> -  Producing program, FVS
+> -  Title; Northeastern
 > -  MgmtId; NONE
 > -  Partition
 > -  File type
 > So,
-> NoManagement_NONE_part1.key
-> NoManagement_NONE_part1.db
+> FVS_Northeastern_NONE_part1.key
+> FVS_Northeastern_NONE_part1.db
 > etc.
 
 ```{r}
@@ -500,7 +501,7 @@ keywordfile_section <- function(StandID, StandCN, MeasYear, Partition) {
   MeasYear <- as.integer(MeasYear)
   paste0(
 "StdIdent\n",
-StandID, "        NoManagement\n",
+StandID, "        Northeastern\n",
 "StandCN\n",
 StandCN, "\n",
 "MgmtId\n",
@@ -525,7 +526,7 @@ StandCN, "\n",
 "SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'\n",
 "EndSQL\n",
 "DSNOut\n",
-"FVS_Out_", Partition, ".db\n",
+"FVS_Northeastern_NONE_", Partition, ".db\n",
 "Summary            2\n",
 "Computdb           0         1\n",
 "MisRpts            2\n",
@@ -544,7 +545,7 @@ STAND_ID.
 
 ```{r}
 for (partition in 1:8) {
-  filename <- paste0("NONE_partition_", partition, ".key")
+  filename <- paste0("FVS_Northeastern_NONE_", partition, ".key")
   write_lines(
     apply(
       keywordfile_stands |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
@@ -559,7 +560,7 @@ for (partition in 1:8) {
 }
 ```
 
-Run FVS.
+#### Run FVS.
 
 ```{r}
 # TODO nik: Run FVS from in R.
