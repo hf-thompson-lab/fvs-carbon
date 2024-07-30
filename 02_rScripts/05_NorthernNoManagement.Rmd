@@ -639,7 +639,8 @@ projected_vs_measured <- stand_stats |>
     Measured_BA, Measured_Carbon
   ) |>
   mutate(`Projection Years` = Year - First_Year) |>
-  left_join(projected_tmp, by = join_by(STAND_ID, Year))
+  left_join(projected_tmp, by = join_by(STAND_ID, Year)) |>
+  filter(!is.na(Projected_Carbon) & !is.na(Measured_Carbon))
 
 remove(projected_carbon_tmp, projected_ba_tmp, projected_tmp, first_measyear_tmp)
 ```
@@ -653,11 +654,11 @@ ggplot(
   ) +
   geom_point(
     size = 2,
-    alpha = 0.25,
+    alpha = 0.5,
     mapping = aes(x = Measured_Carbon, y = Projected_Carbon, color = `Projection Years`)
   ) +
   geom_abline(intercept = 0, slope = 1) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nFFE Measured vs. Projected Carbon (Mg/ha)") +
+  ggtitle("Grow-Only Stands\nFIA Measured vs. FVS Projected Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200))
 ```
