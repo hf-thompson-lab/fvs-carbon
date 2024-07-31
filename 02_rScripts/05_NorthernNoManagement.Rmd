@@ -296,6 +296,8 @@ ggplot(map_states, aes(long, lat, group = group)) +
   geom_polygon(fill = "white", color = "black") + 
   geom_point(plot_location_type, mapping = aes(long, lat, group = group, color = `Forest Type Group`)) +
   coord_quickmap()
+
+remove(plot_location_tmp)
 ```
 
 Look at BA over time
@@ -472,9 +474,68 @@ Process
 Stop
 ```
 
-#### Generation
+#### Keword File Generation
 
 Gather stand IDs and CNs for keywordfile generation.
+
+We gather two series of stands:
+
+-  stands_projected is a list of stands and inventory years to grow out to 2025
+-  stands_surveyed is a list of stands and inventory years to grow for 0 years
+   in each survey year.
+
+When generating keyword files, we create one per partition,
+distributing across partitions using round-robin on STAND_ID.
+
+keywordfile_section is a function to generate a keywordfile section from
+information about a run and a stand.
+
+```{r}
+keywordfile_section <- function(Title, MgmtId, StandID, StandCN, MeasYear, EndYear, Partition) {
+  MeasYear <- as.integer(MeasYear)
+  paste0(
+"StdIdent\n",
+StandID, " ", Title, "\n",
+"StandCN\n",
+StandCN, "\n",
+"MgmtId\n",
+MgmtId, "\n",
+"InvYear   ", sprintf('%10s', MeasYear), "\n",
+"TimeInt            0         1\n",
+"NumCycle  ", sprintf('%10d', EndYear - MeasYear), "\n",
+"FMIn\n",
+"CarbRept           2\n",
+"CarbCut            2\n",
+"CarbCalc           1         1    0.0425         9        11\n",
+"FuelOut            2\n",
+"FuelRept           2\n",
+"End\n",
+"Database\n",
+"DSNIn\n",
+"SQLite_FIADB_ENTIRE.db\n",
+"StandSQL\n",
+"SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'\n",
+"EndSQL\n",
+"TreeSQL\n",
+"SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'\n",
+"EndSQL\n",
+"DSNOut\n",
+"FVS_", Title, "_", MgmtId, "_", Partition, ".db\n",
+"Summary            2\n",
+"Computdb           0         1\n",
+"MisRpts            2\n",
+"CarbReDB           2\n",
+"FuelReDB           2\n",
+"FuelsOut           2\n",
+"End\n",
+"Process\n"
+  )
+}
+
+```
+
+Find the stands we want to project; these are the grow-only stands starting
+in their first measurement year.
 
 ```{r}
 first_measyear <- stand_stats |>
@@ -491,7 +552,7 @@ fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_fvs_standinit_plot <- tbl(fia, 'FVS_StandInit_Plot') |>
   select(STAND_CN, STAND_ID)
 
-keywordfile_stands <- tbl(fia, 'PLOT') |>
+stands_projected <- tbl(fia, 'PLOT') |>
   select(CN, STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR) |>
   filter(INVYR >= 1999) |>
   rename(STAND_CN = CN) |>
@@ -503,75 +564,26 @@ dbDisconnect(fia)
 remove(fia, fia_fvs_standinit_plot)
 ```
 
-A function to generate a keywordfile section from information about a stand.
-
-> TODO nik: All FVS files should probably be named by:
-> -  Producing program, FVS
-> -  Title; Northeastern
-> -  MgmtId; NONE
-> -  Partition
-> -  File type
-> So,
-> FVS_Northeastern_NONE_part1.key
-> FVS_Northeastern_NONE_part1.db
-> etc.
-
-```{r}
-keywordfile_section <- function(StandID, StandCN, MeasYear, Partition) {
-  MeasYear <- as.integer(MeasYear)
-  paste0(
-"StdIdent\n",
-StandID, "        Northeastern\n",
-"StandCN\n",
-StandCN, "\n",
-"MgmtId\n",
-"NONE\n",
-"InvYear   ", sprintf('%10s', MeasYear), "\n",
-"TimeInt            0         1\n",
-"NumCycle  ", sprintf('%10d', 2025 - MeasYear), "\n",
-"FMIn\n",
-"CarbRept           2\n",
-"CarbCut            2\n",
-"CarbCalc           0         1    0.0425         9        11\n",
-"FuelOut            2\n",
-"FuelRept           2\n",
-"End\n",
-"Database\n",
-"DSNIn\n",
-"SQLite_FIADB_ENTIRE.db\n",
-"StandSQL\n",
-"SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'\n",
-"EndSQL\n",
-"TreeSQL\n",
-"SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'\n",
-"EndSQL\n",
-"DSNOut\n",
-"FVS_Northeastern_NONE_", Partition, ".db\n",
-"Summary            2\n",
-"Computdb           0         1\n",
-"MisRpts            2\n",
-"CarbReDB           2\n",
-"FuelReDB           2\n",
-"FuelsOut           2\n",
-"End\n",
-"Process\n"
-  )
-}
-
-```
-
-Generate a keywordfile per partition, distributing across partitions using
-STAND_ID. 
+The first run is to project from the first measurement year to 2025. These
+are given management ID "NONE".
 
 ```{r}
 for (partition in 1:8) {
-  filename <- paste0("FVS_Northeastern_NONE_", partition, ".key")
+  filename <- paste0("../03_outputs/FVS_Northeastern_NONE_", partition, ".key")
   write_lines(
     apply(
-      keywordfile_stands |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
+      stands_projected |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
       1,
       function(row) {
-        keywordfile_section(row['STAND_ID'], row['STAND_CN'], row['MEASYEAR'], partition)
+        keywordfile_section(
+          "Northeastern",
+          "NONE",
+          row['STAND_ID'],
+          row['STAND_CN'],
+          row['MEASYEAR'],
+          2025,
+          partition
+        )
       }
     ),
     filename
@@ -580,6 +592,53 @@ for (partition in 1:8) {
 }
 ```
 
+The second run is a zero-year projection to have FVS calculate the carbon
+in surveyed stands in each year they are surveyed.
+
+```{r}
+fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia_fvs_standinit_plot <- tbl(fia, 'FVS_StandInit_Plot') |>
+  select(STAND_CN, STAND_ID)
+
+stands_surveyed <- tbl(fia, 'PLOT') |>
+  select(CN, STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR) |>
+  filter(INVYR >= 1999) |>
+  rename(STAND_CN = CN) |>
+  semi_join(plot_grow_only, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
+  left_join(fia_fvs_standinit_plot, by = join_by(STAND_CN)) |>
+  collect()
+
+dbDisconnect(fia)
+remove(fia, fia_fvs_standinit_plot)
+```
+
+The second run is to do a 0-year projection for each measurement year. These
+are given management ID "SRVY".
+
+```{r}
+for (partition in 1:8) {
+  filename <- paste0("../03_outputs/FVS_Northeastern_SRVY_", partition, ".key")
+  write_lines(
+    apply(
+      stands_surveyed |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
+      1,
+      function(row) {
+        keywordfile_section(
+          "Northeastern",
+          "SRVY",
+          row['STAND_ID'],
+          row['STAND_CN'],
+          row['MEASYEAR'],
+          as.integer(row['MEASYEAR']) + 1,
+          partition
+        )
+      }
+    ),
+    filename
+  )
+  write_lines("Stop", filename, append = TRUE)
+}
+```
 #### Run FVS.
 
 ```{r}
@@ -593,8 +652,10 @@ for (partition in 1:8) {
 Load the output from all FVS partitions into a single dataframe
 
 ```{r}
-FVS_Carbon <- NULL
-FVS_Summary2_East <- NULL
+FVS_Carbon_NONE <- NULL
+FVS_Carbon_SRVY <- NULL
+FVS_Summary2_East_NONE <- NULL
+FVS_Summary2_East_SRVY <- NULL
 
 for (partition in 1:8) {
   fvs_out_db <- DBI::dbConnect(
@@ -606,8 +667,22 @@ for (partition in 1:8) {
   fvs_summary2_east_tbl = tbl(fvs_out_db, 'FVS_Summary2_East') |>
     mutate(Partition = partition)
 
-  FVS_Carbon <- bind_rows(FVS_Carbon, fvs_carbon_tbl |> collect())
-  FVS_Summary2_East <- bind_rows(FVS_Summary2_East, fvs_summary2_east_tbl |> collect())
+  FVS_Carbon_NONE <- bind_rows(FVS_Carbon_NONE, fvs_carbon_tbl |> collect())
+  FVS_Summary2_East_NONE <- bind_rows(FVS_Summary2_East_NONE, fvs_summary2_east_tbl |> collect())
+  
+  dbDisconnect(fvs_out_db)
+
+  fvs_out_db <- DBI::dbConnect(
+    RSQLite::SQLite(),
+    paste0('../03_outputs/FVS_Northeastern_SRVY_', partition, '.db')
+  )
+  fvs_carbon_tbl = tbl(fvs_out_db, 'FVS_Carbon') |>
+    mutate(Partition = partition)
+  fvs_summary2_east_tbl = tbl(fvs_out_db, 'FVS_Summary2_East') |>
+    mutate(Partition = partition)
+
+  FVS_Carbon_SRVY <- bind_rows(FVS_Carbon_SRVY, fvs_carbon_tbl |> collect())
+  FVS_Summary2_East_SRVY <- bind_rows(FVS_Summary2_East_SRVY, fvs_summary2_east_tbl |> collect())
   
   dbDisconnect(fvs_out_db)
 }
@@ -618,16 +693,11 @@ remove(fvs_out_db, fvs_carbon_tbl, fvs_summary2_east_tbl)
 Filter projections to corresponding observations
 
 ```{r}
-projected_carbon_tmp <- FVS_Carbon |>
-  # TODO nik: why do these stands get multiple, identical cases?
-  filter(CaseID != '3dd9a3f0-57e9-4739-8fd7-58e45bbc3896') |>
-  filter(CaseID != '1a3f3b16-7f96-4aa4-a415-0d79fd555acc') |>
+projected_carbon_tmp <- FVS_Carbon_NONE |>
   select(StandID, Year, Aboveground_Total_Live) |>
   rename(Projected_Carbon = Aboveground_Total_Live)
 
-projected_ba_tmp <- FVS_Summary2_East |>
-  filter(CaseID != '3dd9a3f0-57e9-4739-8fd7-58e45bbc3896') |>
-  filter(CaseID != '1a3f3b16-7f96-4aa4-a415-0d79fd555acc') |>
+projected_ba_tmp <- FVS_Summary2_East_NONE |>
   select(StandID, Year, BA) |>
   rename(Projected_BA = BA)
 
@@ -643,25 +713,63 @@ first_measyear_tmp <- first_measyear |>
   select(STATECD, COUNTYCD, PLOT, MEASYEAR) |>
   rename(First_Year = MEASYEAR)
 
+latest_measyear_tmp <- latest_measyear |>
+  rename(Last_Year = MEASYEAR)
+
+surveyed_carbon_tmp <- FVS_Carbon_SRVY |>
+  select(StandID, Year, Aboveground_Total_Live) |>
+  rename(Measured_Carbon = Aboveground_Total_Live)
+
+surveyed_ba_tmp <- FVS_Summary2_East_SRVY |>
+  select(StandID, Year, BA) |>
+  rename(Measured_BA = BA)
+
+surveyed_tmp <- surveyed_carbon_tmp |>
+  full_join(surveyed_ba_tmp, by = join_by(StandID, Year)) |>
+  mutate(STAND_ID = paste0(
+     substring(StandID, 1, 2),
+     substring(StandID, 5, 12)
+  )) |>
+  select(STAND_ID, Year, Measured_Carbon, Measured_BA)
+
 projected_vs_measured <- stand_stats |>
   left_join(first_measyear_tmp, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  left_join(latest_measyear_tmp, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  filter(MEASYEAR == First_Year | MEASYEAR == Last_Year) |>
   mutate(STAND_ID = sprintf(paste0(
     '%02d',  '%03d',   '%05d'),
     STATECD, COUNTYCD, PLOT
   )) |>
   rename(Year = MEASYEAR) |>
-  rename(Measured_BA = BALIVE_METRIC) |>
-  rename(Measured_Carbon = CARBON_METRIC) |>
+  #rename(Measured_BA = BALIVE_METRIC) |>
+  #rename(Measured_Carbon = CARBON_METRIC) |>
   select(
     STAND_ID, Year, First_Year,
     STDAGE, `Forest Type`, `Forest Type Group`,
-    Measured_BA, Measured_Carbon
+    #Measured_BA, Measured_Carbon
+  ) |>
+  mutate(`Forest Type Group` = 
+     if_else(startsWith(`Forest Type Group`, 'Other'), 'Other',
+       if_else(startsWith(`Forest Type Group`, 'Exotic'), 'Other',
+         `Forest Type Group`
+       )
+     )
   ) |>
   mutate(`Projection Years` = Year - First_Year) |>
   left_join(projected_tmp, by = join_by(STAND_ID, Year)) |>
+  left_join(surveyed_tmp, by = join_by(STAND_ID, Year)) |>
   filter(!is.na(Projected_Carbon) & !is.na(Measured_Carbon))
 
-remove(projected_carbon_tmp, projected_ba_tmp, projected_tmp, first_measyear_tmp)
+remove(
+  projected_carbon_tmp,
+  projected_ba_tmp,
+  projected_tmp,
+  surveyed_carbon_tmp,
+  surveyed_ba_tmp,
+  surveyed_tmp,
+  first_measyear_tmp,
+  latest_measyear_tmp
+)
 ```
 
 plot 'em
@@ -673,11 +781,11 @@ ggplot(
   ) +
   geom_point(
     size = 2,
-    alpha = 0.5,
+#    alpha = 0.5,
     mapping = aes(x = Measured_Carbon, y = Projected_Carbon, color = `Projection Years`)
   ) +
   geom_abline(intercept = 0, slope = 1) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nFIA Measured vs. FVS Projected Carbon (Mg/ha)") +
-  coord_cartesian(xlim = c(0, 200), ylim = c(0, 200))
+  ggtitle("Grow-Only Stands\nMeasured vs. Projected Carbon (Mg/ha)") +
+  coord_cartesian(xlim = c(0, 300), ylim = c(0, 300))
 ```
