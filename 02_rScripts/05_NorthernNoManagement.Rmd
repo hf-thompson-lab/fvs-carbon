@@ -289,6 +289,16 @@ plot_location_tmp <- plot_location |>
   select(STATECD, COUNTYCD, PLOT, long, lat, group)
 
 plot_location_type <- stand_stats |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  filter(INVYR == min(INVYR, na.rm = TRUE)) |>
+  ungroup() |>
+  mutate(`Forest Type Group` = 
+     if_else(startsWith(`Forest Type Group`, 'Other'), 'Other',
+       if_else(startsWith(`Forest Type Group`, 'Exotic'), 'Other',
+         `Forest Type Group`
+       )
+     )
+  ) |>
   select(STATECD, COUNTYCD, PLOT, INVYR, `Forest Type`, `Forest Type Group`) |>
   left_join(plot_location_tmp, by = join_by(STATECD, COUNTYCD, PLOT))
 
