@@ -638,10 +638,7 @@ ggplot(
   ) +
   ggtitle("Grow-Only Stands\nFFE Measured vs. Projected Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
-  geom_line(
-    data = tibble(x = c(0, 200), y=c(0, 200)),
-    mapping = aes(x = x, y = y)
-  )
+  geom_abline(intercept = 0, slope = 1)
 ```
 
 Same, but color by stand age
@@ -656,10 +653,7 @@ ggplot(
   ) +
   ggtitle("Grow-Only Stands\nFFE Measured vs. Projected Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
-  geom_line(
-    data = tibble(x = c(0, 200), y=c(0, 200)),
-    mapping = aes(x = x, y = y)
-  )
+  geom_abline(intercept = 0, slope = 1)
 ```
 
 ### FFE-Jenkins
@@ -737,10 +731,7 @@ ggplot(
   ) +
   ggtitle("FVS Carbon Calculation\nFFE vs. Jenkins Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
-  geom_line(
-    data = tibble(x = c(0, 200), y=c(0, 200)),
-    mapping = aes(x = x, y = y)
-  )
+  geom_abline(intercept = 0, slope = 1)
 ```
 
 From this, it appears the Jenkins over-projects compared to FFE.
@@ -757,11 +748,7 @@ ggplot(
   ) +
   ggtitle("FVS Carbon Calculation\nFFE vs. Jenkins Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
-  geom_line(
-    data = tibble(x = c(0, 200), y=c(0, 200)),
-    mapping = aes(x = x, y = y)
-  )
-
+  geom_abline(intercept = 0, slope = 1)
 ```
 
 ### FIA Spatial
@@ -861,10 +848,7 @@ ggplot(
   ) +
   ggtitle("Carbon Calculation\nFFE vs. Spatial Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
-  geom_line(
-    data = tibble(x = c(0, 200), y=c(0, 200)),
-    mapping = aes(x = x, y = y)
-  )
+  geom_abline(intercept = 0, slope = 1)
 ```
 
 Same, but colored by stand age
@@ -879,10 +863,7 @@ ggplot(
   ) +
   ggtitle("Carbon Calculation\nFFE vs. Spatial Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
-  geom_line(
-    data = tibble(x = c(0, 200), y=c(0, 200)),
-    mapping = aes(x = x, y = y)
-  )
+  geom_abline(intercept = 0, slope = 1)
 ```
 
 ### FIA TPA
@@ -943,10 +924,7 @@ ggplot(
   ) +
   ggtitle("Carbon Calculation\nFFE vs. TPA Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
-  geom_line(
-    data = tibble(x = c(0, 200), y=c(0, 200)),
-    mapping = aes(x = x, y = y)
-  )
+  geom_abline(intercept = 0, slope = 1)
 ```
 
 Same, but color by stand age
@@ -961,10 +939,7 @@ ggplot(
   ) +
   ggtitle("Carbon Calculation\nFFE vs. TPA Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
-  geom_line(
-    data = tibble(x = c(0, 200), y=c(0, 200)),
-    mapping = aes(x = x, y = y)
-  )
+  geom_abline(intercept = 0, slope = 1)
 ```
 
 These look very similar to the spatial approach; plot them against each other
@@ -991,12 +966,7 @@ ggplot(
   ) +
   ggtitle("FVS Carbon Calculation\nSpatial vs. TPA Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
-  geom_line(
-    data = tibble(x = c(0, 200), y=c(0, 200)),
-    mapping = aes(x = x, y = y)
-  )
-
-
+  geom_abline(intercept = 0, slope = 1)
 ```
 
 Same, but color by stand age
@@ -1011,10 +981,7 @@ ggplot(
   ) +
   ggtitle("Carbon Calculation\nSpatial vs. TPA Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
-  geom_line(
-    data = tibble(x = c(0, 200), y=c(0, 200)),
-    mapping = aes(x = x, y = y)
-  )
+  geom_abline(intercept = 0, slope = 1)
 ```
 
 ## Basal Area
@@ -1095,10 +1062,7 @@ ggplot(
   ) +
   ggtitle("Measured Basal Area\nFIA BALIVE vs. FVS BA (m2 / ha)") +
   coord_cartesian(xlim = c(0, 60), ylim = c(0, 60)) +
-  geom_line(
-    data = tibble(x = c(0, 60), y=c(0, 60)),
-    mapping = aes(x = x, y = y)
-  )
+  geom_abline(intercept = 0, slope = 1)
 ```
 
 This shows that FVS and FIA approach to measuring basal area often aligns, but
@@ -1150,9 +1114,6 @@ ggplot(
   ) +
   ggtitle("Basal Area\nFVS Measured vs. Projected (m2 / ha)") +
   coord_cartesian(xlim = c(0, 60), ylim = c(0, 60)) +
-  geom_line(
-    data = tibble(x = c(0, 60), y=c(0, 60)),
-    mapping = aes(x = x, y = y)
-  )
+  geom_abline(intercept = 0, slope = 1)
 ```
 
