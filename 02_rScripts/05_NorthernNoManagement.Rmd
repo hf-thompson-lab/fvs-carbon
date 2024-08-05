@@ -709,7 +709,7 @@ projected_carbon_tmp <- FVS_Carbon_NONE |>
 
 projected_ba_tmp <- FVS_Summary2_East_NONE |>
   select(StandID, Year, BA) |>
-  rename(Projected_BA = BA)
+  mutate(Projected_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare"))
 
 projected_tmp <- projected_carbon_tmp |>
   full_join(projected_ba_tmp, by = join_by(StandID, Year)) |>
@@ -732,7 +732,7 @@ surveyed_carbon_tmp <- FVS_Carbon_SRVY |>
 
 surveyed_ba_tmp <- FVS_Summary2_East_SRVY |>
   select(StandID, Year, BA) |>
-  rename(Measured_BA = BA)
+  mutate(Measured_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare"))
 
 surveyed_tmp <- surveyed_carbon_tmp |>
   full_join(surveyed_ba_tmp, by = join_by(StandID, Year)) |>
@@ -765,10 +765,12 @@ projected_vs_measured <- stand_stats |>
        )
      )
   ) |>
-  mutate(`Projection Years` = Year - First_Year) |>
+  mutate(Projection_Years = Year - First_Year) |>
   left_join(projected_tmp, by = join_by(STAND_ID, Year)) |>
   left_join(surveyed_tmp, by = join_by(STAND_ID, Year)) |>
-  filter(!is.na(Projected_Carbon) & !is.na(Measured_Carbon))
+  filter(!is.na(Projected_Carbon) & !is.na(Measured_Carbon)) |>
+  mutate(Projection_Error = (Projected_Carbon - Measured_Carbon) / Measured_Carbon) |>
+  mutate(Projection_Error_Magnitude = abs(Projection_Error))
 
 remove(
   projected_carbon_tmp,
@@ -792,10 +794,99 @@ ggplot(
   geom_point(
     size = 2,
 #    alpha = 0.5,
-    mapping = aes(x = Measured_Carbon, y = Projected_Carbon, color = `Projection Years`)
+    mapping = aes(x = Measured_Carbon, y = Projected_Carbon, color = Projection_Years)
   ) +
   geom_abline(intercept = 0, slope = 1) +
   facet_wrap(~`Forest Type Group`) +
   ggtitle("Grow-Only Stands\nMeasured vs. Projected Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 300), ylim = c(0, 300))
+```
+
+```{r}
+ggplot(
+    data = projected_vs_measured |> filter(Projection_Years > 0)
+  ) +
+  geom_point(
+    size = 2,
+#    alpha = 0.5,
+    mapping = aes(x = Measured_Carbon, y = Projected_Carbon, color = Projection_Years)
+  ) +
+  geom_smooth(
+    method = lm,
+    mapping = aes(x = Measured_Carbon, y = Projected_Carbon),
+    formula = 'y ~ x',
+    color = 'brown'
+  ) +
+  geom_abline(intercept = 0, slope = 1) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nMeasured vs. Projected Carbon (Mg/ha)") +
+  coord_cartesian(xlim = c(0, 300), ylim = c(0, 300))
+```
+
+
+```{r}
+ggplot(
+    projected_vs_measured |>
+      filter(Projection_Error_Magnitude <= 2)
+  ) +
+  geom_point(
+#    size = 2,
+    alpha = 0.25,
+#    color = 'blue',
+    mapping = aes(x = Projection_Years, y = Projection_Error)
+  ) +
+  geom_smooth(
+    method = lm,
+    mapping = aes(x = Projection_Years, y = Projection_Error),
+    formula = 'y ~ x'
+  ) +
+#  geom_abline(intercept = 0, slope = 0) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nProjection Error (fraction) vs. Projection years")
+  
+```
+
+```{r}
+ggplot(
+    projected_vs_measured |>
+      filter(Projection_Error_Magnitude <= 2)
+  ) +
+  geom_point(
+#    size = 2,
+    alpha = 0.25,
+#    color = 'blue',
+    mapping = aes(x = Projection_Years, y = Projection_Error_Magnitude)
+  ) +
+  geom_smooth(
+    mapping = aes(x = Projection_Years, y = Projection_Error_Magnitude),
+    method = lm,
+    formula = 'y ~ x'
+  ) +
+#  geom_abline(intercept = 0, slope = 0) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nProjection Error Magnitude (fraction) vs. Projection years")
+  
+```
+
+```{r}
+
+ggplot(
+    projected_vs_measured |>
+      filter(Projection_Years > 0) |>
+      filter(Projection_Error_Magnitude < 2)
+  ) +
+  geom_point(
+#    size = 2,
+    alpha = 0.25,
+#    color = 'blue',
+    mapping = aes(x = Measured_BA, y = Projection_Error)
+  ) +
+  geom_smooth(
+    mapping = aes(x = Measured_BA, y = Projection_Error),
+    method = lm,
+    formula = 'y ~ x'
+  ) +
+#  geom_abline(intercept = 0, slope = 0) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nProjection Error (fraction) vs. Measured BA (m2 / ha)")
 ```
