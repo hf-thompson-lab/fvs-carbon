@@ -786,8 +786,7 @@ projected_vs_measured <- stand_stats |>
   mutate(BA_Error = BA_Residual / Measured_BA) |>
   mutate(BA_Error_Magnitude = abs(BA_Error)) |>
   mutate(Carbon_Residual = Projected_Carbon - Measured_Carbon) |>
-  mutate(Carbon_Error = Carbon_Residual / Measured_Carbon) |>
-  mutate(Carbon_Error_Magnitude = abs(Carbon_Error))
+  mutate(Carbon_Error = 2 * abs(Carbon_Residual) / (Projected_Carbon + Measured_Carbon))
 
 remove(
   projected_carbon_tmp,
@@ -860,7 +859,7 @@ ggplot(
 
 ```{r carbon_error_vs_projection_years}
 ggplot(
-    projected_vs_measured |> filter(Carbon_Error_Magnitude <= 2),
+    projected_vs_measured |> filter(Carbon_Error < 1),
     aes(x = Projection_Years, y = Carbon_Error)
   ) +
   geom_point(
@@ -872,23 +871,6 @@ ggplot(
   ) +
   facet_wrap(~`Forest Type Group`) +
   ggtitle("Grow-Only Stands\nCarbon Projection Error (fraction) vs. Projection years")
-  
-```
-
-```{r carbon_error_magnitude_vs_projection_years}
-ggplot(
-    projected_vs_measured |> filter(Carbon_Error_Magnitude <= 2),
-    aes(x = Projection_Years, y = Carbon_Error_Magnitude)
-  ) +
-  geom_point(
-    alpha = 0.25
-  ) +
-  geom_smooth(
-    method = lm,
-    formula = 'y ~ x'
-  ) +
-  facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nCarbon Projection Error Magnitude (fraction) vs. Projection years")
   
 ```
 
@@ -908,7 +890,7 @@ ggplot(
     formula = 'y ~ x'
   ) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nCarbon Projection Error (Mg/ha) vs. Measured BA")
+  ggtitle("Grow-Only Stands\nCarbon Projection Error (Mg/ha) vs. Measured BA (m² / ha)")
   
 ```
 
@@ -917,7 +899,7 @@ ggplot(
 ggplot(
     projected_vs_measured |>
       filter(Projection_Years > 0) |>
-      filter(Carbon_Error_Magnitude < 2),
+      filter(Carbon_Error < 1),
     aes(x = Measured_BA, y = Carbon_Error)
   ) +
   geom_point(
@@ -937,7 +919,7 @@ This omits outliers; looking just at the outliers (error >= 2x value):
 ggplot(
     projected_vs_measured |>
       filter(Projection_Years > 0) |>
-      filter(Carbon_Error_Magnitude >= 2),
+      filter(Carbon_Error >= 1),
     aes(x = Measured_BA, y = Carbon_Error)
   ) +
   geom_point(
