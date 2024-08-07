@@ -49,7 +49,7 @@ Grow-only is described previously:
 *  Plot was not treated: COND.TRTCD1 == 0 & TRTCD2 == 0 & TRTCD3 == 0
 
 Functions for these filters
-```{r}
+```{r filters}
 northeastern_plots_filter <- function(.data) {
   # Region or Station code (RSCD) consolidated multiple regions
   # into region 24, Northeastern Research Station (NERS).
@@ -123,7 +123,7 @@ single_condition_plots_filter <- function(.data) {
 
 Execute the filters to create a list of matching plots.
 
-```{r}
+```{r plot_grow_only}
 fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_cond <- tbl(fia, 'COND') |>
   select(
@@ -167,7 +167,7 @@ Where are these plots?
 
 Fetch plots with measyear, invyr, latitude, longitude, and state information.
 
-```{r}
+```{r plot_location}
 fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
 
 # Survey has the research station code
@@ -205,7 +205,7 @@ remove(fia, fia_plot, fia_survey, fia_ref_research_station)
 
 How many plots are in each state?
 
-```{r}
+```{r state_plot_counts}
 state_plot_counts <- plot_location |>
   group_by(STATE_NAME) |>
   summarize(COUNT = n()) |>
@@ -216,7 +216,7 @@ knitr::kable(state_plot_counts)
 
 Show the plots on a map.
 
-```{r}
+```{r map_states}
 northeastern_states <- plot_location |>
   distinct(STATE_NAME) |>
   mutate(region = str_to_lower(STATE_NAME))
@@ -228,11 +228,12 @@ ggplot(map_states, aes(long, lat, group = group)) +
   coord_quickmap()
 ```
 
-### FIA Carbon and BALIVE
+### Stand Statistics
 
-We can gather BALIVE and CARBON_AG for these plots over time.
+We can gather per-stand statistics such as BALIVE and CARBON_AG from the FIA
+data for these plots over time.
 
-```{r}
+```{r stand_stats}
 fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
 
 measyear <- tbl(fia, 'PLOT') |>
@@ -293,9 +294,9 @@ dbDisconnect(fia)
 remove(fia, measyear, forest_type, tree_stats)
 ```
 
-Re-plot location with forest type
+Plot location with visual distinction by forest type
 
-```{r}
+```{r plot_location_type}
 plot_location_tmp <- plot_location |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   filter(INVYR == min(INVYR, na.rm = TRUE)) |>
@@ -326,7 +327,7 @@ remove(plot_location_tmp)
 
 Look at BA over time
 
-```{r}
+```{r balive_vs_stdage}
 ggplot(
     data = stand_stats |> filter(STDAGE > 0),
     mapping = aes(x = STDAGE, y = BALIVE_METRIC)
@@ -336,7 +337,7 @@ ggplot(
   ggtitle("Grow-Only Stands\nFIA Measured basal area (m2 / ha)")
 ```
 
-```{r}
+```{r seen_types}
 latest_measyear <- stand_stats |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   summarize(
@@ -514,7 +515,7 @@ distributing across partitions using round-robin on STAND_ID.
 keywordfile_section is a function to generate a keywordfile section from
 information about a run and a stand.
 
-```{r}
+```{r keywordfile_section}
 keywordfile_section <- function(Title, MgmtId, StandID, StandCN, MeasYear, EndYear, Partition) {
   MeasYear <- as.integer(MeasYear)
   paste0(
@@ -561,7 +562,7 @@ MgmtId, "\n",
 Find the stands we want to project; these are the grow-only stands starting
 in their first measurement year.
 
-```{r}
+```{r stands_projected}
 first_measyear <- stand_stats |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   summarize(
@@ -591,7 +592,7 @@ remove(fia, fia_fvs_standinit_plot)
 The first run is to project from the first measurement year to 2025. These
 are given management ID "NONE".
 
-```{r}
+```{r FVS_Northeastern_NONE_part.key}
 for (partition in 1:8) {
   filename <- paste0("../03_outputs/FVS_Northeastern_NONE_", partition, ".key")
   write_lines(
@@ -619,7 +620,7 @@ for (partition in 1:8) {
 The second run is a zero-year projection to have FVS calculate the carbon
 in surveyed stands in each year they are surveyed.
 
-```{r}
+```{r stands_surveyed}
 fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_fvs_standinit_plot <- tbl(fia, 'FVS_StandInit_Plot') |>
   select(STAND_CN, STAND_ID)
@@ -639,7 +640,7 @@ remove(fia, fia_fvs_standinit_plot)
 The second run is to do a 0-year projection for each measurement year. These
 are given management ID "SRVY".
 
-```{r}
+```{r FVS_Northeastern_SRVY_part.key}
 for (partition in 1:8) {
   filename <- paste0("../03_outputs/FVS_Northeastern_SRVY_", partition, ".key")
   write_lines(
@@ -665,17 +666,17 @@ for (partition in 1:8) {
 ```
 #### Run FVS.
 
-```{r}
-# TODO nik: Run FVS from in R.
+```{r run_fvs}
+# TODO nik: Run FVS directly from R.
 # Batch file to run FVS in parallel:
 # for %%p in (FVS_Northeastern_NONE_*.key) do start \FVS\FVSbin\FVSne.exe --keywordfile=%%p
 ```
 
-## Assemble Results
+## Results
 
 Load the output from all FVS partitions into a single dataframe
 
-```{r}
+```{r FVS_Carbon}
 FVS_Carbon_NONE <- NULL
 FVS_Carbon_SRVY <- NULL
 FVS_Summary2_East_NONE <- NULL
@@ -716,7 +717,7 @@ remove(fvs_out_db, fvs_carbon_tbl, fvs_summary2_east_tbl)
 
 Filter projections to corresponding observations
 
-```{r}
+```{r projected_vs_measured}
 projected_carbon_tmp <- FVS_Carbon_NONE |>
   select(StandID, Year, Aboveground_Total_Live) |>
   rename(Projected_Carbon = Aboveground_Total_Live)
@@ -781,9 +782,12 @@ projected_vs_measured <- stand_stats |>
   left_join(projected_tmp, by = join_by(STAND_ID, Year)) |>
   left_join(surveyed_tmp, by = join_by(STAND_ID, Year)) |>
   filter(!is.na(Projected_Carbon) & !is.na(Measured_Carbon)) |>
-  mutate(Residual = Projected_Carbon - Measured_Carbon) |>
-  mutate(Projection_Error = Residual / Measured_Carbon) |>
-  mutate(Projection_Error_Magnitude = abs(Projection_Error))
+  mutate(BA_Residual = Projected_BA - Measured_BA) |>
+  mutate(BA_Error = BA_Residual / Measured_BA) |>
+  mutate(BA_Error_Magnitude = abs(BA_Error)) |>
+  mutate(Carbon_Residual = Projected_Carbon - Measured_Carbon) |>
+  mutate(Carbon_Error = Carbon_Residual / Measured_Carbon) |>
+  mutate(Carbon_Error_Magnitude = abs(Carbon_Error))
 
 remove(
   projected_carbon_tmp,
@@ -797,17 +801,16 @@ remove(
 )
 ```
 
-plot 'em
+### Carbon Projection
 
-```{r}
-
+```{r projected_carbon_vs_measured_carbon}
 ggplot(
-    data = projected_vs_measured
+    projected_vs_measured,
+    aes(x = Measured_Carbon, y = Projected_Carbon, color = Projection_Years)
   ) +
   geom_point(
     size = 2,
-#    alpha = 0.5,
-    mapping = aes(x = Measured_Carbon, y = Projected_Carbon, color = Projection_Years)
+#    alpha = 0.25,
   ) +
   geom_abline(intercept = 0, slope = 1) +
   facet_wrap(~`Forest Type Group`) +
@@ -815,18 +818,17 @@ ggplot(
   coord_cartesian(xlim = c(0, 300), ylim = c(0, 300))
 ```
 
-```{r}
+```{r projected_carbon_vs_measured_carbon_with_trendline}
 ggplot(
-    data = projected_vs_measured |> filter(Projection_Years > 0)
+    projected_vs_measured |> filter(Projection_Years > 0),
+    aes(x = Measured_Carbon, y = Projected_Carbon, color = Projection_Years)
   ) +
   geom_point(
     size = 2,
 #    alpha = 0.5,
-    mapping = aes(x = Measured_Carbon, y = Projected_Carbon, color = Projection_Years)
   ) +
   geom_smooth(
     method = lm,
-    mapping = aes(x = Measured_Carbon, y = Projected_Carbon),
     formula = 'y ~ x',
     color = 'brown'
   ) +
@@ -836,10 +838,67 @@ ggplot(
   coord_cartesian(xlim = c(0, 300), ylim = c(0, 300))
 ```
 
-```{r}
+#### Residuals vs. Years Projected
+
+```{r carbon_residual_vs_projection_years}
+ggplot(
+    projected_vs_measured, #|> filter(Projection_Years > 0),
+    aes(x = Projection_Years, y = Carbon_Residual)
+  ) +
+  geom_point(
+    alpha = 0.25
+  ) +
+  geom_smooth(
+    method = lm,
+    formula = 'y ~ x'
+  ) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nCarbon Projection Error (Mg/ha) vs. Projection Years")
+  
+```
+
+
+```{r carbon_error_vs_projection_years}
+ggplot(
+    projected_vs_measured |> filter(Carbon_Error_Magnitude <= 2),
+    aes(x = Projection_Years, y = Carbon_Error)
+  ) +
+  geom_point(
+    alpha = 0.25
+  ) +
+  geom_smooth(
+    method = lm,
+    formula = 'y ~ x'
+  ) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nCarbon Projection Error (fraction) vs. Projection years")
+  
+```
+
+```{r carbon_error_magnitude_vs_projection_years}
+ggplot(
+    projected_vs_measured |> filter(Carbon_Error_Magnitude <= 2),
+    aes(x = Projection_Years, y = Carbon_Error_Magnitude)
+  ) +
+  geom_point(
+    alpha = 0.25
+  ) +
+  geom_smooth(
+    method = lm,
+    formula = 'y ~ x'
+  ) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nCarbon Projection Error Magnitude (fraction) vs. Projection years")
+  
+```
+
+#### Residuals vs. BA
+
+
+```{r carbon_residual_vs_measured_ba}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
-    mapping = aes(x = Projection_Years, y = Residual)
+    mapping = aes(x = Measured_BA, y = Carbon_Residual)
   ) +
   geom_point(
     alpha = 0.25
@@ -849,70 +908,17 @@ ggplot(
     formula = 'y ~ x'
   ) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nProjection Error (Mg/ha) vs. Measured BA")
+  ggtitle("Grow-Only Stands\nCarbon Projection Error (Mg/ha) vs. Measured BA")
   
 ```
 
 
-
-```{r}
-ggplot(
-    projected_vs_measured |> filter(Projection_Years > 0),
-    mapping = aes(x = Measured_BA, y = Residual)
-  ) +
-  geom_point(
-    alpha = 0.25
-  ) +
-  geom_smooth(
-    method = lm,
-    formula = 'y ~ x'
-  ) +
-  facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nProjection Error (Mg/ha) vs. Measured BA")
-  
-```
-
-
-```{r}
-ggplot(
-    projected_vs_measured |> filter(Projection_Error_Magnitude <= 2),
-    mapping = aes(x = Projection_Years, y = Projection_Error)
-  ) +
-  geom_point(
-    alpha = 0.25
-  ) +
-  geom_smooth(
-    method = lm,
-    formula = 'y ~ x'
-  ) +
-  facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nProjection Error (fraction) vs. Projection years")
-  
-```
-
-```{r}
-ggplot(
-    projected_vs_measured |> filter(Projection_Error_Magnitude <= 2),
-    mapping = aes(x = Projection_Years, y = Projection_Error_Magnitude)
-  ) +
-  geom_point(
-    alpha = 0.25
-  ) +
-  geom_smooth(
-    method = lm,
-    formula = 'y ~ x'
-  ) +
-  facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nProjection Error Magnitude (fraction) vs. Projection years")
-  
-```
-
-```{r}
+```{r carbon_error_vs_measured_ba}
 ggplot(
     projected_vs_measured |>
       filter(Projection_Years > 0) |>
-      filter(Projection_Error_Magnitude < 2),
-    mapping = aes(x = Measured_BA, y = Projection_Error)
+      filter(Carbon_Error_Magnitude < 2),
+    aes(x = Measured_BA, y = Carbon_Error)
   ) +
   geom_point(
     alpha = 0.25
@@ -922,31 +928,33 @@ ggplot(
     formula = 'y ~ x'
   ) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nProjection Error (fraction) vs. Measured BA (m2 / ha)")
+  ggtitle("Grow-Only Stands\nCarbon Projection Error (fraction) vs. Measured BA (m² / ha)")
 ```
 
 This omits outliers; looking just at the outliers (error >= 2x value):
 
-```{r}
+```{r carbon_error_vs_measured_ba_outliers}
 ggplot(
     projected_vs_measured |>
       filter(Projection_Years > 0) |>
-      filter(Projection_Error_Magnitude >= 2),
-    mapping = aes(x = Measured_BA, y = Projection_Error)
+      filter(Carbon_Error_Magnitude >= 2),
+    aes(x = Measured_BA, y = Carbon_Error)
   ) +
   geom_point(
     alpha = 0.25
   ) +
   coord_cartesian(xlim = c(0, 80), ylim = c(-15, 15)) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nProjection Error Outliers vs. Measured BA (m2 / ha)")
+  ggtitle("Grow-Only Stands\nCarbon Projection Error Outliers vs. Measured BA (m² / ha)")
 
 ```
 
-```{r}
+#### Residuals vs. QMD
+
+```{r carbon_residuals_vs_qmd}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
-    mapping = aes(x = QMD_METRIC, y = Residual)
+    aes(x = QMD_METRIC, y = Carbon_Residual)
   ) +
   geom_point(
     alpha = 0.25
@@ -956,6 +964,64 @@ ggplot(
     formula = 'y ~ x'
   ) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nProjection Error (Mg/ha) vs. Measured QMD (cm)")
+  ggtitle("Grow-Only Stands\nCarbon Projection Error (Mg/ha) vs. Measured QMD (cm)")
 ```
 
+### Basal Area Projection
+
+```{r projected_ba_vs_measured_ba}
+ggplot(
+    projected_vs_measured,
+    aes(x = Measured_BA, y = Projected_BA, color = Projection_Years)
+  ) +
+  geom_point(
+    size = 2,
+    alpha = 0.5,
+  ) +
+  geom_smooth(
+    method = lm,
+    formula = 'y ~ x',
+    color = 'brown'
+  ) +
+  geom_abline(intercept = 0, slope = 1) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nMeasured vs. Projected Basal Area (m²/ha)")# +
+  #coord_cartesian(xlim = c(0, 300), ylim = c(0, 300))
+```
+
+#### Residuals vs. Years Projected
+
+```{r ba_residual_vs_projection_years}
+ggplot(
+    projected_vs_measured, #|> filter(Projection_Years > 0),
+    aes(x = Projection_Years, y = BA_Residual)
+  ) +
+  geom_point(
+    alpha = 0.25
+  ) +
+  geom_smooth(
+    method = lm,
+    formula = 'y ~ x'
+  ) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nBA Projection Error (m²/ha) vs. Projection Years")
+  
+```
+
+#### Residuals vs. QMD
+
+```{r ba_residual_vs_qmd}
+ggplot(
+    projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
+    aes(x = QMD_METRIC, y = BA_Residual)
+  ) +
+  geom_point(
+    alpha = 0.25
+  ) +
+  geom_smooth(
+    method = lm,
+    formula = 'y ~ x'
+  ) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nBA Projection Error (m²/ha) vs. Measured QMD (cm)")
+```
