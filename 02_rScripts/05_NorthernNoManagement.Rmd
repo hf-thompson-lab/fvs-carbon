@@ -62,20 +62,11 @@ modern_plots_filter <- function(.data) {
   .data |> filter(INVYR >= 1999)
 }
 
-longstanding_plots_filter <- function(.data) {
-  # Plots that were measured prior to 2005
-  # Filter out the entire plot if it was not surveyed prior to 2004
+long_measurement_filter <- function(.data) {
+  # Only retain plots that have measurements a long time apart
   .data |>
     group_by(STATECD, COUNTYCD, PLOT) |>
-    filter(min(MEASYEAR, na.rm = TRUE) <= 2004) |>
-    ungroup()
-}
-
-multiple_inventory_plots_filter <- function(.data) {
-  # Filter out the entire plot if it only had a single inventory
-  .data |>
-    group_by(STATECD, COUNTYCD, PLOT) |>
-    filter(min(INVYR, na.rm = TRUE) != max(INVYR, na.rm = TRUE)) |>
+    filter((max(MEASYEAR, na.rm = TRUE) - min(MEASYEAR, na.rm = TRUE)) >= 10) |>
     ungroup()
 }
 
@@ -144,8 +135,7 @@ plot_grow_only <- fia_cond |>
   left_join(fia_survey, by = join_by(SRV_CN)) |>
   northeastern_plots_filter() |>
   modern_plots_filter() |>
-  longstanding_plots_filter() |>
-  multiple_inventory_plots_filter() |>
+  long_measurement_filter() |>
   forested_plots_filter() |>
   undisturbed_plots_filter() |>
   untreated_plots_filter() |>
@@ -348,7 +338,7 @@ latest_measyear <- stand_stats |>
 
 seen_types <- stand_stats |>
   semi_join(latest_measyear, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR)) |>
-  group_by(`Forest Type`) |>
+  group_by(`Forest Type Group`) |>
   summarize(
     CARBON_AG_METRIC = sum(conv_unit(CARBON_AG, "lbs", "Mg")),
     .groups = "keep"
@@ -356,11 +346,11 @@ seen_types <- stand_stats |>
 
 seen_types |>
   ggplot(
-    aes(y = fct_reorder(`Forest Type`, CARBON_AG_METRIC), x = CARBON_AG_METRIC)
+    aes(y = fct_reorder(`Forest Type Group`, CARBON_AG_METRIC), x = CARBON_AG_METRIC)
   ) +
   scale_x_log10() +
   geom_col() +
-  ggtitle("Total Carbon by Forest Type (Mg)") +
+  ggtitle("Total Carbon by Forest Type Group (Mg)") +
   ylab("Forest Type") +
   xlab("Carbon")
 ```
