@@ -945,10 +945,8 @@ ggplot(
 
 ```{r}
 ggplot(
-    projected_vs_measured |>
-      filter(Projection_Years > 0) |>
-      filter(Projection_Error_Magnitude < 2),
-    mapping = aes(x = QMD_METRIC, y = Projection_Error)
+    projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
+    mapping = aes(x = QMD_METRIC, y = Residual)
   ) +
   geom_point(
     alpha = 0.25
@@ -958,6 +956,6 @@ ggplot(
     formula = 'y ~ x'
   ) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nProjection Error (fraction) vs. Measured QMD (cm)")
+  ggtitle("Grow-Only Stands\nProjection Error (Mg/ha) vs. Measured QMD (cm)")
 ```
 
