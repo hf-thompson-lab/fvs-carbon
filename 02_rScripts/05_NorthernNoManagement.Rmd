@@ -783,8 +783,7 @@ projected_vs_measured <- stand_stats |>
   left_join(surveyed_tmp, by = join_by(STAND_ID, Year)) |>
   filter(!is.na(Projected_Carbon) & !is.na(Measured_Carbon)) |>
   mutate(BA_Residual = Projected_BA - Measured_BA) |>
-  mutate(BA_Error = BA_Residual / Measured_BA) |>
-  mutate(BA_Error_Magnitude = abs(BA_Error)) |>
+  mutate(BA_Error = 2 * abs(BA_Residual) / (Projected_BA + Measured_BA)) |>
   mutate(Carbon_Residual = Projected_Carbon - Measured_Carbon) |>
   mutate(Carbon_Error = 2 * abs(Carbon_Residual) / (Projected_Carbon + Measured_Carbon))
 
@@ -841,7 +840,7 @@ ggplot(
 
 ```{r carbon_residual_vs_projection_years}
 ggplot(
-    projected_vs_measured, #|> filter(Projection_Years > 0),
+    projected_vs_measured|> filter(Projection_Years > 0),
     aes(x = Projection_Years, y = Carbon_Residual)
   ) +
   geom_point(
@@ -986,7 +985,24 @@ ggplot(
     formula = 'y ~ x'
   ) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nBA Projection Error (m²/ha) vs. Projection Years")
+  ggtitle("Grow-Only Stands\nBA Residual (m²/ha) vs. Projection Years")
+  
+```
+
+```{r ba_error_vs_projection_years}
+ggplot(
+    projected_vs_measured |> filter(BA_Error < 1),
+    aes(x = Projection_Years, y = BA_Error)
+  ) +
+  geom_point(
+    alpha = 0.25
+  ) +
+  geom_smooth(
+    method = lm,
+    formula = 'y ~ x'
+  ) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nBA Projection Error (fraction) vs. Projection years")
   
 ```
 
