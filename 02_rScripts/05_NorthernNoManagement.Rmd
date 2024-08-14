@@ -57,11 +57,10 @@ northeastern_plots_filter <- function(.data) {
 }
 
 modern_plots_filter <- function(.data) {
-  # The 4-sublpot structure was introduced for INVYR 1999
-  # but continued to be used after. This will filter to
-  # plots that have surveys that use the national plot
-  # design, but some plots use the same id with multiple
-  # designs, so post-filtering is also required.
+  # FIADB database description Appendix G describes plot designs.
+  # DESIGNCD 1 is the modern plot design.
+  # Many other plot designs may be compatible with DESIGNCD == 1,
+  # but there are enough with DESIGNCD==1 that we can keep our lives simple.
   .data |> filter(DESIGNCD == 1)
 }
 
