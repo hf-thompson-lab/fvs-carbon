@@ -362,7 +362,7 @@ ggplot(
 ggplot(
     stand_stats |>
       consolidate_forest_type_groups_filter() |>
-      filter(YEARS > 0),
+      filter(YEARS > 10),
     aes(x = YEARS, y = BALIVE_DELTA)
   ) +
   geom_point(
@@ -370,8 +370,9 @@ ggplot(
     alpha = 0.25,
   ) +
   geom_abline(intercept = 0, slope = 0) +
+  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nChange in Measured BA (m² / ha) vs. Projection Years")
+  ggtitle("Grow-Only Stands\nChange in FIA Measured BA (m² / ha) vs. Projection Years")
 ```
 
 ```{r seen_types}
@@ -807,7 +808,9 @@ projected_vs_measured <- stand_stats |>
     Last_Year = max(Year, na.rm = TRUE),
     Starting_Carbon = max(if_else(Year == First_Year, Measured_Carbon, 0), na.rm = TRUE),
     Projected_Carbon_Delta = Projected_Carbon - Starting_Carbon,
+    Projected_Carbon_Flux = if_else(Year == First_Year, 0, Projected_Carbon_Delta / (Year - First_Year)),
     Measured_Carbon_Delta = Measured_Carbon - Starting_Carbon,
+    Measured_Carbon_Flux = if_else(Year == First_Year, 0, Measured_Carbon_Delta / (Year - First_Year)),
     Starting_BA = max(if_else(Year == First_Year, Measured_BA, 0), na.rm = TRUE),
     Projected_BA_Delta = Projected_BA - Starting_BA,
     Measured_BA_Delta = Measured_BA - Starting_BA
@@ -821,7 +824,8 @@ projected_vs_measured <- stand_stats |>
   mutate(BA_Delta_Residual = Projected_BA_Delta - Measured_BA_Delta) |>
   mutate(Carbon_Residual = Projected_Carbon - Measured_Carbon) |>
   mutate(Carbon_Error = 2 * abs(Carbon_Residual) / (Projected_Carbon + Measured_Carbon)) |>
-  mutate(Carbon_Delta_Residual = Projected_Carbon_Delta - Measured_Carbon_Delta)
+  mutate(Carbon_Delta_Residual = Projected_Carbon_Delta - Measured_Carbon_Delta) |>
+  mutate(Carbon_Flux_Residual = Projected_Carbon_Flux - Measured_Carbon_Flux)
 
 remove(
   projected_carbon_tmp,
@@ -848,7 +852,7 @@ ggplot(
   geom_abline(intercept = 0, slope = 0) +
   scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nChange in Measured BA (m² / ha) vs. Projection Years")
+  ggtitle("Grow-Only Stands\nChange in FVS Measured BA (m² / ha) vs. Projection Years")
 ```
 
 
@@ -856,16 +860,16 @@ ggplot(
 
 ```{r projected_carbon_vs_measured_carbon}
 ggplot(
-    projected_vs_measured,
+    projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Measured_Carbon, y = Projected_Carbon, color = Projection_Years)
   ) +
   geom_point(
-    size = 2,
-#    alpha = 0.25,
+#    size = 2,
+    alpha = 0.25,
   ) +
   geom_abline(intercept = 0, slope = 1) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nMeasured vs. Projected Carbon (Mg/ha)") +
+  ggtitle("Grow-Only Stands\nProjected vs. Measured Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 300), ylim = c(0, 300))
 ```
 
@@ -875,8 +879,8 @@ ggplot(
     aes(x = Measured_Carbon, y = Projected_Carbon, color = Projection_Years)
   ) +
   geom_point(
-    size = 2,
-#    alpha = 0.5,
+#    size = 2,
+    alpha = 0.25,
   ) +
   geom_abline(intercept = 0, slope = 1) +
   geom_smooth(
@@ -888,22 +892,24 @@ ggplot(
     se = FALSE
   ) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nMeasured vs. Projected Carbon (Mg/ha)") +
+  ggtitle("Grow-Only Stands\nProjected vs. Measured Carbon (Mg/ha)") +
   coord_cartesian(xlim = c(0, 300), ylim = c(0, 300))
 ```
+
+#### Carbon Flux
 
 Which is great, but for large BA plots, only a small portion will be projected,
 so the error is masked by the pre-existing BA. So, instead, look at measured
 vs. projected carbon change.
 
-```{r}
+```{r measured_vs_projected_carbon_change}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Measured_Carbon_Delta, y = Projected_Carbon_Delta, color = Projection_Years)
   ) +
   geom_point(
-    size = 2,
-    alpha = 0.5,
+#    size = 2,
+    alpha = 0.25,
   ) +
   geom_abline(intercept = 0, slope = 1) +
   geom_smooth(
@@ -915,8 +921,31 @@ ggplot(
     se = FALSE
   ) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nMeasured vs. Projected Carbon Change (Mg/ha)") +
+  ggtitle("Grow-Only Stands\nProjected vs. Measured Carbon Change (Mg/ha)") +
   coord_cartesian(xlim = c(-100, 100), ylim = c(-100, 100))
+```
+
+```{r measured_vs_projected_carbon_flux}
+ggplot(
+    projected_vs_measured |> filter(Projection_Years > 0),
+    aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux, color = Projection_Years)
+  ) +
+  geom_point(
+#    size = 2,
+    alpha = 0.25,
+  ) +
+  geom_abline(intercept = 0, slope = 1) +
+  geom_smooth(
+    method = lm,
+    formula = 'y ~ x',
+    color = 'brown',
+    linetype = 'dashed',
+    fullrange = TRUE,
+    se = FALSE
+  ) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nProjected vs. Measured Carbon Flux (Mg/ha/year)") +
+  coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
 ```
 
 #### Residuals vs. Years Projected
@@ -938,7 +967,6 @@ ggplot(
   ) +
   facet_wrap(~`Forest Type Group`) +
   ggtitle("Grow-Only Stands\nCarbon Projection Error (Mg/ha) vs. Projection Years")
-  
 ```
 
 
@@ -964,8 +992,27 @@ ggplot(
   
 ```
 
-#### Residuals vs. BA
+```{r carbon_flux_residual_vs_projection_years}
+ggplot(
+    projected_vs_measured|> filter(Projection_Years > 0),
+    aes(x = Projection_Years, y = Carbon_Flux_Residual)
+  ) +
+  geom_point(
+    alpha = 0.25
+  ) +
+  geom_smooth(
+    method = lm,
+    formula = 'y ~ x',
+    fullrange = TRUE,
+    se = FALSE,
+    color = 'brown'
+  ) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nCarbon Projection Flux Residual (Mg/ha) vs. Projection Years")
+```
 
+
+#### Residuals vs. BA
 
 ```{r carbon_residual_vs_measured_ba}
 ggplot(
@@ -1027,6 +1074,26 @@ ggplot(
 
 ```
 
+```{r carbon_flux_residual_vs_measured_ba}
+ggplot(
+    projected_vs_measured |> filter(Projection_Years > 0),
+    mapping = aes(x = Measured_BA, y = Carbon_Flux_Residual)
+  ) +
+  geom_point(
+    alpha = 0.25
+  ) +
+  geom_smooth(
+    method = lm,
+    formula = 'y ~ x',
+    fullrange = TRUE,
+    se = FALSE,
+    color = 'brown'
+  ) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nCarbon Flux Residual (Mg/ha) vs. Measured BA (m² / ha)")
+  
+```
+
 #### Residuals vs. QMD
 
 ```{r carbon_residuals_vs_qmd}
@@ -1048,16 +1115,35 @@ ggplot(
   ggtitle("Grow-Only Stands\nCarbon Projection Error (Mg/ha) vs. Measured QMD (cm)")
 ```
 
+```{r carbon_flux_residuals_vs_qmd}
+ggplot(
+    projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
+    aes(x = QMD_METRIC, y = Carbon_Flux_Residual)
+  ) +
+  geom_point(
+    alpha = 0.25
+  ) +
+  geom_smooth(
+    method = lm,
+    formula = 'y ~ x',
+    fullrange = TRUE,
+    se = FALSE,
+    color = 'brown'
+  ) +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nCarbon Flux Residual (Mg/ha) vs. Measured QMD (cm)")
+```
+
 ### Basal Area Projection
 
 ```{r projected_ba_vs_measured_ba}
 ggplot(
-    projected_vs_measured,
+    projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Measured_BA, y = Projected_BA, color = Projection_Years)
   ) +
   geom_point(
-    size = 2,
-    alpha = 0.5,
+#    size = 2,
+    alpha = 0.25,
   ) +
   geom_smooth(
     method = lm,
@@ -1068,15 +1154,14 @@ ggplot(
   ) +
   geom_abline(intercept = 0, slope = 1) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nMeasured vs. Projected Basal Area (m²/ha)")# +
-  #coord_cartesian(xlim = c(0, 300), ylim = c(0, 300))
+  ggtitle("Grow-Only Stands\nProjected vs. Measured Basal Area (m²/ha)")
 ```
 
 #### Residuals vs. Years Projected
 
 ```{r ba_residual_vs_projection_years}
 ggplot(
-    projected_vs_measured, #|> filter(Projection_Years > 0),
+    projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Projection_Years, y = BA_Residual)
   ) +
   geom_point(
@@ -1089,6 +1174,7 @@ ggplot(
     se = FALSE,
     color = 'brown'
   ) +
+  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
   facet_wrap(~`Forest Type Group`) +
   ggtitle("Grow-Only Stands\nBA Residual (m²/ha) vs. Projection Years")
   
