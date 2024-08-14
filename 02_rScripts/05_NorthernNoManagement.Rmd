@@ -33,9 +33,9 @@ projected vs. actual growth between measurements.
 
 Survey filters:
 
-*  PLOT.MEASYEAR > 1999
-*  min(PLOT.MEASYEAR) <= 2004
-*  min(PLOT.INVYR) != max(PLOT.INVYR)
+*  PLOT.MEASYEAR > 1999 - really, we want DESIGNCD (plot design) == 1
+*  max(PLOT.MEASYEAR) - min(PLOT.MEASYEAR) >= 10
+*  BALIVE > 0
 
 Northeastern region:
 
@@ -113,6 +113,32 @@ single_condition_plots_filter <- function(.data) {
     filter(max(CONDID, na.rm = TRUE) == 1) |>
     ungroup()
 }
+
+has_trees_filter <- function(.data) {
+  .data |>
+    # Filter out inventory years with no BALIVE
+    group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
+    filter(
+      sum(if_else(is.na(BALIVE), 0, BALIVE), na.rm = TRUE) > 0
+    ) |>
+    ungroup()
+}
+
+consolidate_forest_type_groups_filter <- function(.data) {
+  # Consolidate a few rare forest type groups into a single 'Other' group:
+  # Exotic hardwoods group
+  # Exotic softwoods group
+  # Other eastern softwoods group
+  # Other hardwoods group
+  .data |>
+    mutate(`Forest Type Group` = 
+      if_else(startsWith(`Forest Type Group`, 'Other'), 'Other',
+        if_else(startsWith(`Forest Type Group`, 'Exotic'), 'Other',
+          `Forest Type Group`
+        )
+      )
+    )
+}
 ```
 
 Execute the filters to create a list of matching plots.
@@ -122,7 +148,7 @@ fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_cond <- tbl(fia, 'COND') |>
   select(
     STATECD, COUNTYCD, PLOT, PLT_CN, CONDID, INVYR,
-    COND_STATUS_CD, DSTRBCD1, DSTRBCD2, DSTRBCD3, TRTCD1, TRTCD2, TRTCD3
+    COND_STATUS_CD, BALIVE, DSTRBCD1, DSTRBCD2, DSTRBCD3, TRTCD1, TRTCD2, TRTCD3
   )
 fia_plot <- tbl(fia, 'PLOT') |>
   # Narrow and rename columns to facilitate join
@@ -138,6 +164,7 @@ plot_grow_only <- fia_cond |>
   left_join(fia_survey, by = join_by(SRV_CN)) |>
   northeastern_plots_filter() |>
   modern_plots_filter() |>
+  has_trees_filter() |>
   long_measurement_filter() |>
   forested_plots_filter() |>
   undisturbed_plots_filter() |>
@@ -152,7 +179,7 @@ remove(fia, fia_cond, fia_plot, fia_survey)
 length(plot_grow_only$PLOT)
 ```
 
-This filters to 2598 plots.
+This filters to 2822 plots.
  
 ### Locations
 
@@ -270,7 +297,6 @@ stand_stats <- tbl(fia, 'COND') |>
   ungroup() |>
   left_join(measyear, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
   left_join(tree_stats, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
-  filter(!is.na(CARBON_AG)) |>
   left_join(forest_type, by = join_by(FORTYPCD)) |>
   rename(`Forest Type` = FORTYPE) |>
   mutate(FORTYPCD = floor(FORTYPCD / 10) * 10) |>
@@ -278,6 +304,7 @@ stand_stats <- tbl(fia, 'COND') |>
   rename(`Forest Type Group` = FORTYPE) |>
   collect() |>
   modern_plots_filter() |>
+  has_trees_filter() |>
   mutate(BALIVE_METRIC = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare")) |>
   mutate(QMD = sqrt(BALIVE / (BA_TREES * (pi / 576)))) |>
   mutate(QMD_METRIC = sqrt(BALIVE_METRIC / (BA_TREES * (pi / 40000)))) |>
@@ -305,13 +332,7 @@ plot_location_type <- stand_stats |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   filter(INVYR == min(INVYR, na.rm = TRUE)) |>
   ungroup() |>
-  mutate(`Forest Type Group` = 
-     if_else(startsWith(`Forest Type Group`, 'Other'), 'Other',
-       if_else(startsWith(`Forest Type Group`, 'Exotic'), 'Other',
-         `Forest Type Group`
-       )
-     )
-  ) |>
+  consolidate_forest_type_groups_filter() |>
   select(STATECD, COUNTYCD, PLOT, INVYR, `Forest Type`, `Forest Type Group`) |>
   left_join(plot_location_tmp, by = join_by(STATECD, COUNTYCD, PLOT))
 
@@ -327,7 +348,9 @@ Look at BA over time; first, by stand age, then as change over calendar time.
 
 ```{r balive_vs_stdage}
 ggplot(
-    data = stand_stats |> filter(STDAGE > 0),
+    data = stand_stats |>
+      consolidate_forest_type_groups_filter() |>
+      filter(!is.na(STDAGE)),
     mapping = aes(x = STDAGE, y = BALIVE_METRIC)
   ) +
   geom_point(alpha = 0.25) +
@@ -337,7 +360,9 @@ ggplot(
 
 ```{r balive_delta_vs_years}
 ggplot(
-    stand_stats,
+    stand_stats |>
+      consolidate_forest_type_groups_filter() |>
+      filter(YEARS > 0),
     aes(x = YEARS, y = BALIVE_DELTA)
   ) +
   geom_point(
@@ -345,7 +370,6 @@ ggplot(
     alpha = 0.25,
   ) +
   geom_abline(intercept = 0, slope = 0) +
-  #scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
   facet_wrap(~`Forest Type Group`) +
   ggtitle("Grow-Only Stands\nChange in Measured BA (m² / ha) vs. Projection Years")
 ```
@@ -776,13 +800,7 @@ projected_vs_measured <- stand_stats |>
   ) |>
   left_join(projected_tmp, by = join_by(STAND_ID, Year)) |>
   left_join(surveyed_tmp, by = join_by(STAND_ID, Year)) |>
-  mutate(`Forest Type Group` = 
-     if_else(startsWith(`Forest Type Group`, 'Other'), 'Other',
-       if_else(startsWith(`Forest Type Group`, 'Exotic'), 'Other',
-         `Forest Type Group`
-       )
-     )
-  ) |>
+  consolidate_forest_type_groups_filter() |>
   group_by(STAND_ID) |>
   mutate(
     First_Year = min(Year, na.rm = TRUE),
@@ -790,20 +808,20 @@ projected_vs_measured <- stand_stats |>
     Starting_Carbon = max(if_else(Year == First_Year, Measured_Carbon, 0), na.rm = TRUE),
     Projected_Carbon_Delta = Projected_Carbon - Starting_Carbon,
     Measured_Carbon_Delta = Measured_Carbon - Starting_Carbon,
-    Min_Measured_Carbon_Delta = min(Measured_Carbon_Delta), # Might be < 0
     Starting_BA = max(if_else(Year == First_Year, Measured_BA, 0), na.rm = TRUE),
     Projected_BA_Delta = Projected_BA - Starting_BA,
     Measured_BA_Delta = Measured_BA - Starting_BA
   ) |>
   ungroup() |>
   filter(Year == First_Year | Year == Last_Year) |>
-  #filter(Min_Measured_Carbon_Delta < 0) |>
   filter(!is.na(Projected_Carbon) & !is.na(Measured_Carbon)) |>
   mutate(Projection_Years = Year - First_Year) |>
   mutate(BA_Residual = Projected_BA - Measured_BA) |>
   mutate(BA_Error = 2 * abs(BA_Residual) / (Projected_BA + Measured_BA)) |>
+  mutate(BA_Delta_Residual = Projected_BA_Delta - Measured_BA_Delta) |>
   mutate(Carbon_Residual = Projected_Carbon - Measured_Carbon) |>
-  mutate(Carbon_Error = 2 * abs(Carbon_Residual) / (Projected_Carbon + Measured_Carbon))
+  mutate(Carbon_Error = 2 * abs(Carbon_Residual) / (Projected_Carbon + Measured_Carbon)) |>
+  mutate(Carbon_Delta_Residual = Projected_Carbon_Delta - Measured_Carbon_Delta)
 
 remove(
   projected_carbon_tmp,
@@ -828,7 +846,7 @@ ggplot(
     alpha = 0.25,
   ) +
   geom_abline(intercept = 0, slope = 0) +
-  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
+#  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
   facet_wrap(~`Forest Type Group`) +
   ggtitle("Grow-Only Stands\nChange in Measured BA (m² / ha) vs. Projection Years")
 ```
