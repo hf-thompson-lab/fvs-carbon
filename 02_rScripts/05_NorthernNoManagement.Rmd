@@ -756,8 +756,8 @@ Filter projections to corresponding observations
 
 ```{r projected_vs_measured}
 projected_carbon_tmp <- FVS_Carbon_NONE |>
-  select(StandID, Year, Aboveground_Total_Live) |>
-  rename(Projected_Carbon = Aboveground_Total_Live)
+  select(StandID, Year, Total_Stand_Carbon) |>
+  rename(Projected_Carbon = Total_Stand_Carbon)
 
 projected_ba_tmp <- FVS_Summary2_East_NONE |>
   select(StandID, Year, BA) |>
@@ -772,8 +772,8 @@ projected_tmp <- projected_carbon_tmp |>
   select(STAND_ID, Year, Projected_Carbon, Projected_BA)
 
 surveyed_carbon_tmp <- FVS_Carbon_SRVY |>
-  select(StandID, Year, Aboveground_Total_Live) |>
-  rename(Measured_Carbon = Aboveground_Total_Live)
+  select(StandID, Year, Total_Stand_Carbon) |>
+  rename(Measured_Carbon = Total_Stand_Carbon)
 
 surveyed_ba_tmp <- FVS_Summary2_East_SRVY |>
   select(StandID, Year, BA) |>
@@ -846,7 +846,7 @@ ggplot(
     alpha = 0.25,
   ) +
   geom_abline(intercept = 0, slope = 0) +
-#  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
+  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
   facet_wrap(~`Forest Type Group`) +
   ggtitle("Grow-Only Stands\nChange in Measured BA (m² / ha) vs. Projection Years")
 ```
@@ -894,7 +894,7 @@ ggplot(
 
 Which is great, but for large BA plots, only a small portion will be projected,
 so the error is masked by the pre-existing BA. So, instead, look at measured
-vs. projected BA delta.
+vs. projected carbon change.
 
 ```{r}
 ggplot(
