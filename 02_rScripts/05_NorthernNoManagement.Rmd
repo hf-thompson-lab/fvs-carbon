@@ -993,6 +993,21 @@ ggplot(
   ) +
   geom_boxplot(varwidth = TRUE) +
   # scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  geom_point(
+    data = projected_vs_measured |>
+      filter(Projection_Years > 0) |> 
+      group_by(`Forest Type Group`) |> 
+      summarize(
+        Measured_Carbon_Flux = mean(Measured_Carbon_Flux),
+        Measured_Carbon = sum(Measured_Carbon),
+        .groups = 'keep'
+      ) |> 
+      ungroup(),
+    aes(Measured_Carbon_Flux),
+    color = 'blue',
+    shape = 4,
+    size = 3
+  ) +
   geom_vline(xintercept = 0) +
   ggtitle("Grow-Only Stands\nCarbon Flux Residual by Forest Type Group") +
   xlab("Carbon Flux Residual (Mg/ha/year)")
