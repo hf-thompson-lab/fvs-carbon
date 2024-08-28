@@ -1004,8 +1004,23 @@ ggplot(
     aes(Carbon_Flux_Residual, fct_reorder(`Forest Type Group`, Measured_Carbon, .fun = sum))
   ) +
   geom_boxplot(varwidth = TRUE) +
+  geom_point(
+    data = projected_vs_measured |>
+      filter(Projection_Years > 0) |> 
+      group_by(`Forest Type Group`) |> 
+      summarize(
+        Measured_Carbon_Flux = mean(Measured_Carbon_Flux),
+        Measured_Carbon = sum(Measured_Carbon),
+        .groups = 'keep'
+      ) |> 
+      ungroup(),
+    aes(Measured_Carbon_Flux),
+    color = 'blue',
+    shape = 4,
+    size = 3
+  ) +
 #  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
-  geom_vline(xintercept = 0) +
+  geom_vline(xintercept = 0, color = 'red') +
   coord_cartesian(xlim = c(-2, 2)) +
   scale_x_continuous(breaks = c(-2, -1, 0, 1, 2)) +
   ggtitle(paste0(
@@ -1013,7 +1028,12 @@ ggplot(
     "\n",
     "for Grow-Only FIA Plots in the Northeast"
   )) +
-  xlab("Carbon Flux Residual (Mg/ha/year)")
+  xlab(paste0(
+    "Carbon Flux Residual (Mg/ha/year)",
+    "\n",
+    "(X = Mean Measured Carbon Flux)"
+  )) +
+  ylab("Forest Type Group")
 ```
 
 ```{r carbon-flux-by-ecoregion}
