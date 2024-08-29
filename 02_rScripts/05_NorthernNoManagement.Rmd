@@ -991,6 +991,7 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(Carbon_Flux_Residual, fct_reorder(`Forest Type Group`, Measured_Carbon, .fun = sum))
   ) +
+  geom_vline(xintercept = 0, color = 'red') +
   geom_boxplot(varwidth = TRUE) +
   # scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
   geom_point(
@@ -1008,9 +1009,18 @@ ggplot(
     shape = 4,
     size = 3
   ) +
-  geom_vline(xintercept = 0) +
-  ggtitle("Grow-Only Stands\nCarbon Flux Residual by Forest Type Group") +
-  xlab("Carbon Flux Residual (Mg/ha/year)")
+  ggtitle(paste0(
+    "FVS Projected Carbon Flux Residual by Forest Type Group",
+    "\n",
+    "for Grow-Only FIA Plots in the Northeast"
+  )) +
+  xlab(paste0(
+    "Carbon Flux Residual (Mg/ha/year)",
+    "\n",
+    "(X = Mean Measured Carbon Flux)"
+  )) +
+  ylab("Forest Type Group")
+
 ```
 
 ```{r carbon-flux-by-forest-type-detail}
@@ -1018,6 +1028,7 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(Carbon_Flux_Residual, fct_reorder(`Forest Type Group`, Measured_Carbon, .fun = sum))
   ) +
+  geom_vline(xintercept = 0, color = 'red') +
   geom_boxplot(varwidth = TRUE) +
   geom_point(
     data = projected_vs_measured |>
@@ -1035,7 +1046,6 @@ ggplot(
     size = 3
   ) +
 #  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
-  geom_vline(xintercept = 0, color = 'red') +
   coord_cartesian(xlim = c(-2, 2)) +
   scale_x_continuous(breaks = c(-2, -1, 0, 1, 2)) +
   ggtitle(paste0(
@@ -1056,9 +1066,9 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(Carbon_Flux_Residual, fct_reorder(ECOCD, Measured_Carbon, .fun = sum))
   ) +
+  geom_vline(xintercept = 0, color = 'red') +
   geom_boxplot(varwidth = TRUE) +
 #  scale_y_discrete(guide = guide_axis(n.dodge = 2)) +
-  geom_vline(xintercept = 0) +
   coord_cartesian(xlim = c(-2, 2)) +
   scale_x_continuous(breaks = c(-2, -1, 0, 1, 2)) +
   ggtitle("Grow-Only Stands\nCarbon Flux Residual by Ecoregion") +
