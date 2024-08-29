@@ -1,0 +1,75 @@
+---
+title: "Nunery Keeton Revisited"
+author: "Nikolaus Bates-Haus"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+# Pre-load libraries that issue warnings on startup so these
+# warnings don't corrupt the text later.
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(reshape2)) # for melt()
+suppressPackageStartupMessages(library(RSQLite))
+suppressPackageStartupMessages(library(htmltools))
+suppressPackageStartupMessages(library(rmarkdown))
+suppressPackageStartupMessages(library(dbplyr))
+suppressPackageStartupMessages(library(measurements))
+suppressPackageStartupMessages(library(maps))
+```
+
+Load functions
+```{r source-functions}
+source('../R/functions.R')
+```
+
+## What species occur where?
+
+What species are in which ecosubregion?
+
+```{r}
+
+# TREE.SPCD - species code
+# FIADB_REFERENCE.REF_SPECIES.SPCD - species code
+# FIADB_REFERENCE.REF_SPECIES.SCIENTIFIC_NAME / GENUS / SPECIES
+# TREE.PLT_CN - Plot Control Number
+# PLOT.CN - Plot Control Number
+# PLOT.ECOSUBCD
+
+fia_ref <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/FIADB_REFERENCE.db')
+fia_ref_species <- tbl(fia_ref, 'REF_SPECIES') |> 
+  select(
+    SPCD, SCIENTIFIC_NAME, GENUS, SPECIES, COMMON_NAME
+  ) |> 
+  collect()
+dbDisconnect(fia_ref)
+
+
+fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+
+fia_tree <- tbl(fia, 'TREE') |> 
+  distinct(PLT_CN, SPCD)
+
+fia_plot <- tbl(fia, 'PLOT') |>
+  select(CN, SRV_CN, ECOSUBCD) |>
+  rename(PLT_CN = CN)
+
+fia_survey <- tbl(fia, 'SURVEY') |>
+  select(CN, RSCD) |>
+  rename(SRV_CN = CN)
+
+species_by_ecosubcd <- fia_tree |>
+  left_join(fia_plot, by = join_by(PLT_CN)) |>
+  left_join(fia_survey, by = join_by(SRV_CN)) |>
+  northeastern_plots_filter() |>
+  distinct(ECOSUBCD, SPCD) |>
+  collect() |> 
+  left_join(fia_ref_species, by = join_by(SPCD))
+
+dbDisconnect(fia)
+remove(fia, fia_tree, fia_plot, fia_survey, fia_ref, fia_ref_species)
+```
