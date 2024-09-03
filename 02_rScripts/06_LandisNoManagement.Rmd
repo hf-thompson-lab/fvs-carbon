@@ -19,7 +19,7 @@ suppressPackageStartupMessages(library(htmltools))
 suppressPackageStartupMessages(library(rmarkdown))
 suppressPackageStartupMessages(library(dbplyr))
 suppressPackageStartupMessages(library(measurements))
-suppressPackageStartupMessages(library(maps))
+suppressPackageStartupMessages(library(sf))
 ```
 
 Load functions
@@ -73,3 +73,76 @@ species_by_ecosubcd <- fia_tree |>
 dbDisconnect(fia)
 remove(fia, fia_tree, fia_plot, fia_survey, fia_ref, fia_ref_species)
 ```
+
+### Creating Pixels
+
+Use sf library, st_* functions
+for each plot, create a 100x100 meter polygon centered at the location of the plot.
+We can start with a 100x100 meter polygon at the equator.
+
+As an interesting alternative, see https://gis.stackexchange.com/questions/403504/create-polygon-grid-based-on-spatial-points-wgs84-with-r -
+the approach is to put the points on CRS84, re-project to something locally flat,
+put the polygon on using distance measurements in the projection, then back-project
+to CRS84.
+
+For CRS for the various states, see this example:
+```
+library(rgdal)
+epsg <- make_EPSG()
+i <- grep("France", epsg$note, ignore.case=TRUE)
+# first three
+epsg[i[1:3], ]
+##       code                                note
+## 1399  2192           ED50 / France EuroLambert
+## 2466 27561   NTF (Paris) / Lambert Nord France
+## 2467 27562 NTF (Paris) / Lambert Centre France
+```
+
+```{r}
+boston_loc <- c(42.360278, -71.057778)
+a <- st_sfc(st_point(boston_loc) + c(0.0005, 0), crs = 'OGC:CRS84')
+b <- st_sfc(st_point(boston_loc) + c(-0.0005, 0), crs = 'OGC:CRS84')
+c <- st_sfc(st_point(boston_loc) + c(0, 0.0005), crs = 'OGC:CRS84')
+d <- st_sfc(st_point(boston_loc) + c(0, -0.0005), crs = 'OGC:CRS84')
+st_distance(a, b)
+st_distance(c, d)
+```
+
+
+```{r}
+degrees_per_meter <- 360 / 40007862.87
+# TODO: compute the number of degrees per 100 meters at the target location.
+# st_distance between two points can get us a meters-per-degree;
+# probably start at 0.001 degree = 111.13 on a great circle.
+# See: https://www.fws.gov/r7/nwr/Realty/data/LandMappers/Public/Help/HTML/R7-Public-Land-Mapper-Help.html?Degreesandgrounddistance.html
+half_edge <- 50 * degrees_per_meter
+plot_geometry = matrix(
+  c(
+    -half_edge, -half_edge,
+     half_edge, -half_edge,
+     half_edge,  half_edge,
+    -half_edge,  half_edge,
+    -half_edge, -half_edge
+  ),
+  ncol = 2,
+  byrow = TRUE
+)
+plot_polygon <- st_sfc(st_polygon(list(plot_geometry)), crs = 'OGC:CRS84')
+```
+
+```{r}
+stopifnot(st_is_valid(plot_polygon))
+stopifnot(st_is_simple(plot_polygon))
+st_area(plot_polygon)
+```
+
+Confirm that it's messed up:
+```{r}
+polygon_in_boston <- plot_polygon + boston_loc
+# ^^^ why does this lose the CRS?
+st_crs(polygon_in_boston) <- st_crs(plot_polygon)
+st_area(polygon_in_boston)
+```
+
+...which is very wrong.
+
