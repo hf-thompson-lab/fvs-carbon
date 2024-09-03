@@ -116,7 +116,7 @@ plot_geometry = matrix(
   ncol = 2,
   byrow = TRUE
 )
-plot_polygon <- st_sfc(st_polygon(list(plot_geometry)), crs = 'OGC:CRS84')
+plot_polygon <- st_sfc(st_polygon(list(plot_geometry)), crs = 'EPSG:4326')
 stopifnot(st_is_valid(plot_polygon))
 stopifnot(st_is_simple(plot_polygon))
 st_area(plot_polygon)
