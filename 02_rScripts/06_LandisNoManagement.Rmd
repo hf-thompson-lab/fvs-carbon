@@ -150,7 +150,12 @@ Also also, from the sf docs:
 
 > EPSG:4326 formally defines coordinate axes to be in the order latitude-longitude, but practically all data sources and software environments use longitude-latitude axis order. OGC:CRS84 is equivalent to EPSG:4326 except that it defines coordinate axis order longitude-latitude, removing this ambiguity so to speak. See also st_axis_order()
 
+st_axis_order() determines whether the authority's axis order is respected; if
+FALSE (the default), axis order is always lon/lat.
+
 ```{r}
+st_axis_order(TRUE)
+
 a <- st_sfc(st_point(boston_loc) + c(0.0005, 0), crs = 'EPSG:4326')
 b <- st_sfc(st_point(boston_loc) + c(-0.0005, 0), crs = 'EPSG:4326')
 fifty_meter_angle_lat <- 0.005 / as.numeric(st_distance(a, b))
