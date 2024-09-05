@@ -79,11 +79,11 @@ consolidate_forest_type_groups_filter <- function(.data) {
   # Other hardwoods group
   .data |>
     mutate(`Forest Type Group` = 
-             if_else(startsWith(`Forest Type Group`, 'Other'), 'Other',
-                     if_else(startsWith(`Forest Type Group`, 'Exotic'), 'Other',
-                             `Forest Type Group`
-                     )
-             )
+     if_else(startsWith(`Forest Type Group`, 'Other'), 'Other',
+       if_else(startsWith(`Forest Type Group`, 'Exotic'), 'Other',
+         `Forest Type Group`
+       )
+     )
     )
 }
 
