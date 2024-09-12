@@ -1,0 +1,203 @@
+---
+title: "Nunery Keeton Revisited"
+author: "Nikolaus Bates-Haus"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+# Pre-load libraries that issue warnings on startup so these
+# warnings don't corrupt the text later.
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(reshape2)) # for melt()
+suppressPackageStartupMessages(library(RSQLite))
+suppressPackageStartupMessages(library(htmltools))
+suppressPackageStartupMessages(library(rmarkdown))
+suppressPackageStartupMessages(library(dbplyr))
+suppressPackageStartupMessages(library(measurements))
+suppressPackageStartupMessages(library(maps))
+```
+
+```{r source-functions}
+source('../R/functions.R')
+```
+
+```{r plot_grow_only}
+fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia_cond <- tbl(fia, 'COND') |>
+  select(
+    STATECD, COUNTYCD, PLOT, PLT_CN, CONDID, INVYR,
+    COND_STATUS_CD, BALIVE, DSTRBCD1, DSTRBCD2, DSTRBCD3,
+    TRTCD1, TRTYR1, TRTCD2, TRTYR2, TRTCD3, TRTYR3
+  )
+fia_plot <- tbl(fia, 'PLOT') |>
+  # Narrow and rename columns to facilitate join
+  select(CN, DESIGNCD, SRV_CN, MEASYEAR, ECOSUBCD) |>
+  rename(PLT_CN = CN)
+fia_survey <- tbl(fia, 'SURVEY') |>
+  # Narrow and rename columns to facilitate join
+  select(CN, RSCD) |>
+  rename(SRV_CN = CN)
+
+plot_forested <- fia_cond |>
+  left_join(fia_plot, by = join_by(PLT_CN)) |>
+  left_join(fia_survey, by = join_by(SRV_CN)) |>
+  northeastern_plots_filter() |>
+  modern_plots_filter() |>
+  long_measurement_filter() |>
+  forested_plots_filter() |>
+  undisturbed_plots_filter() |>
+  harvested_plots_filter() |>
+  no_unnatural_regen_filter() |> 
+  measured_pre_post_harvest_filter() |>
+  single_condition_plots_filter() |>
+  distinct(STATECD, COUNTYCD, PLOT) |>
+  collect()
+
+dbDisconnect(fia)
+remove(fia, fia_cond, fia_plot, fia_survey)
+
+write_rds(plot_forested, '../03_outputs/plot_grow_only.rds')
+
+nrow(plot_forested)
+```
+
+Only 204 plots; fewer than expected!
+
+Where are they?
+
+```{r plot_location}
+fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+
+# Survey has the research station code
+fia_survey <- tbl(fia, 'SURVEY') |>
+  select(CN, RSCD) |>
+  rename(SRV_CN = CN)
+
+# plot has invyr, measyr, lat and lon
+fia_plot <- tbl(fia, 'PLOT') |>
+  # Narrow and rename columns to facilitate join
+  select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, SRV_CN, ECOSUBCD, LAT, LON)
+
+# research station has state name and abbreviation
+fia_ref_research_station <- tbl(fia, 'REF_RESEARCH_STATION') |>
+  select(STATECD, STATE_NAME, STATE_ABBR)
+
+plot_location <- fia_plot |>
+  semi_join(plot_forested, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
+  left_join(fia_survey, by = join_by(SRV_CN)) |>
+  left_join(fia_ref_research_station, by = join_by(STATECD)) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  # Pick just the first inventory year
+  filter(min_rank(INVYR) == 1) |> 
+  ungroup() |>
+  collect() |>
+  rename(
+    long = LON,
+    lat = LAT
+  ) |>
+  mutate(group = sprintf('%02d%03d%05d', STATECD, COUNTYCD, PLOT))
+
+dbDisconnect(fia)
+remove(fia, fia_plot, fia_survey, fia_ref_research_station)
+```
+
+```{r}
+northeastern_states <- plot_location |>
+  distinct(STATE_NAME) |>
+  mutate(region = str_to_lower(STATE_NAME))
+map_data('state', northeastern_states$region) |> 
+  ggplot(aes(long, lat, group = group)) +
+  geom_polygon(fill = "white", color = "black") + 
+  geom_point(data = plot_location, color = alpha("blue", alpha = 0.5)) +
+  coord_quickmap()
+```
+
+```{r stand_stats}
+fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+
+measyear <- tbl(fia, 'PLOT') |>
+  select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, DESIGNCD, ECOSUBCD)
+
+forest_type <- tbl(fia, 'REF_FOREST_TYPE') |>
+  select(VALUE, MEANING) |>
+  rename(FORTYPCD = VALUE) |>
+  rename(FORTYPE = MEANING)
+
+tree_stats <- tbl(fia, 'TREE') |>
+  select(STATECD, COUNTYCD, PLOT, CONDID, INVYR, DIA, CARBON_AG, TPA_UNADJ) |>
+  group_by(STATECD, COUNTYCD, PLOT, CONDID, INVYR) |>
+  summarize(
+    CARBON_AG = sum(CARBON_AG, na.rm = TRUE),
+    CPA = sum(CARBON_AG * TPA_UNADJ, na.rm = TRUE),
+    BA_TREES = sum(if_else(DIA >= 1, TPA_UNADJ, 0), na.rm = TRUE),
+    .groups = "keep"
+  )
+
+stand_stats <- tbl(fia, 'COND') |>
+  select(
+    STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, FORTYPCD,
+    TRTCD1, TRTYR1, TRTCD2, TRTYR2, TRTCD3, TRTYR3
+  ) |>
+  semi_join(plot_forested, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
+  left_join(measyear, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+  measured_pre_post_harvest_filter() |> # Adds interesting fields
+  group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
+  summarize(
+    BALIVE = sum(BALIVE, na.rm = TRUE),
+    FORTYPCD = max(FORTYPCD, na.rm = TRUE),
+    STDAGE = max(STDAGE, na.rm = TRUE),
+    MIN_MEASYEAR = min(MIN_MEASYEAR, na.rm = TRUE),
+    MAX_MEASYEAR = max(MAX_MEASYEAR, na.rm = TRUE),
+    MIN_HRVYR = min(MIN_HRVYR, na.rm = TRUE),
+    MAX_HRVYR = max(MAX_HRVYR, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  left_join(measyear, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+  left_join(tree_stats, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+  left_join(forest_type, by = join_by(FORTYPCD)) |>
+  modern_plots_filter() |>
+  rename(`Forest Type` = FORTYPE) |>
+  mutate(FORTYPCD = floor(FORTYPCD / 10) * 10) |>
+  left_join(forest_type, by = join_by(FORTYPCD)) |>
+  rename(`Forest Type Group` = FORTYPE) |>
+  collect() |>
+  mutate(
+    `Forest Type Group` = str_replace(`Forest Type Group`, ' group', ''),
+    BALIVE_METRIC = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare"),
+    QMD = sqrt(BALIVE / (BA_TREES * (pi / 576))),
+    QMD_METRIC = sqrt(BALIVE_METRIC / (BA_TREES * (pi / 40000))),
+    CARBON_METRIC = conv_multiunit(CPA, "lbs / acre", "Mg / hectare")
+  ) |> 
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  mutate(
+    BALIVE_START = if_else(MEASYEAR == min(MEASYEAR, na.rm = TRUE), BALIVE_METRIC, NA),
+    BALIVE_DELTA = BALIVE_METRIC - max(BALIVE_START, na.rm = TRUE),
+    YEARS = MEASYEAR - min(MEASYEAR, na.rm = TRUE)
+  ) |> 
+  ungroup()
+
+dbDisconnect(fia)
+remove(fia, measyear, forest_type, tree_stats)
+```
+
+
+
+```{r}
+fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+measyear <- tbl(fia, 'PLOT') |>
+  select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, DESIGNCD, ECOSUBCD)
+
+cond_forested <- tbl(fia, 'COND') |>
+  semi_join(plot_forested, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |> 
+  left_join(measyear, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+  modern_plots_filter() |> 
+  collect()
+dbDisconnect(fia)
+remove(fia)
+```

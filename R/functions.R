@@ -53,6 +53,108 @@ untreated_plots_filter <- function(.data) {
     ungroup()
 }
 
+harvested_plots_filter <- function(.data) {
+  # Filter out the entire plot if no trees were cut
+  .data |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    filter(
+      sum(
+        if_else(!is.na(TRTCD1) & TRTCD1 == 10, 1,
+          if_else(!is.na(TRTCD2) & TRTCD2 == 10, 1,
+            if_else(!is.na(TRTCD3) & TRTCD3 == 10, 1, 0)
+          )
+        ),
+        na.rm = TRUE
+      ) > 0
+    ) |>
+    ungroup()
+}
+
+no_unnatural_regen_filter <- function(.data) {
+  # Filter out the entire plot if it was treated to encourage growth
+  # TRTCD 30 - Artificial regeneration - planting or direct seeding
+  # TRTCD 50 - Other silvicultural treatment - fertilizers, herbicides, etc.
+  .data |> 
+    group_by(STATECD, COUNTYCD, PLOT) |> 
+    filter(
+      sum(
+        if_else(!is.na(TRTCD1) & TRTCD1 == 30, 1,
+          if_else(!is.na(TRTCD2) & TRTCD2 == 30, 1,
+            if_else(!is.na(TRTCD3) & TRTCD3 == 30, 1, 0)
+          )
+        ),
+        na.rm = TRUE
+      ) == 0
+    ) |>
+    filter(
+      sum(
+        if_else(!is.na(TRTCD1) & TRTCD1 == 50, 1,
+          if_else(!is.na(TRTCD2) & TRTCD2 == 50, 1,
+            if_else(!is.na(TRTCD3) & TRTCD3 == 50, 1, 0)
+          )
+        ),
+        na.rm = TRUE
+      ) == 0
+    ) |>
+    ungroup()
+}
+
+measured_pre_post_harvest_filter <- function(.data) {
+  # Remove the entire plot if:
+  # 1. The plot was not measured prior to the earliest harvest in the window,
+  # and
+  # 2. The plot was not measured 10 years after the most recent harvest.
+  # Note that a single condition can have multiple harvest years,
+  # meaning more than one of TRTCD1, TRTCD2 and TRTCD3 is 10, and
+  # TRTYR1, TRTYR2 and TRTYR3 are different.
+  # We want the latest of the latest harvests.
+  .data |> 
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    mutate(
+      MIN_MEASYEAR = min(MEASYEAR, na.rm = TRUE),
+      MAX_MEASYEAR = max(MEASYEAR, na.rm = TRUE),
+      MIN_HRVYR1 = min(if_else(!is.na(TRTCD1) & (TRTCD1 == 10), TRTYR1, 9999), na.rm = TRUE),
+      MAX_HRVYR1 = max(if_else(!is.na(TRTCD1) & (TRTCD1 == 10), TRTYR1, 0), na.rm = TRUE),
+      MIN_HRVYR2 = min(if_else(!is.na(TRTCD2) & (TRTCD2 == 10), TRTYR2, 9999), na.rm = TRUE),
+      MAX_HRVYR2 = max(if_else(!is.na(TRTCD2) & (TRTCD2 == 10), TRTYR2, 0), na.rm = TRUE),
+      MIN_HRVYR3 = min(if_else(!is.na(TRTCD3) & (TRTCD3 == 10), TRTYR3, 9999), na.rm = TRUE),
+      MAX_HRVYR3 = max(if_else(!is.na(TRTCD3) & (TRTCD3 == 10), TRTYR3, 0), na.rm = TRUE),
+      MIN_HRVYR =
+        if_else(
+          MIN_HRVYR1 < MIN_HRVYR2,
+          if_else(
+            MIN_HRVYR1 < MIN_HRVYR3,
+            MIN_HRVYR1,
+            MIN_HRVYR3
+          ),
+          if_else(
+            MIN_HRVYR2 < MIN_HRVYR3,
+            MIN_HRVYR2,
+            MIN_HRVYR3
+          )
+        ),
+      MAX_HRVYR =
+        if_else(
+          MAX_HRVYR1 > MAX_HRVYR2,
+          if_else(
+            MAX_HRVYR1 > MAX_HRVYR3,
+            MAX_HRVYR1,
+            MAX_HRVYR3
+          ),
+          if_else(
+            MAX_HRVYR2 > MAX_HRVYR3,
+            MAX_HRVYR2,
+            MAX_HRVYR3
+          )
+        )
+    ) |> 
+    filter(
+      (MIN_MEASYEAR < MIN_HRVYR) &
+      (MAX_MEASYEAR - MAX_HRVYR >= 10)
+    ) |> 
+    ungroup()
+}
+
 single_condition_plots_filter <- function(.data) {
   # Filter out the entire plot if it ever had more than one condition
   .data |>
