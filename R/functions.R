@@ -230,4 +230,51 @@ hectare_at <- function(lat, lon) {
   hectare_polygon
 }
 
+fvs_kwd0 <- function(kwd) {
+  sprintf('%-10s\n', kwd)
+}
 
+fvs_kwd1 <- function(kwd, arg1) {
+  arg1 <- as.character(arg1)
+  sprintf('%-10s%10s\n', kwd, arg1)
+}
+
+fvs_kwd2 <- function(kwd, arg1, arg2) {
+  arg1 <- as.character(arg1)
+  arg2 <- as.character(arg2)
+  sprintf('%-10s%10s%10s\n', kwd, arg1, arg2)
+}
+
+fvs_kwd3 <- function(kwd, arg1, arg2, arg3) {
+  arg1 <- as.character(arg1)
+  arg2 <- as.character(arg2)
+  arg3 <- as.character(arg3)
+  sprintf('%-10s%10s%10s%10s\n', kwd, arg1, arg2, arg3)
+}
+
+fvs_kwd4 <- function(kwd, arg1, arg2, arg3, arg4) {
+  arg1 <- as.character(arg1)
+  arg2 <- as.character(arg2)
+  arg3 <- as.character(arg3)
+  arg4 <- as.character(arg4)
+  sprintf('%-10s%10s%10s%10s%10s\n', kwd, arg1, arg2, arg3, arg4)
+}
+
+fvs_kwd5 <- function(kwd, arg1, arg2, arg3, arg4, arg5) {
+  arg1 <- as.character(arg1)
+  arg2 <- as.character(arg2)
+  arg3 <- as.character(arg3)
+  arg4 <- as.character(arg4)
+  arg5 <- as.character(arg5)
+  sprintf('%-10s%10s%10s%10s%10s%10s\n', kwd, arg1, arg2, arg3, arg4, arg5)
+}
+
+fvs_kwd6 <- function(kwd, arg1, arg2, arg3, arg4, arg5, arg6) {
+  arg1 <- as.character(arg1)
+  arg2 <- as.character(arg2)
+  arg3 <- as.character(arg3)
+  arg4 <- as.character(arg4)
+  arg5 <- as.character(arg5)
+  arg6 <- as.character(arg6)
+  sprintf('%-10s%10s%10s%10s%10s%10s%10s\n', kwd, arg1, arg2, arg3, arg4, arg5, arg6)
+}
