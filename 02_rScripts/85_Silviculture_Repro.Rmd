@@ -176,6 +176,12 @@ table4_rot$`ITS_High Retention` <-
   round(conv_unit(table4_rot$`ITS_High Retention`, 'hectare', 'acre'))
 table4_rot$Background <-
   round(conv_unit(table4_rot$Background, 'hectare', 'acre'))
+
+background_regen <- table4_rot |>
+  select(`Species Code`, Background) |>
+  rename(TPA = Background) |> 
+  filter(!is.na(TPA)) |>
+  arrange(desc(TPA))
 ```
 
 The regeneration section of a keywordfile looks like
@@ -217,25 +223,31 @@ From FVS Report INT-279, Appendix C, Page 30, re: the Natural keyword:
 Generate a natural regen section for Clearcut:
 
 ```{r natural_regen_clearcut}
-natural_regen_clearcut <- table4_rot |>
-  select(`Species Code`, Background) |>
-  filter(!is.na(Background)) |>
-  arrange(desc(Background)) |>
-  mutate(
-    KEYWORD = paste0(
-      sprintf("%-10s", "Natural"),        # Keyword
-      sprintf("%10d", 1),                 # Years to reach density.
-      sprintf("%10s", `Species Code`),    # Species Code
-      sprintf("%10d", Background),        # TPA
-      sprintf("%10d", 100),               # Survival %
-      sprintf("%10s", ""),                # Age
-      sprintf("%10s", ""),                # Height
-      sprintf("%10d", 0)                  # Shade Code
-    )
-  )
-natural_regen_clearcut_str <- ''
-for (kw in natural_regen_clearcut$KEYWORD) {
-  natural_regen_clearcut_str <- paste0(natural_regen_clearcut_str, kw, "\n")
+natural_regen_clearcut <- function(InvYear, TimeInt, NumCycle) {
+  lines <- vector()
+  for (cycle in 1:NumCycle) {
+    Year <- InvYear + (TimeInt * (cycle - 1))
+    lines <- c(lines, fvs_kwd1("Estab", Year), recursive = TRUE)
+    Year <- Year + 1
+    for (rownum in 1:nrow(background_regen)) {
+      row <- background_regen[rownum, ]
+      lines <- c(
+        lines,
+        paste0(
+          sprintf("%-10s", "Natural"),
+          sprintf("%10d", Year),
+          sprintf("%10s", row['Species Code']),
+          sprintf("%10s", row['TPA']),
+          sprintf("%10d", 100),
+          sprintf("%10s", ""),
+          sprintf("%10s", ""),
+          sprintf("%10d", 0)
+        ),
+        recursive = TRUE
+      )
+    }
+  }
+  lines
 }
 ```
 
@@ -250,26 +262,26 @@ keywordfile_section <- function(Title, MgmtId, StandID, StandCN, InvYear, CutEff
   InvYear <- as.numeric(InvYear)
   TimeConfig <- NULL
   if (InvYear == 2022) {
-    TimeConfig <- paste0(
+    TimeConfig <- c(
       fvs_kwd1("InvYear", InvYear),
       fvs_kwd2("TimeInt", 0, 5),
       fvs_kwd1("NumCycle", 30)
     )
   } else {
-    TimeConfig <- paste0(
+    TimeConfig <- c(
       fvs_kwd1("InvYear", InvYear),
       fvs_kwd2("TimeInt", 0, 5),
       fvs_kwd2("TimeInt", 1, 2022 - InvYear),
       fvs_kwd1("NumCycle", 31)
     )
   }
-  paste0(
+  c(
     fvs_kwd0("StdIdent"),
-    StandID, " ", Title, "\n",
+    paste0(StandID, " ", Title),
     fvs_kwd0("StandCN"),
-    StandCN, "\n",
+    StandCN,
     fvs_kwd0("MgmtId"),
-    MgmtId, "\n",
+    MgmtId,
     TimeConfig,
     fvs_kwd0("FMIn"), # Fire and Fuels Extension
     fvs_kwd1("CarbRept", 2),
@@ -280,15 +292,15 @@ keywordfile_section <- function(Title, MgmtId, StandID, StandCN, InvYear, CutEff
     fvs_kwd0("End"), # FMIn
     fvs_kwd0("Database"), # Database extension
     fvs_kwd0("DSNIn"),
-    "SQLite_FIADB_ENTIRE.db", "\n",
+    "SQLite_FIADB_ENTIRE.db",
     fvs_kwd0("StandSQL"),
-    "SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'", "\n",
+    "SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'",
     fvs_kwd0("EndSQL"), # StandSQL
     fvs_kwd0("TreeSQL"),
-    "SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'", "\n",
+    "SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'",
     fvs_kwd0("EndSQL"), # TreeSQL
     fvs_kwd0("DSNOut"),
-    "FVS_", Title, "_", MgmtId, "_", Partition, ".db", "\n",
+    paste0("FVS_", Title, "_", MgmtId, "_", Partition, ".db"),
     fvs_kwd1("Summary",  2),
     fvs_kwd2("Computdb", 0, 1),
     fvs_kwd1("MisRpts",  2),
@@ -296,17 +308,11 @@ keywordfile_section <- function(Title, MgmtId, StandID, StandCN, InvYear, CutEff
     fvs_kwd1("FuelReDB", 2),
     fvs_kwd1("FuelsOut", 2),
     fvs_kwd0("End"), # Database
-    # Condition: Every 20 years
-    fvs_kwd1("If", 20),
-    "year ge 0", "\n",
-    fvs_kwd0("Then"),
     fvs_kwd6("ThinDBH",  0, 5, 999, CutEff, "All", 0),
-    fvs_kwd1("Estab", 0),
-    fvs_kwd0("Sprout"),
-    natural_regen_clearcut_str,
+    natural_regen_clearcut(2022, 5, 30),
     fvs_kwd0("End"), # Estab
-    fvs_kwd0("EndIf"), # Every 20 years
-    fvs_kwd0("Process")
+    fvs_kwd0("Process"),
+    recursive = TRUE
   )
 }
 ```
@@ -348,11 +354,12 @@ for (cuteff in c(100, 92, 67, 41, 22, 0)) {
   mgt_id <- sprintf('X%03d', cuteff)
   for (partition in 1:8) {
     filename <- paste0("../03_outputs/FVS_Northeastern_", mgt_id, "_", partition, ".key")
-    write_lines(
-      apply(
-        stands_projected |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
-        1,
-        function(row) {
+    unlink(filename)
+    apply(
+      stands_projected |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
+      1,
+      function(row) {
+        write_lines(
           keywordfile_section(
             "Northeastern",
             mgt_id,
@@ -361,10 +368,11 @@ for (cuteff in c(100, 92, 67, 41, 22, 0)) {
             row['MEASYEAR'],
             cuteff / 100,
             partition
-          )
-        }
-      ),
-      filename
+          ),
+          filename,
+          append = TRUE
+        )
+      }
     )
     write_lines("Stop", filename, append = TRUE)
   }
