@@ -1,0 +1,4884 @@
+LandisData "Initial Communities"
+MapCode 0 <<
+>>MapCode 1 << water, ag, pavement, etc
+
+MapCode 166 << FIA PLT_CN 375682850489998 << FIA Forest Type:  701 Black ash / American elm / red maple
+poputrem 50 (2694)
+acerrubr 25 (1633)
+betupopu 25 (1222)
+
+MapCode 1023 << FIA PLT_CN 449072841489998 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (444) 75 (605)
+larilari 125 (238) 175 (655)
+picemari 100 (253) 175 (581)
+betupapy 75 (319)
+
+MapCode 1856 << FIA PLT_CN 451063275489998 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 50 (3322) 75 (1681) 100 (570)
+popugran 108 (1584)
+acerrubr 75 (1292)
+
+MapCode 1857 << FIA PLT_CN 451063276489998 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (648) 50 (3398) 75 (608)
+acerrubr 75 (1155)
+betupopu 50 (872)
+
+MapCode 1860 << FIA PLT_CN 451063280489998 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (3946)
+piceglau 50 (1935) 100 (1895)
+betupopu 25 (798) 50 (540)
+
+MapCode 1861 << FIA PLT_CN 451063285489998 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 50 (4518)
+acerrubr 50 (2909) 75 (571)
+popugran 50 (881)
+
+MapCode 1883 << FIA PLT_CN 451063315489998 << FIA Forest Type:  125 Black spruce
+picemari 75 (3652) 100 (1763) 125 (729)
+acerrubr 50 (1478) 75 (842)
+larilari 100 (752)
+thujocci 50 (594)
+
+MapCode 2049 << FIA PLT_CN 451063506489998 << FIA Forest Type:  809 Red maple / upland
+acerrubr 25 (1209) 50 (2439) 75 (528)
+abiebals 25 (277) 50 (496)
+
+MapCode 2225 << FIA PLT_CN 451063712489998 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (2507) 50 (1582)
+picerube 50 (2617)
+poputrem 75 (1526)
+betupapy 25 (851)
+thujocci 50 (827)
+
+MapCode 2291 << FIA PLT_CN 451063792489998 << FIA Forest Type:  809 Red maple / upland
+abiebals 25 (1764) 50 (674)
+popugran 75 (1457)
+acerrubr 50 (503) 75 (741)
+thujocci 50 (410)
+
+MapCode 2293 << FIA PLT_CN 451063794489998 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (1450)
+ostrvirg 25 (763)
+fagugran 25 (609)
+abiebals 25 (329)
+
+MapCode 2296 << FIA PLT_CN 451063797489998 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 25 (854) 50 (898)
+
+MapCode 2438 << FIA PLT_CN 451158070489998 << FIA Forest Type:  701 Black ash / American elm / red maple
+fraxnigr 100 (989) 125 (1502) 175 (468)
+acerrubr 75 (342) 100 (384) 175 (390)
+thujocci 175 (563)
+abiebals 50 (546)
+picemari 175 (518)
+
+MapCode 2473 << FIA PLT_CN 451158114489998 << FIA Forest Type:  805 Hard maple / basswood
+acersacc 50 (1285) 75 (2544) 100 (9842) 125 (2298)
+tiliamer 100 (1076)
+
+MapCode 3352 << FIA PLT_CN 459835910489998 << FIA Forest Type:  103 Eastern white pine
+pinustro 25 (212)
+
+MapCode 3586 << FIA PLT_CN 459836367489998 << FIA Forest Type:  105 Eastern hemlock
+tiliamer 50 (2522) 75 (3981)
+tsugcana 50 (2885)
+acerrubr 50 (1006)
+ulmuamer 75 (853)
+
+MapCode 3592 << FIA PLT_CN 459836377489998 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 75 (5624)
+fagugran 50 (4310) 75 (993)
+acersacc 75 (933)
+
+MapCode 3698 << FIA PLT_CN 459836535489998 << FIA Forest Type:  520 Mixed upland hardwoods
+fraxamer 50 (1928) 75 (9908)
+fraxnigr 50 (1934)
+
+MapCode 3700 << FIA PLT_CN 459836538489998 << FIA Forest Type:  809 Red maple / upland
+prunsero 50 (3533)
+acerrubr 50 (1995)
+poputrem 50 (1889)
+
+MapCode 4719 << FIA PLT_CN 465276453489998 << FIA Forest Type:  805 Hard maple / basswood
+acersacc 50 (1811) 75 (6854) 100 (3831)
+querrubr 75 (1062) 100 (3471)
+ostrvirg 50 (1237)
+
+MapCode 4720 << FIA PLT_CN 465276454489998 << FIA Forest Type:  809 Red maple / upland
+acerrubr 25 (352) 50 (3413)
+prunsero 50 (992)
+poputrem 25 (774)
+queralba 50 (624)
+
+MapCode 4725 << FIA PLT_CN 465276468489998 << FIA Forest Type:  901 Aspen
+poputrem 25 (2556) 50 (3131)
+
+MapCode 4729 << FIA PLT_CN 465276488489998 << FIA Forest Type:  103 Eastern white pine
+pinustro 75 (23896)
+
+MapCode 4771 << FIA PLT_CN 465276591489998 << FIA Forest Type:  101 Jack pine
+pinustro 50 (1882) 75 (2220) 100 (736)
+quervelu 75 (758)
+
+MapCode 4784 << FIA PLT_CN 465276615489998 << FIA Forest Type:  901 Aspen
+poputrem 50 (3898) 75 (3859)
+pinustro 75 (2956)
+prunsero 50 (895)
+
+MapCode 4790 << FIA PLT_CN 465276632489998 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (3497)
+larilari 50 (1384)
+piceglau 50 (1376)
+poputrem 50 (736)
+
+MapCode 4871 << FIA PLT_CN 465276821489998 << FIA Forest Type:  901 Aspen
+acerrubr 25 (781) 75 (398)
+abiebals 50 (848)
+poputrem 25 (294) 50 (487)
+fraxnigr 50 (184) 75 (519)
+
+MapCode 4911 << FIA PLT_CN 465276921489998 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 75 (627) 100 (1196) 125 (373)
+abiebals 25 (849) 50 (1321)
+poputrem 125 (620) 175 (525)
+betupapy 75 (375)
+
+MapCode 4942 << FIA PLT_CN 465276972489998 << FIA Forest Type:  805 Hard maple / basswood
+acersacc 75 (1909) 100 (3308) 125 (3858)
+acerrubr 100 (3622)
+tiliamer 75 (2714)
+querrubr 75 (2227)
+
+MapCode 4944 << FIA PLT_CN 465276987489998 << FIA Forest Type:  505 Northern red oak
+querrubr 75 (5747) 100 (7553) 125 (3299)
+pinuresi 100 (3353)
+
+MapCode 4959 << FIA PLT_CN 465277059489998 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (3870) 75 (11961)
+piceglau 125 (5354)
+
+MapCode 4960 << FIA PLT_CN 465277060489998 << FIA Forest Type:  901 Aspen
+betupapy 25 (2806)
+querrubr 25 (1303)
+poputrem 25 (353) 50 (941)
+prunsero 25 (341)
+
+MapCode 4961 << FIA PLT_CN 465277061489998 << FIA Forest Type:  901 Aspen
+popugran 50 (4863) 75 (3321)
+poputrem 50 (3417) 75 (1108)
+acerrubr 25 (1466) 50 (1070)
+pinustro 50 (1247)
+
+MapCode 4968 << FIA PLT_CN 465277096489998 << FIA Forest Type:  125 Black spruce
+pinustro 175 (3553)
+picemari 75 (537) 100 (1187) 125 (964)
+acerrubr 175 (526)
+
+MapCode 4969 << FIA PLT_CN 465277097489998 << FIA Forest Type:  809 Red maple / upland
+thujocci 50 (2512)
+acerrubr 50 (1232)
+fraxamer 25 (993)
+abiebals 50 (597)
+
+MapCode 4970 << FIA PLT_CN 465277100489998 << FIA Forest Type:  126 Tamarack
+larilari 50 (399) 75 (577) 100 (1704)
+pinustro 50 (692)
+ulmuamer 50 (242)
+
+MapCode 4989 << FIA PLT_CN 465277170489998 << FIA Forest Type:  505 Northern red oak
+acerrubr 50 (1873) 75 (3135)
+querrubr 50 (1126) 75 (2428)
+poputrem 75 (1284) 100 (1263)
+thujocci 50 (1394)
+abiebals 50 (1084)
+
+MapCode 4990 << FIA PLT_CN 465277178489998 << FIA Forest Type:  901 Aspen
+pinustro 50 (1098) 75 (1937)
+popugran 50 (3020)
+poputrem 50 (1262)
+larilari 50 (975)
+pinuresi 50 (832)
+
+MapCode 4993 << FIA PLT_CN 465277183489998 << FIA Forest Type:  101 Jack pine
+queralba 50 (2682)
+poputrem 50 (1448)
+quervelu 50 (1075)
+prunsero 25 (926)
+
+MapCode 4994 << FIA PLT_CN 465277186489998 << FIA Forest Type:  509 Bur oak
+pinuresi 50 (2327)
+prunsero 50 (1042)
+quervelu 50 (329)
+
+MapCode 4997 << FIA PLT_CN 465277199489998 << FIA Forest Type:  520 Mixed upland hardwoods
+querrubr 50 (136)
+pinustro 25 (64)
+poputrem 10 (43)
+fraxamer 10 (42)
+
+MapCode 4998 << FIA PLT_CN 465277201489998 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (7438) 75 (2163)
+fraxnigr 25 (899) 50 (1881)
+poputrem 50 (780)
+
+MapCode 5035 << FIA PLT_CN 465277328489998 << FIA Forest Type:  802 Black cherry
+prunsero 50 (1156)
+betupapy 25 (196)
+
+MapCode 5055 << FIA PLT_CN 465277367489998 << FIA Forest Type:  805 Hard maple / basswood
+acersacc 50 (1860) 75 (5191)
+tiliamer 75 (2648) 100 (3251)
+acerrubr 75 (5718)
+
+MapCode 5073 << FIA PLT_CN 465277416489998 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (1966) 75 (1981)
+poputrem 75 (1315)
+fraxnigr 100 (1116)
+betupapy 175 (524)
+
+MapCode 5083 << FIA PLT_CN 465277445489998 << FIA Forest Type:  809 Red maple / upland
+betupapy 25 (635) 75 (530) 100 (2255)
+acerrubr 100 (820) 125 (2155)
+tsugcana 50 (1788)
+acersacc 75 (717)
+
+MapCode 5092 << FIA PLT_CN 465277459489998 << FIA Forest Type:  901 Aspen
+betupapy 25 (2672)
+poputrem 50 (1294)
+
+MapCode 5095 << FIA PLT_CN 465277466489998 << FIA Forest Type:  127 Northern white-cedar
+thujocci 75 (440) 100 (1041) 125 (929)
+tsugcana 50 (482) 100 (410) 125 (548)
+queralba 175 (1300)
+betualle 75 (648)
+
+MapCode 5098 << FIA PLT_CN 465277482489998 << FIA Forest Type:  901 Aspen
+popugran 10 (3557)
+querrubr 25 (322) 50 (517)
+
+MapCode 5099 << FIA PLT_CN 465277489489998 << FIA Forest Type:  103 Eastern white pine
+pinustro 25 (3731) 50 (5607)
+queralba 25 (603)
+
+MapCode 5106 << FIA PLT_CN 465277521489998 << FIA Forest Type:  509 Bur oak
+quervelu 25 (237) 50 (622)
+acerrubr 25 (117)
+prunsero 50 (89)
+queralba 10 (63)
+
+MapCode 5115 << FIA PLT_CN 465277546489998 << FIA Forest Type:  805 Hard maple / basswood
+acersacc 25 (1599) 50 (8994) 75 (2951)
+tiliamer 50 (1091) 75 (4740)
+
+MapCode 5118 << FIA PLT_CN 465277549489998 << FIA Forest Type:  901 Aspen
+poputrem 25 (1078) 50 (2881) 75 (3093)
+ulmuamer 50 (569)
+prunsero 25 (448)
+
+MapCode 5119 << FIA PLT_CN 465277551489998 << FIA Forest Type:  701 Black ash / American elm / red maple
+acerrubr 75 (2017) 100 (1366) 125 (1423) 175 (1302)
+fraxnigr 50 (1511)
+abiebals 50 (633)
+
+MapCode 5120 << FIA PLT_CN 465277552489998 << FIA Forest Type:  102 Red pine
+pinuresi 75 (5991) 100 (491)
+
+MapCode 5121 << FIA PLT_CN 465277555489998 << FIA Forest Type:  520 Mixed upland hardwoods
+querrubr 75 (2617) 100 (5625)
+fraxamer 100 (4111) 175 (3194)
+tiliamer 75 (1182) 100 (3009)
+
+MapCode 5132 << FIA PLT_CN 465277626489998 << FIA Forest Type:  809 Red maple / upland
+querrubr 75 (1892) 100 (1073) 175 (1308)
+acerrubr 50 (1143) 75 (3002)
+prunsero 50 (843) 75 (2481)
+
+MapCode 5139 << FIA PLT_CN 465277650489998 << FIA Forest Type:  809 Red maple / upland
+acerrubr 25 (1034) 50 (4431) 75 (1071)
+pinustro 75 (3540)
+
+MapCode 5224 << FIA PLT_CN 465277884489998 << FIA Forest Type:  805 Hard maple / basswood
+acersacc 75 (7709)
+querrubr 100 (4322)
+poputrem 50 (2377) 75 (1555)
+pinuresi 50 (2066)
+
+MapCode 5255 << FIA PLT_CN 465277958489998 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (2077) 75 (10461) 100 (4540)
+tiliamer 50 (1820) 75 (1268)
+ulmuamer 50 (1313)
+
+MapCode 5265 << FIA PLT_CN 465277990489998 << FIA Forest Type:  901 Aspen
+popugran 108 (6263)
+querrubr 50 (1595) 75 (1382) 100 (1147)
+acerrubr 50 (1743)
+poputrem 125 (1450)
+
+MapCode 5275 << FIA PLT_CN 465278016489998 << FIA Forest Type:  701 Black ash / American elm / red maple
+larilari 75 (1334) 100 (2867)
+acerrubr 50 (1416)
+abiebals 50 (517)
+
+MapCode 5289 << FIA PLT_CN 465278050489998 << FIA Forest Type:  805 Hard maple / basswood
+acersacc 100 (6547)
+tiliamer 125 (2350)
+queralba 100 (2068)
+querrubr 175 (1698)
+
+MapCode 5303 << FIA PLT_CN 465278080489998 << FIA Forest Type:  805 Hard maple / basswood
+acerrubr 50 (2040) 75 (6426)
+tiliamer 75 (3434)
+acersacc 50 (2863)
+querrubr 50 (1440) 75 (1354)
+
+MapCode 5645 << FIA PLT_CN 509641945126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (2533) 75 (1806)
+thujocci 50 (1209) 75 (895)
+abiebals 25 (825)
+piceglau 50 (417)
+
+MapCode 5647 << FIA PLT_CN 509641947126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+querrubr 25 (629) 50 (2910) 100 (906)
+ostrvirg 25 (1723) 50 (706)
+fagugran 25 (1008) 50 (736)
+acersacc 50 (969)
+
+MapCode 5648 << FIA PLT_CN 509641948126144 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (3314) 75 (1076)
+picerube 75 (3194)
+acerrubr 50 (1040) 75 (1125)
+betualle 50 (1770)
+
+MapCode 5656 << FIA PLT_CN 509641956126144 << FIA Forest Type:  901 Aspen
+poputrem 25 (2707) 50 (938)
+acerrubr 25 (334)
+
+MapCode 5657 << FIA PLT_CN 509641957126144 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (1650) 50 (2060)
+picerube 50 (1678) 75 (705)
+betupapy 25 (428) 50 (1188)
+
+MapCode 5662 << FIA PLT_CN 509641963126144 << FIA Forest Type:  124 Red spruce / balsam fir
+tsugcana 50 (2859) 75 (1506)
+abiebals 50 (468) 75 (393)
+picerube 50 (725)
+
+MapCode 5667 << FIA PLT_CN 509641968126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (6251)
+pinustro 75 (3292)
+popugran 75 (2425)
+picerube 50 (1824)
+
+MapCode 5680 << FIA PLT_CN 509641981126144 << FIA Forest Type:  123 Red spruce
+acerrubr 50 (2034) 75 (3299)
+pinustro 75 (4050)
+picemari 50 (1097) 75 (1168)
+
+MapCode 5681 << FIA PLT_CN 509641982126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 25 (1111)
+acersacc 25 (214)
+ostrvirg 25 (178)
+fraxamer 10 (149)
+
+MapCode 5682 << FIA PLT_CN 509641983126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+querrubr 25 (557) 50 (2198)
+acerrubr 50 (1871)
+betupapy 25 (337)
+
+MapCode 5683 << FIA PLT_CN 509641984126144 << FIA Forest Type:  123 Red spruce
+picerube 50 (2924) 75 (10025) 100 (2475)
+pinuresi 75 (946)
+
+MapCode 5685 << FIA PLT_CN 509641986126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (866)
+
+MapCode 5686 << FIA PLT_CN 509641988126144 << FIA Forest Type:  121 Balsam fir
+acerrubr 50 (724) 75 (562) 100 (2319)
+abiebals 50 (951)
+poputrem 75 (717)
+
+MapCode 5690 << FIA PLT_CN 509641997126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 25 (2652) 50 (2285)
+acersacc 50 (3061) 75 (751)
+betupapy 75 (1264)
+ostrvirg 25 (1008)
+querrubr 50 (724)
+
+MapCode 5691 << FIA PLT_CN 509641998126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 50 (5976)
+ostrvirg 50 (2344)
+betupapy 25 (1077)
+
+MapCode 5696 << FIA PLT_CN 509642004126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 25 (988)
+betualle 25 (486)
+fagugran 25 (361)
+
+MapCode 5697 << FIA PLT_CN 509642005126144 << FIA Forest Type:  809 Red maple / upland
+fagugran 50 (1949)
+acerrubr 50 (1897)
+picerube 50 (1290)
+betualle 25 (1278)
+tsugcana 50 (668)
+
+MapCode 5699 << FIA PLT_CN 509642007126144 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (4289) 75 (3155)
+picerube 50 (916) 75 (2175)
+pinustro 100 (1410)
+
+MapCode 5703 << FIA PLT_CN 509642012126144 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (3163)
+betualle 50 (1144)
+abiebals 25 (428) 50 (610)
+pinustro 50 (957)
+acerrubr 50 (856)
+
+MapCode 5711 << FIA PLT_CN 509642025126144 << FIA Forest Type:  124 Red spruce / balsam fir
+thujocci 25 (1420) 50 (501)
+acerrubr 50 (508) 75 (1020)
+picerube 50 (1301)
+pinustro 50 (836)
+abiebals 25 (758)
+
+MapCode 5721 << FIA PLT_CN 509642036126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (2812) 75 (3609) 100 (1437)
+betualle 75 (846) 125 (833) 175 (1977)
+fagugran 75 (1060)
+betupapy 50 (926)
+
+MapCode 5723 << FIA PLT_CN 509642038126144 << FIA Forest Type:  124 Red spruce / balsam fir
+tsugcana 50 (1378) 75 (2005)
+acerrubr 50 (886) 75 (2063)
+betualle 25 (748) 50 (1761)
+betupapy 50 (921) 75 (1414)
+
+MapCode 5731 << FIA PLT_CN 509642046126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 175 (5353)
+pinuresi 125 (885) 175 (1358)
+picemari 25 (510)
+
+MapCode 5732 << FIA PLT_CN 509642047126144 << FIA Forest Type:  124 Red spruce / balsam fir
+pinustro 50 (2956) 75 (599)
+picerube 50 (721)
+betupopu 75 (706)
+abiebals 75 (610)
+
+MapCode 5733 << FIA PLT_CN 509642049126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (3523) 75 (6083)
+betualle 75 (1456)
+fraxamer 75 (951)
+fagugran 25 (883)
+
+MapCode 5735 << FIA PLT_CN 509642051126144 << FIA Forest Type:  105 Eastern hemlock
+querrubr 50 (4038)
+ostrvirg 25 (1166)
+pinustro 50 (872)
+
+MapCode 5736 << FIA PLT_CN 509642052126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (5818) 75 (2676)
+poputrem 75 (4765)
+
+MapCode 5737 << FIA PLT_CN 509642053126144 << FIA Forest Type:  103 Eastern white pine
+larilari 50 (2476)
+acerrubr 50 (1679)
+pinustro 50 (1567)
+betualle 25 (1361)
+picerube 50 (921)
+
+MapCode 5738 << FIA PLT_CN 509642054126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (10461) 75 (2144)
+abiebals 50 (3042)
+pinustro 75 (2582)
+fraxamer 50 (1164)
+betupapy 50 (1160)
+
+MapCode 5739 << FIA PLT_CN 509642056126144 << FIA Forest Type:  122 White spruce
+piceglau 50 (8647)
+picerube 50 (1473)
+
+MapCode 5741 << FIA PLT_CN 509642058126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 50 (8211) 75 (7977)
+pinustro 75 (9148)
+
+MapCode 5742 << FIA PLT_CN 509642059126144 << FIA Forest Type:  802 Black cherry
+fraxamer 25 (1079) 50 (1620)
+prunsero 25 (603) 50 (1052)
+
+MapCode 5743 << FIA PLT_CN 509642060126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (6385) 75 (6681)
+abiebals 25 (852) 50 (849)
+
+MapCode 5745 << FIA PLT_CN 509642063126144 << FIA Forest Type:  121 Balsam fir
+acerrubr 50 (1485) 75 (3137)
+betupapy 50 (647) 75 (720)
+abiebals 50 (1088)
+thujocci 50 (943)
+betualle 50 (684)
+
+MapCode 5749 << FIA PLT_CN 509642069126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betupapy 10 (601) 50 (2182)
+acerrubr 75 (2443)
+pinustro 50 (2162)
+acersacc 50 (1168)
+querrubr 25 (944)
+
+MapCode 5750 << FIA PLT_CN 509642070126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 25 (598) 50 (5807)
+betualle 75 (575)
+abiebals 50 (470)
+
+MapCode 5751 << FIA PLT_CN 509642071126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (1052) 75 (917) 100 (557) 125 (728)
+abiebals 25 (453) 50 (1024) 75 (605)
+
+MapCode 5775 << FIA PLT_CN 509642099126144 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 25 (719) 50 (2194)
+pinustro 50 (2212)
+picerube 50 (803)
+thujocci 50 (601)
+
+MapCode 5777 << FIA PLT_CN 509642102126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 50 (3377) 75 (2076)
+acersacc 50 (1547)
+betualle 100 (983)
+acerrubr 50 (540)
+
+MapCode 5781 << FIA PLT_CN 509642107126144 << FIA Forest Type:  127 Northern white-cedar
+abiebals 25 (399) 50 (1888)
+acerrubr 50 (310) 100 (921)
+thujocci 50 (967) 75 (244)
+
+MapCode 5782 << FIA PLT_CN 509642108126144 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (301) 50 (1413)
+thujocci 50 (798) 75 (487) 100 (322)
+acerrubr 25 (520)
+tsugcana 50 (464)
+
+MapCode 5785 << FIA PLT_CN 509642113126144 << FIA Forest Type:  809 Red maple / upland
+prunsero 75 (3822) 100 (1503)
+acerrubr 50 (1929) 75 (1973)
+betupapy 175 (1214)
+
+MapCode 5787 << FIA PLT_CN 509642116126144 << FIA Forest Type:  901 Aspen
+poputrem 25 (2591) 50 (979)
+acerrubr 25 (1040) 50 (924)
+abiebals 25 (962) 50 (481)
+pinustro 50 (1058)
+querrubr 25 (476)
+
+MapCode 5788 << FIA PLT_CN 509642118126144 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (3098)
+picerube 50 (1945)
+pinustro 50 (1665)
+acerrubr 75 (1086)
+tsugcana 75 (567)
+
+MapCode 5789 << FIA PLT_CN 509642119126144 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (383) 50 (670) 75 (943)
+acerrubr 50 (563) 75 (1149)
+betupopu 50 (244) 75 (621)
+
+MapCode 5790 << FIA PLT_CN 509642120126144 << FIA Forest Type:  121 Balsam fir
+acerrubr 50 (1725) 75 (874)
+fraxamer 25 (602) 50 (1019)
+thujocci 50 (506)
+betualle 25 (471)
+fraxnigr 50 (435)
+
+MapCode 5791 << FIA PLT_CN 509642121126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 25 (1615)
+acersacc 25 (1422)
+betupapy 10 (805) 25 (533)
+betupopu 10 (688) 25 (505)
+
+MapCode 5792 << FIA PLT_CN 509642122126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+tsugcana 50 (1160) 75 (1499) 100 (860)
+acerrubr 75 (2248)
+picerube 50 (1348)
+querrubr 50 (992)
+betupapy 75 (624)
+
+MapCode 5793 << FIA PLT_CN 509642123126144 << FIA Forest Type:  809 Red maple / upland
+querrubr 50 (4404) 75 (14986)
+acerrubr 50 (7804)
+betupapy 75 (3883)
+
+MapCode 5794 << FIA PLT_CN 509642124126144 << FIA Forest Type:  127 Northern white-cedar
+tsugcana 50 (978) 75 (759)
+acerrubr 75 (1575)
+fraxamer 100 (1073)
+popugran 108 (1002)
+betualle 75 (579)
+
+MapCode 5795 << FIA PLT_CN 509642125126144 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (1271) 75 (4913)
+picerube 75 (426) 125 (777)
+
+MapCode 5796 << FIA PLT_CN 509642126126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+abiebals 25 (1226) 50 (2909)
+fraxamer 25 (1986)
+betupapy 25 (592) 50 (843)
+acerrubr 50 (804)
+ostrvirg 25 (644)
+
+MapCode 5797 << FIA PLT_CN 509642128126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 50 (2143) 75 (10471)
+betupapy 50 (2860)
+acerrubr 75 (2221)
+
+MapCode 5798 << FIA PLT_CN 509642129126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 100 (4138) 125 (2475)
+betualle 50 (1405) 75 (2246)
+fraxamer 75 (2794)
+acerrubr 75 (1678)
+tsugcana 50 (1535)
+
+MapCode 5800 << FIA PLT_CN 509642131126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (1276) 75 (5569)
+tsugcana 50 (3666) 75 (888)
+fagugran 50 (1567)
+fraxamer 75 (1138)
+acersacc 50 (952)
+
+MapCode 5801 << FIA PLT_CN 509642132126144 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 25 (1171) 50 (4696) 75 (3779)
+picerube 75 (705)
+
+MapCode 5802 << FIA PLT_CN 509642133126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (5479)
+fagugran 50 (4521)
+querrubr 75 (1179)
+
+MapCode 5803 << FIA PLT_CN 509642135126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 175 (4863)
+pinustro 175 (4825)
+acerrubr 125 (800) 175 (2198)
+acersacc 125 (740)
+
+MapCode 5804 << FIA PLT_CN 509642136126144 << FIA Forest Type:  902 Paper birch
+betupapy 50 (750) 75 (2696)
+querrubr 75 (2266) 100 (894)
+acerrubr 50 (648) 75 (2456)
+pinustro 50 (681) 75 (1101)
+
+MapCode 5805 << FIA PLT_CN 509642137126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (8148) 75 (743)
+acerrubr 25 (1170) 50 (2860)
+querrubr 50 (1175)
+
+MapCode 5806 << FIA PLT_CN 509642138126144 << FIA Forest Type:  809 Red maple / upland
+querrubr 75 (7330) 100 (3380)
+acersacc 50 (3184) 100 (1741)
+acerrubr 75 (2858)
+
+MapCode 5807 << FIA PLT_CN 509642139126144 << FIA Forest Type:  104 Eastern white pine / eastern hemlock
+tsugcana 25 (412) 50 (1205)
+fraxamer 75 (682)
+
+MapCode 5808 << FIA PLT_CN 509642140126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (6386) 75 (1954)
+acerrubr 75 (5481)
+querrubr 100 (3558)
+pinustro 100 (2255)
+picerube 50 (1587)
+
+MapCode 5809 << FIA PLT_CN 509642141126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+pinustro 75 (2088) 100 (5052)
+querrubr 100 (4926) 175 (1129)
+picerube 50 (1459) 75 (1194)
+acerrubr 75 (2290)
+
+MapCode 5811 << FIA PLT_CN 509642144126144 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 50 (2383) 75 (3548)
+querrubr 75 (972) 100 (1930)
+tsugcana 50 (700)
+
+MapCode 5812 << FIA PLT_CN 509642145126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 100 (1274) 175 (4438)
+tsugcana 50 (2293) 100 (1554)
+pinustro 75 (1431)
+
+MapCode 5813 << FIA PLT_CN 509642146126144 << FIA Forest Type:  123 Red spruce
+picerube 50 (3036) 75 (10304)
+pinurigi 50 (1707)
+acerrubr 50 (1102)
+
+MapCode 5836 << FIA PLT_CN 509642172126144 << FIA Forest Type:  123 Red spruce
+tsugcana 50 (5036) 75 (6772)
+picerube 75 (4513)
+acerrubr 50 (1355)
+
+MapCode 5837 << FIA PLT_CN 509642173126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 50 (796) 75 (583)
+acersacc 100 (1280)
+
+MapCode 5841 << FIA PLT_CN 509642177126144 << FIA Forest Type:  121 Balsam fir
+querrubr 125 (4895) 175 (4337)
+abiebals 50 (2727)
+acerrubr 50 (1395) 75 (1037)
+
+MapCode 5842 << FIA PLT_CN 509642178126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 25 (553) 50 (3239)
+popugran 50 (575) 75 (1692)
+fraxamer 50 (980)
+thujocci 50 (863)
+acerrubr 50 (740)
+
+MapCode 5843 << FIA PLT_CN 509642179126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 50 (1027) 75 (3358)
+acersacc 75 (2432)
+fagugran 25 (574)
+acerrubr 75 (471)
+
+MapCode 5844 << FIA PLT_CN 509642180126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 25 (448) 50 (718)
+fagugran 25 (274) 50 (237)
+fraxamer 50 (380)
+betualle 50 (223)
+abiebals 25 (158)
+
+MapCode 5846 << FIA PLT_CN 509642182126144 << FIA Forest Type:  901 Aspen
+thujocci 25 (922) 50 (2726)
+poputrem 50 (911) 75 (2466)
+popubals 50 (1623) 75 (1621)
+abiebals 25 (1235) 50 (1048)
+
+MapCode 5847 << FIA PLT_CN 509642183126144 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (3758) 50 (1786)
+thujocci 25 (461) 50 (1227)
+acerrubr 25 (1267)
+
+MapCode 5848 << FIA PLT_CN 509642184126144 << FIA Forest Type:  121 Balsam fir
+acerrubr 50 (2852) 75 (1761)
+querrubr 75 (3266)
+betupapy 75 (1667)
+abiebals 50 (943)
+piceglau 75 (936)
+
+MapCode 5851 << FIA PLT_CN 509642187126144 << FIA Forest Type:  902 Paper birch
+betupapy 25 (687) 50 (2881) 75 (611)
+acerrubr 75 (2343)
+tsugcana 50 (2166)
+acersacc 75 (600)
+
+MapCode 5852 << FIA PLT_CN 509642188126144 << FIA Forest Type:  127 Northern white-cedar
+tsugcana 50 (5171)
+betualle 25 (2005) 50 (1417)
+acersacc 50 (1604)
+fraxamer 75 (1440)
+fagugran 50 (1214)
+
+MapCode 5853 << FIA PLT_CN 509642189126144 << FIA Forest Type:  701 Black ash / American elm / red maple
+betualle 50 (4765)
+fraxnigr 50 (4085)
+fraxamer 50 (1354) 75 (1571)
+thujocci 25 (2362)
+
+MapCode 5854 << FIA PLT_CN 509642190126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betupopu 50 (2120)
+acerrubr 50 (806) 75 (512)
+poputrem 50 (320) 75 (505)
+prunsero 50 (437)
+ulmuamer 75 (326)
+
+MapCode 5855 << FIA PLT_CN 509642191126144 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (600) 50 (2234)
+thujocci 25 (879) 50 (1935)
+acerrubr 50 (905) 75 (658)
+
+MapCode 5856 << FIA PLT_CN 509642192126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (2032) 75 (23670)
+acerrubr 50 (1926) 75 (3839)
+
+MapCode 5857 << FIA PLT_CN 509642193126144 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (2197) 75 (1897)
+acerrubr 75 (1982) 100 (626)
+poputrem 100 (627)
+popugran 75 (581)
+
+MapCode 5858 << FIA PLT_CN 509642200126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (3477) 75 (6039)
+querrubr 75 (5657)
+betualle 50 (2180)
+fagugran 50 (1937)
+
+MapCode 5859 << FIA PLT_CN 509642201126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+pinustro 75 (2272) 100 (2887)
+acerrubr 50 (1218) 75 (899)
+querrubr 25 (862) 75 (809)
+betupapy 75 (1083)
+fagugran 25 (726)
+
+MapCode 5860 << FIA PLT_CN 509642202126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (2045) 75 (17705) 100 (4411)
+fraxamer 25 (2772)
+
+MapCode 5862 << FIA PLT_CN 509642207126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (5644) 75 (1651)
+fraxamer 50 (1103) 75 (2060)
+ostrvirg 25 (1015)
+
+MapCode 5864 << FIA PLT_CN 509642210126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 75 (23896)
+
+MapCode 5866 << FIA PLT_CN 509642213126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+pinustro 75 (6044)
+acerrubr 75 (4639)
+fraxamer 75 (877)
+
+MapCode 5867 << FIA PLT_CN 509642214126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (2616) 75 (17992)
+pinustro 75 (2428) 100 (5481)
+acerrubr 75 (7030)
+betualle 50 (2773)
+querrubr 50 (2513)
+
+MapCode 5868 << FIA PLT_CN 509642217126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (5660) 75 (4931)
+pinustro 75 (3480)
+tsugcana 50 (1360)
+
+MapCode 5869 << FIA PLT_CN 509642220126144 << FIA Forest Type:  708 Red maple / lowland
+pinustro 50 (2181) 75 (15265)
+acerrubr 50 (3177)
+querrubr 50 (3162)
+
+MapCode 5870 << FIA PLT_CN 509642221126144 << FIA Forest Type:  409 Other pine / hardwood
+pinustro 75 (10775)
+acerrubr 25 (1839) 50 (2684)
+
+MapCode 5873 << FIA PLT_CN 509642224126144 << FIA Forest Type:  127 Northern white-cedar
+thujocci 25 (2083) 50 (1927)
+acerrubr 75 (1815)
+abiebals 50 (1161)
+piceglau 75 (517)
+
+MapCode 5885 << FIA PLT_CN 509642241126144 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (5189) 75 (3263)
+acerrubr 50 (1761)
+piceglau 75 (965)
+
+MapCode 5920 << FIA PLT_CN 509642276126144 << FIA Forest Type:  127 Northern white-cedar
+pinustro 175 (10512)
+thujocci 50 (3437)
+acerrubr 75 (3126)
+betualle 50 (1705)
+abiebals 50 (1497)
+
+MapCode 5921 << FIA PLT_CN 509642277126144 << FIA Forest Type:  124 Red spruce / balsam fir
+pinustro 75 (5283)
+acerrubr 50 (1645) 75 (2315)
+abiebals 25 (992) 50 (2031)
+piceglau 75 (760)
+
+MapCode 5923 << FIA PLT_CN 509642279126144 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (7504)
+thujocci 50 (3578)
+pinustro 75 (1161)
+abiebals 50 (1011)
+
+MapCode 5924 << FIA PLT_CN 509642280126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (1089) 75 (1099)
+abiebals 50 (1906)
+popugran 75 (487) 100 (621)
+betualle 75 (756)
+acersacc 75 (693)
+
+MapCode 5925 << FIA PLT_CN 509642282126144 << FIA Forest Type:  901 Aspen
+acerrubr 25 (1833) 50 (2583) 75 (795)
+betupapy 50 (3187)
+fraxamer 50 (1639)
+poputrem 50 (1060)
+
+MapCode 5930 << FIA PLT_CN 509642288126144 << FIA Forest Type:  103 Eastern white pine
+popugran 75 (2872) 108 (3185)
+pinustro 75 (5796)
+acerrubr 50 (2367)
+
+MapCode 5931 << FIA PLT_CN 509642289126144 << FIA Forest Type:  103 Eastern white pine
+abiebals 25 (2026) 50 (2670)
+acerrubr 50 (3911)
+poputrem 50 (1475)
+pinustro 50 (1271)
+acersacc 50 (850)
+
+MapCode 5933 << FIA PLT_CN 509642294126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 25 (1464) 50 (4412)
+fagugran 50 (1725)
+betualle 50 (1715)
+fraxamer 50 (962)
+ostrvirg 50 (629)
+
+MapCode 5935 << FIA PLT_CN 509642297126144 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 50 (2100) 75 (5145)
+poputrem 25 (721) 125 (3100)
+fraxamer 25 (1042) 50 (1200)
+
+MapCode 5936 << FIA PLT_CN 509642299126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 75 (2034) 100 (3970)
+abiebals 50 (1549) 75 (1602)
+tsugcana 100 (2566)
+fraxamer 175 (2176)
+larilari 175 (1707)
+
+MapCode 5937 << FIA PLT_CN 509642300126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 25 (752)
+acerrubr 25 (103)
+
+MapCode 5940 << FIA PLT_CN 509642304126144 << FIA Forest Type:  701 Black ash / American elm / red maple
+fraxamer 50 (2381) 75 (759)
+acerrubr 50 (1159) 75 (1383)
+betupopu 25 (1758)
+ulmuamer 50 (584) 75 (585)
+querrubr 50 (643)
+
+MapCode 5941 << FIA PLT_CN 509642306126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+querrubr 50 (5124)
+fagugran 25 (1396) 50 (2059)
+acerrubr 50 (2371)
+tsugcana 50 (1241)
+acersacc 50 (824)
+
+MapCode 5943 << FIA PLT_CN 509642308126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+acersacc 50 (1355) 75 (13151)
+acerrubr 75 (2292)
+
+MapCode 5944 << FIA PLT_CN 509642309126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (1955) 75 (867) 100 (2399)
+fagugran 50 (3554)
+ostrvirg 25 (951) 50 (1815)
+acerrubr 75 (1010)
+
+MapCode 5946 << FIA PLT_CN 509642311126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 75 (9416) 100 (10289)
+
+MapCode 5947 << FIA PLT_CN 509642312126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+pinustro 75 (9271)
+pinuresi 75 (3963)
+acerrubr 75 (3131)
+fagugran 75 (1769)
+tsugcana 50 (1314)
+
+MapCode 5948 << FIA PLT_CN 509642313126144 << FIA Forest Type:  103 Eastern white pine
+fraxamer 50 (2177)
+betupapy 50 (1836)
+prunsero 25 (394)
+
+MapCode 5949 << FIA PLT_CN 509642314126144 << FIA Forest Type:  409 Other pine / hardwood
+pinustro 50 (3265) 75 (11198) 100 (9800)
+querrubr 50 (5221)
+acerrubr 50 (4940)
+
+MapCode 5950 << FIA PLT_CN 509642317126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (766) 75 (5112)
+betupapy 125 (785)
+acerrubr 25 (568)
+querrubr 75 (526)
+
+MapCode 5951 << FIA PLT_CN 509642318126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 25 (1007) 50 (3269) 75 (5045)
+pinustro 75 (6456)
+acerrubr 50 (1139) 75 (935)
+
+MapCode 5952 << FIA PLT_CN 509642319126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+pinustro 50 (1864) 75 (2090)
+
+MapCode 5953 << FIA PLT_CN 509642320126144 << FIA Forest Type:  104 Eastern white pine / eastern hemlock
+pinustro 50 (694) 75 (4141)
+tsugcana 50 (3522)
+
+MapCode 5954 << FIA PLT_CN 509642321126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 75 (880) 100 (3463)
+acerrubr 100 (3124)
+tsugcana 75 (1161) 125 (1818)
+
+MapCode 5956 << FIA PLT_CN 509642323126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+tsugcana 50 (5367)
+fraxamer 50 (1850) 75 (3012)
+querrubr 50 (1148) 75 (1060)
+betupapy 50 (1314)
+larilari 75 (1314)
+
+MapCode 5957 << FIA PLT_CN 509642324126144 << FIA Forest Type:  505 Northern red oak
+querrubr 50 (6451) 100 (5162)
+queralba 75 (9142)
+acerrubr 50 (2753) 75 (2948)
+
+MapCode 5958 << FIA PLT_CN 509642325126144 << FIA Forest Type:  903 Gray birch
+tsugcana 50 (1231) 75 (310)
+pinustro 50 (1070)
+prunsero 50 (653)
+acerrubr 75 (589)
+betupopu 25 (481)
+
+MapCode 5959 << FIA PLT_CN 509642326126144 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 50 (1867) 75 (6711)
+pinustro 50 (976) 75 (3800)
+querrubr 50 (885)
+queralba 75 (870)
+
+MapCode 5961 << FIA PLT_CN 509642328126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (4601)
+acerrubr 50 (801) 75 (1348)
+betulent 50 (1439)
+
+MapCode 5964 << FIA PLT_CN 509642331126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 75 (9083)
+querrubr 75 (1287)
+acerrubr 75 (720)
+
+MapCode 5965 << FIA PLT_CN 509642332126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 25 (412) 50 (706) 75 (2650)
+acerrubr 50 (413)
+picerube 50 (367)
+acersacc 50 (300)
+
+MapCode 6006 << FIA PLT_CN 509642378126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 75 (4371) 100 (1948)
+pinustro 100 (3186)
+abiebals 25 (1313)
+fraxamer 75 (1025)
+
+MapCode 6008 << FIA PLT_CN 509642381126144 << FIA Forest Type:  903 Gray birch
+betupopu 10 (322)
+acerrubr 10 (270)
+pinustro 50 (122)
+abiebals 10 (57) 25 (57)
+
+MapCode 6012 << FIA PLT_CN 509642385126144 << FIA Forest Type:  505 Northern red oak
+querrubr 75 (8672) 100 (1366) 125 (3224)
+pinustro 100 (2574)
+acerrubr 50 (1555)
+
+MapCode 6016 << FIA PLT_CN 509642390126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+pinustro 100 (2108) 175 (7433)
+querrubr 75 (1994)
+acersacc 50 (1214)
+fagugran 50 (1033)
+acerrubr 50 (875)
+
+MapCode 6017 << FIA PLT_CN 509642391126144 << FIA Forest Type:  122 White spruce
+betupapy 25 (881) 50 (784) 75 (8304)
+acerrubr 50 (2175)
+abiebals 50 (1403)
+piceglau 50 (1152)
+
+MapCode 6063 << FIA PLT_CN 509642445126144 << FIA Forest Type:  121 Balsam fir
+acerrubr 50 (2979) 75 (1576)
+abiebals 25 (582) 50 (1687) 75 (859) 175 (510)
+betualle 75 (825)
+
+MapCode 6087 << FIA PLT_CN 509642470126144 << FIA Forest Type:  809 Red maple / upland
+tsugcana 50 (6429)
+acerrubr 50 (3552) 75 (1508)
+acersacc 50 (4934)
+abiebals 50 (3992)
+betupapy 75 (1496)
+
+MapCode 6088 << FIA PLT_CN 509642471126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (1269) 75 (4404)
+tsugcana 50 (2325) 100 (2800)
+betupapy 125 (1004)
+
+MapCode 6093 << FIA PLT_CN 509642478126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 75 (1156) 100 (4198) 125 (4847)
+ulmuamer 50 (979)
+abiebals 75 (801)
+
+MapCode 6094 << FIA PLT_CN 509642479126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 50 (5625) 75 (3232)
+acersacc 50 (1462)
+ostrvirg 25 (916)
+acerrubr 50 (766)
+
+MapCode 6098 << FIA PLT_CN 509642483126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (12372) 75 (23896)
+acerrubr 50 (3361)
+
+MapCode 6099 << FIA PLT_CN 509642484126144 << FIA Forest Type:  104 Eastern white pine / eastern hemlock
+tsugcana 25 (549) 50 (535) 75 (1557)
+acerrubr 75 (1112) 100 (1163)
+picerube 75 (588)
+betupapy 125 (502)
+
+MapCode 6101 << FIA PLT_CN 509642487126144 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (2294)
+piceglau 75 (172)
+abiebals 75 (160)
+
+MapCode 6109 << FIA PLT_CN 509642496126144 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (4906) 75 (2119) 100 (2179)
+larilari 75 (1376) 100 (1277) 125 (2591)
+picemari 100 (1409)
+
+MapCode 6195 << FIA PLT_CN 509642588126144 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (5875)
+abiebals 25 (1884) 50 (2370)
+
+MapCode 7263 << FIA PLT_CN 511084176126144 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 25 (524) 50 (919)
+poputrem 50 (891)
+pinustro 50 (352)
+
+MapCode 7264 << FIA PLT_CN 511084177126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (10609) 75 (9866)
+querrubr 50 (8806)
+
+MapCode 7267 << FIA PLT_CN 511084183126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 50 (2246) 75 (3192)
+ostrvirg 25 (1676)
+acerrubr 50 (1422)
+
+MapCode 7268 << FIA PLT_CN 511084184126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (3943) 75 (2279)
+betulent 25 (807) 50 (3331)
+tsugcana 50 (2667)
+acersacc 50 (822)
+
+MapCode 7269 << FIA PLT_CN 511084185126144 << FIA Forest Type:  409 Other pine / hardwood
+quervelu 50 (3090) 75 (1934) 100 (799)
+querrubr 50 (2521) 75 (1960)
+queralba 50 (1771)
+acerrubr 50 (1042)
+pinustro 75 (889)
+
+MapCode 7303 << FIA PLT_CN 511084227126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (3100) 100 (1513)
+acerrubr 75 (2617)
+pinustro 75 (1641)
+betualle 50 (1442)
+querrubr 75 (998)
+
+MapCode 7304 << FIA PLT_CN 511084228126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 25 (1519) 50 (2950)
+fraxamer 25 (1018) 50 (1432) 75 (1866)
+acerrubr 50 (2578)
+acersacc 25 (1716)
+betupapy 50 (1712)
+
+MapCode 7322 << FIA PLT_CN 511084362126144 << FIA Forest Type:  503 White oak / red oak / hickory
+querrubr 75 (7077) 125 (13663) 175 (21423)
+fraxamer 75 (5741) 100 (18526)
+quervelu 75 (6080)
+
+MapCode 7324 << FIA PLT_CN 511084365126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (2731) 75 (1545)
+picerube 50 (914)
+acersacc 100 (698)
+betualle 75 (665)
+pinustro 75 (533)
+
+MapCode 7326 << FIA PLT_CN 511084367126144 << FIA Forest Type:  809 Red maple / upland
+fraxamer 50 (2557) 75 (2282)
+acerrubr 50 (1924) 75 (1033)
+acersacc 75 (696)
+ulmuamer 50 (567)
+
+MapCode 7327 << FIA PLT_CN 511084368126144 << FIA Forest Type:  503 White oak / red oak / hickory
+queralba 50 (5352) 75 (2989)
+querrubr 75 (3969)
+betulent 50 (2024)
+acerrubr 50 (1323)
+pinustro 75 (1277)
+
+MapCode 7328 << FIA PLT_CN 511084369126144 << FIA Forest Type:  104 Eastern white pine / eastern hemlock
+tsugcana 50 (3673)
+pinustro 50 (636) 75 (2873)
+fraxamer 50 (1886)
+querrubr 50 (846)
+
+MapCode 7329 << FIA PLT_CN 511084370126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (1906) 75 (18067)
+acerrubr 50 (3182)
+betupapy 50 (1715)
+
+MapCode 7340 << FIA PLT_CN 511084385126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+acerrubr 50 (3445) 75 (4899)
+querrubr 50 (2059) 75 (5182)
+fraxamer 50 (2675) 75 (3360)
+
+MapCode 7348 << FIA PLT_CN 511084393126144 << FIA Forest Type:  123 Red spruce
+acerrubr 75 (4096) 100 (6444)
+tsugcana 50 (1903) 75 (1954) 100 (1803)
+picerube 75 (2534)
+
+MapCode 7351 << FIA PLT_CN 511084396126144 << FIA Forest Type:  505 Northern red oak
+querrubr 50 (1556) 75 (4040) 100 (1721) 125 (2568)
+popugran 50 (846) 75 (1822)
+acerrubr 50 (782)
+fagugran 50 (773)
+
+MapCode 8658 << FIA PLT_CN 511268792126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (2842)
+betualle 50 (2696)
+fagugran 25 (445) 50 (1026)
+betupapy 50 (993)
+
+MapCode 8665 << FIA PLT_CN 511268800126144 << FIA Forest Type:  809 Red maple / upland
+prunsero 75 (4763)
+picerube 75 (1087) 100 (1641)
+tsugcana 75 (2524)
+acerrubr 75 (2493)
+betupapy 100 (1106)
+
+MapCode 9215 << FIA PLT_CN 514077776126144 << FIA Forest Type:  517 Elm / ash / black locust
+prunsero 50 (1098)
+
+MapCode 9308 << FIA PLT_CN 514077989126144 << FIA Forest Type:  901 Aspen
+betupapy 50 (6067)
+poputrem 50 (5349)
+
+MapCode 9786 << FIA PLT_CN 514079555126144 << FIA Forest Type:  901 Aspen
+querrubr 50 (255) 75 (3286)
+pinustro 50 (635)
+popugran 50 (262)
+
+MapCode 9946 << FIA PLT_CN 514080132126144 << FIA Forest Type:  901 Aspen
+poputrem 50 (4715) 75 (1347)
+
+MapCode 10308 << FIA PLT_CN 532495186126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 75 (2119) 100 (4003)
+poputrem 100 (1585) 125 (1703) 175 (920)
+piceglau 100 (1521)
+abiebals 50 (1404)
+
+MapCode 10309 << FIA PLT_CN 532495187126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 25 (1083) 50 (2151) 75 (5137)
+acerrubr 50 (1949) 75 (6060)
+fraxnigr 75 (1292)
+
+MapCode 10310 << FIA PLT_CN 532495188126144 << FIA Forest Type:  101 Jack pine
+pinustro 75 (4512)
+
+MapCode 10353 << FIA PLT_CN 532495309126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (606) 75 (7130)
+betupapy 50 (757)
+abiebals 25 (542)
+
+MapCode 10354 << FIA PLT_CN 532495311126144 << FIA Forest Type:  901 Aspen
+pinuresi 50 (8002)
+poputrem 50 (1887) 75 (4654)
+
+MapCode 10355 << FIA PLT_CN 532495313126144 << FIA Forest Type:  901 Aspen
+poputrem 50 (9286) 75 (1650)
+tiliamer 25 (1064)
+
+MapCode 10376 << FIA PLT_CN 532495362126144 << FIA Forest Type:  901 Aspen
+acersacc 75 (378) 100 (1154) 125 (2205)
+poputrem 175 (1672)
+ostrvirg 75 (566)
+
+MapCode 10436 << FIA PLT_CN 532495480126144 << FIA Forest Type:  102 Red pine
+betupapy 50 (2945)
+pinuresi 25 (1613)
+prunsero 25 (293)
+
+MapCode 10723 << FIA PLT_CN 532496173126144 << FIA Forest Type:  901 Aspen
+poputrem 50 (3148) 75 (6994)
+tiliamer 75 (1298) 100 (1799)
+acersacc 75 (983)
+
+MapCode 10841 << FIA PLT_CN 532496403126144 << FIA Forest Type:  102 Red pine
+pinuresi 75 (11464)
+
+MapCode 10842 << FIA PLT_CN 532496404126144 << FIA Forest Type:  805 Hard maple / basswood
+acersacc 50 (3057)
+tiliamer 50 (2318)
+acerrubr 50 (939) 75 (675)
+
+MapCode 10843 << FIA PLT_CN 532496407126144 << FIA Forest Type:  901 Aspen
+betupapy 50 (2555) 75 (1439)
+acersacc 50 (748) 75 (3044)
+poputrem 50 (2700)
+tsugcana 50 (1137)
+
+MapCode 10849 << FIA PLT_CN 532496426126144 << FIA Forest Type:  127 Northern white-cedar
+larilari 50 (2122) 75 (4646)
+thujocci 50 (4733) 75 (1304)
+picemari 50 (1078)
+
+MapCode 10866 << FIA PLT_CN 532496467126144 << FIA Forest Type:  901 Aspen
+poputrem 50 (6300)
+acersacc 25 (3466) 75 (2540)
+popugran 50 (1010)
+
+MapCode 10870 << FIA PLT_CN 532496471126144 << FIA Forest Type:  125 Black spruce
+larilari 175 (5936)
+picemari 75 (1270)
+abiebals 50 (531)
+
+MapCode 11006 << FIA PLT_CN 532496742126144 << FIA Forest Type:  805 Hard maple / basswood
+acersacc 75 (4062) 100 (6913)
+acerrubr 50 (1168) 75 (3773)
+fraxamer 125 (1885)
+
+MapCode 11029 << FIA PLT_CN 532496785126144 << FIA Forest Type:  126 Tamarack
+larilari 50 (3690) 75 (5154)
+abiebals 50 (1192)
+poputrem 50 (950)
+picemari 50 (890)
+
+MapCode 11069 << FIA PLT_CN 532496864126144 << FIA Forest Type:  809 Red maple / upland
+acersacc 50 (1914) 75 (8225)
+betualle 50 (3361)
+querrubr 50 (1501) 75 (1378)
+poputrem 50 (2061)
+betupapy 50 (2023)
+
+MapCode 11419 << FIA PLT_CN 602592949126144 << FIA Forest Type:  506 Yellow-poplar / white oak / northern red oak
+quervelu 100 (3402) 175 (7438)
+queralba 75 (4085)
+betulent 50 (1542) 100 (1937)
+querrubr 100 (3321)
+fagugran 75 (2987)
+
+MapCode 12657 << FIA PLT_CN 606237267126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (1254) 75 (6676) 100 (8651)
+pinuresi 100 (1756)
+
+MapCode 12661 << FIA PLT_CN 606237271126144 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (1348) 75 (1545)
+tsugcana 75 (2381)
+acerrubr 75 (1491) 100 (707)
+abiebals 75 (1906)
+fagugran 50 (1043)
+
+MapCode 12672 << FIA PLT_CN 606237285126144 << FIA Forest Type:  123 Red spruce
+acerrubr 25 (1063) 50 (331) 75 (696)
+pinustro 125 (2000)
+picerube 75 (561)
+tsugcana 50 (453)
+thujocci 50 (335)
+
+MapCode 12674 << FIA PLT_CN 606237288126144 << FIA Forest Type:  124 Red spruce / balsam fir
+acerrubr 75 (1278) 100 (2589)
+abiebals 50 (1664)
+tsugcana 75 (1286)
+betualle 100 (955)
+picerube 75 (926)
+
+MapCode 12676 << FIA PLT_CN 606237290126144 << FIA Forest Type:  103 Eastern white pine
+picerube 50 (1268) 75 (1372) 100 (1180)
+pinustro 75 (1718) 100 (1957)
+tsugcana 75 (2314)
+acerrubr 100 (1926)
+abiebals 50 (1054)
+
+MapCode 12677 << FIA PLT_CN 606237291126144 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 25 (916) 50 (3154) 75 (777)
+acerrubr 50 (1338) 75 (1011)
+picerube 50 (1423) 75 (775)
+pinustro 75 (1095)
+
+MapCode 12693 << FIA PLT_CN 606237313126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+poputrem 50 (1388)
+fagugran 10 (683) 25 (317)
+abiebals 25 (596)
+
+MapCode 12694 << FIA PLT_CN 606237314126144 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (843) 50 (2929) 75 (1281) 100 (970)
+larilari 175 (3310)
+betupapy 125 (1406)
+poputrem 75 (1109)
+picerube 50 (861)
+
+MapCode 12695 << FIA PLT_CN 606237315126144 << FIA Forest Type:  123 Red spruce
+abiebals 25 (920) 50 (1318)
+thujocci 50 (1451) 75 (696)
+betualle 50 (1185) 75 (541)
+tsugcana 75 (1187)
+piceglau 75 (924)
+
+MapCode 12696 << FIA PLT_CN 606237316126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 50 (556) 75 (2116)
+fagugran 25 (1667)
+betualle 50 (829)
+acerrubr 50 (425)
+
+MapCode 12697 << FIA PLT_CN 606237317126144 << FIA Forest Type:  124 Red spruce / balsam fir
+acerrubr 50 (375) 75 (2333)
+abiebals 25 (545) 50 (1101)
+thujocci 50 (269)
+
+MapCode 12698 << FIA PLT_CN 606237319126144 << FIA Forest Type:  124 Red spruce / balsam fir
+tsugcana 50 (1501) 75 (886)
+abiebals 25 (1354) 50 (391)
+betualle 50 (702)
+acerrubr 50 (456)
+fagugran 25 (450)
+
+MapCode 12699 << FIA PLT_CN 606237320126144 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (1191) 50 (2805)
+pinustro 50 (1336) 75 (1279)
+
+MapCode 12705 << FIA PLT_CN 606237327126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+picerube 50 (1471) 75 (7208)
+fagugran 25 (768)
+betualle 75 (650)
+
+MapCode 12706 << FIA PLT_CN 606237328126144 << FIA Forest Type:  809 Red maple / upland
+popugran 50 (1289) 75 (1704)
+pinuresi 75 (2643)
+pinustro 50 (1926)
+abiebals 25 (1249)
+acerrubr 50 (1162)
+
+MapCode 12707 << FIA PLT_CN 606237329126144 << FIA Forest Type:  102 Red pine
+pinuresi 75 (10219)
+pinustro 75 (9496)
+
+MapCode 12708 << FIA PLT_CN 606237330126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (4261) 75 (3630)
+picerube 50 (5651)
+
+MapCode 12711 << FIA PLT_CN 606237333126144 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (2477)
+pinustro 75 (1862)
+abiebals 25 (383)
+
+MapCode 12712 << FIA PLT_CN 606237334126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 50 (3695) 75 (5931)
+betualle 50 (1339) 75 (2584)
+acersacc 50 (3531)
+
+MapCode 12715 << FIA PLT_CN 606237337126144 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (1177) 75 (2631) 100 (1602)
+tsugcana 50 (1676) 75 (2717)
+acerrubr 75 (1914) 100 (929)
+pinustro 100 (1593)
+
+MapCode 12716 << FIA PLT_CN 606237338126144 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (1451)
+pinustro 50 (284) 75 (631)
+abiebals 50 (681)
+
+MapCode 12730 << FIA PLT_CN 606237357126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 25 (803) 50 (1076)
+betupapy 50 (1523)
+acerrubr 50 (1465)
+abiebals 50 (1338)
+betupopu 75 (826)
+
+MapCode 12735 << FIA PLT_CN 606237362126144 << FIA Forest Type:  126 Tamarack
+larilari 25 (153) 50 (920)
+
+MapCode 12736 << FIA PLT_CN 606237363126144 << FIA Forest Type:  104 Eastern white pine / eastern hemlock
+tsugcana 50 (6369)
+acerrubr 50 (1481)
+pinustro 75 (1148)
+picerube 50 (1086)
+betupapy 50 (686)
+
+MapCode 12738 << FIA PLT_CN 606237365126144 << FIA Forest Type:  124 Red spruce / balsam fir
+pinustro 75 (4424)
+acerrubr 50 (2252) 75 (1421)
+abiebals 50 (2266)
+picerube 50 (1358)
+
+MapCode 12740 << FIA PLT_CN 606237367126144 << FIA Forest Type:  103 Eastern white pine
+betupopu 25 (3819) 50 (518)
+abiebals 25 (1067) 50 (433)
+acerrubr 25 (395) 50 (456)
+
+MapCode 12741 << FIA PLT_CN 606237368126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (2252) 75 (2945)
+fagugran 25 (713) 50 (1779)
+acersacc 50 (931)
+
+MapCode 12743 << FIA PLT_CN 606237372126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (1625) 100 (3705)
+acerrubr 50 (2574)
+pinuresi 75 (2376)
+querrubr 50 (2263)
+betupapy 50 (849)
+
+MapCode 12746 << FIA PLT_CN 606237377126144 << FIA Forest Type:  103 Eastern white pine
+fraxamer 75 (6423)
+pinustro 75 (4696)
+querrubr 75 (4063)
+tsugcana 75 (2696)
+fagugran 50 (1839)
+
+MapCode 12747 << FIA PLT_CN 606237378126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (749) 75 (5143)
+poputrem 100 (820)
+abiebals 50 (764)
+
+MapCode 12751 << FIA PLT_CN 606237382126144 << FIA Forest Type:  103 Eastern white pine
+thujocci 50 (5165)
+pinustro 75 (4271)
+piceglau 50 (1921) 75 (1071)
+
+MapCode 12760 << FIA PLT_CN 606237391126144 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 25 (1876) 50 (1257)
+picerube 50 (3043)
+acerrubr 50 (2062)
+tsugcana 25 (1645)
+thujocci 50 (801)
+
+MapCode 12763 << FIA PLT_CN 606237394126144 << FIA Forest Type:  105 Eastern hemlock
+pinustro 125 (2310) 175 (2383)
+tsugcana 50 (651) 75 (2556) 100 (828)
+
+MapCode 12764 << FIA PLT_CN 606237395126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (2720) 75 (408)
+fagugran 25 (330) 50 (1550)
+
+MapCode 12770 << FIA PLT_CN 606237401126144 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (1632) 75 (1691) 100 (1375)
+acerrubr 75 (960) 100 (2192)
+tsugcana 50 (3110)
+thujocci 75 (1176)
+
+MapCode 12773 << FIA PLT_CN 606237404126144 << FIA Forest Type:  901 Aspen
+abiebals 25 (2998) 50 (928)
+acerrubr 25 (1310) 50 (1999)
+poputrem 50 (608) 75 (2245)
+larilari 50 (1003)
+
+MapCode 12776 << FIA PLT_CN 606237407126144 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 25 (502) 50 (1474)
+picerube 50 (1440) 75 (367)
+thujocci 50 (545)
+betualle 50 (419)
+betupapy 25 (410)
+
+MapCode 12777 << FIA PLT_CN 606237408126144 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (1607)
+prunsero 50 (315)
+ulmuamer 50 (215)
+larilari 25 (173)
+acerrubr 50 (163)
+
+MapCode 12778 << FIA PLT_CN 606237409126144 << FIA Forest Type:  124 Red spruce / balsam fir
+pinustro 50 (823) 75 (2013)
+thujocci 50 (938) 75 (1517)
+picerube 50 (2171)
+acerrubr 75 (1161)
+piceglau 75 (592)
+
+MapCode 12782 << FIA PLT_CN 606237413126144 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (3645) 75 (1028)
+acerrubr 75 (1964)
+betualle 50 (875)
+picerube 75 (875)
+abiebals 75 (646)
+
+MapCode 12783 << FIA PLT_CN 606237414126144 << FIA Forest Type:  104 Eastern white pine / eastern hemlock
+pinustro 175 (5328)
+tsugcana 75 (1652)
+
+MapCode 12785 << FIA PLT_CN 606237416126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fraxamer 50 (3542) 75 (1870)
+acerrubr 25 (1427) 50 (3188)
+fagugran 25 (1172)
+acersacc 50 (976)
+betupapy 50 (688)
+
+MapCode 12788 << FIA PLT_CN 606237419126144 << FIA Forest Type:  121 Balsam fir
+tsugcana 50 (1149) 75 (885)
+acerrubr 75 (1359)
+betualle 75 (934)
+popugran 108 (642)
+abiebals 50 (391)
+
+MapCode 12790 << FIA PLT_CN 606237421126144 << FIA Forest Type:  701 Black ash / American elm / red maple
+acerrubr 50 (1353) 75 (1890)
+picerube 50 (838) 75 (1650)
+abiebals 50 (1984)
+thujocci 50 (916)
+
+MapCode 12791 << FIA PLT_CN 606237422126144 << FIA Forest Type:  121 Balsam fir
+pinustro 50 (1136)
+thujocci 25 (204) 50 (190)
+acerrubr 50 (335)
+larilari 25 (277)
+prunsero 50 (237)
+
+MapCode 12792 << FIA PLT_CN 606237423126144 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 25 (749) 50 (3616)
+pinustro 50 (2967)
+queralba 50 (2501)
+acersacc 75 (1161)
+betupapy 50 (1044)
+
+MapCode 12793 << FIA PLT_CN 606237424126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 50 (966) 75 (3796)
+abiebals 25 (1982)
+betupapy 50 (976) 75 (879)
+pinustro 50 (1357)
+
+MapCode 12794 << FIA PLT_CN 606237425126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (2411)
+pinuresi 50 (2018)
+betupapy 25 (1349)
+piceglau 25 (596)
+betupopu 25 (471)
+
+MapCode 12795 << FIA PLT_CN 606237426126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 25 (792) 50 (4542)
+abiebals 25 (3678)
+pinustro 75 (2253)
+
+MapCode 12796 << FIA PLT_CN 606237427126144 << FIA Forest Type:  121 Balsam fir
+acerrubr 25 (846) 50 (2856)
+pinustro 75 (2530)
+piceglau 75 (1490)
+abiebals 25 (518)
+
+MapCode 12797 << FIA PLT_CN 606237429126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (471) 75 (1786)
+fagugran 50 (873)
+ostrvirg 50 (713)
+betupapy 75 (584)
+acersacc 25 (494)
+
+MapCode 12798 << FIA PLT_CN 606237430126144 << FIA Forest Type:  505 Northern red oak
+querrubr 50 (9198) 75 (2479)
+fagugran 25 (1179) 50 (2562)
+acerrubr 50 (1373)
+betupapy 50 (1235)
+
+MapCode 12801 << FIA PLT_CN 606237433126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (2284) 75 (10461) 100 (1188)
+poputrem 75 (1365)
+
+MapCode 12802 << FIA PLT_CN 606237434126144 << FIA Forest Type:  701 Black ash / American elm / red maple
+fraxnigr 50 (3013) 75 (3802)
+tiliamer 50 (964) 75 (893)
+acerrubr 50 (1831)
+
+MapCode 12803 << FIA PLT_CN 606237435126144 << FIA Forest Type:  125 Black spruce
+picemari 25 (1865) 50 (1953)
+acerrubr 50 (3619)
+thujocci 25 (1254)
+larilari 25 (1231)
+
+MapCode 12804 << FIA PLT_CN 606237436126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 75 (1004) 100 (1523) 125 (1368) 175 (2559)
+querrubr 175 (2722)
+tsugcana 75 (2012)
+
+MapCode 12805 << FIA PLT_CN 606237437126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 25 (866) 50 (4717)
+tsugcana 50 (4885)
+acerrubr 50 (851)
+
+MapCode 12810 << FIA PLT_CN 606237444126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 75 (4075)
+
+MapCode 12811 << FIA PLT_CN 606237445126144 << FIA Forest Type:  708 Red maple / lowland
+pinustro 75 (11884)
+acerrubr 25 (1737) 50 (2545) 75 (3768)
+
+MapCode 12813 << FIA PLT_CN 606237448126144 << FIA Forest Type:  409 Other pine / hardwood
+querrubr 50 (6054) 75 (7609) 100 (21423)
+acerrubr 50 (4024)
+
+MapCode 12814 << FIA PLT_CN 606237449126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 50 (3019) 75 (2132)
+pinustro 50 (1965) 75 (888)
+acerrubr 50 (2029)
+ostrvirg 25 (754)
+
+MapCode 12838 << FIA PLT_CN 606237484126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 25 (1371) 50 (1515)
+betualle 25 (484)
+abiebals 25 (318)
+betupapy 25 (310)
+acerrubr 25 (293)
+
+MapCode 12848 << FIA PLT_CN 606237494126144 << FIA Forest Type:  121 Balsam fir
+pinustro 75 (5602)
+abiebals 50 (4409)
+prunsero 50 (890)
+acerrubr 50 (631)
+
+MapCode 12849 << FIA PLT_CN 606237495126144 << FIA Forest Type:  124 Red spruce / balsam fir
+fagugran 50 (3213)
+abiebals 50 (1118)
+acerrubr 25 (583)
+picerube 50 (512)
+
+MapCode 12852 << FIA PLT_CN 606237498126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 75 (1086) 100 (1481)
+fagugran 25 (657) 50 (1541)
+betualle 75 (1799)
+acerrubr 25 (1789)
+ostrvirg 75 (703)
+
+MapCode 12855 << FIA PLT_CN 606237501126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (2554) 75 (6809)
+abiebals 50 (1289)
+acersacc 75 (1222)
+thujocci 50 (1192)
+
+MapCode 12856 << FIA PLT_CN 606237502126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fraxamer 50 (1156)
+
+MapCode 12857 << FIA PLT_CN 606237503126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 50 (381) 75 (1224)
+fagugran 50 (123)
+
+MapCode 12858 << FIA PLT_CN 606237504126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 75 (4728)
+ostrvirg 25 (1422) 50 (937)
+fagugran 50 (1471)
+acerrubr 50 (1042)
+poputrem 75 (961)
+
+MapCode 12859 << FIA PLT_CN 606237505126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fraxamer 25 (539) 50 (2702) 75 (1532)
+acerrubr 50 (1069)
+betualle 50 (1041)
+thujocci 50 (599)
+acersacc 75 (496)
+
+MapCode 12860 << FIA PLT_CN 606237506126144 << FIA Forest Type:  127 Northern white-cedar
+acerrubr 50 (862) 75 (357)
+thujocci 50 (941) 75 (256)
+betualle 100 (862)
+abiebals 25 (443)
+
+MapCode 12861 << FIA PLT_CN 606237507126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 50 (1001) 75 (1114) 175 (1031)
+abiebals 75 (1555) 125 (643)
+fagugran 50 (1613)
+betupapy 175 (1144)
+fraxamer 175 (1050)
+
+MapCode 12863 << FIA PLT_CN 606237509126144 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (1223) 75 (1560)
+abiebals 25 (979) 50 (758)
+acerrubr 50 (1694)
+fraxnigr 50 (1212)
+larilari 50 (1177)
+
+MapCode 12864 << FIA PLT_CN 606237510126144 << FIA Forest Type:  127 Northern white-cedar
+tsugcana 50 (4155)
+thujocci 50 (3301)
+acerrubr 75 (1436)
+betualle 50 (1223)
+fraxnigr 50 (964)
+
+MapCode 12865 << FIA PLT_CN 606237512126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (835) 75 (645)
+fraxamer 50 (1203)
+abiebals 25 (319) 50 (573)
+querrubr 75 (464)
+
+MapCode 12866 << FIA PLT_CN 606237513126144 << FIA Forest Type:  903 Gray birch
+abiebals 25 (652) 50 (1572) 75 (1084)
+poputrem 75 (2773)
+acerrubr 50 (1397) 75 (891)
+thujocci 50 (1367)
+
+MapCode 12867 << FIA PLT_CN 606237514126144 << FIA Forest Type:  903 Gray birch
+acerrubr 25 (685) 50 (2574)
+betupopu 25 (1284) 50 (761)
+fraxnigr 25 (542) 50 (724)
+
+MapCode 12868 << FIA PLT_CN 606237515126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 100 (2697) 125 (1740)
+tsugcana 50 (1567)
+fraxamer 175 (770)
+
+MapCode 12869 << FIA PLT_CN 606237516126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fraxamer 175 (3586)
+acerrubr 75 (1599) 125 (1032)
+querrubr 175 (1815)
+fagugran 75 (904)
+
+MapCode 12870 << FIA PLT_CN 606237518126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (1706) 75 (1730) 100 (2295)
+acersacc 75 (1136)
+acerrubr 75 (1125)
+fagugran 100 (940)
+
+MapCode 12871 << FIA PLT_CN 606237520126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+pinustro 50 (531) 75 (1515)
+acersacc 25 (590) 50 (1357)
+fraxamer 50 (529) 75 (1310)
+fagugran 50 (1337)
+querrubr 50 (599)
+
+MapCode 12872 << FIA PLT_CN 606237523126144 << FIA Forest Type:  121 Balsam fir
+pinustro 100 (2230) 175 (4280)
+abiebals 50 (2958)
+acerrubr 75 (1676)
+picerube 100 (1051)
+
+MapCode 12873 << FIA PLT_CN 606237524126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 25 (650) 50 (2176)
+acerrubr 50 (2637)
+fagugran 50 (2538)
+querrubr 50 (1332)
+
+MapCode 12874 << FIA PLT_CN 606237525126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (3553) 75 (6472)
+pinustro 125 (7248)
+querrubr 75 (6407)
+acerrubr 50 (2058)
+fagugran 50 (1958)
+
+MapCode 12875 << FIA PLT_CN 606237526126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+pinustro 50 (3609) 75 (6361)
+querrubr 50 (7886)
+
+MapCode 12876 << FIA PLT_CN 606237527126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (3343) 75 (884)
+abiebals 50 (1503) 75 (1069)
+acerrubr 75 (2224)
+pinustro 75 (1678)
+betupapy 50 (1061)
+
+MapCode 12877 << FIA PLT_CN 606237528126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 25 (5056) 50 (3371)
+fraxamer 25 (4941) 50 (1409)
+ostrvirg 25 (1918)
+
+MapCode 12878 << FIA PLT_CN 606237533126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (3621) 75 (8007)
+acerrubr 50 (1276) 75 (2959)
+acersacc 100 (3533)
+
+MapCode 12880 << FIA PLT_CN 606237535126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (2919) 75 (9611)
+fraxamer 100 (7422)
+acerrubr 75 (2803)
+
+MapCode 12881 << FIA PLT_CN 606237536126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+acerrubr 50 (10461)
+querrubr 75 (6862) 100 (3027)
+quervelu 75 (3918) 100 (2310)
+betupapy 50 (2494) 75 (2198)
+
+MapCode 12882 << FIA PLT_CN 606237538126144 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 50 (2633) 75 (3154)
+pinustro 75 (5639)
+
+MapCode 12883 << FIA PLT_CN 606237539126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 75 (5170) 100 (6098) 125 (6098)
+acerrubr 50 (7370) 75 (3304)
+fagugran 50 (3485) 75 (5241)
+tsugcana 50 (3078) 75 (4090)
+pinustro 75 (4322)
+
+MapCode 12884 << FIA PLT_CN 606237540126144 << FIA Forest Type:  701 Black ash / American elm / red maple
+acerrubr 50 (1205) 75 (2057)
+pinustro 75 (2485)
+ulmuamer 50 (1833)
+
+MapCode 12887 << FIA PLT_CN 606237546126144 << FIA Forest Type:  505 Northern red oak
+querrubr 50 (13270)
+
+MapCode 12915 << FIA PLT_CN 606237586126144 << FIA Forest Type:  901 Aspen
+popugran 75 (2119) 100 (2192) 108 (5717)
+fagugran 50 (750)
+
+MapCode 12923 << FIA PLT_CN 606237596126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (3112) 75 (2285)
+fagugran 25 (1140) 50 (3629)
+picerube 50 (2212)
+ostrvirg 50 (1013)
+
+MapCode 12924 << FIA PLT_CN 606237597126144 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 50 (1988) 75 (3959) 125 (2154)
+abiebals 50 (622) 75 (854)
+acersacc 50 (650)
+ostrvirg 50 (635)
+
+MapCode 12925 << FIA PLT_CN 606237598126144 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (4904)
+abiebals 25 (1474)
+tsugcana 50 (636)
+fagugran 25 (628)
+
+MapCode 12927 << FIA PLT_CN 606237600126144 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (2543) 75 (1315) 100 (533)
+abiebals 25 (1236) 50 (1926)
+prunsero 75 (721)
+
+MapCode 12929 << FIA PLT_CN 606237602126144 << FIA Forest Type:  102 Red pine
+pinuresi 50 (7752)
+betupopu 25 (5006)
+picemari 25 (1017)
+
+MapCode 12932 << FIA PLT_CN 606237605126144 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (994) 50 (3430)
+acerrubr 50 (2624)
+popugran 50 (645)
+
+MapCode 12933 << FIA PLT_CN 606237606126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fraxamer 50 (1380)
+acerrubr 50 (1308)
+popugran 25 (778)
+acersacc 50 (531)
+poputrem 25 (365)
+
+MapCode 12934 << FIA PLT_CN 606237607126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (2239) 75 (4474)
+acersacc 75 (1082) 100 (2348)
+poputrem 75 (1291)
+pinustro 75 (861)
+
+MapCode 12935 << FIA PLT_CN 606237608126144 << FIA Forest Type:  901 Aspen
+poputrem 75 (1710)
+acerrubr 50 (1138)
+prunsero 25 (359)
+
+MapCode 12936 << FIA PLT_CN 606237609126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (6211)
+pinustro 75 (4250)
+fraxamer 50 (1691)
+acersacc 100 (1055)
+fagugran 75 (942)
+
+MapCode 12937 << FIA PLT_CN 606237610126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (4231)
+betualle 25 (446) 50 (432)
+abiebals 50 (529)
+acersacc 50 (462)
+
+MapCode 12938 << FIA PLT_CN 606237612126144 << FIA Forest Type:  708 Red maple / lowland
+pinustro 100 (4000) 125 (2864)
+fraxnigr 50 (1686)
+acerrubr 50 (1155)
+thujocci 50 (895)
+
+MapCode 12939 << FIA PLT_CN 606237614126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (4371) 75 (703)
+acerrubr 50 (2805)
+pinustro 50 (783) 75 (872)
+fagugran 50 (1017)
+
+MapCode 12940 << FIA PLT_CN 606237615126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+querrubr 50 (5226)
+fagugran 25 (1270) 50 (2340)
+popugran 50 (635)
+
+MapCode 12941 << FIA PLT_CN 606237617126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 50 (7646) 75 (1116)
+fraxamer 50 (3689)
+acerrubr 50 (2305)
+pinustro 50 (1838)
+
+MapCode 12943 << FIA PLT_CN 606237619126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 25 (608) 50 (299)
+querrubr 25 (200)
+piceglau 25 (140)
+pinustro 25 (107)
+abiebals 10 (99)
+
+MapCode 12944 << FIA PLT_CN 606237622126144 << FIA Forest Type:  902 Paper birch
+quervelu 50 (3084)
+acersacc 50 (2374)
+prunsero 50 (2335)
+fraxamer 25 (1078) 50 (932)
+betualle 25 (878)
+
+MapCode 12946 << FIA PLT_CN 606237625126144 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 50 (1679)
+pinustro 50 (975)
+poputrem 50 (906)
+tsugcana 25 (436) 50 (313)
+betualle 25 (447)
+
+MapCode 12947 << FIA PLT_CN 606237626126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 175 (5564)
+fraxamer 100 (735) 125 (1307)
+acerrubr 75 (1775)
+tsugcana 50 (1610)
+pinustro 50 (1312)
+
+MapCode 12948 << FIA PLT_CN 606237627126144 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 50 (981) 75 (2812) 100 (3394) 125 (2391)
+pinustro 75 (1302) 100 (2506)
+abiebals 25 (906) 75 (877)
+
+MapCode 12951 << FIA PLT_CN 606237632126144 << FIA Forest Type:  708 Red maple / lowland
+pinustro 100 (22007)
+acerrubr 75 (6587)
+
+MapCode 12952 << FIA PLT_CN 606237633126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 75 (15284)
+acerrubr 50 (10461)
+
+MapCode 12953 << FIA PLT_CN 606237634126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (3490) 75 (2020)
+querrubr 75 (4749)
+queralba 50 (1037) 75 (1838)
+
+MapCode 12955 << FIA PLT_CN 606237636126144 << FIA Forest Type:  409 Other pine / hardwood
+pinustro 50 (6653) 75 (9955)
+querrubr 75 (5466)
+acerrubr 75 (1990)
+
+MapCode 12956 << FIA PLT_CN 606237637126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 50 (2095) 75 (6367)
+pinustro 25 (815) 50 (2060)
+acerrubr 50 (1331)
+
+MapCode 13007 << FIA PLT_CN 606237692126144 << FIA Forest Type:  124 Red spruce / balsam fir
+betupapy 75 (5705)
+pinustro 75 (4390)
+abiebals 50 (2933) 75 (1422)
+picerube 75 (4177)
+betualle 75 (3186)
+
+MapCode 13020 << FIA PLT_CN 606237706126144 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (1255) 50 (945)
+piceglau 50 (1557)
+betupopu 25 (308)
+
+MapCode 13021 << FIA PLT_CN 606237707126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 50 (774) 75 (2794)
+acerrubr 75 (2714)
+acersacc 75 (836) 100 (1342)
+abiebals 50 (1436)
+ostrvirg 125 (1068)
+
+MapCode 13022 << FIA PLT_CN 606237708126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fraxamer 25 (1658) 50 (1534)
+acerrubr 50 (1620)
+acersacc 50 (896)
+poputrem 50 (710)
+abiebals 25 (463)
+
+MapCode 13023 << FIA PLT_CN 606237709126144 << FIA Forest Type:  701 Black ash / American elm / red maple
+fraxnigr 75 (2574) 100 (2603)
+acerrubr 100 (1849)
+betualle 75 (972)
+
+MapCode 13024 << FIA PLT_CN 606237710126144 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (3172)
+abiebals 50 (1101)
+betupopu 25 (348)
+
+MapCode 13026 << FIA PLT_CN 606237713126144 << FIA Forest Type:  701 Black ash / American elm / red maple
+thujocci 50 (561) 75 (448) 100 (234)
+fraxnigr 50 (214)
+acerrubr 50 (127)
+
+MapCode 13027 << FIA PLT_CN 606237714126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (5295) 75 (583)
+abiebals 25 (1370)
+fraxamer 50 (679)
+
+MapCode 13028 << FIA PLT_CN 606237716126144 << FIA Forest Type:  809 Red maple / upland
+pinustro 50 (2447) 75 (1141)
+abiebals 25 (1191) 50 (1347)
+acerrubr 50 (1948)
+fraxamer 50 (781)
+
+MapCode 13029 << FIA PLT_CN 606237719126144 << FIA Forest Type:  903 Gray birch
+pinustro 75 (3592)
+poputrem 50 (1286) 75 (2147)
+acerrubr 50 (1530)
+popugran 75 (733)
+
+MapCode 13030 << FIA PLT_CN 606237720126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (1911)
+betupapy 75 (1558)
+fraxamer 25 (1255)
+pinustro 75 (967)
+picerube 75 (891)
+
+MapCode 13031 << FIA PLT_CN 606237721126144 << FIA Forest Type:  809 Red maple / upland
+poputrem 50 (7198)
+fraxamer 50 (4253) 75 (2184)
+acersacc 50 (4746)
+querrubr 50 (2512)
+acerrubr 50 (2221)
+
+MapCode 13032 << FIA PLT_CN 606237723126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+acerrubr 25 (815) 50 (2473)
+betupopu 25 (1265)
+betupapy 25 (1048)
+pinustro 25 (1015)
+querrubr 25 (579)
+
+MapCode 13033 << FIA PLT_CN 606237725126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 75 (1033) 100 (2111)
+pinustro 75 (1321) 100 (1774)
+acerrubr 75 (1834)
+thujocci 50 (1304)
+
+MapCode 13034 << FIA PLT_CN 606237726126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 50 (1279) 75 (4814)
+acerrubr 25 (1312) 50 (2523)
+betupapy 50 (2327)
+querrubr 50 (1699)
+
+MapCode 13035 << FIA PLT_CN 606237727126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (2626) 75 (2051) 100 (2331)
+querrubr 50 (2353) 75 (1575)
+
+MapCode 13036 << FIA PLT_CN 606237728126144 << FIA Forest Type:  903 Gray birch
+betupopu 25 (2389)
+acerrubr 50 (1060)
+picerube 50 (776)
+tsugcana 50 (433)
+
+MapCode 13037 << FIA PLT_CN 606237730126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (3693) 75 (2030)
+querrubr 75 (1687)
+poputrem 75 (1242)
+betupapy 50 (1167)
+ostrvirg 25 (1076)
+
+MapCode 13038 << FIA PLT_CN 606237731126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 75 (5273)
+tsugcana 50 (1440) 75 (2549)
+fagugran 50 (659)
+
+MapCode 13039 << FIA PLT_CN 606237732126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 50 (5978) 75 (3211)
+pinustro 50 (2723) 75 (2847)
+acerrubr 50 (1501)
+ostrvirg 25 (984)
+
+MapCode 13040 << FIA PLT_CN 606237733126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 75 (7542) 100 (2044)
+querrubr 75 (1206) 100 (1531)
+acerrubr 100 (929)
+
+MapCode 13041 << FIA PLT_CN 606237734126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+acerrubr 50 (3226)
+querrubr 50 (2590)
+quervelu 75 (2176)
+pinustro 50 (1012)
+fagugran 50 (845)
+
+MapCode 13042 << FIA PLT_CN 606237737126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+acerrubr 25 (4435)
+pinustro 25 (826) 50 (3334)
+querrubr 50 (2404)
+fagugran 25 (2392)
+
+MapCode 13043 << FIA PLT_CN 606237738126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+pinustro 75 (1027) 100 (7443)
+querrubr 50 (4436) 75 (1065)
+acerrubr 50 (1213)
+
+MapCode 13044 << FIA PLT_CN 606237739126144 << FIA Forest Type:  809 Red maple / upland
+fraxamer 75 (3786)
+acerrubr 50 (1776) 75 (876)
+betupopu 10 (712)
+
+MapCode 13045 << FIA PLT_CN 606237740126144 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 50 (8118) 75 (5098) 100 (1372)
+pinustro 100 (1494)
+ulmuamer 75 (1212)
+
+MapCode 13046 << FIA PLT_CN 606237741126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+acerrubr 50 (5959)
+querrubr 50 (892)
+pinustro 50 (787)
+queralba 50 (587)
+
+MapCode 13047 << FIA PLT_CN 606237743126144 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 50 (1195) 75 (2705)
+fraxamer 25 (615) 50 (1303) 75 (1890)
+querrubr 50 (1348)
+
+MapCode 13048 << FIA PLT_CN 606237744126144 << FIA Forest Type:  901 Aspen
+poputrem 50 (3863) 75 (12460) 100 (2773)
+betupapy 25 (1426)
+
+MapCode 13049 << FIA PLT_CN 606237745126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+acerrubr 25 (728) 50 (764)
+fraxamer 125 (1134)
+abiebals 25 (879)
+querrubr 50 (719)
+betualle 50 (470)
+
+MapCode 13070 << FIA PLT_CN 606237766126144 << FIA Forest Type:  127 Northern white-cedar
+pinustro 175 (2671)
+picerube 100 (2331)
+abiebals 50 (373)
+
+MapCode 13072 << FIA PLT_CN 606237768126144 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (5955)
+pinustro 50 (1495)
+acerrubr 25 (611)
+
+MapCode 13082 << FIA PLT_CN 606237780126144 << FIA Forest Type:  901 Aspen
+thujocci 25 (2113) 50 (698)
+picemari 50 (1994)
+betupapy 50 (1190)
+abiebals 50 (906)
+poputrem 75 (847)
+
+MapCode 13095 << FIA PLT_CN 606237794126144 << FIA Forest Type:  104 Eastern white pine / eastern hemlock
+pinustro 50 (6495)
+betupapy 25 (3559)
+picerube 50 (1033)
+acerrubr 25 (697)
+
+MapCode 13096 << FIA PLT_CN 606237795126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (1517)
+fagugran 50 (1439)
+betualle 50 (1051)
+fraxamer 75 (364)
+picerube 50 (330)
+
+MapCode 13098 << FIA PLT_CN 606237797126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 50 (4695)
+acerrubr 50 (2973) 75 (1464)
+acersacc 50 (777) 100 (1724)
+fagugran 50 (1110)
+
+MapCode 13100 << FIA PLT_CN 606237799126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+querrubr 10 (835) 25 (826) 50 (558)
+fagugran 50 (1269)
+pinustro 50 (764)
+acerrubr 25 (667)
+popugran 25 (553)
+
+MapCode 13101 << FIA PLT_CN 606237800126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 50 (1734) 75 (1954)
+fagugran 75 (2841)
+acerrubr 50 (1245) 75 (1159)
+fraxamer 75 (1946)
+querrubr 75 (1239)
+
+MapCode 13103 << FIA PLT_CN 606237802126144 << FIA Forest Type:  121 Balsam fir
+piceglau 75 (2202)
+abiebals 25 (157) 50 (400)
+
+MapCode 13157 << FIA PLT_CN 606237861126144 << FIA Forest Type:  124 Red spruce / balsam fir
+acerrubr 50 (1893)
+picerube 50 (1872)
+abiebals 50 (860)
+thujocci 50 (706)
+betupapy 50 (567)
+
+MapCode 13172 << FIA PLT_CN 606237876126144 << FIA Forest Type:  902 Paper birch
+querrubr 50 (882) 75 (1219)
+betupapy 25 (1160) 50 (633)
+popugran 75 (952)
+acerrubr 25 (656)
+
+MapCode 13177 << FIA PLT_CN 606237881126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (1272) 75 (490)
+querrubr 25 (891) 50 (501)
+fraxamer 100 (1244)
+fagugran 25 (387) 50 (776)
+acersacc 50 (361)
+
+MapCode 13178 << FIA PLT_CN 606237882126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (1404) 75 (10059)
+querrubr 50 (2713) 75 (3741)
+betupapy 50 (4204)
+fraxamer 75 (1816)
+
+MapCode 13264 << FIA PLT_CN 606238118126144 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 25 (1893) 50 (2428)
+acerrubr 50 (2930)
+betupapy 50 (784)
+
+MapCode 13265 << FIA PLT_CN 606238119126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 100 (704) 125 (2656) 175 (1867)
+betualle 75 (865) 125 (744) 175 (1729)
+fagugran 50 (1307) 75 (1184)
+
+MapCode 13266 << FIA PLT_CN 606238201126144 << FIA Forest Type:  105 Eastern hemlock
+picerube 50 (5070) 75 (7182) 100 (2504) 125 (1592)
+tsugcana 50 (2972) 75 (3462)
+
+MapCode 15377 << FIA PLT_CN 610880002126144 << FIA Forest Type:  103 Eastern white pine
+querrubr 100 (21423)
+pinustro 75 (11907)
+acerrubr 75 (7720)
+
+MapCode 15379 << FIA PLT_CN 610880005126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 75 (8283)
+querrubr 75 (4358)
+acerrubr 50 (1332) 75 (1681)
+betupapy 75 (1898)
+
+MapCode 15385 << FIA PLT_CN 610880015126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betulent 100 (1620) 125 (1553)
+fraxamer 50 (778) 75 (742)
+acersacc 25 (803) 50 (476)
+
+MapCode 15388 << FIA PLT_CN 610880018126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 75 (21763)
+acerrubr 50 (9340) 75 (9034)
+
+MapCode 15389 << FIA PLT_CN 610880019126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+acerrubr 50 (4467)
+querrubr 50 (3709)
+
+MapCode 15393 << FIA PLT_CN 610880026126144 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 50 (10461) 75 (10461) 100 (10461)
+pinustro 50 (3212) 75 (2970)
+
+MapCode 15397 << FIA PLT_CN 610880031126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (3128) 75 (929)
+picerube 50 (1542)
+querrubr 75 (1423)
+fagugran 25 (517) 50 (582)
+betupapy 75 (594)
+
+MapCode 15398 << FIA PLT_CN 610880033126144 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (2661) 75 (1658)
+
+MapCode 15400 << FIA PLT_CN 610880037126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+pinustro 50 (4246) 75 (2587)
+querrubr 50 (5158)
+acerrubr 50 (3504)
+betualle 50 (954)
+
+MapCode 15401 << FIA PLT_CN 610880038126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (7154) 75 (1743)
+fagugran 75 (2300)
+
+MapCode 15413 << FIA PLT_CN 610880053126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (4596) 75 (8265) 100 (4468)
+fagugran 50 (1519)
+
+MapCode 15420 << FIA PLT_CN 610880060126144 << FIA Forest Type:  902 Paper birch
+popugran 75 (3411) 108 (12251)
+fagugran 50 (7218) 75 (6648)
+querrubr 75 (8051)
+poputrem 75 (3382)
+acerrubr 75 (2731)
+
+MapCode 15421 << FIA PLT_CN 610880061126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (5484) 75 (2587)
+fagugran 25 (1112) 50 (4682) 75 (1753)
+picerube 75 (975)
+
+MapCode 15426 << FIA PLT_CN 610880066126144 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (9981)
+pinustro 75 (4097)
+picerube 50 (1357)
+
+MapCode 15430 << FIA PLT_CN 610880071126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+acerrubr 50 (1693) 75 (4173)
+querrubr 75 (5432)
+betupapy 50 (950)
+
+MapCode 15433 << FIA PLT_CN 610880074126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+acersacc 50 (6379) 75 (1951)
+pinustro 75 (6242)
+fraxamer 50 (2063) 75 (1851)
+acerrubr 75 (2133)
+
+MapCode 15478 << FIA PLT_CN 610880126126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (4083) 75 (5616) 100 (4180)
+tiliamer 100 (5780)
+
+MapCode 15518 << FIA PLT_CN 610880172126144 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 50 (10285) 75 (1960)
+ostrvirg 25 (1552)
+acersacc 50 (1316)
+fraxamer 50 (880)
+
+MapCode 15519 << FIA PLT_CN 610880173126144 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (2303) 75 (2463)
+querrubr 75 (4166)
+fagugran 50 (3229)
+acersacc 75 (2637)
+
+MapCode 17510 << FIA PLT_CN 721819619290487 << FIA Forest Type:  903 Gray birch
+betupopu 25 (695) 50 (1334)
+acerrubr 50 (603)
+abiebals 25 (265) 50 (267)
+pinustro 50 (362)
+
+MapCode 17511 << FIA PLT_CN 721819621290487 << FIA Forest Type:  901 Aspen
+popugran 50 (1019) 75 (2196) 100 (1250)
+tsugcana 25 (1595) 50 (896)
+pinustro 50 (2016)
+betupapy 50 (1613)
+querrubr 50 (958)
+
+MapCode 17512 << FIA PLT_CN 721819622290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (3552)
+fagugran 50 (452) 75 (1472)
+acersacc 125 (1628)
+
+MapCode 17514 << FIA PLT_CN 721819625290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (2989) 75 (6535)
+abiebals 25 (1902) 50 (808)
+fagugran 50 (806)
+
+MapCode 17518 << FIA PLT_CN 721819632290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (2404) 75 (5006)
+fagugran 50 (3288) 75 (1509)
+betualle 75 (904)
+
+MapCode 17521 << FIA PLT_CN 721819636290487 << FIA Forest Type:  105 Eastern hemlock
+acerrubr 75 (6590) 100 (1605)
+tsugcana 50 (5825)
+fagugran 75 (3865)
+acersacc 100 (3239)
+betualle 100 (1505)
+
+MapCode 17522 << FIA PLT_CN 721819637290487 << FIA Forest Type:  809 Red maple / upland
+betupopu 25 (910) 50 (1171)
+tsugcana 25 (418) 50 (854)
+betupapy 50 (1184)
+popugran 50 (500)
+
+MapCode 17523 << FIA PLT_CN 721819638290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (2173) 75 (710) 100 (3585)
+fagugran 50 (1212) 75 (990)
+betualle 75 (742) 125 (700)
+picerube 75 (1267)
+
+MapCode 17524 << FIA PLT_CN 721819641290487 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 50 (2018) 75 (5322) 100 (3753)
+picerube 50 (1069) 75 (1464)
+querrubr 175 (1751)
+betualle 75 (1563)
+
+MapCode 17525 << FIA PLT_CN 721819642290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fraxamer 25 (1079) 50 (2272)
+abiebals 50 (2839)
+acerrubr 50 (2635)
+
+MapCode 17526 << FIA PLT_CN 721819644290487 << FIA Forest Type:  125 Black spruce
+picemari 50 (2641) 75 (2291) 100 (1368) 175 (926)
+
+MapCode 17530 << FIA PLT_CN 721819648290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (1847) 50 (2370)
+picerube 50 (4087)
+acerrubr 50 (1627)
+
+MapCode 17534 << FIA PLT_CN 721819652290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+picerube 50 (3740)
+poputrem 75 (1858)
+abiebals 50 (1421)
+acerrubr 50 (1097)
+betualle 25 (867)
+
+MapCode 17535 << FIA PLT_CN 721819653290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betupapy 25 (784) 50 (547) 75 (575)
+abiebals 25 (885) 50 (772)
+acerrubr 50 (1233)
+thujocci 50 (880)
+querrubr 75 (718)
+
+MapCode 17536 << FIA PLT_CN 721819654290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+pinustro 50 (1068) 75 (4763) 100 (3136)
+acersacc 75 (3482)
+querrubr 75 (1651) 100 (1703)
+acerrubr 75 (1134)
+
+MapCode 17537 << FIA PLT_CN 721819657290487 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (4327) 75 (4070)
+piceglau 100 (889) 125 (665)
+abiebals 25 (1036)
+popubals 75 (777)
+
+MapCode 17538 << FIA PLT_CN 721819658290487 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 125 (4793)
+tsugcana 125 (1897) 175 (2291)
+betualle 175 (4037)
+betupapy 175 (1557)
+
+MapCode 17539 << FIA PLT_CN 721819659290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 50 (1523) 75 (2131)
+picerube 75 (1434) 125 (1683)
+acersacc 100 (946) 125 (1112)
+fraxamer 175 (813)
+betualle 125 (796)
+
+MapCode 17540 << FIA PLT_CN 721819660290487 << FIA Forest Type:  123 Red spruce
+picerube 75 (3415)
+picemari 50 (902) 75 (1366)
+acerrubr 50 (787)
+abiebals 75 (403)
+
+MapCode 17541 << FIA PLT_CN 721819661290487 << FIA Forest Type:  901 Aspen
+fraxnigr 25 (1097) 50 (1617)
+abiebals 25 (1276) 50 (1364)
+poputrem 50 (2082)
+popubals 50 (1581)
+piceglau 75 (970)
+
+MapCode 17542 << FIA PLT_CN 721819662290487 << FIA Forest Type:  901 Aspen
+poputrem 50 (9313)
+fraxamer 50 (1794)
+acerrubr 50 (1216)
+piceglau 50 (1159)
+
+MapCode 17543 << FIA PLT_CN 721819665290487 << FIA Forest Type:  121 Balsam fir
+acerrubr 75 (1414) 100 (739)
+abiebals 50 (800) 75 (1128)
+betualle 75 (842) 100 (770)
+betupapy 175 (1210)
+picerube 75 (971)
+
+MapCode 17544 << FIA PLT_CN 721819666290487 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (2402)
+acerrubr 25 (379) 50 (432)
+abiebals 25 (369) 50 (382)
+thujocci 50 (538)
+
+MapCode 17547 << FIA PLT_CN 721819669290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (3146)
+picerube 50 (2651)
+betualle 75 (2346)
+fagugran 50 (1214)
+fraxamer 100 (941)
+
+MapCode 17548 << FIA PLT_CN 721819670290487 << FIA Forest Type:  121 Balsam fir
+acerrubr 50 (1426) 75 (3336)
+abiebals 50 (3182) 75 (625)
+
+MapCode 17549 << FIA PLT_CN 721819671290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+poputrem 10 (110) 25 (1051)
+acersacc 50 (254)
+
+MapCode 17550 << FIA PLT_CN 721819672290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fraxamer 50 (1770) 75 (8247)
+tiliamer 50 (5016)
+fagugran 50 (4959)
+
+MapCode 17552 << FIA PLT_CN 721819675290487 << FIA Forest Type:  124 Red spruce / balsam fir
+tsugcana 75 (384) 100 (1809) 125 (2674)
+picerube 50 (381)
+thujocci 75 (375)
+
+MapCode 17555 << FIA PLT_CN 721819678290487 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (3040)
+acerrubr 50 (1088) 75 (1536)
+betualle 50 (1347)
+fraxamer 100 (1297)
+
+MapCode 17556 << FIA PLT_CN 721819680290487 << FIA Forest Type:  103 Eastern white pine
+popugran 100 (11078) 108 (15893)
+tsugcana 25 (2363) 50 (2124)
+pinustro 50 (2841)
+
+MapCode 17557 << FIA PLT_CN 721819681290487 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (6918) 75 (10461) 100 (10461)
+fraxamer 75 (3102)
+
+MapCode 17558 << FIA PLT_CN 721819682290487 << FIA Forest Type:  122 White spruce
+abiebals 50 (2094) 75 (175)
+popubals 75 (211)
+
+MapCode 17559 << FIA PLT_CN 721819684290487 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 25 (632) 50 (2626) 75 (2338)
+acerrubr 75 (1868)
+picerube 75 (1161)
+betualle 125 (823)
+popugran 108 (682)
+
+MapCode 17560 << FIA PLT_CN 721819685290487 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (3120) 75 (1964)
+acerrubr 75 (2426)
+betupopu 50 (735)
+picerube 75 (660)
+
+MapCode 17561 << FIA PLT_CN 721819688290487 << FIA Forest Type:  902 Paper birch
+acerrubr 50 (1819) 75 (1752)
+tsugcana 75 (2553)
+popugran 75 (1457) 100 (723)
+betupapy 50 (1810)
+poputrem 100 (834)
+
+MapCode 17562 << FIA PLT_CN 721819689290487 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 25 (930) 50 (7474)
+picerube 50 (2311) 75 (1926)
+betupapy 50 (822)
+
+MapCode 17563 << FIA PLT_CN 721819691290487 << FIA Forest Type:  125 Black spruce
+abiebals 25 (413) 50 (421)
+picemari 10 (100) 25 (349) 50 (333)
+larilari 10 (105) 50 (188)
+
+MapCode 17564 << FIA PLT_CN 721819692290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 25 (730) 50 (483)
+acersacc 25 (497)
+picerube 50 (403)
+betualle 10 (316)
+acerrubr 25 (221)
+
+MapCode 17569 << FIA PLT_CN 721819697290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+abiebals 25 (1074) 50 (2122) 75 (668)
+picerube 50 (1111) 75 (1007)
+betualle 50 (1218) 75 (526)
+acerrubr 75 (788)
+
+MapCode 17571 << FIA PLT_CN 721819700290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+pinustro 100 (4640) 125 (10134)
+popugran 100 (2877)
+
+MapCode 17572 << FIA PLT_CN 721819701290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+betupapy 50 (1816)
+acerrubr 75 (1765)
+tsugcana 50 (711) 75 (1009)
+fraxamer 50 (942) 100 (658)
+acersacc 100 (706)
+
+MapCode 17573 << FIA PLT_CN 721819702290487 << FIA Forest Type:  809 Red maple / upland
+betupopu 25 (2105) 50 (1372)
+abiebals 25 (1403) 50 (1624)
+acerrubr 25 (595) 50 (2222)
+
+MapCode 17574 << FIA PLT_CN 721819703290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 50 (2944) 75 (1258)
+acerrubr 50 (2782)
+acersacc 50 (889)
+fraxamer 75 (826)
+querrubr 75 (750)
+
+MapCode 17575 << FIA PLT_CN 721819704290487 << FIA Forest Type:  505 Northern red oak
+querrubr 50 (2656) 75 (1531)
+acersacc 50 (3841)
+acerrubr 50 (860)
+betupapy 50 (850)
+
+MapCode 17576 << FIA PLT_CN 721819706290487 << FIA Forest Type:  409 Other pine / hardwood
+querrubr 75 (7066) 100 (5826)
+pinustro 50 (2748)
+acerrubr 50 (2671)
+betupapy 75 (1530)
+tsugcana 50 (1453)
+
+MapCode 17577 << FIA PLT_CN 721819707290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+pinustro 125 (6787)
+acerrubr 75 (4683)
+querrubr 75 (1888)
+tsugcana 50 (1860)
+
+MapCode 17578 << FIA PLT_CN 721819708290487 << FIA Forest Type:  104 Eastern white pine / eastern hemlock
+pinustro 75 (2523) 100 (3875)
+tsugcana 50 (1617) 75 (1227)
+acerrubr 75 (1052)
+picerube 75 (878)
+
+MapCode 17579 << FIA PLT_CN 721819709290487 << FIA Forest Type:  901 Aspen
+acerrubr 50 (897) 75 (991)
+tsugcana 50 (857)
+querrubr 50 (393)
+acersacc 50 (324)
+popugran 25 (197)
+
+MapCode 17580 << FIA PLT_CN 721819710290487 << FIA Forest Type:  105 Eastern hemlock
+acerrubr 175 (6798)
+tsugcana 100 (5239)
+querrubr 100 (904)
+
+MapCode 17581 << FIA PLT_CN 721819711290487 << FIA Forest Type:  409 Other pine / hardwood
+querrubr 50 (790) 75 (2800) 125 (699)
+pinustro 75 (2820)
+acerrubr 75 (728)
+queralba 75 (690)
+
+MapCode 17583 << FIA PLT_CN 721819714290487 << FIA Forest Type:  409 Other pine / hardwood
+pinustro 75 (6317) 100 (2649)
+quervelu 50 (1267) 75 (5328)
+acerrubr 50 (2578) 75 (2637)
+
+MapCode 17586 << FIA PLT_CN 721819718290487 << FIA Forest Type:  701 Black ash / American elm / red maple
+fraxnigr 25 (1689) 50 (286)
+acerrubr 50 (484)
+
+MapCode 17587 << FIA PLT_CN 721819719290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (3955)
+betupapy 25 (2001) 50 (1411)
+acerrubr 50 (1864)
+poputrem 50 (1343)
+fraxamer 50 (1090)
+
+MapCode 17588 << FIA PLT_CN 721819720290487 << FIA Forest Type:  121 Balsam fir
+acerrubr 50 (3196) 75 (2328)
+abiebals 25 (1257) 50 (734)
+larilari 125 (1988)
+pinustro 75 (978)
+betupapy 75 (836)
+
+MapCode 17589 << FIA PLT_CN 721819721290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (4760) 75 (707)
+thujocci 50 (2196)
+acersacc 50 (844) 75 (630)
+acerrubr 50 (755)
+betualle 75 (669)
+
+MapCode 17590 << FIA PLT_CN 721819722290487 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 25 (3133) 50 (5007)
+fraxamer 50 (3316)
+pinustro 75 (3254)
+betupopu 25 (1932)
+
+MapCode 17591 << FIA PLT_CN 721819725290487 << FIA Forest Type:  121 Balsam fir
+acerrubr 50 (1641) 75 (666)
+abiebals 50 (1865)
+tsugcana 50 (882)
+picerube 50 (791)
+thujocci 50 (589)
+
+MapCode 17592 << FIA PLT_CN 721819726290487 << FIA Forest Type:  903 Gray birch
+ulmuamer 50 (1622)
+poputrem 25 (1102)
+pinustro 50 (733)
+
+MapCode 17593 << FIA PLT_CN 721819727290487 << FIA Forest Type:  809 Red maple / upland
+poputrem 75 (2564) 100 (1265)
+thujocci 25 (2428) 50 (1256)
+fraxamer 25 (1061) 50 (1161)
+acerrubr 75 (1968)
+
+MapCode 17594 << FIA PLT_CN 721819728290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+querrubr 50 (2325) 75 (2798)
+tsugcana 50 (1077) 75 (1476)
+acerrubr 50 (1928)
+abiebals 50 (1490)
+thujocci 50 (1218)
+
+MapCode 17595 << FIA PLT_CN 721819730290487 << FIA Forest Type:  505 Northern red oak
+querrubr 50 (3020) 75 (1622)
+pinustro 50 (4212)
+
+MapCode 17596 << FIA PLT_CN 721819731290487 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (2500)
+
+MapCode 17597 << FIA PLT_CN 721819732290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+pinustro 50 (2010) 75 (865)
+tsugcana 25 (400) 50 (1657)
+acerrubr 50 (1037)
+querrubr 50 (425)
+
+MapCode 17599 << FIA PLT_CN 721819734290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 50 (3441) 75 (8100)
+betulent 50 (1170) 75 (3415)
+acerrubr 75 (1242)
+
+MapCode 17600 << FIA PLT_CN 721819736290487 << FIA Forest Type:  409 Other pine / hardwood
+acerrubr 50 (3404) 75 (9152)
+querrubr 75 (10328) 100 (2219)
+
+MapCode 17601 << FIA PLT_CN 721819737290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 50 (8520)
+tsugcana 50 (3081)
+fraxamer 50 (2112)
+pinustro 50 (1958)
+acersacc 50 (1234)
+
+MapCode 17602 << FIA PLT_CN 721819738290487 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 50 (994) 75 (4537) 100 (1983)
+poputrem 175 (3757)
+pinustro 50 (1628)
+
+MapCode 17604 << FIA PLT_CN 721819741290487 << FIA Forest Type:  409 Other pine / hardwood
+tsugcana 75 (926) 100 (1064)
+poputrem 75 (1001)
+fagugran 75 (963)
+pinustro 75 (889)
+acerrubr 75 (839)
+
+MapCode 17605 << FIA PLT_CN 721819742290487 << FIA Forest Type:  505 Northern red oak
+querrubr 50 (7280) 75 (6454)
+acerrubr 25 (1512) 50 (2572)
+pinustro 75 (1707)
+
+MapCode 17608 << FIA PLT_CN 721819746290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (2831)
+fagugran 50 (1514)
+betualle 50 (989)
+picerube 50 (875)
+acersacc 50 (829)
+
+MapCode 17609 << FIA PLT_CN 721819747290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (992) 75 (643) 125 (859) 175 (2060)
+acerrubr 75 (1819)
+fagugran 75 (603)
+
+MapCode 17610 << FIA PLT_CN 721819748290487 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (2474) 75 (362)
+abiebals 50 (2124)
+pinustro 75 (640)
+
+MapCode 17611 << FIA PLT_CN 721819749290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+thujocci 50 (3001) 75 (670)
+betualle 50 (678) 75 (1411)
+acerrubr 75 (1387)
+fraxamer 75 (889)
+betupapy 125 (708)
+
+MapCode 17612 << FIA PLT_CN 721819751290487 << FIA Forest Type:  809 Red maple / upland
+acerrubr 25 (1840) 50 (2155)
+pinustro 50 (842) 75 (2622)
+abiebals 50 (634)
+
+MapCode 17613 << FIA PLT_CN 721819752290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 50 (2145) 75 (3408)
+betualle 50 (501)
+
+MapCode 17614 << FIA PLT_CN 721819753290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tiliamer 50 (2739)
+fagugran 25 (563) 50 (450)
+
+MapCode 17615 << FIA PLT_CN 721819754290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+popugran 25 (3067)
+fagugran 25 (1601)
+betupapy 25 (1132)
+betualle 25 (960)
+acerrubr 25 (919)
+
+MapCode 17616 << FIA PLT_CN 721819755290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 75 (2333)
+betualle 75 (2172)
+fagugran 25 (485)
+abiebals 50 (325)
+
+MapCode 17617 << FIA PLT_CN 721819756290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 50 (1749) 75 (4927) 100 (1438)
+acersacc 100 (2441) 125 (3310)
+
+MapCode 17618 << FIA PLT_CN 721819758290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 50 (4699)
+acersacc 50 (1176)
+ostrvirg 25 (997)
+acerrubr 75 (570)
+
+MapCode 17619 << FIA PLT_CN 721819759290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 75 (3450)
+querrubr 50 (1893) 75 (998)
+fagugran 50 (2373)
+acersacc 50 (1266) 75 (940)
+
+MapCode 17620 << FIA PLT_CN 721819760290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 25 (993)
+abiebals 25 (363) 50 (299)
+acerrubr 25 (506)
+fraxamer 25 (371)
+acersacc 25 (189)
+
+MapCode 17622 << FIA PLT_CN 721819762290487 << FIA Forest Type:  127 Northern white-cedar
+popubals 75 (1362) 100 (4149) 125 (1955) 175 (1987)
+prunsero 50 (1496) 75 (1691)
+poputrem 75 (1785)
+abiebals 75 (1091)
+
+MapCode 17623 << FIA PLT_CN 721819763290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (1064) 75 (3420)
+tsugcana 75 (3429)
+fraxamer 50 (1538) 100 (781)
+betualle 75 (1217)
+fagugran 50 (874)
+
+MapCode 17624 << FIA PLT_CN 721819764290487 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (4056)
+picerube 75 (1792) 100 (1796)
+pinustro 125 (873)
+abiebals 50 (806)
+
+MapCode 17625 << FIA PLT_CN 721819765290487 << FIA Forest Type:  124 Red spruce / balsam fir
+pinustro 50 (2385)
+picerube 25 (741) 50 (1391)
+betupopu 25 (1389)
+betupapy 25 (638)
+abiebals 25 (535)
+
+MapCode 17626 << FIA PLT_CN 721819766290487 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (3762) 75 (1825)
+acerrubr 50 (2017)
+betualle 50 (939)
+picerube 50 (782)
+
+MapCode 17627 << FIA PLT_CN 721819767290487 << FIA Forest Type:  123 Red spruce
+piceglau 100 (2647) 125 (2003)
+picerube 75 (4297)
+abiebals 25 (1421) 50 (1521)
+thujocci 50 (1126)
+
+MapCode 17628 << FIA PLT_CN 721819768290487 << FIA Forest Type:  505 Northern red oak
+acerrubr 25 (3969) 50 (1532)
+querrubr 25 (1316) 50 (2475) 75 (1517)
+picerube 50 (2763)
+betupopu 25 (1131)
+
+MapCode 17631 << FIA PLT_CN 721819772290487 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (997) 75 (5515)
+fagugran 50 (2993)
+querrubr 50 (1084)
+betualle 50 (661)
+
+MapCode 17632 << FIA PLT_CN 721819773290487 << FIA Forest Type:  409 Other pine / hardwood
+acerrubr 50 (3947) 75 (3058)
+querrubr 75 (6799)
+tsugcana 50 (4112) 75 (1963)
+
+MapCode 17634 << FIA PLT_CN 721819775290487 << FIA Forest Type:  902 Paper birch
+betupapy 100 (3880) 125 (1974)
+acerrubr 75 (3220) 100 (1318)
+betualle 75 (1087)
+abiebals 50 (863)
+
+MapCode 17635 << FIA PLT_CN 721819779290487 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (3229) 75 (3161)
+tsugcana 50 (1465) 75 (3390)
+abiebals 50 (2650) 75 (1770)
+
+MapCode 17636 << FIA PLT_CN 721819780290487 << FIA Forest Type:  102 Red pine
+pinustro 50 (3164) 75 (5364)
+pinuresi 50 (2407)
+
+MapCode 17637 << FIA PLT_CN 721819781290487 << FIA Forest Type:  901 Aspen
+poputrem 50 (1094) 75 (1888) 100 (975)
+piceglau 75 (2739)
+abiebals 75 (847)
+
+MapCode 17638 << FIA PLT_CN 721819783290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+poputrem 175 (3893)
+acersacc 75 (1128) 125 (835)
+ostrvirg 100 (884)
+acerrubr 75 (845)
+abiebals 50 (756)
+
+MapCode 17639 << FIA PLT_CN 721819785290487 << FIA Forest Type:  701 Black ash / American elm / red maple
+fraxnigr 25 (258) 50 (1198)
+abiebals 50 (569)
+prunsero 50 (172)
+
+MapCode 17640 << FIA PLT_CN 721819786290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 75 (3856)
+fagugran 50 (443)
+
+MapCode 17641 << FIA PLT_CN 721819787290487 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (969) 75 (1203) 100 (649)
+betualle 75 (968) 175 (1038)
+tsugcana 125 (1959)
+abiebals 50 (716) 75 (587)
+acerrubr 100 (496)
+
+MapCode 17642 << FIA PLT_CN 721819788290487 << FIA Forest Type:  121 Balsam fir
+betualle 25 (522) 50 (969) 75 (488)
+abiebals 50 (1233) 75 (488)
+acerrubr 50 (1110)
+
+MapCode 17643 << FIA PLT_CN 721819789290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (641) 50 (1224)
+acerrubr 50 (1295) 75 (426)
+betupapy 75 (1513)
+
+MapCode 17645 << FIA PLT_CN 721819791290487 << FIA Forest Type:  121 Balsam fir
+picerube 50 (1705)
+abiebals 50 (712) 75 (497)
+fraxnigr 50 (939)
+acerrubr 50 (605)
+
+MapCode 17646 << FIA PLT_CN 721819792290487 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (10715)
+abiebals 25 (3141) 50 (1292)
+acerrubr 25 (832)
+
+MapCode 17648 << FIA PLT_CN 721819794290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (3026) 50 (2557)
+picerube 50 (3184) 75 (1607)
+betualle 50 (1075) 75 (2538)
+betupapy 50 (1022)
+
+MapCode 17649 << FIA PLT_CN 721819795290487 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (292)
+
+MapCode 17650 << FIA PLT_CN 721819796290487 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (1898) 75 (535)
+picerube 50 (791) 75 (1352)
+abiebals 50 (1358) 75 (384)
+acerrubr 50 (700)
+fraxnigr 25 (381)
+
+MapCode 17651 << FIA PLT_CN 721819797290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (820) 50 (2609)
+acerrubr 50 (921) 100 (1485)
+thujocci 50 (1500) 75 (864)
+pinustro 175 (2349)
+betupopu 50 (1437)
+
+MapCode 17652 << FIA PLT_CN 721819798290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 50 (1419) 75 (1889)
+tsugcana 50 (2921)
+betupapy 50 (1979)
+acersacc 75 (1696)
+acerrubr 50 (1319)
+
+MapCode 17653 << FIA PLT_CN 721819799290487 << FIA Forest Type:  121 Balsam fir
+tsugcana 50 (884) 75 (2686)
+picerube 75 (1197) 175 (748)
+betupapy 175 (1139)
+acerrubr 100 (916)
+betualle 100 (731)
+
+MapCode 17654 << FIA PLT_CN 721819800290487 << FIA Forest Type:  901 Aspen
+abiebals 25 (4895) 50 (1695)
+poputrem 25 (3372) 50 (3026)
+popubals 25 (1117)
+acerrubr 25 (942)
+
+MapCode 17655 << FIA PLT_CN 721819801290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+ostrvirg 25 (535) 50 (1393)
+tsugcana 50 (1834)
+betualle 50 (1150)
+fagugran 25 (866)
+fraxamer 50 (734)
+
+MapCode 17656 << FIA PLT_CN 721819802290487 << FIA Forest Type:  903 Gray birch
+pinustro 100 (2521)
+acerrubr 50 (1823)
+fraxamer 25 (505) 50 (617)
+larilari 50 (558)
+piceglau 50 (541)
+
+MapCode 17658 << FIA PLT_CN 721819804290487 << FIA Forest Type:  809 Red maple / upland
+betualle 50 (2856)
+abiebals 25 (1234) 50 (1105)
+acerrubr 25 (509) 50 (1135)
+tsugcana 50 (946)
+
+MapCode 17659 << FIA PLT_CN 721819806290487 << FIA Forest Type:  105 Eastern hemlock
+abiebals 25 (362) 50 (735)
+betupapy 50 (305) 75 (306)
+acerrubr 25 (166) 50 (166)
+tsugcana 50 (230)
+popugran 50 (211)
+
+MapCode 17660 << FIA PLT_CN 721819807290487 << FIA Forest Type:  123 Red spruce
+pinustro 75 (5226) 100 (6915)
+betupopu 25 (1231) 50 (2026)
+picemari 75 (1981)
+
+MapCode 17661 << FIA PLT_CN 721819808290487 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 25 (2209) 50 (1945) 75 (556)
+picerube 50 (705)
+pinustro 50 (357)
+
+MapCode 17663 << FIA PLT_CN 721819810290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 50 (1575) 75 (3748)
+fagugran 50 (3535) 75 (752)
+picerube 50 (763) 75 (1229)
+acerrubr 50 (1287)
+
+MapCode 17664 << FIA PLT_CN 721819811290487 << FIA Forest Type:  124 Red spruce / balsam fir
+acerrubr 75 (4151) 100 (895)
+picerube 75 (3980)
+pinustro 100 (1475)
+abiebals 50 (973)
+betualle 100 (818)
+
+MapCode 17665 << FIA PLT_CN 721819812290487 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (2030) 75 (1205) 100 (4139)
+
+MapCode 17666 << FIA PLT_CN 721819813290487 << FIA Forest Type:  123 Red spruce
+acerrubr 25 (854) 50 (6198)
+picerube 50 (5778)
+pinustro 50 (1068)
+betupapy 50 (1009)
+
+MapCode 17668 << FIA PLT_CN 721819817290487 << FIA Forest Type:  105 Eastern hemlock
+betualle 50 (1594) 75 (2958)
+fraxamer 50 (1373) 75 (1386)
+picerube 75 (1211)
+tsugcana 50 (1183)
+
+MapCode 17669 << FIA PLT_CN 721819818290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (1655) 75 (5760)
+acerrubr 75 (3246)
+tsugcana 50 (2894)
+
+MapCode 17670 << FIA PLT_CN 721819819290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 175 (5381)
+betualle 100 (1050) 175 (1702)
+ostrvirg 100 (2450)
+acerrubr 100 (1420)
+
+MapCode 17671 << FIA PLT_CN 721819820290487 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (2431)
+acerrubr 50 (2395)
+abiebals 25 (590) 50 (786)
+pinustro 50 (1145)
+betupapy 25 (826)
+
+MapCode 17672 << FIA PLT_CN 721819821290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+pinustro 25 (1419) 50 (433)
+tsugcana 75 (1657)
+querrubr 50 (814)
+acerrubr 50 (709)
+picerube 50 (604)
+
+MapCode 17673 << FIA PLT_CN 721819823290487 << FIA Forest Type:  409 Other pine / hardwood
+pinustro 50 (1620) 75 (2815)
+ostrvirg 25 (1935)
+querrubr 75 (1391)
+acerrubr 75 (1112)
+
+MapCode 17674 << FIA PLT_CN 721819824290487 << FIA Forest Type:  505 Northern red oak
+querrubr 50 (21423)
+acerrubr 75 (10461)
+fraxamer 100 (3070)
+
+MapCode 17677 << FIA PLT_CN 721819828290487 << FIA Forest Type:  127 Northern white-cedar
+thujocci 25 (86) 50 (346)
+acerrubr 50 (99)
+
+MapCode 17678 << FIA PLT_CN 721819829290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 25 (432) 50 (653) 75 (1542)
+betualle 50 (391) 75 (929) 100 (638)
+thujocci 75 (913)
+
+MapCode 17679 << FIA PLT_CN 721819830290487 << FIA Forest Type:  121 Balsam fir
+acerrubr 50 (927) 75 (1955)
+tsugcana 50 (1848)
+betupapy 25 (931)
+betualle 50 (750)
+abiebals 50 (743)
+
+MapCode 17680 << FIA PLT_CN 721819831290487 << FIA Forest Type:  103 Eastern white pine
+pinustro 75 (10341) 100 (3393)
+betupapy 75 (1409)
+
+MapCode 17681 << FIA PLT_CN 721819832290487 << FIA Forest Type:  121 Balsam fir
+thujocci 50 (1691) 75 (681)
+abiebals 50 (1237) 75 (788)
+pinustro 50 (838) 75 (1162)
+acerrubr 75 (1807)
+tsugcana 50 (1124)
+
+MapCode 17682 << FIA PLT_CN 721819833290487 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (2853) 75 (6297)
+abiebals 50 (979)
+
+MapCode 17683 << FIA PLT_CN 721819834290487 << FIA Forest Type:  121 Balsam fir
+acerrubr 50 (2186) 75 (1147)
+pinuresi 175 (1100)
+abiebals 50 (767)
+poputrem 75 (500)
+
+MapCode 17684 << FIA PLT_CN 721819835290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (1541) 75 (6048) 100 (3177)
+acerrubr 100 (1671)
+picerube 125 (1015)
+
+MapCode 17685 << FIA PLT_CN 721819836290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (2726) 75 (4015)
+picerube 50 (1350) 75 (1242)
+betualle 50 (1154) 75 (937)
+acerrubr 100 (1249)
+
+MapCode 17686 << FIA PLT_CN 721819837290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 25 (1057) 50 (4549) 75 (1354)
+betualle 50 (1320) 75 (1437)
+fagugran 50 (1863)
+
+MapCode 17687 << FIA PLT_CN 721819838290487 << FIA Forest Type:  121 Balsam fir
+acerrubr 50 (2998) 75 (772)
+picerube 75 (2281)
+betupapy 75 (2206)
+abiebals 50 (1184)
+betualle 50 (1102)
+
+MapCode 17688 << FIA PLT_CN 721819839290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 75 (3243)
+picerube 75 (1554)
+betualle 50 (1496)
+betupapy 75 (1422)
+acerrubr 50 (1379)
+
+MapCode 17689 << FIA PLT_CN 721819840290487 << FIA Forest Type:  902 Paper birch
+betupapy 50 (2375) 75 (417)
+popugran 108 (1545)
+acerrubr 50 (680)
+abiebals 50 (568)
+poputrem 100 (511)
+
+MapCode 17690 << FIA PLT_CN 721819841290487 << FIA Forest Type:  124 Red spruce / balsam fir
+acerrubr 50 (1345) 75 (900)
+thujocci 50 (573) 75 (915)
+pinustro 50 (1045)
+abiebals 25 (460)
+
+MapCode 17691 << FIA PLT_CN 721819842290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 25 (432) 50 (4642)
+
+MapCode 17692 << FIA PLT_CN 721819843290487 << FIA Forest Type:  124 Red spruce / balsam fir
+thujocci 10 (217) 25 (756) 50 (299)
+piceglau 50 (1102)
+abiebals 25 (691) 50 (278)
+picerube 50 (488)
+
+MapCode 17699 << FIA PLT_CN 721819850290487 << FIA Forest Type:  125 Black spruce
+picemari 50 (3009) 75 (1015)
+larilari 75 (669)
+
+MapCode 17705 << FIA PLT_CN 721819857290487 << FIA Forest Type:  409 Other pine / hardwood
+querrubr 50 (2256) 75 (2591) 100 (7000)
+pinustro 75 (7883)
+
+MapCode 17706 << FIA PLT_CN 721819858290487 << FIA Forest Type:  409 Other pine / hardwood
+querrubr 100 (5635)
+acerrubr 25 (1306) 75 (1633)
+tsugcana 50 (2610)
+
+MapCode 17707 << FIA PLT_CN 721819860290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 125 (1642)
+betualle 75 (328) 100 (390)
+acerrubr 25 (455) 75 (253)
+fagugran 50 (328)
+abiebals 75 (224)
+
+MapCode 17708 << FIA PLT_CN 721819861290487 << FIA Forest Type:  105 Eastern hemlock
+betupapy 50 (1792) 75 (688) 100 (701)
+tsugcana 50 (1276) 75 (1128)
+thujocci 50 (779)
+
+MapCode 17709 << FIA PLT_CN 721819862290487 << FIA Forest Type:  127 Northern white-cedar
+thujocci 25 (749) 50 (302)
+picemari 75 (108) 100 (132)
+abiebals 25 (94)
+
+MapCode 17710 << FIA PLT_CN 721819863290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 50 (4737)
+fagugran 50 (2756)
+picerube 50 (1715)
+tsugcana 50 (808)
+
+MapCode 17711 << FIA PLT_CN 721819864290487 << FIA Forest Type:  123 Red spruce
+picerube 75 (2399) 100 (730) 125 (846)
+fagugran 50 (1488) 75 (1058)
+betualle 75 (564)
+
+MapCode 17712 << FIA PLT_CN 721819865290487 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (4940) 75 (675)
+pinustro 50 (2361)
+picerube 75 (1003)
+abiebals 25 (893)
+acerrubr 75 (775)
+
+MapCode 17713 << FIA PLT_CN 721819866290487 << FIA Forest Type:  102 Red pine
+pinuresi 50 (5483)
+picerube 50 (2002)
+acerrubr 25 (1647)
+pinustro 50 (932)
+abiebals 50 (604)
+
+MapCode 17714 << FIA PLT_CN 721819867290487 << FIA Forest Type:  123 Red spruce
+acerrubr 50 (2422) 75 (447)
+betualle 75 (898)
+
+MapCode 17715 << FIA PLT_CN 721819868290487 << FIA Forest Type:  125 Black spruce
+picemari 25 (6146)
+tsugcana 25 (381)
+
+MapCode 17716 << FIA PLT_CN 721819869290487 << FIA Forest Type:  123 Red spruce
+picerube 50 (1194) 75 (10043) 100 (1791) 125 (950)
+tsugcana 75 (921)
+
+MapCode 17717 << FIA PLT_CN 721819871290487 << FIA Forest Type:  901 Aspen
+popugran 50 (4611) 75 (10562)
+picerube 50 (10519) 75 (3460)
+pinustro 75 (2370)
+
+MapCode 17718 << FIA PLT_CN 721819872290487 << FIA Forest Type:  123 Red spruce
+acerrubr 50 (3248)
+betupapy 25 (1659) 50 (1239)
+piceglau 50 (848)
+abiebals 50 (683)
+picerube 50 (680)
+
+MapCode 17722 << FIA PLT_CN 721819880290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 50 (1156)
+picerube 50 (870)
+acersacc 125 (739)
+acerrubr 75 (483)
+
+MapCode 17733 << FIA PLT_CN 721819891290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (788) 75 (1751) 100 (1341)
+acerrubr 75 (1338) 100 (1518)
+betualle 75 (1367)
+
+MapCode 17738 << FIA PLT_CN 721819897290487 << FIA Forest Type:  104 Eastern white pine / eastern hemlock
+pinustro 75 (2859) 100 (2363)
+betupapy 50 (1851) 75 (2343)
+querrubr 75 (1878)
+tsugcana 50 (1813)
+
+MapCode 17739 << FIA PLT_CN 721819898290487 << FIA Forest Type:  104 Eastern white pine / eastern hemlock
+pinustro 75 (4795)
+querrubr 75 (2294)
+tsugcana 50 (1961)
+acerrubr 50 (1045)
+ostrvirg 25 (621)
+
+MapCode 17740 << FIA PLT_CN 721819900290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+tsugcana 50 (861) 75 (3824)
+fagugran 50 (1748)
+querrubr 50 (1710)
+
+MapCode 17741 << FIA PLT_CN 721819901290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 25 (1049) 50 (1921) 75 (1854)
+acerrubr 50 (1774) 75 (728)
+acersacc 75 (1895)
+picerube 50 (1027)
+fagugran 50 (897)
+
+MapCode 17743 << FIA PLT_CN 721819903290487 << FIA Forest Type:  902 Paper birch
+betupapy 75 (574) 100 (721) 175 (887)
+abiebals 50 (1416) 75 (737)
+acerrubr 100 (750)
+fraxamer 175 (561)
+betualle 75 (512)
+
+MapCode 17744 << FIA PLT_CN 721819904290487 << FIA Forest Type:  103 Eastern white pine
+pinustro 100 (4802) 125 (12095) 175 (4762)
+
+MapCode 17745 << FIA PLT_CN 721819906290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (2963) 75 (610)
+acerrubr 50 (2164)
+abiebals 25 (1792)
+popugran 50 (602)
+fraxamer 25 (547)
+
+MapCode 17748 << FIA PLT_CN 721819911290487 << FIA Forest Type:  708 Red maple / lowland
+tsugcana 50 (2852) 75 (1459) 100 (5558)
+acerrubr 50 (804) 75 (1852)
+fraxamer 75 (1071)
+
+MapCode 17749 << FIA PLT_CN 721819912290487 << FIA Forest Type:  103 Eastern white pine
+poputrem 75 (2874)
+abiebals 25 (504)
+acerrubr 50 (312)
+thujocci 50 (300)
+
+MapCode 17750 << FIA PLT_CN 721819913290487 << FIA Forest Type:  103 Eastern white pine
+pinustro 75 (1101) 100 (4570)
+acerrubr 50 (1092) 75 (916)
+betupapy 25 (684)
+
+MapCode 17751 << FIA PLT_CN 721819914290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 50 (834) 75 (4142)
+acerrubr 50 (805) 75 (2866)
+popugran 108 (1865)
+betualle 75 (1182)
+fagugran 50 (1006)
+
+MapCode 17752 << FIA PLT_CN 721819915290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 75 (1339) 100 (3437) 125 (1245)
+tsugcana 50 (1799) 75 (2377) 100 (1340)
+pinustro 175 (1776)
+picerube 75 (1536)
+fagugran 75 (1326)
+
+MapCode 17753 << FIA PLT_CN 721819916290487 << FIA Forest Type:  103 Eastern white pine
+pinustro 100 (1362)
+acerrubr 50 (674)
+betualle 50 (203)
+tsugcana 25 (190)
+
+MapCode 17754 << FIA PLT_CN 721819917290487 << FIA Forest Type:  121 Balsam fir
+thujocci 50 (4449) 75 (3820)
+betualle 175 (2762)
+piceglau 175 (1481)
+abiebals 50 (1239)
+
+MapCode 17756 << FIA PLT_CN 721819919290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (743) 75 (3238) 100 (4393)
+betualle 100 (1158)
+fagugran 50 (671)
+
+MapCode 17757 << FIA PLT_CN 721819920290487 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (8833)
+pinustro 100 (1970)
+picerube 50 (1083)
+
+MapCode 17758 << FIA PLT_CN 721819921290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 25 (578) 50 (2136)
+abiebals 50 (1141)
+acerrubr 50 (798)
+fraxamer 25 (502)
+
+MapCode 17759 << FIA PLT_CN 721819922290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 25 (861) 50 (6030)
+acersacc 75 (3721)
+acerrubr 50 (1241)
+
+MapCode 17760 << FIA PLT_CN 721819923290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (623) 50 (3796)
+thujocci 25 (900) 50 (1443)
+betupapy 75 (1507)
+acerrubr 50 (690)
+popubals 175 (599)
+
+MapCode 17762 << FIA PLT_CN 721819926290487 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 50 (6960)
+picerube 50 (4666)
+
+MapCode 17764 << FIA PLT_CN 721819928290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (2015) 75 (1500)
+piceglau 175 (1991)
+acersacc 100 (1846)
+poputrem 175 (1302)
+picerube 75 (1140)
+
+MapCode 17777 << FIA PLT_CN 721819942290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 25 (1837) 50 (2183)
+betualle 50 (1352)
+acersacc 100 (1246)
+fagugran 50 (704)
+picerube 50 (559)
+
+MapCode 17779 << FIA PLT_CN 721819944290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (635) 50 (111)
+thujocci 50 (706)
+
+MapCode 17780 << FIA PLT_CN 721819945290487 << FIA Forest Type:  121 Balsam fir
+acerrubr 50 (756)
+abiebals 25 (145) 50 (343)
+
+MapCode 17781 << FIA PLT_CN 721819946290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 100 (1410)
+betualle 75 (1342)
+thujocci 75 (285) 100 (586)
+tsugcana 100 (810)
+betupapy 175 (281)
+
+MapCode 17783 << FIA PLT_CN 721819949290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (1358) 75 (1230) 100 (1069)
+fagugran 50 (2522)
+fraxamer 125 (991)
+tsugcana 50 (541)
+betualle 75 (466)
+
+MapCode 17785 << FIA PLT_CN 721819951290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (5623)
+picerube 50 (3810)
+thujocci 50 (2686)
+betualle 50 (1842)
+
+MapCode 17786 << FIA PLT_CN 721819952290487 << FIA Forest Type:  708 Red maple / lowland
+popugran 50 (2846)
+abiebals 25 (509) 50 (1562)
+acerrubr 50 (1940)
+betupapy 50 (1243)
+
+MapCode 17787 << FIA PLT_CN 721819953290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (6978) 50 (5858)
+betupapy 50 (771)
+
+MapCode 17790 << FIA PLT_CN 721819956290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (372) 75 (1721)
+acerrubr 25 (1783)
+ostrvirg 25 (1051)
+fagugran 25 (358)
+fraxamer 25 (344)
+
+MapCode 17794 << FIA PLT_CN 721819961290487 << FIA Forest Type:  121 Balsam fir
+betupapy 25 (876) 50 (2422)
+poputrem 100 (2549)
+piceglau 75 (1215)
+pinustro 50 (649)
+
+MapCode 17795 << FIA PLT_CN 721819962290487 << FIA Forest Type:  809 Red maple / upland
+abiebals 50 (1165)
+fagugran 50 (510)
+acerrubr 50 (362)
+picerube 50 (287)
+poputrem 75 (226)
+
+MapCode 17796 << FIA PLT_CN 721819963290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (1457) 50 (4727)
+acerrubr 50 (1626) 75 (959)
+picerube 50 (2246)
+pinustro 50 (717)
+
+MapCode 17797 << FIA PLT_CN 721819964290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (4302) 50 (4743)
+picemari 25 (1188) 50 (1133)
+pinustro 50 (1991)
+
+MapCode 17798 << FIA PLT_CN 721819967290487 << FIA Forest Type:  809 Red maple / upland
+betualle 75 (2558) 125 (816)
+acerrubr 25 (672) 50 (962) 75 (931)
+abiebals 50 (790)
+
+MapCode 17799 << FIA PLT_CN 721819971290487 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (1780) 75 (437)
+abiebals 50 (1399)
+acerrubr 50 (718) 75 (356)
+
+MapCode 17800 << FIA PLT_CN 721819972290487 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (4371) 75 (1601)
+abiebals 25 (990) 50 (3230)
+pinustro 100 (3005)
+
+MapCode 17801 << FIA PLT_CN 721819973290487 << FIA Forest Type:  123 Red spruce
+picerube 50 (3665) 75 (4590)
+pinustro 175 (542)
+
+MapCode 17802 << FIA PLT_CN 721819974290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 25 (419) 50 (1980)
+betualle 25 (803) 50 (881)
+picerube 50 (377)
+
+MapCode 17803 << FIA PLT_CN 721819975290487 << FIA Forest Type:  904 Balsam poplar
+abiebals 25 (107) 50 (593)
+popubals 25 (293)
+poputrem 25 (221)
+
+MapCode 17810 << FIA PLT_CN 721819985290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 25 (337) 50 (1010)
+betualle 50 (1113)
+acerrubr 50 (314) 75 (412)
+fraxamer 50 (404)
+ostrvirg 25 (361)
+
+MapCode 17811 << FIA PLT_CN 721819987290487 << FIA Forest Type:  103 Eastern white pine
+pinurigi 50 (3127)
+acerrubr 50 (1151)
+pinustro 50 (1012)
+
+MapCode 17812 << FIA PLT_CN 721819988290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+pinustro 25 (507) 50 (363) 75 (1125)
+acerrubr 50 (915) 75 (957)
+querrubr 50 (490) 75 (549)
+abiebals 25 (512) 50 (396)
+betupapy 75 (366)
+
+MapCode 17813 << FIA PLT_CN 721819991290487 << FIA Forest Type:  409 Other pine / hardwood
+querrubr 50 (7368)
+pinustro 50 (954) 75 (2385)
+acerrubr 50 (790)
+
+MapCode 17814 << FIA PLT_CN 721819992290487 << FIA Forest Type:  409 Other pine / hardwood
+querrubr 50 (7418)
+pinustro 50 (2631)
+poputrem 50 (568)
+
+MapCode 17815 << FIA PLT_CN 721819993290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+acersacc 75 (14226)
+fraxamer 75 (6580)
+acerrubr 75 (2169)
+
+MapCode 17816 << FIA PLT_CN 721819994290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+acerrubr 25 (1017) 50 (2821)
+pinustro 75 (3101)
+tsugcana 50 (3000)
+querrubr 50 (2233)
+
+MapCode 17817 << FIA PLT_CN 721819995290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+pinustro 75 (2062)
+acerrubr 50 (902) 75 (1103)
+queralba 50 (518) 75 (873)
+querrubr 75 (1047)
+picemari 75 (888)
+
+MapCode 17818 << FIA PLT_CN 721819996290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 25 (951) 50 (1216) 75 (757)
+betualle 50 (722) 75 (2123)
+fraxamer 50 (1930)
+abiebals 25 (854)
+fraxnigr 50 (502)
+
+MapCode 17819 << FIA PLT_CN 721819997290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 25 (1729) 50 (1406)
+fraxamer 50 (2853)
+acersacc 50 (2210)
+betualle 50 (1943)
+
+MapCode 17820 << FIA PLT_CN 721819998290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (3427)
+fagugran 50 (3265)
+tsugcana 25 (791) 50 (1328)
+querrubr 75 (1307)
+poputrem 75 (1214)
+
+MapCode 17821 << FIA PLT_CN 721819999290487 << FIA Forest Type:  121 Balsam fir
+poputrem 25 (870) 50 (2185)
+pinustro 75 (1998)
+abiebals 25 (1424)
+fraxamer 25 (802)
+piceglau 50 (765)
+
+MapCode 17822 << FIA PLT_CN 721820001290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (696) 75 (2024) 100 (1709)
+fagugran 75 (767)
+betupapy 175 (745)
+picerube 75 (731)
+ulmuamer 80 (667)
+
+MapCode 17823 << FIA PLT_CN 721820002290487 << FIA Forest Type:  103 Eastern white pine
+thujocci 50 (3929)
+acerrubr 50 (1800) 75 (531)
+piceglau 75 (1451)
+abiebals 50 (951)
+pinustro 75 (604)
+
+MapCode 17824 << FIA PLT_CN 721820003290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+querrubr 100 (1826)
+acerrubr 50 (1598)
+tsugcana 50 (375) 75 (610)
+betupapy 100 (307)
+
+MapCode 17825 << FIA PLT_CN 721820004290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+abiebals 25 (1347) 50 (2323)
+tsugcana 25 (798) 50 (1413)
+acersacc 50 (2168)
+pinustro 50 (2046)
+poputrem 50 (2032)
+
+MapCode 17826 << FIA PLT_CN 721820006290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 25 (413) 50 (1435)
+acerrubr 50 (490) 75 (462)
+ostrvirg 25 (926)
+fraxamer 10 (288) 50 (522)
+fagugran 50 (342)
+
+MapCode 17827 << FIA PLT_CN 721820007290487 << FIA Forest Type:  901 Aspen
+betupapy 25 (1643) 50 (1727)
+fraxamer 50 (1908)
+querrubr 50 (1560)
+poputrem 75 (1444)
+acerrubr 50 (1354)
+
+MapCode 17829 << FIA PLT_CN 721820011290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (2355) 50 (3723)
+picerube 50 (978)
+poputrem 50 (614)
+
+MapCode 17830 << FIA PLT_CN 721820012290487 << FIA Forest Type:  901 Aspen
+thujocci 75 (745)
+abiebals 50 (335) 75 (327)
+
+MapCode 17831 << FIA PLT_CN 721820013290487 << FIA Forest Type:  121 Balsam fir
+betualle 100 (1473) 125 (3404)
+acersacc 100 (2438)
+thujocci 50 (2430)
+abiebals 50 (972) 75 (803)
+
+MapCode 17832 << FIA PLT_CN 721820014290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (725) 50 (3669)
+poputrem 175 (1523)
+acerrubr 25 (508) 50 (764)
+ostrvirg 50 (1012)
+
+MapCode 17833 << FIA PLT_CN 721820015290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (1349) 50 (6898)
+thujocci 50 (2038)
+acerrubr 50 (1375)
+betualle 25 (1189)
+
+MapCode 17834 << FIA PLT_CN 721820016290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 75 (1718)
+picerube 50 (877) 75 (829)
+fraxamer 75 (580) 100 (1115)
+acerrubr 50 (1001)
+acersacc 75 (651)
+
+MapCode 17835 << FIA PLT_CN 721820017290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 25 (579) 50 (1471)
+acerrubr 50 (1132)
+abiebals 25 (749) 75 (246)
+
+MapCode 17836 << FIA PLT_CN 721820018290487 << FIA Forest Type:  124 Red spruce / balsam fir
+acerrubr 25 (1187) 50 (1371)
+poputrem 50 (1149)
+pinustro 50 (1032)
+betupapy 25 (650)
+piceglau 50 (637)
+
+MapCode 17837 << FIA PLT_CN 721820019290487 << FIA Forest Type:  809 Red maple / upland
+acerrubr 25 (1273) 75 (263)
+abiebals 50 (395) 75 (437)
+thujocci 50 (780)
+tsugcana 75 (720)
+piceglau 75 (248)
+
+MapCode 17838 << FIA PLT_CN 721820020290487 << FIA Forest Type:  121 Balsam fir
+picemari 50 (824) 75 (1977)
+betupapy 25 (469) 50 (1136)
+abiebals 50 (288)
+
+MapCode 17839 << FIA PLT_CN 721820021290487 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (948) 75 (281)
+picerube 25 (164) 50 (677)
+betualle 10 (323)
+fagugran 25 (233)
+
+MapCode 17840 << FIA PLT_CN 721820022290487 << FIA Forest Type:  125 Black spruce
+picemari 50 (1615) 75 (3603)
+larilari 50 (1602) 75 (1174)
+
+MapCode 17842 << FIA PLT_CN 721820024290487 << FIA Forest Type:  126 Tamarack
+larilari 50 (651) 75 (1131) 100 (963) 175 (2769)
+thujocci 25 (718) 50 (1907) 175 (549)
+picemari 175 (768)
+
+MapCode 17843 << FIA PLT_CN 721820025290487 << FIA Forest Type:  125 Black spruce
+thujocci 25 (837) 50 (1396) 75 (429)
+pinustro 75 (557) 100 (381)
+abiebals 25 (475)
+picerube 75 (419)
+picemari 50 (292)
+
+MapCode 17844 << FIA PLT_CN 721820026290487 << FIA Forest Type:  103 Eastern white pine
+pinustro 75 (770) 100 (2612) 125 (850)
+acerrubr 50 (492) 75 (1636) 100 (861) 125 (494)
+
+MapCode 17845 << FIA PLT_CN 721820027290487 << FIA Forest Type:  809 Red maple / upland
+acerrubr 25 (572) 50 (1261) 75 (914)
+picemari 50 (920) 75 (239)
+
+MapCode 17846 << FIA PLT_CN 721820029290487 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (725) 75 (4073)
+betualle 50 (687) 75 (2163)
+betupapy 50 (1289)
+
+MapCode 17848 << FIA PLT_CN 721820031290487 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (1841) 100 (786)
+picerube 75 (696)
+popugran 100 (428)
+pinustro 50 (422)
+acerrubr 25 (244)
+
+MapCode 17849 << FIA PLT_CN 721820032290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 25 (1270) 50 (3882)
+pinustro 100 (3357)
+querrubr 50 (3177)
+acerrubr 75 (1386)
+picerube 50 (817)
+
+MapCode 17850 << FIA PLT_CN 721820033290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (670) 50 (1225)
+acerrubr 25 (251) 50 (950)
+
+MapCode 17853 << FIA PLT_CN 721820036290487 << FIA Forest Type:  901 Aspen
+popugran 50 (1040) 75 (1419) 100 (3045) 108 (1123)
+poputrem 50 (1045) 75 (1891)
+abiebals 50 (1343)
+acerrubr 50 (1024)
+
+MapCode 17855 << FIA PLT_CN 721820038290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (1385) 50 (5227)
+
+MapCode 17856 << FIA PLT_CN 721820040290487 << FIA Forest Type:  126 Tamarack
+picemari 25 (545) 50 (88)
+larilari 50 (475)
+
+MapCode 17857 << FIA PLT_CN 721820041290487 << FIA Forest Type:  127 Northern white-cedar
+pinustro 50 (575) 75 (2220)
+picerube 50 (2111)
+thujocci 50 (1720)
+abiebals 25 (959) 50 (663)
+
+MapCode 17858 << FIA PLT_CN 721820042290487 << FIA Forest Type:  122 White spruce
+piceglau 175 (7465)
+picerube 75 (1454) 100 (2236) 125 (2968)
+abiebals 50 (1697) 75 (1797)
+larilari 100 (1260)
+
+MapCode 17861 << FIA PLT_CN 721820046290487 << FIA Forest Type:  126 Tamarack
+larilari 25 (1471) 50 (1666)
+acerrubr 50 (2883)
+
+MapCode 17862 << FIA PLT_CN 721820047290487 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (7308) 75 (1549)
+picemari 50 (753) 75 (1538)
+abiebals 50 (2051)
+
+MapCode 17863 << FIA PLT_CN 721820048290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (539) 50 (3027)
+picerube 50 (2128)
+betupapy 50 (972)
+piceglau 50 (853)
+
+MapCode 17867 << FIA PLT_CN 721820052290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 50 (2938)
+acersacc 75 (2935)
+fagugran 50 (1437) 75 (961)
+picerube 50 (1446)
+
+MapCode 17868 << FIA PLT_CN 721820053290487 << FIA Forest Type:  127 Northern white-cedar
+thujocci 25 (502) 50 (2197) 75 (1243)
+picemari 75 (339)
+acerrubr 50 (331)
+piceglau 100 (280)
+
+MapCode 17869 << FIA PLT_CN 721820054290487 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 25 (791) 50 (1645) 75 (2740)
+picemari 75 (2032) 100 (1211)
+betupapy 50 (1321)
+piceglau 125 (870)
+
+MapCode 17871 << FIA PLT_CN 721820057290487 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (1538) 75 (419)
+picerube 50 (1370)
+betupapy 50 (281) 75 (404)
+
+MapCode 17873 << FIA PLT_CN 721820059290487 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 25 (1132) 50 (2006)
+picerube 50 (606)
+
+MapCode 17876 << FIA PLT_CN 721820062290487 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 25 (858) 50 (1687)
+poputrem 50 (1659) 75 (779)
+betupapy 25 (2413)
+betualle 10 (657) 25 (556) 50 (592)
+acerrubr 50 (586)
+
+MapCode 17878 << FIA PLT_CN 721820065290487 << FIA Forest Type:  127 Northern white-cedar
+thujocci 25 (789) 50 (1876)
+pinustro 50 (685) 75 (897)
+picerube 50 (1496)
+abiebals 50 (873)
+
+MapCode 17879 << FIA PLT_CN 721820066290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (1524) 100 (1832)
+fagugran 50 (1444)
+
+MapCode 17880 << FIA PLT_CN 721820067290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betupapy 25 (1188) 100 (1232)
+abiebals 25 (867) 50 (772)
+acerrubr 25 (1418)
+betualle 50 (561) 75 (686)
+picerube 50 (941)
+
+MapCode 17881 << FIA PLT_CN 721820068290487 << FIA Forest Type:  102 Red pine
+pinuresi 50 (4472)
+abiebals 25 (1192) 50 (2165)
+popugran 50 (1642)
+betupapy 25 (1553)
+
+MapCode 17882 << FIA PLT_CN 721820069290487 << FIA Forest Type:  102 Red pine
+pinuresi 50 (3270)
+abiebals 50 (490)
+picerube 50 (428)
+
+MapCode 17883 << FIA PLT_CN 721820070290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 50 (3402)
+abiebals 50 (1076) 75 (534)
+fraxnigr 50 (767)
+
+MapCode 17884 << FIA PLT_CN 721820071290487 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (6634)
+pinustro 125 (1708) 175 (1914)
+abiebals 50 (1384)
+betupapy 50 (1139)
+thujocci 50 (1118)
+
+MapCode 17885 << FIA PLT_CN 721820072290487 << FIA Forest Type:  123 Red spruce
+tsugcana 50 (812) 75 (794)
+ostrvirg 50 (762)
+abiebals 25 (247) 50 (470)
+picerube 75 (639)
+
+MapCode 17886 << FIA PLT_CN 721820073290487 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 25 (2055) 50 (2602)
+picerube 50 (3846)
+pinustro 50 (1094)
+acerrubr 50 (901)
+
+MapCode 17887 << FIA PLT_CN 721820074290487 << FIA Forest Type:  902 Paper birch
+acerrubr 50 (2681) 75 (641) 100 (688)
+betupapy 50 (647) 75 (2328)
+piceglau 75 (1049)
+
+MapCode 17888 << FIA PLT_CN 721820075290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+picerube 50 (687) 75 (3654)
+betualle 50 (878) 75 (3001)
+fagugran 50 (2439)
+acerrubr 75 (2287)
+
+MapCode 17889 << FIA PLT_CN 721820076290487 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (1850) 75 (705)
+pinustro 75 (1179)
+acerrubr 25 (319)
+
+MapCode 17890 << FIA PLT_CN 721820077290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (3882)
+fagugran 25 (349) 50 (1901)
+
+MapCode 17891 << FIA PLT_CN 721820079290487 << FIA Forest Type:  123 Red spruce
+pinustro 175 (6134)
+picerube 50 (1163) 75 (2425)
+betupapy 125 (1340) 175 (1537)
+
+MapCode 17892 << FIA PLT_CN 721820080290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 75 (4303)
+picerube 75 (3290)
+betualle 125 (3107)
+acersacc 100 (2822)
+acerrubr 75 (1698)
+
+MapCode 17893 << FIA PLT_CN 721820083290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (2701) 75 (3174)
+fagugran 25 (1498) 75 (1136)
+betualle 50 (500)
+
+MapCode 17894 << FIA PLT_CN 721820084290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 25 (1578) 50 (4218)
+betualle 50 (411)
+acerrubr 50 (403)
+
+MapCode 17895 << FIA PLT_CN 721820085290487 << FIA Forest Type:  121 Balsam fir
+acerrubr 25 (427) 50 (561) 75 (1517)
+querrubr 75 (1730)
+betualle 25 (674) 50 (382)
+fagugran 75 (551)
+betupapy 50 (422)
+
+MapCode 17896 << FIA PLT_CN 721820086290487 << FIA Forest Type:  701 Black ash / American elm / red maple
+acerrubr 25 (362) 50 (3129)
+fraxnigr 25 (1686) 50 (1759)
+
+MapCode 17897 << FIA PLT_CN 721820087290487 << FIA Forest Type:  505 Northern red oak
+querrubr 75 (748) 100 (765) 175 (3348)
+tsugcana 75 (4353)
+popugran 50 (1353)
+
+MapCode 17899 << FIA PLT_CN 721820090290487 << FIA Forest Type:  809 Red maple / upland
+fraxamer 100 (2947)
+acerrubr 50 (2635)
+betupopu 10 (383)
+betualle 10 (366)
+
+MapCode 17900 << FIA PLT_CN 721820091290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (1699) 75 (2394)
+
+MapCode 17901 << FIA PLT_CN 721820093290487 << FIA Forest Type:  409 Other pine / hardwood
+querrubr 50 (8452) 75 (20800) 100 (21423)
+pinustro 75 (21365)
+acerrubr 50 (4650)
+
+MapCode 17902 << FIA PLT_CN 721820094290487 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (1559) 75 (2496)
+querrubr 50 (1263) 75 (2490)
+fagugran 75 (836)
+abiebals 50 (753)
+picerube 50 (676)
+
+MapCode 17903 << FIA PLT_CN 721820095290487 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 75 (2796) 100 (1734)
+betupapy 50 (2278)
+tsugcana 50 (1293)
+
+MapCode 17904 << FIA PLT_CN 721820096290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+tsugcana 75 (5239)
+pinustro 75 (4398)
+picerube 50 (1780) 75 (2267)
+acerrubr 75 (2703)
+querrubr 50 (1723)
+
+MapCode 17905 << FIA PLT_CN 721820098290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+popugran 108 (1840)
+fraxamer 175 (1285)
+acersacc 175 (763)
+acerrubr 75 (382) 100 (374)
+ulmuamer 80 (675)
+
+MapCode 17906 << FIA PLT_CN 721820099290487 << FIA Forest Type:  105 Eastern hemlock
+acersacc 100 (1666) 175 (8566)
+tsugcana 75 (4128) 100 (2605)
+
+MapCode 17907 << FIA PLT_CN 721820100290487 << FIA Forest Type:  121 Balsam fir
+acerrubr 50 (2630) 75 (801) 100 (505)
+betualle 100 (778) 175 (885)
+abiebals 50 (797)
+
+MapCode 17908 << FIA PLT_CN 721820101290487 << FIA Forest Type:  127 Northern white-cedar
+thujocci 25 (1353) 50 (8121) 75 (6115)
+piceglau 125 (839)
+
+MapCode 17909 << FIA PLT_CN 721820102290487 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (6667)
+betupapy 75 (1373) 100 (662)
+poputrem 50 (1541)
+
+MapCode 17910 << FIA PLT_CN 721820103290487 << FIA Forest Type:  127 Northern white-cedar
+thujocci 25 (2270) 50 (1757)
+larilari 25 (1277) 50 (1547)
+
+MapCode 17911 << FIA PLT_CN 721820104290487 << FIA Forest Type:  121 Balsam fir
+tsugcana 50 (1380)
+acerrubr 50 (758)
+abiebals 50 (562)
+acersacc 50 (420)
+
+MapCode 17912 << FIA PLT_CN 721820105290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (909) 50 (3547)
+thujocci 50 (3168)
+betualle 50 (1418) 75 (1096)
+acerrubr 50 (1244)
+
+MapCode 17913 << FIA PLT_CN 721820106290487 << FIA Forest Type:  124 Red spruce / balsam fir
+acerrubr 50 (3119)
+tsugcana 25 (967) 50 (875)
+picerube 50 (1753)
+abiebals 25 (523)
+
+MapCode 17914 << FIA PLT_CN 721820107290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 50 (1702) 75 (1654) 100 (1542)
+fagugran 50 (3013)
+acersacc 50 (1741)
+ostrvirg 25 (1306)
+
+MapCode 17915 << FIA PLT_CN 721820108290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 75 (1895) 100 (2382) 125 (852)
+picerube 100 (1097) 125 (1781)
+popugran 108 (1642)
+acerrubr 100 (697)
+
+MapCode 17916 << FIA PLT_CN 721820109290487 << FIA Forest Type:  124 Red spruce / balsam fir
+tsugcana 50 (2831)
+picerube 50 (1486)
+thujocci 50 (1436)
+pinustro 50 (811) 75 (529)
+betualle 50 (453)
+
+MapCode 17917 << FIA PLT_CN 721820110290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 25 (731) 50 (1342) 75 (1934)
+
+MapCode 17927 << FIA PLT_CN 721820120290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 50 (2129)
+acersacc 25 (809) 50 (950)
+
+MapCode 17931 << FIA PLT_CN 721820124290487 << FIA Forest Type:  121 Balsam fir
+abiebals 75 (795) 100 (1035) 125 (989) 175 (2989)
+acerrubr 50 (1199) 75 (2452)
+piceglau 175 (1859)
+betupapy 100 (760)
+
+MapCode 17935 << FIA PLT_CN 721820128290487 << FIA Forest Type:  123 Red spruce
+picerube 75 (3798)
+abiebals 25 (1087) 50 (1554)
+betualle 125 (2334)
+betupapy 25 (1158)
+acersacc 75 (1154)
+
+MapCode 17936 << FIA PLT_CN 721820129290487 << FIA Forest Type:  809 Red maple / upland
+poputrem 75 (2319) 100 (1231) 125 (1471)
+acerrubr 50 (2764) 75 (963)
+popugran 100 (1416)
+acersacc 50 (971)
+
+MapCode 17937 << FIA PLT_CN 721820131290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (3189) 75 (10883)
+acerrubr 75 (920)
+fagugran 50 (907)
+
+MapCode 17938 << FIA PLT_CN 721820132290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+querrubr 50 (3391)
+acerrubr 50 (1378)
+tsugcana 50 (1350)
+acersacc 50 (1042)
+ostrvirg 25 (886)
+
+MapCode 17939 << FIA PLT_CN 721820133290487 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 25 (902) 50 (730)
+pinustro 50 (372)
+
+MapCode 17940 << FIA PLT_CN 721820134290487 << FIA Forest Type:  809 Red maple / upland
+querrubr 50 (370) 75 (2445) 100 (2438)
+acerrubr 50 (881)
+acersacc 50 (649)
+
+MapCode 17941 << FIA PLT_CN 721820135290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 25 (355) 50 (1122)
+querrubr 50 (743) 100 (406)
+acersacc 50 (225)
+poputrem 25 (210)
+betupapy 50 (206)
+
+MapCode 17942 << FIA PLT_CN 721820136290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 25 (1590) 50 (2616)
+pinustro 75 (4136)
+fraxamer 50 (3606)
+
+MapCode 17943 << FIA PLT_CN 721820137290487 << FIA Forest Type:  901 Aspen
+popugran 25 (751) 50 (3032)
+acersacc 25 (679) 50 (698)
+acerrubr 50 (828)
+abiebals 25 (531)
+querrubr 25 (525)
+
+MapCode 17944 << FIA PLT_CN 721820138290487 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (1535) 75 (5693)
+abiebals 50 (848) 75 (1281)
+fraxamer 25 (941) 50 (747)
+poputrem 100 (1497)
+
+MapCode 17945 << FIA PLT_CN 721820139290487 << FIA Forest Type:  121 Balsam fir
+betualle 50 (2874) 75 (2522)
+thujocci 50 (576) 75 (1654)
+acersacc 25 (753)
+
+MapCode 17946 << FIA PLT_CN 721820140290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 50 (873) 75 (1820)
+acerrubr 50 (348)
+fagugran 50 (318)
+thujocci 50 (209)
+
+MapCode 17947 << FIA PLT_CN 721820141290487 << FIA Forest Type:  124 Red spruce / balsam fir
+betualle 25 (1788) 50 (914) 75 (327)
+acerrubr 50 (1938)
+picerube 50 (664)
+abiebals 50 (396)
+
+MapCode 17948 << FIA PLT_CN 721820142290487 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (2222) 75 (7486)
+
+MapCode 17949 << FIA PLT_CN 721820143290487 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (4119) 75 (2767) 100 (1170)
+
+MapCode 17951 << FIA PLT_CN 721820145290487 << FIA Forest Type:  901 Aspen
+popugran 50 (1642) 100 (1871)
+ostrvirg 25 (2636)
+fagugran 50 (2439)
+betupapy 50 (1390) 75 (769)
+poputrem 50 (1080)
+
+MapCode 17952 << FIA PLT_CN 721820146290487 << FIA Forest Type:  701 Black ash / American elm / red maple
+piceglau 125 (6818)
+picerube 50 (3016) 75 (1508)
+
+MapCode 17953 << FIA PLT_CN 721820147290487 << FIA Forest Type:  124 Red spruce / balsam fir
+thujocci 75 (454) 100 (1027)
+piceglau 100 (831)
+acerrubr 75 (696)
+abiebals 50 (328)
+
+MapCode 17954 << FIA PLT_CN 721820148290487 << FIA Forest Type:  809 Red maple / upland
+picerube 50 (1948) 75 (2828)
+acerrubr 50 (1173) 75 (3199)
+betualle 75 (4320)
+abiebals 25 (823)
+
+MapCode 17958 << FIA PLT_CN 721820152290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (194) 50 (1008)
+thujocci 50 (436)
+acerrubr 25 (417)
+betupapy 50 (411)
+
+MapCode 17959 << FIA PLT_CN 721820153290487 << FIA Forest Type:  124 Red spruce / balsam fir
+poputrem 100 (4349) 125 (3936)
+abiebals 50 (2359) 75 (1316)
+popubals 75 (1753)
+piceglau 75 (1061)
+
+MapCode 17960 << FIA PLT_CN 721820156290487 << FIA Forest Type:  121 Balsam fir
+acerrubr 50 (809) 75 (828)
+poputrem 75 (460) 100 (742)
+betupapy 75 (589)
+abiebals 50 (254)
+
+MapCode 17961 << FIA PLT_CN 721820157290487 << FIA Forest Type:  121 Balsam fir
+poputrem 50 (4977) 75 (2209)
+abiebals 25 (1252) 50 (5886)
+
+MapCode 17962 << FIA PLT_CN 721820158290487 << FIA Forest Type:  121 Balsam fir
+poputrem 50 (811) 75 (1240) 100 (837) 175 (3722)
+abiebals 25 (865) 50 (1528)
+acerrubr 50 (1817)
+acersacc 50 (1249)
+piceglau 75 (1024)
+
+MapCode 17963 << FIA PLT_CN 721820159290487 << FIA Forest Type:  122 White spruce
+piceglau 50 (9659) 75 (2111)
+poputrem 100 (744)
+
+MapCode 17964 << FIA PLT_CN 721820160290487 << FIA Forest Type:  127 Northern white-cedar
+tsugcana 50 (1529) 75 (3722) 100 (3631)
+betualle 75 (1773) 125 (1140)
+thujocci 75 (2119)
+acerrubr 75 (1671)
+picerube 75 (1439)
+
+MapCode 17965 << FIA PLT_CN 721820161290487 << FIA Forest Type:  127 Northern white-cedar
+pinustro 50 (409) 175 (2407)
+thujocci 50 (1275)
+betupapy 25 (938)
+popubals 50 (581)
+
+MapCode 17966 << FIA PLT_CN 721820162290487 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (3613) 75 (4165)
+pinustro 75 (1625) 100 (1796)
+thujocci 75 (998)
+
+MapCode 17967 << FIA PLT_CN 721820163290487 << FIA Forest Type:  105 Eastern hemlock
+acerrubr 75 (3406) 100 (3642)
+tsugcana 50 (1706) 75 (4883)
+picerube 75 (5928)
+betupapy 50 (1610) 100 (2052) 175 (2247)
+
+MapCode 17968 << FIA PLT_CN 721820165290487 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 25 (964)
+acerrubr 25 (893)
+thujocci 50 (233)
+pinustro 25 (199)
+
+MapCode 17969 << FIA PLT_CN 721820166290487 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (2786)
+pinustro 50 (467) 75 (1808)
+abiebals 50 (770)
+betupopu 25 (498)
+
+MapCode 17970 << FIA PLT_CN 721820167290487 << FIA Forest Type:  125 Black spruce
+picemari 50 (7465)
+
+MapCode 17971 << FIA PLT_CN 721820168290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 75 (4623) 100 (1712)
+acerrubr 75 (1743) 100 (1154)
+popugran 108 (777)
+
+MapCode 17972 << FIA PLT_CN 721820169290487 << FIA Forest Type:  124 Red spruce / balsam fir
+pinustro 50 (2539) 75 (1808)
+abiebals 25 (1579) 50 (1377)
+picemari 25 (986) 50 (1573)
+picerube 50 (2099)
+
+MapCode 17973 << FIA PLT_CN 721820170290487 << FIA Forest Type:  105 Eastern hemlock
+picerube 100 (1563)
+thujocci 75 (778)
+betualle 75 (594)
+abiebals 50 (245) 75 (313)
+acerrubr 25 (521)
+
+MapCode 17974 << FIA PLT_CN 721820171290487 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (2104) 75 (392)
+abiebals 25 (760) 50 (472)
+
+MapCode 17975 << FIA PLT_CN 721820172290487 << FIA Forest Type:  121 Balsam fir
+acerrubr 50 (773) 75 (1797)
+pinustro 50 (750) 75 (1266)
+picemari 50 (988) 75 (600)
+abiebals 50 (1263)
+poputrem 50 (805)
+
+MapCode 17976 << FIA PLT_CN 721820173290487 << FIA Forest Type:  123 Red spruce
+picerube 50 (1443) 75 (733) 100 (332) 125 (445)
+thujocci 50 (738)
+betupapy 100 (451)
+piceglau 125 (414)
+
+MapCode 17978 << FIA PLT_CN 721820175290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 25 (2356) 50 (3358)
+acerrubr 50 (943) 75 (2158)
+acersacc 75 (1436)
+betualle 75 (1305)
+
+MapCode 17980 << FIA PLT_CN 721820177290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 50 (1162) 175 (1608)
+abiebals 25 (567) 50 (721)
+acersacc 50 (772)
+acerrubr 25 (659)
+fraxamer 25 (510)
+
+MapCode 17982 << FIA PLT_CN 721820179290487 << FIA Forest Type:  123 Red spruce
+picerube 50 (1505) 125 (1493)
+acersacc 75 (724) 125 (1298)
+piceglau 50 (827)
+abiebals 75 (808)
+
+MapCode 17984 << FIA PLT_CN 721820181290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (758) 50 (3091)
+betupapy 25 (549) 50 (2238)
+acerrubr 50 (1387)
+
+MapCode 17989 << FIA PLT_CN 721820186290487 << FIA Forest Type:  125 Black spruce
+picerube 50 (1283) 75 (1699)
+betupapy 50 (278)
+
+MapCode 17990 << FIA PLT_CN 721820187290487 << FIA Forest Type:  902 Paper birch
+betualle 175 (4812)
+betupapy 100 (2093) 175 (1056)
+acerrubr 125 (3094)
+acersacc 175 (1784)
+fagugran 50 (1177)
+
+MapCode 17991 << FIA PLT_CN 721820188290487 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (2181) 75 (3053)
+picerube 50 (1859) 75 (2468)
+betualle 50 (1402) 75 (2096)
+abiebals 50 (1198)
+
+MapCode 17992 << FIA PLT_CN 721820190290487 << FIA Forest Type:  127 Northern white-cedar
+betualle 10 (211) 25 (881) 50 (1252)
+thujocci 25 (558) 75 (712)
+pinustro 50 (270)
+
+MapCode 17993 << FIA PLT_CN 721820191290487 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 25 (1619) 50 (173)
+picerube 25 (581) 50 (510)
+pinustro 50 (188)
+
+MapCode 17994 << FIA PLT_CN 721820192290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 75 (2527)
+picerube 50 (1282)
+fagugran 50 (1129)
+betualle 100 (890)
+abiebals 75 (462)
+
+MapCode 17995 << FIA PLT_CN 721820193290487 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 50 (3206) 75 (2293)
+picerube 50 (1872) 75 (864)
+
+MapCode 17996 << FIA PLT_CN 721820194290487 << FIA Forest Type:  121 Balsam fir
+acerrubr 50 (4559) 75 (4426)
+abiebals 50 (2639) 75 (1589)
+
+MapCode 17997 << FIA PLT_CN 721820196290487 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 50 (4084) 75 (685)
+thujocci 50 (2307)
+picerube 50 (1632)
+piceglau 75 (1218)
+betupapy 50 (1144)
+
+MapCode 17998 << FIA PLT_CN 721820197290487 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (841) 75 (4618) 100 (470) 125 (532)
+acerrubr 50 (448) 75 (1056)
+
+MapCode 17999 << FIA PLT_CN 721820199290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (1194) 50 (8868)
+picerube 50 (2105)
+betupapy 50 (1713)
+thujocci 50 (859)
+
+MapCode 18000 << FIA PLT_CN 721820200290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (3912) 75 (5565) 100 (1573)
+acerrubr 50 (1792)
+ostrvirg 25 (1534)
+
+MapCode 18002 << FIA PLT_CN 721820202290487 << FIA Forest Type:  708 Red maple / lowland
+pinustro 100 (8933)
+acerrubr 50 (4569) 75 (2047)
+querrubr 175 (2264)
+abiebals 50 (1415)
+
+MapCode 18006 << FIA PLT_CN 721820209290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 25 (812) 50 (1870) 75 (3909) 100 (5616)
+picerube 75 (2400)
+
+MapCode 18007 << FIA PLT_CN 721820211290487 << FIA Forest Type:  124 Red spruce / balsam fir
+acerrubr 50 (1324) 75 (787)
+abiebals 50 (1940)
+picerube 50 (1224)
+betualle 50 (626)
+
+MapCode 18010 << FIA PLT_CN 721820214290487 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (5116)
+abiebals 25 (1929) 50 (1560)
+
+MapCode 18015 << FIA PLT_CN 721820220290487 << FIA Forest Type:  901 Aspen
+piceglau 50 (1526) 75 (7408)
+acerrubr 25 (1623)
+poputrem 50 (709)
+
+MapCode 18016 << FIA PLT_CN 721820221290487 << FIA Forest Type:  121 Balsam fir
+popugran 75 (1123) 100 (1126)
+abiebals 25 (338) 50 (1658)
+acerrubr 25 (370) 50 (323)
+
+MapCode 18017 << FIA PLT_CN 721820222290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 75 (1155) 100 (641)
+acersacc 100 (455) 175 (867)
+abiebals 50 (605) 75 (498)
+tsugcana 75 (941)
+betualle 125 (443)
+
+MapCode 18019 << FIA PLT_CN 721820227290487 << FIA Forest Type:  121 Balsam fir
+tsugcana 25 (1266) 50 (1272)
+acerrubr 50 (2070)
+fraxamer 25 (1172) 75 (621)
+abiebals 25 (1028) 50 (528)
+betualle 25 (582)
+
+MapCode 18020 << FIA PLT_CN 721820229290487 << FIA Forest Type:  903 Gray birch
+betupopu 25 (1313) 50 (1223)
+abiebals 50 (1407)
+poputrem 50 (502) 75 (679)
+fraxnigr 50 (670)
+fraxamer 50 (653)
+
+MapCode 18021 << FIA PLT_CN 721820230290487 << FIA Forest Type:  121 Balsam fir
+tsugcana 50 (2626)
+abiebals 25 (700) 50 (1676)
+piceglau 50 (1809)
+acerrubr 50 (1667)
+betupapy 50 (1300)
+
+MapCode 18022 << FIA PLT_CN 721820231290487 << FIA Forest Type:  121 Balsam fir
+betupopu 25 (899) 50 (302)
+abiebals 25 (534) 50 (618)
+thujocci 25 (191) 50 (256)
+betualle 75 (243)
+
+MapCode 18023 << FIA PLT_CN 721820232290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (1161) 50 (4217)
+acerrubr 25 (2896) 50 (2244)
+
+MapCode 18024 << FIA PLT_CN 721820233290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 25 (848) 50 (3830)
+acerrubr 50 (1371) 75 (2592)
+betualle 25 (1511)
+popugran 75 (1048)
+
+MapCode 18025 << FIA PLT_CN 721820234290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 25 (889) 50 (2050) 75 (1044)
+betualle 75 (1408) 125 (1567)
+betupapy 175 (1834)
+acerrubr 100 (1722)
+fraxamer 175 (913)
+
+MapCode 18026 << FIA PLT_CN 721820235290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (3033) 75 (9117)
+acerrubr 50 (1480) 75 (1226)
+fagugran 50 (1782)
+acersacc 50 (1425)
+
+MapCode 18027 << FIA PLT_CN 721820236290487 << FIA Forest Type:  121 Balsam fir
+tsugcana 50 (1411) 75 (4548)
+acerrubr 50 (2252) 75 (892)
+abiebals 50 (1571)
+thujocci 50 (1282)
+
+MapCode 18028 << FIA PLT_CN 721820237290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 75 (2578) 100 (1242)
+fraxamer 100 (1636)
+ostrvirg 50 (1528)
+betualle 100 (966)
+abiebals 50 (885)
+
+MapCode 18029 << FIA PLT_CN 721820238290487 << FIA Forest Type:  903 Gray birch
+betupopu 25 (1264) 50 (1057)
+acerrubr 50 (1771)
+larilari 50 (599)
+abiebals 25 (318)
+
+MapCode 18030 << FIA PLT_CN 721820239290487 << FIA Forest Type:  121 Balsam fir
+acerrubr 25 (644) 50 (2013) 75 (2408)
+poputrem 75 (1101) 100 (769)
+fraxamer 75 (1642)
+betupapy 75 (709)
+
+MapCode 18031 << FIA PLT_CN 721820240290487 << FIA Forest Type:  121 Balsam fir
+betupapy 125 (1760) 175 (2922)
+acerrubr 100 (2880)
+acersacc 50 (2443)
+thujocci 50 (1879)
+larilari 175 (1578)
+
+MapCode 18032 << FIA PLT_CN 721820241290487 << FIA Forest Type:  124 Red spruce / balsam fir
+piceglau 75 (684) 100 (2548)
+abiebals 75 (1844) 100 (1065)
+thujocci 50 (594) 75 (643)
+betupapy 175 (973)
+
+MapCode 18033 << FIA PLT_CN 721820242290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (3231) 75 (3649)
+fagugran 50 (2669)
+betualle 50 (2648)
+querrubr 100 (1141)
+
+MapCode 18034 << FIA PLT_CN 721820243290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (1677) 50 (1663)
+fagugran 75 (982)
+tsugcana 75 (857)
+acerrubr 125 (674)
+betualle 100 (464)
+
+MapCode 18035 << FIA PLT_CN 721820244290487 << FIA Forest Type:  103 Eastern white pine
+pinustro 50 (1825) 75 (11452)
+picerube 50 (3722)
+acerrubr 50 (1893)
+
+MapCode 18036 << FIA PLT_CN 721820245290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (969) 50 (1198)
+acerrubr 25 (414) 50 (1336)
+pinustro 50 (1364)
+
+MapCode 18039 << FIA PLT_CN 721820249290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (1541) 75 (932) 100 (1819)
+fagugran 25 (435) 50 (1181)
+betualle 50 (495)
+
+MapCode 18041 << FIA PLT_CN 721820251290487 << FIA Forest Type:  124 Red spruce / balsam fir
+betualle 50 (2427)
+abiebals 50 (1606) 75 (532)
+piceglau 75 (1668)
+acerrubr 75 (993)
+betupapy 50 (923)
+
+MapCode 18059 << FIA PLT_CN 721820270290487 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (2457) 75 (1643)
+tsugcana 75 (780) 100 (1972)
+piceglau 100 (538)
+
+MapCode 18060 << FIA PLT_CN 721820272290487 << FIA Forest Type:  123 Red spruce
+pinustro 50 (1407)
+picerube 25 (216) 50 (635)
+abiebals 25 (515)
+popugran 50 (350)
+acerrubr 50 (230)
+
+MapCode 18061 << FIA PLT_CN 721820273290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 25 (577) 50 (1081) 75 (918) 125 (1275)
+acerrubr 50 (678) 75 (529)
+pinustro 75 (377) 100 (505)
+
+MapCode 18062 << FIA PLT_CN 721820274290487 << FIA Forest Type:  123 Red spruce
+tsugcana 50 (2515)
+acerrubr 50 (2482)
+pinustro 50 (1683)
+abiebals 25 (1442)
+picerube 50 (1174)
+
+MapCode 18064 << FIA PLT_CN 721820277290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 50 (3666) 75 (2093)
+pinustro 50 (901) 75 (2323)
+fagugran 25 (1072) 50 (2135)
+
+MapCode 18065 << FIA PLT_CN 721820278290487 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (4614) 75 (2217)
+pinustro 50 (2156)
+abiebals 25 (710) 50 (748)
+
+MapCode 18068 << FIA PLT_CN 721820281290487 << FIA Forest Type:  809 Red maple / upland
+acerrubr 75 (5415)
+abiebals 25 (753) 50 (716)
+pinustro 25 (951)
+
+MapCode 18069 << FIA PLT_CN 721820282290487 << FIA Forest Type:  121 Balsam fir
+thujocci 50 (1615)
+acerrubr 50 (756) 75 (580)
+abiebals 50 (1223)
+pinustro 50 (715)
+
+MapCode 18070 << FIA PLT_CN 721820283290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acerrubr 75 (3348) 100 (993)
+fagugran 50 (2417) 75 (1421)
+abiebals 25 (680) 50 (606)
+querrubr 100 (583)
+
+MapCode 18071 << FIA PLT_CN 721820286290487 << FIA Forest Type:  124 Red spruce / balsam fir
+acerrubr 75 (2758) 175 (1329)
+tsugcana 50 (1339) 75 (2063)
+abiebals 50 (982) 75 (2067)
+picerube 75 (1464) 100 (1312)
+
+MapCode 18072 << FIA PLT_CN 721820288290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 25 (2791) 50 (943)
+betupapy 25 (1468) 50 (1717)
+acerrubr 50 (2157)
+
+MapCode 18073 << FIA PLT_CN 721820289290487 << FIA Forest Type:  901 Aspen
+querrubr 50 (1705) 100 (1805)
+fagugran 50 (989)
+poputrem 50 (934)
+abiebals 50 (926)
+acerrubr 75 (869)
+
+MapCode 18074 << FIA PLT_CN 721820290290487 << FIA Forest Type:  903 Gray birch
+popugran 50 (2267)
+betupopu 25 (1570)
+abiebals 50 (806)
+acerrubr 50 (780)
+betupapy 25 (696)
+
+MapCode 18075 << FIA PLT_CN 721820292290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (1787) 50 (6745)
+thujocci 50 (2245)
+picerube 50 (830)
+betupapy 125 (809)
+
+MapCode 18076 << FIA PLT_CN 721820293290487 << FIA Forest Type:  902 Paper birch
+abiebals 25 (1252) 50 (2113)
+betupapy 75 (870) 100 (696)
+fagugran 50 (933)
+betualle 75 (385)
+
+MapCode 18077 << FIA PLT_CN 721820294290487 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (3439)
+pinustro 75 (2127)
+abiebals 25 (544) 50 (1071)
+picerube 50 (1246)
+acerrubr 50 (629)
+
+MapCode 18081 << FIA PLT_CN 721820301290487 << FIA Forest Type:  809 Red maple / upland
+acerrubr 25 (538) 50 (3189)
+abiebals 25 (634) 50 (1298)
+picerube 50 (776)
+
+MapCode 18082 << FIA PLT_CN 721820302290487 << FIA Forest Type:  123 Red spruce
+acerrubr 50 (4511)
+picerube 50 (2396)
+thujocci 50 (2161)
+abiebals 25 (766)
+pinustro 50 (740)
+
+MapCode 18084 << FIA PLT_CN 721820304290487 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (2353)
+abiebals 50 (1063)
+thujocci 25 (331) 50 (693)
+picemari 50 (987)
+pinustro 75 (444)
+
+MapCode 18085 << FIA PLT_CN 721820305290487 << FIA Forest Type:  105 Eastern hemlock
+picerube 50 (478) 75 (1043) 100 (572)
+betualle 75 (1859)
+tsugcana 50 (1020) 75 (585)
+acerrubr 75 (638)
+betupapy 50 (472)
+
+MapCode 18086 << FIA PLT_CN 721820306290487 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (2528) 75 (3580)
+acerrubr 75 (1086) 100 (1262)
+thujocci 50 (1802)
+betupapy 100 (1334)
+picerube 75 (952)
+
+MapCode 18088 << FIA PLT_CN 721820308290487 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 25 (536) 50 (2923)
+picerube 50 (1956)
+thujocci 50 (1295)
+pinuresi 50 (553)
+
+MapCode 18090 << FIA PLT_CN 721820310290487 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (4144)
+picerube 50 (674)
+betupapy 50 (315)
+
+MapCode 18091 << FIA PLT_CN 721820311290487 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (4744) 75 (3805)
+tsugcana 50 (3714)
+picerube 50 (877)
+
+MapCode 18092 << FIA PLT_CN 721820312290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 50 (5306) 75 (642)
+tsugcana 50 (729) 75 (2030)
+fraxamer 100 (1578)
+betualle 75 (1138)
+
+MapCode 18093 << FIA PLT_CN 721820313290487 << FIA Forest Type:  123 Red spruce
+picerube 50 (6731)
+tsugcana 50 (3594)
+thujocci 25 (1978)
+betupapy 50 (1497)
+
+MapCode 18094 << FIA PLT_CN 721820314290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 50 (4274) 75 (1165)
+betupapy 50 (939) 75 (1896)
+betualle 25 (753) 75 (644)
+
+MapCode 18095 << FIA PLT_CN 721820315290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 50 (4266)
+tsugcana 75 (2382)
+picerube 50 (1275) 75 (1025)
+
+MapCode 18096 << FIA PLT_CN 721820317290487 << FIA Forest Type:  708 Red maple / lowland
+abiebals 25 (1513) 50 (2470)
+prunsero 25 (251)
+pinustro 50 (225)
+
+MapCode 18097 << FIA PLT_CN 721820319290487 << FIA Forest Type:  124 Red spruce / balsam fir
+picerube 50 (1444) 75 (3424)
+abiebals 50 (2657)
+acerrubr 50 (951)
+
+MapCode 18098 << FIA PLT_CN 721820320290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (268) 75 (401) 100 (222) 175 (592)
+fagugran 50 (1015)
+abiebals 75 (220)
+
+MapCode 18099 << FIA PLT_CN 721820321290487 << FIA Forest Type:  708 Red maple / lowland
+popugran 75 (134) 108 (440)
+betupopu 25 (166) 50 (272)
+betualle 25 (308)
+acerrubr 25 (287)
+fraxnigr 25 (223)
+
+MapCode 18100 << FIA PLT_CN 721820322290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 50 (1823) 75 (6919)
+betupapy 75 (3231)
+pinustro 50 (2048)
+tsugcana 50 (1682)
+
+MapCode 18101 << FIA PLT_CN 721820323290487 << FIA Forest Type:  505 Northern red oak
+querrubr 50 (1318) 75 (2916) 100 (7792)
+fagugran 50 (1519)
+
+MapCode 18102 << FIA PLT_CN 721820324290487 << FIA Forest Type:  708 Red maple / lowland
+acerrubr 50 (2574) 75 (4670) 100 (826)
+pinustro 50 (1127)
+
+MapCode 18104 << FIA PLT_CN 721820326290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (970) 50 (1335) 75 (949)
+picerube 50 (764)
+
+MapCode 18105 << FIA PLT_CN 721820328290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 50 (309) 75 (1472)
+thujocci 50 (279) 75 (872)
+acersacc 100 (1146)
+
+MapCode 18106 << FIA PLT_CN 721820329290487 << FIA Forest Type:  124 Red spruce / balsam fir
+thujocci 25 (1752) 50 (1153)
+abiebals 50 (1555) 75 (1177)
+picerube 50 (1336)
+
+MapCode 18109 << FIA PLT_CN 721820332290487 << FIA Forest Type:  121 Balsam fir
+abiebals 50 (2379) 75 (1848) 100 (506)
+picerube 50 (1224) 100 (1038)
+betupapy 50 (723)
+
+MapCode 18113 << FIA PLT_CN 721822037290487 << FIA Forest Type:  127 Northern white-cedar
+thujocci 50 (4719) 75 (5129)
+acerrubr 75 (1620)
+betupapy 125 (1499)
+fraxnigr 50 (959)
+picemari 75 (883)
+
+MapCode 20258 << FIA PLT_CN 721848569290487 << FIA Forest Type:  121 Balsam fir
+abiebals 25 (2644) 50 (4596) 75 (1214)
+picerube 50 (600)
+
+MapCode 20273 << FIA PLT_CN 721848585290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+betulent 50 (6971)
+betupapy 75 (2718)
+acerrubr 50 (965)
+
+MapCode 20279 << FIA PLT_CN 721848592290487 << FIA Forest Type:  805 Hard maple / basswood
+fraxamer 25 (1470) 50 (4072) 75 (5146) 100 (4194)
+querrubr 75 (4711)
+acersacc 75 (4595)
+pinustro 75 (3046)
+
+MapCode 20280 << FIA PLT_CN 721848593290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+tsugcana 50 (6277) 75 (3797)
+acersacc 75 (2443) 100 (5020)
+fagugran 75 (3353)
+acerrubr 75 (1453)
+
+MapCode 20286 << FIA PLT_CN 721848601290487 << FIA Forest Type:  123 Red spruce
+acerrubr 75 (5663) 100 (1510)
+tsugcana 75 (4245) 100 (1821)
+picerube 75 (4235) 100 (1529)
+betualle 50 (1624)
+
+MapCode 20307 << FIA PLT_CN 721848625290487 << FIA Forest Type:  103 Eastern white pine
+pinustro 75 (4516)
+acerrubr 50 (2862)
+betupapy 50 (666)
+
+MapCode 20308 << FIA PLT_CN 721848626290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (3306) 75 (4178)
+fagugran 50 (3587) 75 (1831)
+acerrubr 50 (2295) 75 (2354)
+betualle 75 (2389)
+
+MapCode 20315 << FIA PLT_CN 721848636290487 << FIA Forest Type:  519 Red maple / oak
+querrubr 50 (8431)
+pinustro 25 (2541)
+fraxamer 25 (2009)
+acerrubr 50 (1506)
+
+MapCode 20316 << FIA PLT_CN 721848637290487 << FIA Forest Type:  401 Eastern white pine / northern red oak / white ash
+querrubr 100 (8645)
+prunsero 75 (3944)
+fraxamer 50 (3482)
+poputrem 100 (3335)
+
+MapCode 20317 << FIA PLT_CN 721848639290487 << FIA Forest Type:  809 Red maple / upland
+queralba 75 (13150)
+querrubr 75 (5015) 100 (3433)
+acerrubr 50 (2532) 75 (3268)
+fagugran 100 (4714)
+
+MapCode 20319 << FIA PLT_CN 721848641290487 << FIA Forest Type:  505 Northern red oak
+acerrubr 25 (2197) 50 (6323)
+quervelu 50 (6301)
+tsugcana 25 (2479)
+queralba 25 (2215)
+
+MapCode 20320 << FIA PLT_CN 721848643290487 << FIA Forest Type:  103 Eastern white pine
+pinustro 75 (23896) 100 (2370)
+
+MapCode 20324 << FIA PLT_CN 721848648290487 << FIA Forest Type:  505 Northern red oak
+querrubr 50 (3927) 75 (8641)
+popugran 75 (1332) 100 (1585)
+acerrubr 50 (2622)
+queralba 75 (1124)
+
+MapCode 20349 << FIA PLT_CN 721848679290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fagugran 50 (3018) 75 (3164)
+acersacc 75 (3629)
+tsugcana 50 (1365)
+betulent 50 (716)
+
+MapCode 20353 << FIA PLT_CN 721848684290487 << FIA Forest Type:  708 Red maple / lowland
+tsugcana 50 (3832) 75 (2932)
+acerrubr 50 (1712) 75 (1336)
+pinustro 100 (2159)
+
+MapCode 20354 << FIA PLT_CN 721848685290487 << FIA Forest Type:  409 Other pine / hardwood
+querrubr 75 (3118) 100 (1290)
+pinustro 50 (1165) 75 (663)
+acerrubr 50 (1575)
+
+MapCode 20356 << FIA PLT_CN 721848688290487 << FIA Forest Type:  124 Red spruce / balsam fir
+abiebals 25 (388) 50 (2949)
+piceglau 50 (1188)
+prunsero 50 (632)
+
+MapCode 20360 << FIA PLT_CN 721848693290487 << FIA Forest Type:  901 Aspen
+popugran 75 (5111) 100 (4116)
+pinustro 50 (2781) 75 (5940)
+
+MapCode 20363 << FIA PLT_CN 721848698290487 << FIA Forest Type:  809 Red maple / upland
+querrubr 75 (4376)
+acerrubr 50 (991) 75 (1188)
+fagugran 50 (759) 75 (582)
+tsugcana 50 (499)
+
+MapCode 20364 << FIA PLT_CN 721848699290487 << FIA Forest Type:  104 Eastern white pine / eastern hemlock
+tsugcana 50 (3785) 75 (9603) 100 (11477)
+pinustro 125 (17510)
+
+MapCode 20365 << FIA PLT_CN 721848700290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (4054) 75 (2889)
+betualle 50 (2419)
+picerube 50 (763)
+
+MapCode 20381 << FIA PLT_CN 721848719290487 << FIA Forest Type:  103 Eastern white pine
+querrubr 50 (2069) 100 (2232)
+pinustro 50 (677) 75 (1324)
+picerube 50 (939)
+fagugran 50 (874)
+acerrubr 25 (718)
+
+MapCode 20955 << FIA PLT_CN 722577760290487 << FIA Forest Type:  809 Red maple / upland
+acerrubr 50 (5438) 75 (6420)
+betupapy 75 (699)
+
+MapCode 20958 << FIA PLT_CN 722577767290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 50 (3908) 75 (5486)
+fraxamer 100 (5909)
+fagugran 75 (4004)
+
+MapCode 20994 << FIA PLT_CN 722577823290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+fraxamer 50 (2760) 75 (1248) 100 (1955)
+tsugcana 25 (901) 50 (2320)
+betupopu 50 (1368)
+pinustro 75 (925)
+
+MapCode 20996 << FIA PLT_CN 722577826290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+acersacc 75 (5309)
+acerrubr 50 (2158) 75 (2766)
+picerube 75 (2044)
+betualle 50 (1814)
+prunsero 75 (1205)
+
+MapCode 21021 << FIA PLT_CN 722577856290487 << FIA Forest Type:  105 Eastern hemlock
+tsugcana 50 (1751) 75 (6265) 100 (4222)
+querrubr 125 (2904) 175 (3826)
+
+MapCode 21047 << FIA PLT_CN 722577891290487 << FIA Forest Type:  801 Sugar maple / beech / yellow birch
+betualle 50 (3965) 75 (6460)
+fagugran 75 (1327)
+
+<<End- last plot, this plot is: 873
