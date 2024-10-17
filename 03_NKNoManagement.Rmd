@@ -190,7 +190,7 @@ carbon for comparison.
 
 ```{r}
 NoManagement_Carbon_ByPlot <- read_csv(
-    "03_outputs/NoManagement_Carbon_ByPlot.csv",
+    "data/fvs/NoManagement_Carbon_ByPlot.csv",
     col_types = cols(
       StandID = col_character()
     )
@@ -310,7 +310,7 @@ and clean the results in the same manner.
 
 ```{r}
 NoManagement_Carbon_BySubplot_ByYear <- read_csv(
-    "03_outputs/NoManagement_Carbon_BySubplot.csv",
+    "data/fvs/NoManagement_Carbon_BySubplot.csv",
     col_types = cols(StandID = col_character())
   ) |>
   rename(Total_Carbon = Total_Stand_Carbon) |>
@@ -381,7 +381,7 @@ and clean the results in the same manner.
 
 ```{r}
 NoManagement_Carbon_ByCondition_ByYear <- read_csv(
-    "03_outputs/NoManagement_Carbon_ByCondition.csv",
+    "data/fvs/NoManagement_Carbon_ByCondition.csv",
     col_types = cols(StandID = col_character())
   ) |>
   rename(Total_Carbon = Total_Stand_Carbon) |>
