@@ -664,7 +664,7 @@ are given management ID "NONE".
 
 ```{r FVS_Northeastern_NONE_part.key}
 for (partition in 1:8) {
-  filename <- paste0("03_outputs/FVS_Northeastern_NONE_", partition, ".key")
+  filename <- paste0("data/fvs/FVS_Northeastern_NONE_", partition, ".key")
   unlink(filename)
   apply(
     stands_projected |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
@@ -714,7 +714,7 @@ are given management ID "SRVY".
 
 ```{r FVS_Northeastern_SRVY_part.key}
 for (partition in 1:8) {
-  filename <- paste0("03_outputs/FVS_Northeastern_SRVY_", partition, ".key")
+  filename <- paste0("data/fvs/FVS_Northeastern_SRVY_", partition, ".key")
   unlink(filename)
   apply(
     stands_surveyed |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
@@ -762,7 +762,7 @@ FVS_Summary2_East_SRVY <- NULL
 for (partition in 1:8) {
   fvs_out_db <- DBI::dbConnect(
     RSQLite::SQLite(),
-    paste0('03_outputs/FVS_Northeastern_NONE_', partition, '.db')
+    paste0('data/fvs/FVS_Northeastern_NONE_', partition, '.db')
   )
   fvs_carbon_tbl = tbl(fvs_out_db, 'FVS_Carbon') |>
     mutate(Partition = partition)
@@ -776,7 +776,7 @@ for (partition in 1:8) {
 
   fvs_out_db <- DBI::dbConnect(
     RSQLite::SQLite(),
-    paste0('03_outputs/FVS_Northeastern_SRVY_', partition, '.db')
+    paste0('data/fvs/FVS_Northeastern_SRVY_', partition, '.db')
   )
   fvs_carbon_tbl = tbl(fvs_out_db, 'FVS_Carbon') |>
     mutate(Partition = partition)
