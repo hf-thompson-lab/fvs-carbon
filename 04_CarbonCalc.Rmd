@@ -546,14 +546,11 @@ FFE Carbon for measured vs. projected stands.
 
 This gives us a plot of measured carbon over time.
 
-> TODO nik: Grow_ should be something to indicate that we're not growing,
-> and instead just converting FIA data to FVS data.
-
 ```{r}
 FVS_Carbon <- NULL
 
 for (measyear in measyears)
-  fname <- paste0("data/fvs/Grow_", sprintf("%04d", measyear), "_FVS_Carbon.csv")
+  fname <- paste0("data/fvs/FVS_NK_", sprintf("%04d", measyear), "_Carbon.csv")
   FVS_Carbon <- bind_rows(
       FVS_Carbon,
       read_csv(fname, col_types = cols(StandID = col_character()))
@@ -671,9 +668,9 @@ FVS_Carbon_Jenkins <- NULL
 
 for (measyear in measyears)
   fname <- paste0(
-    "data/fvs/Grow_",
+    "data/fvs/FVS_NK",
     sprintf("%04d", measyear),
-    "_FVS_Carbon_Jenkins.csv"
+    "_NONE_Carbon_Jenkins.csv"
   )
   FVS_Carbon_Jenkins <- bind_rows(
       FVS_Carbon_Jenkins,
@@ -1020,7 +1017,7 @@ which we presume to be square feet per acre for standing live trees only.
 FVS_Summary2_East <- NULL
 
 for (measyear in measyears)
-  fname <- paste0("data/fvs/Grow_", sprintf("%04d", measyear), "_FVS_Summary2_East.csv")
+  fname <- paste0("data/fvs/FVS_NK", sprintf("%04d", measyear), "_NONE_Summary2_East.csv")
   FVS_Summary2_East <- bind_rows(
       FVS_Summary2_East,
       read_csv(fname, col_types = cols(StandID = col_character()))
