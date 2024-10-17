@@ -749,6 +749,8 @@ for (partition in 1:8) {
 
 ## Results
 
+### Load Results
+
 Load the output from all FVS partitions into a single dataframe
 
 ```{r FVS_Carbon}
@@ -933,7 +935,6 @@ ggplot(
   facet_wrap(~`Forest Type Group`) +
   ggtitle("Grow-Only Stands\nChange in FVS Measured BA (m² / ha) vs. Projection Years")
 ```
-
 
 ### Carbon Projection
 
