@@ -190,7 +190,7 @@ carbon for comparison.
 
 ```{r}
 NoManagement_Carbon_ByPlot <- read_csv(
-    "data/fvs/NoManagement_Carbon_ByPlot.csv",
+    "data/fvs/FVS_NKByPlot_NONE_Carbon.csv",
     col_types = cols(
       StandID = col_character()
     )
@@ -249,7 +249,7 @@ NoManagement_Carbon_ByPlot_ByYear <- NoManagement_Carbon_ByPlot |>
   full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
   rename(NK_Fig2_NoManagement = NoManagement)
 
-write_csv(NoManagement_Carbon_ByPlot_ByYear, "data/output/NoManagement_Carbon_ByPlot_ByYear.csv")
+write_csv(NoManagement_Carbon_ByPlot_ByYear, "data/output/FVS_NKByPlot_ByYear_NONE_Carbon.csv")
 
 ggplot(
     data = melt(NoManagement_Carbon_ByPlot_ByYear, id.vars = "Year"),
@@ -310,7 +310,7 @@ and clean the results in the same manner.
 
 ```{r}
 NoManagement_Carbon_BySubplot_ByYear <- read_csv(
-    "data/fvs/NoManagement_Carbon_BySubplot.csv",
+    "data/fvs/FVS_NKBySubplot_NONE_Carbon.csv",
     col_types = cols(StandID = col_character())
   ) |>
   rename(Total_Carbon = Total_Stand_Carbon) |>
@@ -381,7 +381,7 @@ and clean the results in the same manner.
 
 ```{r}
 NoManagement_Carbon_ByCondition_ByYear <- read_csv(
-    "data/fvs/NoManagement_Carbon_ByCondition.csv",
+    "data/fvs/FVS_NKByCondition_NONE_Carbon.csv",
     col_types = cols(StandID = col_character())
   ) |>
   rename(Total_Carbon = Total_Stand_Carbon) |>

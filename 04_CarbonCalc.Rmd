@@ -587,7 +587,7 @@ get projected FFE carbon.
 
 ```{r}
 fvs_stand_projected_ffe <- read_csv(
-    "data/fvs/NoManagement_Carbon_ByPlotYearly.csv",
+    "data/fvs/FVS_NKByPlotYearly_NONE_Carbon.csv",
     col_types = cols(StandID = col_character())
   ) |>
   left_join(stand_id_crosswalk, by = join_by(StandID == FVS_STAND_ID)) |>
@@ -668,9 +668,9 @@ FVS_Carbon_Jenkins <- NULL
 
 for (measyear in measyears)
   fname <- paste0(
-    "data/fvs/FVS_NK",
+    "data/fvs/FVS_NK_",
     sprintf("%04d", measyear),
-    "_NONE_Carbon_Jenkins.csv"
+    "_Carbon_Jenkins.csv"
   )
   FVS_Carbon_Jenkins <- bind_rows(
       FVS_Carbon_Jenkins,
@@ -1017,7 +1017,7 @@ which we presume to be square feet per acre for standing live trees only.
 FVS_Summary2_East <- NULL
 
 for (measyear in measyears)
-  fname <- paste0("data/fvs/FVS_NK", sprintf("%04d", measyear), "_NONE_Summary2_East.csv")
+  fname <- paste0("data/fvs/FVS_NK_", sprintf("%04d", measyear), "_Summary2_East.csv")
   FVS_Summary2_East <- bind_rows(
       FVS_Summary2_East,
       read_csv(fname, col_types = cols(StandID = col_character()))
@@ -1075,7 +1075,7 @@ carbon calculation.
 
 ```{r}
 FVS_NoManagement_ByPlotYearly_Summary2 <-
-  read_csv("data/fvs/NoManagement_ByPlotYearly_Summary2.csv", 
+  read_csv("data/fvs/FVS_NKByPlotYearly_NONE_Summary2_East.csv", 
     col_types = cols(StandID = col_character()))
 
 fvs_stand_projected_ba <- FVS_NoManagement_ByPlotYearly_Summary2 |>
