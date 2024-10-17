@@ -89,7 +89,7 @@ plot_grow_only <- fia_cond |>
 dbDisconnect(fia)
 remove(fia, fia_cond, fia_plot, fia_survey)
 
-write_rds(plot_grow_only, '03_outputs/plot_grow_only.rds')
+write_rds(plot_grow_only, 'data/intermediate/plot_grow_only.rds')
 
 nrow(plot_grow_only)
 ```

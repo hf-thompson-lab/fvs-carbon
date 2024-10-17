@@ -52,7 +52,7 @@ Create a single crosswalk between NK, FIA and FVS identifiers.
 
 ```{r}
 nk_to_fia <- read_csv(
-    "03_outputs/nk_to_fia.csv",
+    "data/intermediate/nk_to_fia.csv",
     col_types = cols(
       `FIA plot code` = col_character(),
       .default = col_integer()
@@ -61,7 +61,7 @@ nk_to_fia <- read_csv(
   select(`FIA plot code`, STATECD, COUNTYCD, PLOT, CONDID)
 
 nk_to_fvs <- read_csv(
-    "03_outputs/nk_to_fvs.csv",
+    "data/intermediate/nk_to_fvs.csv",
     col_types = cols(
       `FIA plot code` = col_character(),
       FVS_STAND_ID = col_character(),

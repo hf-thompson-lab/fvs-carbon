@@ -61,7 +61,7 @@ plot_forested <- fia_cond |>
 dbDisconnect(fia)
 remove(fia, fia_cond, fia_plot, fia_survey)
 
-write_rds(plot_forested, '03_outputs/plot_grow_only.rds')
+write_rds(plot_forested, 'data/intermediate/plot_grow_only.rds')
 
 nrow(plot_forested)
 ```

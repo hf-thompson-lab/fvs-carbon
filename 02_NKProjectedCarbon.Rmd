@@ -110,7 +110,7 @@ fig2 <- NK_Fig2_NoManagement |>
 
 write_csv(
   fig2,
-  "03_outputs/nk_fig2_reconstructed.csv"
+  "data/intermediate/nk_fig2_reconstructed.csv"
 )
 
 ggplot(

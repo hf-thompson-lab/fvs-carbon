@@ -221,7 +221,7 @@ to omit 2164 / 2165 as well.
 
 ```{r}
 fig2 <- read_csv(
-  "03_outputs/nk_fig2_reconstructed.csv",
+  "data/intermediate/nk_fig2_reconstructed.csv",
   col_types = cols(
     Year = col_integer(),
     NoManagement = col_double(),
