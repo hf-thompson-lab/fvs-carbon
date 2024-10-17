@@ -52,7 +52,7 @@ Create a single crosswalk between NK, FIA and FVS identifiers.
 
 ```{r}
 nk_to_fia <- read_csv(
-    "../03_outputs/nk_to_fia.csv",
+    "03_outputs/nk_to_fia.csv",
     col_types = cols(
       `FIA plot code` = col_character(),
       .default = col_integer()
@@ -61,7 +61,7 @@ nk_to_fia <- read_csv(
   select(`FIA plot code`, STATECD, COUNTYCD, PLOT, CONDID)
 
 nk_to_fvs <- read_csv(
-    "../03_outputs/nk_to_fvs.csv",
+    "03_outputs/nk_to_fvs.csv",
     col_types = cols(
       `FIA plot code` = col_character(),
       FVS_STAND_ID = col_character(),
@@ -87,7 +87,7 @@ remove(nk_to_fvs)
 Given the NK plot IDs, we can find the matching FIA plots.
 
 ```{r}
-fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia = DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_plot = tbl(fia, 'PLOT')
 
 matching_plot <- fia_plot |>
@@ -194,7 +194,7 @@ age. Because there are only a few plots with multiple conditions, we simplify
 this analysis by omitting multi-condition plots.
 
 ```{r}
-fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia = DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_cond = tbl(fia, 'COND')
 fia_ref_forest_type = tbl(fia, 'REF_FOREST_TYPE') |>
   select(VALUE, MEANING)
@@ -553,7 +553,7 @@ This gives us a plot of measured carbon over time.
 FVS_Carbon <- NULL
 
 for (measyear in measyears)
-  fname <- paste0("../03_outputs/Grow_", sprintf("%04d", measyear), "_FVS_Carbon.csv")
+  fname <- paste0("03_outputs/Grow_", sprintf("%04d", measyear), "_FVS_Carbon.csv")
   FVS_Carbon <- bind_rows(
       FVS_Carbon,
       read_csv(fname, col_types = cols(StandID = col_character()))
@@ -590,7 +590,7 @@ get projected FFE carbon.
 
 ```{r}
 fvs_stand_projected_ffe <- read_csv(
-    "../03_outputs/NoManagement_Carbon_ByPlotYearly.csv",
+    "03_outputs/NoManagement_Carbon_ByPlotYearly.csv",
     col_types = cols(StandID = col_character())
   ) |>
   left_join(stand_id_crosswalk, by = join_by(StandID == FVS_STAND_ID)) |>
@@ -671,7 +671,7 @@ FVS_Carbon_Jenkins <- NULL
 
 for (measyear in measyears)
   fname <- paste0(
-    "../03_outputs/Grow_",
+    "03_outputs/Grow_",
     sprintf("%04d", measyear),
     "_FVS_Carbon_Jenkins.csv"
   )
@@ -780,7 +780,7 @@ Method:
 Fetch all the trees for the grow-only plots:
 
 ```{r}
-fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia = DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_tree = tbl(fia, 'TREE')
 
 # Create a dataframe containing the TREE rows for all inventories of
@@ -1020,7 +1020,7 @@ which we presume to be square feet per acre for standing live trees only.
 FVS_Summary2_East <- NULL
 
 for (measyear in measyears)
-  fname <- paste0("../03_outputs/Grow_", sprintf("%04d", measyear), "_FVS_Summary2_East.csv")
+  fname <- paste0("03_outputs/Grow_", sprintf("%04d", measyear), "_FVS_Summary2_East.csv")
   FVS_Summary2_East <- bind_rows(
       FVS_Summary2_East,
       read_csv(fname, col_types = cols(StandID = col_character()))
@@ -1078,7 +1078,7 @@ carbon calculation.
 
 ```{r}
 FVS_NoManagement_ByPlotYearly_Summary2 <-
-  read_csv("../03_outputs/NoManagement_ByPlotYearly_Summary2.csv", 
+  read_csv("03_outputs/NoManagement_ByPlotYearly_Summary2.csv", 
     col_types = cols(StandID = col_character()))
 
 fvs_stand_projected_ba <- FVS_NoManagement_ByPlotYearly_Summary2 |>
