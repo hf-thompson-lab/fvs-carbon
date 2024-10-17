@@ -51,13 +51,13 @@ Grow-only is described previously:
 
 Load functions for these filters
 ```{r source-functions}
-source('../R/functions.R')
+source('R/functions.R')
 ```
 
 Execute the filters to create a list of matching plots.
 
 ```{r plot_grow_only}
-fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_cond <- tbl(fia, 'COND') |>
   select(
     STATECD, COUNTYCD, PLOT, PLT_CN, CONDID, INVYR,
@@ -89,7 +89,7 @@ plot_grow_only <- fia_cond |>
 dbDisconnect(fia)
 remove(fia, fia_cond, fia_plot, fia_survey)
 
-write_rds(plot_grow_only, '../03_outputs/plot_grow_only.rds')
+write_rds(plot_grow_only, '03_outputs/plot_grow_only.rds')
 
 nrow(plot_grow_only)
 ```
@@ -103,7 +103,7 @@ Where are these plots?
 Fetch plots with measyear, invyr, latitude, longitude, and state information.
 
 ```{r plot_location}
-fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
 
 # Survey has the research station code
 fia_survey <- tbl(fia, 'SURVEY') |>
@@ -169,7 +169,7 @@ We can gather per-stand statistics such as BALIVE and CARBON_AG from the FIA
 data for these plots over time.
 
 ```{r stand_stats}
-fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
 
 measyear <- tbl(fia, 'PLOT') |>
   select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, DESIGNCD, ECOSUBCD)
@@ -643,7 +643,7 @@ timeframe <- stand_stats |>
   ungroup()
 
 
-fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_fvs_standinit_plot <- tbl(fia, 'FVS_StandInit_Plot') |>
   select(STAND_CN, STAND_ID)
 
@@ -664,7 +664,7 @@ are given management ID "NONE".
 
 ```{r FVS_Northeastern_NONE_part.key}
 for (partition in 1:8) {
-  filename <- paste0("../03_outputs/FVS_Northeastern_NONE_", partition, ".key")
+  filename <- paste0("03_outputs/FVS_Northeastern_NONE_", partition, ".key")
   unlink(filename)
   apply(
     stands_projected |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
@@ -693,7 +693,7 @@ The second run is a zero-year projection to have FVS calculate the carbon
 in surveyed stands in each year they are surveyed.
 
 ```{r stands_surveyed}
-fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_fvs_standinit_plot <- tbl(fia, 'FVS_StandInit_Plot') |>
   select(STAND_CN, STAND_ID)
 
@@ -714,7 +714,7 @@ are given management ID "SRVY".
 
 ```{r FVS_Northeastern_SRVY_part.key}
 for (partition in 1:8) {
-  filename <- paste0("../03_outputs/FVS_Northeastern_SRVY_", partition, ".key")
+  filename <- paste0("03_outputs/FVS_Northeastern_SRVY_", partition, ".key")
   unlink(filename)
   apply(
     stands_surveyed |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
@@ -762,7 +762,7 @@ FVS_Summary2_East_SRVY <- NULL
 for (partition in 1:8) {
   fvs_out_db <- DBI::dbConnect(
     RSQLite::SQLite(),
-    paste0('../03_outputs/FVS_Northeastern_NONE_', partition, '.db')
+    paste0('03_outputs/FVS_Northeastern_NONE_', partition, '.db')
   )
   fvs_carbon_tbl = tbl(fvs_out_db, 'FVS_Carbon') |>
     mutate(Partition = partition)
@@ -776,7 +776,7 @@ for (partition in 1:8) {
 
   fvs_out_db <- DBI::dbConnect(
     RSQLite::SQLite(),
-    paste0('../03_outputs/FVS_Northeastern_SRVY_', partition, '.db')
+    paste0('03_outputs/FVS_Northeastern_SRVY_', partition, '.db')
   )
   fvs_carbon_tbl = tbl(fvs_out_db, 'FVS_Carbon') |>
     mutate(Partition = partition)
@@ -839,7 +839,7 @@ There are 66 missing plots; where are they?
 missing_stands <- matched_carbon_tmp |>
   filter(is.na(Starting_Carbon)) |>
   select(STAND_ID, STAND_CN, STATECD, COUNTYCD, PLOT, INVYR)
-fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
 missing_standinit <- tbl(fia, 'FVS_StandInit_Plot') |>
   semi_join(missing_stands, by = join_by(STAND_CN), copy = TRUE) |>
   collect()
@@ -851,7 +851,7 @@ remove(fia)
 OK, they're not in FVS_StandInit_Plot. Do they exist at all?
 
 ```{r missing_plot}
-fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
 missing_plot <- tbl(fia, 'PLOT') |>
   semi_join(missing_stands, by = join_by(CN == STAND_CN), copy = TRUE) |>
   collect()
@@ -865,7 +865,7 @@ all are MODIFIED_BY=TROFFE
 so I wonder if there's a modified version of the stand that's getting picked up.
 Let's see if we can find them by STAND_ID
 ```{r missing_standinit_by_stand_id}
-fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
 missing_stands <- missing_stands |>
   mutate(STAND_ID = sprintf(paste0(
     '%02d',  '%03d',   '%05d'),
@@ -889,7 +889,7 @@ first_missing
 
 Any other stands present for this one?
 ```{r missing_plot_by_location}
-fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
 #first_missing_plot <- tbl(fia, 'PLOT') |>
 #  semi_join(first_missing, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE)
 missing_stand_by_location <- tbl(fia, 'FVS_StandInit_Plot') |>
@@ -903,7 +903,7 @@ No.
 
 Anything interesting on the associated survey?
 ```{r missing_survey}
-fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
 missing_survey <- tbl(fia, 'SURVEY') |>
   filter(CN == '76387293010538') |>
   collect()
