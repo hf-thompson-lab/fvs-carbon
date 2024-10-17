@@ -30,7 +30,7 @@ FVS Software with `Release date: 20240401` was used.
 FIA data version:
 
 ```{r}
-fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_ref_fiadb_version <- tbl(fia, 'REF_FIADB_VERSION')
 version <- fia_ref_fiadb_version |>
   filter(INSTALL_TYPE == 'RELEASE') |>
@@ -82,7 +82,7 @@ This background regeneration rate is in NK Table 4.
 
 ```{r}
 table4 <- read_csv(
-  "../00_rawData/NK_Table_4.csv",
+  "00_rawData/NK_Table_4.csv",
   col_types = cols(
     `Management scenario` = col_character(),
     .default = col_number(),
@@ -91,7 +91,7 @@ table4 <- read_csv(
 
 # Table4 uses scientific names; translate to get FVS Species Code
 fvs_species_codes <- read_csv(
-    "../01_processedInputData/FVSne_Overview_Table_3.2.1.csv",
+    "01_processedInputData/FVSne_Overview_Table_3.2.1.csv",
     col_types = "iiciccc"
   ) |>
   select("Scientific Name", "Species Code", "Common Name")
@@ -190,7 +190,7 @@ carbon for comparison.
 
 ```{r}
 NoManagement_Carbon_ByPlot <- read_csv(
-    "../03_outputs/NoManagement_Carbon_ByPlot.csv",
+    "03_outputs/NoManagement_Carbon_ByPlot.csv",
     col_types = cols(
       StandID = col_character()
     )
@@ -221,7 +221,7 @@ to omit 2164 / 2165 as well.
 
 ```{r}
 fig2 <- read_csv(
-  "../03_outputs/nk_fig2_reconstructed.csv",
+  "03_outputs/nk_fig2_reconstructed.csv",
   col_types = cols(
     Year = col_integer(),
     NoManagement = col_double(),
@@ -249,7 +249,7 @@ NoManagement_Carbon_ByPlot_ByYear <- NoManagement_Carbon_ByPlot |>
   full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
   rename(NK_Fig2_NoManagement = NoManagement)
 
-write_csv(NoManagement_Carbon_ByPlot_ByYear, "../03_outputs/NoManagement_Carbon_ByPlot_ByYear.csv")
+write_csv(NoManagement_Carbon_ByPlot_ByYear, "03_outputs/NoManagement_Carbon_ByPlot_ByYear.csv")
 
 ggplot(
     data = melt(NoManagement_Carbon_ByPlot_ByYear, id.vars = "Year"),
@@ -310,7 +310,7 @@ and clean the results in the same manner.
 
 ```{r}
 NoManagement_Carbon_BySubplot_ByYear <- read_csv(
-    "../03_outputs/NoManagement_Carbon_BySubplot.csv",
+    "03_outputs/NoManagement_Carbon_BySubplot.csv",
     col_types = cols(StandID = col_character())
   ) |>
   rename(Total_Carbon = Total_Stand_Carbon) |>
@@ -381,7 +381,7 @@ and clean the results in the same manner.
 
 ```{r}
 NoManagement_Carbon_ByCondition_ByYear <- read_csv(
-    "../03_outputs/NoManagement_Carbon_ByCondition.csv",
+    "03_outputs/NoManagement_Carbon_ByCondition.csv",
     col_types = cols(StandID = col_character())
   ) |>
   rename(Total_Carbon = Total_Stand_Carbon) |>
