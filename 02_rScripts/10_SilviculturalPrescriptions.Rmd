@@ -26,7 +26,7 @@ suppressPackageStartupMessages(library(maps))
 source('../R/functions.R')
 ```
 
-```{r plot_grow_only}
+```{r plot_forested}
 fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_cond <- tbl(fia, 'COND') |>
   select(
@@ -106,7 +106,7 @@ dbDisconnect(fia)
 remove(fia, fia_plot, fia_survey, fia_ref_research_station)
 ```
 
-```{r}
+```{r map_by_location}
 northeastern_states <- plot_location |>
   distinct(STATE_NAME) |>
   mutate(region = str_to_lower(STATE_NAME))
@@ -115,6 +115,7 @@ map_data('state', northeastern_states$region) |>
   geom_polygon(fill = "white", color = "black") + 
   geom_point(data = plot_location, color = alpha("blue", alpha = 0.5)) +
   coord_quickmap()
+remove(northeastern_states)
 ```
 
 ```{r stand_stats}
@@ -186,18 +187,16 @@ dbDisconnect(fia)
 remove(fia, measyear, forest_type, tree_stats)
 ```
 
+> TODO nik: in FVS_TreeInit_Plot, column PRESCRIPTION FLOAT is use for ThinPRSC.
+> Should be able to identify in which year a tree is harvested and put the year
+> in PRESCRIPTION, then run with a ThinPRSC to remove the trees prescribed for
+> each year.
+> Will need to find the database and modify it in-place.
+> Good news: TREE_CN is TREE.CN (and, presumably, PLOT_CN is PLOT.CN, etc)
+> Can a tree be indirectly harvested, e.g. TPA_UNADJ is reduced?
 
+Find the trees that were removed.
 
-```{r}
-fia <- DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
-measyear <- tbl(fia, 'PLOT') |>
-  select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, DESIGNCD, ECOSUBCD)
+```{r removed_trees}
 
-cond_forested <- tbl(fia, 'COND') |>
-  semi_join(plot_forested, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |> 
-  left_join(measyear, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
-  modern_plots_filter() |> 
-  collect()
-dbDisconnect(fia)
-remove(fia)
 ```
