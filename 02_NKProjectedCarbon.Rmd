@@ -27,7 +27,7 @@ this, we use the tool <https://automeris.io/wpd/> which aids in
 estimating the tabular data behind a chart.
 
 The project used to extract the table is in
-[02_rScripts/AutoMeris_NK_Fig2.json]. The tool is imperfect, so we apply
+[config/AutoMeris_NK_Fig2.json]. The tool is imperfect, so we apply
 some cleanup to produce an approximate table.
 
 Note that all values are approximate. For example, all values should
