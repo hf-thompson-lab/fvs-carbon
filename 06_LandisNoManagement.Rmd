@@ -201,7 +201,7 @@ What species are in which ecosubregion?
 # PLOT.CN - Plot Control Number
 # PLOT.ECOSUBCD
 
-fia_ref <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_REFERENCE.db')
+fia_ref <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_REFERENCE.db')
 fia_ref_species <- tbl(fia_ref, 'REF_SPECIES') |> 
   select(
     SPCD, SCIENTIFIC_NAME, GENUS, SPECIES, COMMON_NAME
@@ -210,7 +210,7 @@ fia_ref_species <- tbl(fia_ref, 'REF_SPECIES') |>
 dbDisconnect(fia_ref)
 
 
-fia <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 
 fia_tree <- tbl(fia, 'TREE') |> 
   distinct(PLT_CN, SPCD)

@@ -30,7 +30,7 @@ FVS Software with `Release date: 20240401` was used.
 FIA data version:
 
 ```{r}
-fia <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 fia_ref_fiadb_version <- tbl(fia, 'REF_FIADB_VERSION')
 version <- fia_ref_fiadb_version |>
   filter(INSTALL_TYPE == 'RELEASE') |>
@@ -82,7 +82,7 @@ This background regeneration rate is in NK Table 4.
 
 ```{r}
 table4 <- read_csv(
-  "00_rawData/NK_Table_4.csv",
+  "data/raw/NK_Table_4.csv",
   col_types = cols(
     `Management scenario` = col_character(),
     .default = col_number(),

@@ -27,7 +27,7 @@ source('R/functions.R')
 ```
 
 ```{r plot_forested}
-fia <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 fia_cond <- tbl(fia, 'COND') |>
   select(
     STATECD, COUNTYCD, PLOT, PLT_CN, CONDID, INVYR,
@@ -71,7 +71,7 @@ Only 204 plots; fewer than expected!
 Where are they?
 
 ```{r plot_location}
-fia <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 
 # Survey has the research station code
 fia_survey <- tbl(fia, 'SURVEY') |>
@@ -119,7 +119,7 @@ remove(northeastern_states)
 ```
 
 ```{r stand_stats}
-fia <- DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 
 measyear <- tbl(fia, 'PLOT') |>
   select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, DESIGNCD, ECOSUBCD)

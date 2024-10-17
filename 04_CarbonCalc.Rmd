@@ -87,7 +87,7 @@ remove(nk_to_fvs)
 Given the NK plot IDs, we can find the matching FIA plots.
 
 ```{r}
-fia = DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
+fia = DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 fia_plot = tbl(fia, 'PLOT')
 
 matching_plot <- fia_plot |>
@@ -194,7 +194,7 @@ age. Because there are only a few plots with multiple conditions, we simplify
 this analysis by omitting multi-condition plots.
 
 ```{r}
-fia = DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
+fia = DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 fia_cond = tbl(fia, 'COND')
 fia_ref_forest_type = tbl(fia, 'REF_FOREST_TYPE') |>
   select(VALUE, MEANING)
@@ -780,7 +780,7 @@ Method:
 Fetch all the trees for the grow-only plots:
 
 ```{r}
-fia = DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
+fia = DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 fia_tree = tbl(fia, 'TREE')
 
 # Create a dataframe containing the TREE rows for all inventories of
