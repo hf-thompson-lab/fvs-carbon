@@ -91,7 +91,7 @@ table4 <- read_csv(
 
 # Table4 uses scientific names; translate to get FVS Species Code
 fvs_species_codes <- read_csv(
-    "01_processedInputData/FVSne_Overview_Table_3.2.1.csv",
+    "data/raw/FVSne_Overview_Table_3.2.1.csv",
     col_types = "iiciccc"
   ) |>
   select("Scientific Name", "Species Code", "Common Name")
