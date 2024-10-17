@@ -139,14 +139,14 @@ OK, this might actually be right:
 
 This looks good:
 ```{r}
-pixel <- c(42.36028, -71.05778) |>
-  st_point() |>
-  st_sfc() |>
-  st_sf(crs = 'EPSG:4326') |>
-  st_transform(crs = 'EPSG:5070') |>
-  st_buffer(dist = 50) |>
-  st_bbox() |>
-  st_as_stars(nx = 1, ny = 1, values = 9)
+pixel <- c(42.36028, -71.05778) |>   # Raw lat / lon coordinates
+  st_point() |>                      # Wrap in Point object
+  st_sfc() |>                        # Wrap in Geometry Column
+  st_sf(crs = 'EPSG:4326') |>        # Wrap in Simple Feature w/ lat/lon CRS
+  st_transform(crs = 'EPSG:5070') |> # Transform to flat projection
+  st_buffer(dist = 50) |>            # 50m buffer -> 100m diameter circle
+  st_bbox() |>                       # bounding box -> 100m wide square
+  st_as_stars(nx = 1, ny = 1, values = 9) # 1-by-1 Stars grid, assign value '9'
 ```
 
 Writing this to gpkg is correct, except:
