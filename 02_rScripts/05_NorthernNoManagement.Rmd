@@ -2,8 +2,9 @@
 title: "Nunery Keeton Revisited"
 author: "Nikolaus Bates-Haus"
 output:
-  pdf_document: default
+  word_document: default
   html_document: default
+  pdf_document: default
 editor_options:
   markdown:
     wrap: 72
@@ -90,7 +91,7 @@ remove(fia, fia_cond, fia_plot, fia_survey)
 
 write_rds(plot_grow_only, '../03_outputs/plot_grow_only.rds')
 
-length(plot_grow_only$PLOT)
+nrow(plot_grow_only)
 ```
 
 This filters to 2822 plots.
@@ -238,7 +239,7 @@ dbDisconnect(fia)
 remove(fia, measyear, forest_type, tree_stats)
 ```
 
-Plot location with visual distinction by forest type
+Plot location with visual distinction by ecotype and forest type
 
 ```{r plot_location_by_ecotype}
 plot_location_tmp <- plot_location |>
@@ -376,11 +377,27 @@ For each stand, we need:
 
 #### Time
 
-We will run the model from first measurement year to 2024, with a 1-year timestep.
+We will run the model from first measurement year to last measurement year,
+with as many 10-year timesteps as we can get. We will add an initial timestep
+that is less than 10 years to get to a 10 year boundary. We choose a 10-year
+timestep because FVSne is calibrated to 10 years, and running with a different
+length timestep introduces bias. The bias is less with shorter timesteps than
+with longer timesteps, so using a short timestep to adjust length introduces
+less bias than using a long timestep.
 
--  InvYear: Inventory Year, this is the first fia.PLOT.MEASYEAR
--  TimeInt: Time Interval, set this to 1 for all timesteps
--  NumCycle: Number of cycles to run, 2024 - InvYear
+There are two years of interest for each plot: FIRSTYEAR, which is
+the minimum fia.PLOT.MEASYEAR for the modern plot design; and
+LASTYEAR, which is the maximum of the same.
+
+-  InvYear: Inventory Year, set to FIRSTYEAR
+-  TimeInt: Time Interval, there may be two entries:
+   -  TimeInt 0: Default time interval, 10 years
+   -  TimeInt 1: First cycle time interval, (LASTYEAR - FIRSTYEAR) %% 10
+-  NumCycle: Number of cycles to run, int((LASTYEAR - FIRSTYEAR) / 10), + 1
+   if there is a TimeInt 1.
+
+Note that the number of cycles is the number of full 10-year cycles
+plus one if there is a short first cycle.
 
 #### Input
 
@@ -413,6 +430,45 @@ Within a Database section:
 -  FuelReDB: FVS_Consumption table: database (2)
 -  FuelsOut: FVS_Fuels table: database (2)
 
+#### Regeneration, Ingrowth, and Establishment
+
+The Northeastern variant is a partial establishment model, so it does not
+automatically perform natural regeneration. We will therefore use actual
+ingrowth from the FIA data.
+
+fia.TREE_GRM_COMPONENT.MICR_COMPONENT_AL_FOREST is set to 'INGROWTH' when
+the tree is judged to be 'established'. Only one record for the tree will
+be marked 'INGROWTH'; it may have other records with other components, e.g.
+'SURVIVOR'.
+
+For each timestep, we will find the trees that establish during that timestep,
+and add a record describing the tree at the time of establishment.
+
+Note that FIA establishes at 5" DBH, whereas FVS establishes at 3" DBH,
+and FVS puts an upper bound on height based on expectations for 3" DBH trees.
+We can follow PREV_TRE_CN backward to find when the tree was 3" DBH; note
+that this might be a long time ago. As an alternative, we could multiply TPA
+by DIA^2 / 3^2 and set the height to (3/DIA)*HT - this would give us the same
+total basal area in trees of reduced height.
+
+Because of the way time is set up in FVS, establishment is scheduled for the
+year prior to the start of a cycle. Within the cycle, each tree that is
+established gets its own Natural keyword. This specifies:
+
+-  Year: The (actual) year in which the tree is marked as INGROWTH
+-  Species: The 2-character FVS species code
+-  TPA: Trees per acre; prefer the TPA from the tree record over TPAGROW_UNADJ
+   from the establishment record (the two should be the same)
+-  Survivorship: Always 100%
+-  Age: average age at the year of establishment. Leave this blank.
+-  Height: Average height.  Use fia.TREE.HT, but see above note.
+-  Shade: 0 = uniform, 1 = prefer shade; 2 = prefer sun. Use 0.
+
+FVS is semi-spatial; it is aware of subplots and microplots, and how many
+trees are on each. There does not appear to be a way to designate which
+subplot a tree establishes on; presumably, the TPA is distributed across
+subplots.
+
 #### Output
 
 We use database output; it is easiest to work with. Many output options take
@@ -443,8 +499,9 @@ StandCN
 MgmtId
 NONE
 InvYear         2002
-TimeInt            0         1
-NumCycle           1
+TimeInt            0        10
+TimeInt            1         2
+NumCycle           3
 
 FMIn
 CarbRept           2
@@ -501,44 +558,71 @@ keywordfile_section is a function to generate a keywordfile section from
 information about a run and a stand.
 
 ```{r keywordfile_section}
-keywordfile_section <- function(Title, MgmtId, StandID, StandCN, MeasYear, EndYear, Partition) {
-  MeasYear <- as.integer(MeasYear)
-  paste0(
-"StdIdent\n",
-StandID, " ", Title, "\n",
-"StandCN\n",
-StandCN, "\n",
-"MgmtId\n",
-MgmtId, "\n",
-"InvYear   ", sprintf('%10s', MeasYear), "\n",
-"TimeInt            0         1\n",
-"NumCycle  ", sprintf('%10d', EndYear - MeasYear), "\n",
-"FMIn\n",
-"CarbRept           2\n",
-"CarbCut            2\n",
-"CarbCalc           1         1    0.0425         9        11\n",
-"FuelOut            2\n",
-"FuelRept           2\n",
-"End\n",
-"Database\n",
-"DSNIn\n",
-"SQLite_FIADB_ENTIRE.db\n",
-"StandSQL\n",
-"SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'\n",
-"EndSQL\n",
-"TreeSQL\n",
-"SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'\n",
-"EndSQL\n",
-"DSNOut\n",
-"FVS_", Title, "_", MgmtId, "_", Partition, ".db\n",
-"Summary            2\n",
-"Computdb           0         1\n",
-"MisRpts            2\n",
-"CarbReDB           2\n",
-"FuelReDB           2\n",
-"FuelsOut           2\n",
-"End\n",
-"Process\n"
+keywordfile_section <- function(Title, MgmtId, StandID, StandCN, FirstYear, LastYear, Partition) {
+  FirstYear <- as.integer(FirstYear)
+  LastYear <- as.integer(LastYear)#  + 1 #LastYear + 1 is the cycle boundary
+  NumCycles <- as.integer((LastYear - FirstYear) / 10) + 1
+  ShortCycle <- (LastYear - FirstYear) %% 10
+  TimeConfig <- NULL
+  if (NumCycles == 0) {
+    # Produce a single cycle of the necessary duration
+    TimeConfig <- c(
+      fvs_kwd1("InvYear", FirstYear),
+      fvs_kwd2("TimeInt", 0, ShortCycle),
+      fvs_kwd1("NumCycle", 1)
+    )
+  } else if (ShortCycle > 0) {
+    # Produce a single short cycle followed by 10-year cycles
+    NumCycles <- NumCycles + 1
+    TimeConfig <- c(
+      fvs_kwd1("InvYear", FirstYear),
+      fvs_kwd2("TimeInt", 0, 10),
+      fvs_kwd2("TimeInt", 1, ShortCycle),
+      fvs_kwd1("NumCycle", NumCycles)
+    )
+  } else {
+    # No need for an initial short cycle
+    TimeConfig <- c(
+      fvs_kwd1("InvYear", FirstYear),
+      fvs_kwd2("TimeInt", 0, 10),
+      fvs_kwd1("NumCycle", NumCycles)
+    )
+  }
+  c(
+    fvs_kwd0("StdIdent"),
+    paste0(StandID, " ", Title),
+    fvs_kwd0("StandCN"),
+    StandCN,
+    fvs_kwd0("MgmtId"),
+    MgmtId,
+    TimeConfig,
+    fvs_kwd0("FMIn"), # Fire and Fuels Extension
+    fvs_kwd0("CarbRept"),
+    fvs_kwd0("CarbCut"),
+    fvs_kwd5("CarbCalc", 1, 1, 0.0425, 9, 11),
+    fvs_kwd0("FuelOut"),
+    fvs_kwd0("FuelRept"),
+    fvs_kwd0("End"), # FMIn
+    fvs_kwd0("Database"), # Database extension
+    fvs_kwd0("DSNIn"),
+    "SQLite_FIADB_ENTIRE.db",
+    fvs_kwd0("StandSQL"),
+    "SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'",
+    fvs_kwd0("EndSQL"), # StandSQL
+    fvs_kwd0("TreeSQL"),
+    "SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'",
+    fvs_kwd0("EndSQL"), # TreeSQL
+    fvs_kwd0("DSNOut"),
+    paste0("FVS_", Title, "_", MgmtId, "_", Partition, ".db"),
+    fvs_kwd1("Summary",  2),
+    fvs_kwd2("Computdb", 0, 1),
+    fvs_kwd1("MisRpts",  2),
+    fvs_kwd1("CarbReDB", 2),
+    fvs_kwd1("FuelReDB", 2),
+    fvs_kwd1("FuelsOut", 2),
+    fvs_kwd0("End"), # Database
+    fvs_kwd0("Process"),
+    recursive = TRUE
   )
 }
 
@@ -548,11 +632,12 @@ Find the stands we want to project; these are the grow-only stands starting
 in their first measurement year.
 
 ```{r stands_projected}
-first_measyear <- stand_stats |>
+timeframe <- stand_stats |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   summarize(
     INVYR = min(INVYR),
-    MEASYEAR = min(MEASYEAR, na.rm = TRUE),
+    FIRSTYEAR = min(MEASYEAR, na.rm = TRUE),
+    LASTYEAR = max(MEASYEAR, na.rm = TRUE),
     .groups = "keep"
   ) |>
   ungroup()
@@ -563,10 +648,10 @@ fia_fvs_standinit_plot <- tbl(fia, 'FVS_StandInit_Plot') |>
   select(STAND_CN, STAND_ID)
 
 stands_projected <- tbl(fia, 'PLOT') |>
-  select(CN, STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, DESIGNCD) |>
   filter(DESIGNCD == 1) |>
+  select(CN, STATECD, COUNTYCD, PLOT, INVYR) |>
   rename(STAND_CN = CN) |>
-  semi_join(first_measyear, by = join_by(STATECD, COUNTYCD, PLOT, INVYR), copy = TRUE) |>
+  inner_join(timeframe, by = join_by(STATECD, COUNTYCD, PLOT, INVYR), copy = TRUE) |>
   left_join(fia_fvs_standinit_plot, by = join_by(STAND_CN)) |>
   collect()
 
@@ -580,23 +665,25 @@ are given management ID "NONE".
 ```{r FVS_Northeastern_NONE_part.key}
 for (partition in 1:8) {
   filename <- paste0("../03_outputs/FVS_Northeastern_NONE_", partition, ".key")
-  write_lines(
-    apply(
-      stands_projected |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
-      1,
-      function(row) {
+  unlink(filename)
+  apply(
+    stands_projected |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
+    1,
+    function(row) {
+      write_lines(
         keywordfile_section(
           "Northeastern",
           "NONE",
           row['STAND_ID'],
           row['STAND_CN'],
-          row['MEASYEAR'],
-          2025,
+          row['FIRSTYEAR'],
+          row['LASTYEAR'],
           partition
-        )
-      }
-    ),
-    filename
+        ),
+        filename,
+        append = TRUE
+      )
+    }
   )
   write_lines("Stop", filename, append = TRUE)
 }
@@ -628,23 +715,25 @@ are given management ID "SRVY".
 ```{r FVS_Northeastern_SRVY_part.key}
 for (partition in 1:8) {
   filename <- paste0("../03_outputs/FVS_Northeastern_SRVY_", partition, ".key")
-  write_lines(
-    apply(
-      stands_surveyed |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
-      1,
-      function(row) {
+  unlink(filename)
+  apply(
+    stands_surveyed |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
+    1,
+    function(row) {
+      write_lines(
         keywordfile_section(
           "Northeastern",
           "SRVY",
           row['STAND_ID'],
           row['STAND_CN'],
           row['MEASYEAR'],
-          as.integer(row['MEASYEAR']) + 1,
+          row['MEASYEAR'],
           partition
-        )
-      }
-    ),
-    filename
+        ),
+        filename,
+        append = TRUE
+      )
+    }
   )
   write_lines("Stop", filename, append = TRUE)
 }
@@ -654,7 +743,8 @@ for (partition in 1:8) {
 ```{r run_fvs}
 # TODO nik: Run FVS directly from R.
 # Batch file to run FVS in parallel:
-# for %%p in (FVS_Northeastern_NONE_*.key) do start \FVS\FVSbin\FVSne.exe --keywordfile=%%p
+# for %%p in (FVS_Northeastern_%1_*.key) do del %%~np.db
+# for %%p in (FVS_Northeastern_%1_*.key) do start \FVS\FVSbin\FVSne.exe --keywordfile=%%p
 ```
 
 ## Results
@@ -698,6 +788,47 @@ for (partition in 1:8) {
 }
 
 remove(fvs_out_db, fvs_carbon_tbl, fvs_summary2_east_tbl)
+```
+
+Sanity check: did we get the outputs we requested?
+```{r sanity-check-expected-output}
+matched_carbon_tmp <- stands_projected |>
+  left_join(
+    FVS_Carbon_NONE |>
+      select(StandID, Year, Aboveground_Total_Live) |> 
+      rename(
+        STAND_ID = StandID,
+        FIRSTYEAR = Year,
+        Starting_Carbon = Aboveground_Total_Live
+      ),
+    by = join_by(STAND_ID, FIRSTYEAR)
+  ) |>
+  left_join(
+    FVS_Carbon_NONE |>
+      select(StandID, Year, Aboveground_Total_Live) |>
+      rename(
+        STAND_ID = StandID,
+        LASTYEAR = Year,
+        Ending_Carbon = Aboveground_Total_Live
+        ),
+    by = join_by(STAND_ID, LASTYEAR)
+  ) |>
+  mutate(partition = (as.numeric(STAND_ID) %% 8) + 1)
+missing_start <- matched_carbon_tmp |>
+  filter(is.na(Starting_Carbon)) |> 
+  nrow()
+print(missing_start)
+missing_end <- matched_carbon_tmp |>
+  filter(is.na(Ending_Carbon)) |> 
+  nrow()
+print(missing_end)
+#stopifnot(missing_start == 0)
+#stopifnot(missing_end == 0)
+remove(
+  matched_carbon_tmp,
+  missing_start,
+  missing_end
+)
 ```
 
 Filter projections to corresponding observations
@@ -788,7 +919,7 @@ remove(
 Run a quick check to make sure the plots grew during the projection period,
 rather than shrank.
 
-```{r sanity-check}
+```{r sanity-check-plots-grew}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Projection_Years, y = Measured_BA_Delta)
