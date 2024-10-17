@@ -12,12 +12,12 @@ editor_options:
 ```{r setup, include=FALSE}
 # Pre-load libraries that issue warnings on startup so these
 # warnings don't corrupt the text later.
-suppressPackageStartupMessages(library(tidyverse))
-suppressPackageStartupMessages(library(reshape2)) # for melt()
-suppressPackageStartupMessages(library(RSQLite))
-suppressPackageStartupMessages(library(htmltools))
-suppressPackageStartupMessages(library(rmarkdown))
-suppressPackageStartupMessages(library(dbplyr))
+require(tidyverse)
+require(reshape2) # for melt()
+require(RSQLite)
+require(htmltools)
+require(rmarkdown)
+require(dbplyr)
 ```
 
 # Identifying Stands
