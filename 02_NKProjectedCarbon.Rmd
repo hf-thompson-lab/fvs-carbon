@@ -36,7 +36,7 @@ are within the error bounds for parsing the chart.
 
 ```{r}
 NK_Fig2_NoManagement <- read_csv(
-    "../01_processedInputData/NK_Fig2_NoManagement.csv",
+    "01_processedInputData/NK_Fig2_NoManagement.csv",
     col_names = c("Year","NoManagement"),
     # Read columns as double, since that is how they were written
     col_types = "dd"
@@ -44,49 +44,49 @@ NK_Fig2_NoManagement <- read_csv(
   # Round columns to nearest integer, since that is what was intended
   mutate(Year=round(Year), NoManagement=round(NoManagement))
 NK_Fig2_ClearcutHigh <- read_csv(
-    "../01_processedInputData/NK_Fig2_ClearcutHigh.csv",
+    "01_processedInputData/NK_Fig2_ClearcutHigh.csv",
     col_names = c("Year","ClearcutHigh"),
     col_types = "dd"
   ) |>
   mutate(Year=round(Year), ClearcutHigh=round(ClearcutHigh))
 NK_Fig2_ClearcutLow <- read_csv(
-    "../01_processedInputData/NK_Fig2_ClearcutLow.csv",
+    "01_processedInputData/NK_Fig2_ClearcutLow.csv",
     col_names = c("Year","ClearcutLow"),
     col_types = "dd"
   ) |>
   mutate(Year=round(Year), ClearcutLow=round(ClearcutLow))
 NK_Fig2_ShelterwoodHigh <- read_csv(
-    "../01_processedInputData/NK_Fig2_ShelterwoodHigh.csv",
+    "01_processedInputData/NK_Fig2_ShelterwoodHigh.csv",
     col_names = c("Year","ShelterwoodHigh"),
     col_types = "dd"
   ) |>
   mutate(Year=round(Year), ShelterwoodHigh=round(ShelterwoodHigh))
 NK_Fig2_ShelterwoodLow <- read_csv(
-    "../01_processedInputData/NK_Fig2_ShelterwoodLow.csv",
+    "01_processedInputData/NK_Fig2_ShelterwoodLow.csv",
     col_names = c("Year","ShelterwoodLow"),
     col_types = "dd"
   ) |>
   mutate(Year=round(Year), ShelterwoodLow=round(ShelterwoodLow))
 NK_Fig2_ITS_LowHigh <- read_csv(
-    "../01_processedInputData/NK_Fig2_ITS_LowHigh.csv",
+    "01_processedInputData/NK_Fig2_ITS_LowHigh.csv",
     col_names = c("Year","ITS_LowHigh"),
     col_types = "dd"
   ) |>
   mutate(Year=round(Year), ITS_LowHigh=round(ITS_LowHigh))
 NK_Fig2_ITS_LowLow <- read_csv(
-    "../01_processedInputData/NK_Fig2_ITS_LowLow.csv",
+    "01_processedInputData/NK_Fig2_ITS_LowLow.csv",
     col_names = c("Year","ITS_LowLow"),
     col_types = "dd"
   ) |>
   mutate(Year=round(Year), ITS_LowLow=round(ITS_LowLow))
 NK_Fig2_ITS_HighHigh <- read_csv(
-    "../01_processedInputData/NK_Fig2_ITS_HighHigh.csv",
+    "01_processedInputData/NK_Fig2_ITS_HighHigh.csv",
     col_names = c("Year","ITS_HighHigh"),
     col_types = "dd"
   ) |>
   mutate(Year=round(Year), ITS_HighHigh=round(ITS_HighHigh))
 NK_Fig2_ITS_HighLow <- read_csv(
-    "../01_processedInputData/NK_Fig2_ITS_HighLow.csv",
+    "01_processedInputData/NK_Fig2_ITS_HighLow.csv",
     col_names = c("Year","ITS_HighLow"),
     col_types = "dd"
   ) |>
@@ -110,7 +110,7 @@ fig2 <- NK_Fig2_NoManagement |>
 
 write_csv(
   fig2,
-  "../03_outputs/nk_fig2_reconstructed.csv"
+  "03_outputs/nk_fig2_reconstructed.csv"
 )
 
 ggplot(
