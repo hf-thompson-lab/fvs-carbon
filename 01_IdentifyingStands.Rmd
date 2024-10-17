@@ -30,7 +30,7 @@ identifiers in the FVS tables in the published FIA data.
 
 ```{r}
 nk_table1 <- read_csv(
-  "../00_rawData/NK_Table_1.csv",
+  "00_rawData/NK_Table_1.csv",
   col_types = cols(`FIA plot code` = col_character())
 )
 knitr::kable(nk_table1, caption = 'Nunery Keeton Table 1')
@@ -75,7 +75,7 @@ longer aligns with the inventory years in the FIA data for 27 of the 32
 plots.
 
 ```{r}
-fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia = DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
 fia_cond = tbl(fia, 'COND')
 # Note: we're joining tables across data providers so we have to copy one to the other.
 # We do a right join so that we can copy the small table (nk_plot_codes) to
@@ -136,7 +136,7 @@ nk_to_fia <- unique_cond |>
   select(`FIA plot code`, NK_INVYR, 
          STATECD, FIA_INVYR, CYCLE, SUBCYCLE, CONDID, UNITCD, COUNTYCD, PLOT) |>
   rename(INVYR = FIA_INVYR)
-write_csv(nk_to_fia, "../03_outputs/nk_to_fia.csv")
+write_csv(nk_to_fia, "03_outputs/nk_to_fia.csv")
 
 knitr::kable(unique_cond)
 ```
@@ -184,7 +184,7 @@ confirming that each updated Stand ID corresponds to a unique stand in
 the provided FVS tables.
 
 ```{r}
-fia = DBI::dbConnect(RSQLite::SQLite(), '../00_rawData/SQLite_FIADB_ENTIRE.db')
+fia = DBI::dbConnect(RSQLite::SQLite(), '00_rawData/SQLite_FIADB_ENTIRE.db')
 
 fia_fvs_plotinit_plot = tbl(fia, 'FVS_PLOTINIT_PLOT')
 matching_plotinit_plot <- fia_fvs_plotinit_plot |>
@@ -221,7 +221,7 @@ nk_to_fvs <- translated_stands |>
   left_join(matching_standinit_cond_grp, by=join_by(STAND_ID_COND==FVS_STANDINIT_COND)) |>
   left_join(matching_standinit_plot_grp, by=join_by(STAND_ID_PLOT==FVS_STANDINIT_PLOT))
 
-write_csv(nk_to_fvs, "../03_outputs/nk_to_fvs.csv")
+write_csv(nk_to_fvs, "03_outputs/nk_to_fvs.csv")
 
 knitr::kable(nk_to_fvs)
 ```
