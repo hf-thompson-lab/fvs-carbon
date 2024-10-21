@@ -391,11 +391,13 @@ LASTYEAR, which is the maximum of the same.
 -  TimeInt: Time Interval, there may be two entries:
    -  TimeInt 0: Default time interval, 10 years
    -  TimeInt 1: First cycle time interval, (LASTYEAR - FIRSTYEAR) %% 10
--  NumCycle: Number of cycles to run, int((LASTYEAR - FIRSTYEAR) / 10), + 1
-   if there is a TimeInt 1.
+-  NumCycle: Number of cycles to run, int((LASTYEAR - FIRSTYEAR) / 10) + 1,
+   and +1 again if there is a TimeInt 1.
 
 Note that the number of cycles is the number of full 10-year cycles
-plus one if there is a short first cycle.
+plus one if there is a short first cycle. Since metrics are printed at the start
+of each cycle, we need LASTYEAR to be the first year of a cycle, and work
+backwards from that.
 
 #### Input
 
