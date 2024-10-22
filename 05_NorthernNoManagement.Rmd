@@ -441,6 +441,142 @@ the tree is judged to be 'established'. Only one record for the tree will
 be marked 'INGROWTH'; it may have other records with other components, e.g.
 'SURVIVOR'.
 
+```{r ingrowth}
+# We want ingrowth for all the plots in plot_grow_only
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+
+# Get PLT_CN for all plots in plot_grow_only, for all valid INVYR
+plt_cns <- tbl(fia, 'PLOT') |>
+  semi_join(plot_grow_only, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
+  select(CN) |>
+  distinct() |> # should be redundant, but doesn't appear to be
+  rename(PLT_CN = CN)
+
+# Get all the Tree Growth, Removal, and Mortality entries for those plots,
+# where MICR_COMPONENT_AL_FOREST = 'INGROWTH'
+ingrowth <- tbl(fia, 'TREE_GRM_COMPONENT') |>
+  semi_join(plt_cns, by = join_by(PLT_CN)) |>
+  ingrowth_filter() |>
+  select(
+    TRE_CN, PREV_TRE_CN, PLT_CN, STATECD,
+    DIA_BEGIN, DIA_MIDPT, DIA_END, ANN_DIA_GROWTH, ANN_HT_GROWTH,
+    MICR_COMPONENT_AL_FOREST, MICR_TPAGROW_UNADJ_AL_FOREST,
+    SUBP_COMPONENT_AL_FOREST, SUBP_TPAGROW_UNADJ_AL_FOREST
+  ) |>
+  collect() # It ends up faster to materialize and copy back for pre_ingrowth
+
+fia_tree <- tbl(fia, 'TREE')
+fia_tree_cols <- function(.data) {
+  .data |>
+    select(
+      CN, PLT_CN, PREV_TRE_CN,
+      INVYR, STATECD, UNITCD, PLOT, SUBP, TREE, CONDID,
+      STATUSCD, SPCD, DIA, DIAHTCD, HT, HTCD, ACTUALHT, BHAGE, TOTAGE, SITREE,
+      PREVDIA, P2A_GRM_FLG, PREV_STATUS_CD, TPA_UNADJ
+    )
+}
+
+# Start with the ingrown trees to walk back the chain of previous trees
+prev_tre_cns <- ingrowth |>
+#  select(TRE_CN) |>
+  select(PREV_TRE_CN) |> rename(TRE_CN = PREV_TRE_CN) |>
+  filter(!is.na(TRE_CN)) |>
+  rename(CN = TRE_CN) |>
+  distinct()
+
+prev_tree <- NULL
+iterations <- 0
+while (nrow(prev_tre_cns) > 0) {
+  print(paste0(
+    "Iteration ",
+    iterations <- iterations + 1,
+    ", ",
+    nrow(prev_tre_cns),
+    " CNs"
+  ))
+  more_prev_trees <- fia_tree |>
+    semi_join(prev_tre_cns, by = join_by(CN), copy = TRUE) |>
+    fia_tree_cols() |>
+    collect()
+  prev_tree <- rbind(prev_tree, more_prev_trees) |>
+    distinct()
+  prev_tre_cns <- more_prev_trees |>
+    select(PREV_TRE_CN) |>
+    filter(!is.na(PREV_TRE_CN)) |>
+    rename(CN = PREV_TRE_CN) |>
+    distinct()
+}
+
+dbDisconnect(fia)
+remove(fia, plt_cns, fia_tree, prev_tre_cns)
+```
+
+Walk the tree history to see what diameter we can get to.
+
+```{r starting_trees}
+# CN - the latest CN for this tree
+# DIA - the latest DIA for this tree
+# PREV_TRE_CN - the next earlier CN for this tree, if any
+# FRST_DIA - the earliest available DIA for this tree
+# FRST_TRE_CN - the earliest available CN for this tree
+starting_trees <- ingrowth |>
+  select(TRE_CN, PREV_TRE_CN, DIA_END) |>
+  rename(CN = TRE_CN, DIA = DIA_END) |>
+  mutate(FRST_DIA = DIA) |>
+  mutate(FRST_TRE_CN = CN)
+
+trees_rhs <- prev_tree |>
+  select(CN, PREV_TRE_CN, DIA)
+
+prev_tre_cns <- starting_trees |>
+  select(PREV_TRE_CN) |>
+  filter(!is.na(PREV_TRE_CN)) |>
+  distinct()
+
+iterations <- 0
+while (nrow(prev_tre_cns) > 0) {
+  print(paste0(
+    "Iteration: ",
+    iterations <- iterations + 1,
+    ", CNs: ",
+    nrow(prev_tre_cns)
+  ))
+  tmp_trees <- starting_trees |>
+    left_join(trees_rhs, by = join_by(PREV_TRE_CN == CN))
+  starting_trees <- tmp_trees |>
+    rename(DIA = DIA.x) |>
+    mutate( # Update FRST_DIA
+      FRST_DIA = if_else(is.na(DIA.y), FRST_DIA, DIA.y)
+    ) |>
+    mutate( # Update FRST_CN
+      FRST_TRE_CN = if_else(is.na(PREV_TRE_CN), FRST_TRE_CN, PREV_TRE_CN)
+    ) |>
+    mutate( # Move PREV_TRE_CN one time hop
+      PREV_TRE_CN = PREV_TRE_CN.y
+    ) |>
+    select(CN, PREV_TRE_CN, DIA, FRST_TRE_CN, FRST_DIA)
+  prev_tre_cns <- tmp_trees |>
+    select(PREV_TRE_CN.y) |>
+    rename(PREV_TRE_CN = PREV_TRE_CN.y) |>
+    filter(!is.na(PREV_TRE_CN))
+}
+```
+
+How many trees ingrow with DBH>3?
+```{r dbh_gt_3}
+starting_trees |> filter(DIA > 3) |> nrow()
+```
+
+How many of those are traceable back to when they had DBH <= 3?
+```{r dbh_le_3}
+starting_trees |> filter(DIA > 3 & FRST_DIA <= 3) |> nrow() 
+```
+
+For the remaining 29,373 trees, we will need to back-project. TREE_GRM_COMPONENT
+provides annualized growth rates for both DIA and HT.
+
+> TODO Nik: Do these growth rates make sense? We can validate using our 705 trees.
+
 For each timestep, we will find the trees that establish during that timestep,
 and add a record describing the tree at the time of establishment.
 

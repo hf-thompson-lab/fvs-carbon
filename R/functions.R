@@ -173,6 +173,15 @@ has_trees_filter <- function(.data) {
     ungroup()
 }
 
+ingrowth_filter <- function(.data) {
+  .data |>
+    # From TREE_GRM_COMPONENT, filter to records marked ingrowth
+    filter(
+      MICR_COMPONENT_AL_FOREST == 'INGROWTH' |
+      SUBP_COMPONENT_AL_FOREST == 'INGROWTH'
+    )
+}
+
 consolidate_forest_type_groups_filter <- function(.data) {
   # Consolidate a few rare forest type groups into a single 'Other' group:
   # Exotic hardwoods group
