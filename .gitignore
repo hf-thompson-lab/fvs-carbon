@@ -6,6 +6,9 @@
 .RData
 .RDataTmp
 
+# Profiling
+*.Rprof
+
 # User-specific files
 .Ruserdata
 
