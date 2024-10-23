@@ -190,6 +190,11 @@ Single pixel, must match ecoregion,
 
 What species are in which ecosubregion?
 
+For this, we need the `FIADB Reference Table CSV Archive`.
+Download and unzip that into data/raw/FIADB_REFERENCE/
+then run `load-sqlite-fiadb-reference.sh` to create a SQLite3
+database from the CSV files.
+
 ```{r}
 
 # TREE.SPCD - species code

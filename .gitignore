@@ -51,8 +51,9 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 
-# SQLite Database files
+# SQLite Database files and compressed versions thereof
 **/*.db
+**/*.db.gz
 
 # MacOS Metadata
 .DS_Store
