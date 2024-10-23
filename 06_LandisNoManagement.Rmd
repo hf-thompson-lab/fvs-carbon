@@ -10,15 +10,15 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-require(tidyverse)
-require(reshape2) # for melt()
-require(RSQLite)
-require(htmltools)
-require(rmarkdown)
-require(dbplyr)
-require(measurements)
-require(sf)
-require(stars)
+library(tidyverse)
+library(reshape2) # for melt()
+library(RSQLite)
+library(htmltools)
+library(rmarkdown)
+library(dbplyr)
+library(measurements)
+library(sf)
+library(stars)
 ```
 
 Load functions

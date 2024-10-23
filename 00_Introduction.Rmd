@@ -20,7 +20,7 @@ management regimens.
 
 # Project Plan
 ```{r}
-require(DiagrammeR)
+library(DiagrammeR)
 
 create_graph() |>
 
