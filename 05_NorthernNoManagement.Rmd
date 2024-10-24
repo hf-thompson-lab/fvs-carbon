@@ -628,7 +628,14 @@ ingrowth_rate |> filter(abs(DIA_ERR) < 0.1) |> nrow() / ingrowth_rate |> nrow()
 ```
 
 This shows that using the FIA growth rate, only 30% of trees back-project
-to within 10% of their first surveyed diameter.
+to within 10% of their first surveyed diameter, so we can't rely on the FIA
+growth rate when we don't have previous tree records for an ingrown tree.
+
+Let's see if we can compute our own growth rate from a subsequent tree record.
+
+> TODO Nik: get subsequent trees the same way we got previous trees. Use
+> DIA to compute a growth rate. Back-project that and see how accurate it is.
+
 
 ##### Translating to FVS
 
