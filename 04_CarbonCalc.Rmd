@@ -316,7 +316,8 @@ Code Descriptions are given in [@Burrill2024]:
 # Who had disturbance?
 matching_cond_disturbed <- matching_cond |>
   select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, DSTRBCD1, DSTRBCD2, DSTRBCD3) |>
-  mutate(DISTURBED_FLAG = DSTRBCD1 > 0 | DSTRBCD2 > 0 | DSTRBCD3 > 0)
+  mutate(DISTURBED_FLAG = DSTRBCD1 > 0 | DSTRBCD2 > 0 | DSTRBCD3 > 0) |>
+  mutate(DISTURBED_FLAG = if_else(is.na(DISTURBED_FLAG), FALSE, DISTURBED_FLAG))
 
 knitr::kable(matching_cond_disturbed |> filter(DISTURBED_FLAG))
 ```
@@ -339,7 +340,8 @@ Code Descriptions are given in [@Burrill2024]:
 # Who had treatment?
 matching_cond_treated <- matching_cond |>
   select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, TRTCD1, TRTCD2, TRTCD3) |>
-  mutate(TREATED_FLAG = TRTCD1 > 0 | TRTCD2 > 0 | TRTCD3 > 0)
+  mutate(TREATED_FLAG = TRTCD1 > 0 | TRTCD2 > 0 | TRTCD3 > 0) |>
+  mutate(TREATED_FLAG = if_else(is.na(TREATED_FLAG), FALSE, TREATED_FLAG))
 
 knitr::kable(matching_cond_treated |> filter(TREATED_FLAG))
 ```
@@ -414,8 +416,6 @@ ggplot(
   ggtitle("Stand Inventory Timeline") +
   geom_point()
 ```
-> TODO nik: Plot 23 is multi-condition, but none of the conditions is flagged
-> as such. Figure that out and fix it.
 
 ### Grow-Only Stands
 
