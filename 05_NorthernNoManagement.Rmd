@@ -437,6 +437,8 @@ The Northeastern variant is a partial establishment model, so it does not
 automatically perform natural regeneration. We will therefore use actual
 ingrowth from the FIA data.
 
+##### Observed Ingrowth
+
 fia.TREE_GRM_COMPONENT.MICR_COMPONENT_AL_FOREST is set to 'INGROWTH' when
 the tree is judged to be 'established'. Only one record for the tree will
 be marked 'INGROWTH'; it may have other records with other components, e.g.
@@ -453,6 +455,11 @@ plt_cns <- tbl(fia, 'PLOT') |>
   distinct() |> # should be redundant, but doesn't appear to be
   rename(PLT_CN = CN)
 
+# mixin table to get MEASYEAR
+measyear_mixin <- tbl(fia, 'PLOT') |>
+  select(CN, MEASYEAR) |>
+  rename(PLT_CN = CN)
+
 # Get all the Tree Growth, Removal, and Mortality entries for those plots,
 # where MICR_COMPONENT_AL_FOREST = 'INGROWTH'
 ingrowth <- tbl(fia, 'TREE_GRM_COMPONENT') |>
@@ -465,13 +472,24 @@ ingrowth <- tbl(fia, 'TREE_GRM_COMPONENT') |>
     SUBP_COMPONENT_AL_FOREST, SUBP_TPAGROW_UNADJ_AL_FOREST
   ) |>
   collect() # It ends up faster to materialize and copy back for pre_ingrowth
+```
 
+There are ~30,000 trees that ingrow over the 20 years, so about one tree per
+plot per year.
+Most of these trees are over the 3"DBH diameter limit on ingrowth set by FVS.
+
+##### Ingrown Tree History
+
+Trees >1" DBH are in the TREE table in FVS, so in some cases we should be able
+to follow a tree back to the point when it was <=3"DBH.
+
+```{r prev_tree}
 fia_tree <- tbl(fia, 'TREE')
 fia_tree_cols <- function(.data) {
   .data |>
     select(
       CN, PLT_CN, PREV_TRE_CN,
-      INVYR, STATECD, UNITCD, PLOT, SUBP, TREE, CONDID,
+      INVYR, MEASYEAR, STATECD, UNITCD, PLOT, SUBP, TREE, CONDID,
       STATUSCD, SPCD, DIA, DIAHTCD, HT, HTCD, ACTUALHT, BHAGE, TOTAGE, SITREE,
       PREVDIA, P2A_GRM_FLG, PREV_STATUS_CD, TPA_UNADJ
     )
@@ -479,40 +497,47 @@ fia_tree_cols <- function(.data) {
 
 # Start with the ingrown trees to walk back the chain of previous trees
 prev_tre_cns <- ingrowth |>
-# Ideally, we'd start with the trees themselves and walk back from there
-#  select(TRE_CN) |>
-# but that's wicked slow (hours), so we start with the imperfect record
-# in ingrowth
-  select(PREV_TRE_CN) |> rename(TRE_CN = PREV_TRE_CN) |>
+  select(TRE_CN) |>
   filter(!is.na(TRE_CN)) |>
   rename(CN = TRE_CN) |>
   distinct()
 
+# SQLite3 takes forever to do the semi_join at scale (despite joining on an index),
+# so we run in chunks of 1000.
+progress_total = nrow(prev_tre_cns)
 prev_tree <- NULL
-iterations <- 0
 while (nrow(prev_tre_cns) > 0) {
+  progress_remaining = nrow(prev_tre_cns)
   print(paste0(
-    "Iteration ",
-    iterations <- iterations + 1,
-    ", ",
-    nrow(prev_tre_cns),
-    " CNs"
+    progress_remaining,
+    " / ",
+    progress_total,
+    " remaining"
   ))
+  chunk <- prev_tre_cns |> head(1000)
   more_prev_trees <- fia_tree |>
-    semi_join(prev_tre_cns, by = join_by(CN), copy = TRUE) |>
+    semi_join(chunk, by = join_by(CN), copy = TRUE) |>
+    left_join(measyear_mixin, by = join_by(PLT_CN)) |>
     fia_tree_cols() |>
     collect()
   prev_tree <- rbind(prev_tree, more_prev_trees) |>
-    distinct()
-  prev_tre_cns <- more_prev_trees |>
-    select(PREV_TRE_CN) |>
-    filter(!is.na(PREV_TRE_CN)) |>
-    rename(CN = PREV_TRE_CN) |>
-    distinct()
+    distinct() # Should be redundant, but isn't
+
+  # Add all new prev_tre_cn to the pool
+  prev_tre_cns <- prev_tre_cns |>
+    union_all(
+      more_prev_trees |>
+      select(PREV_TRE_CN) |>
+      filter(!is.na(PREV_TRE_CN)) |>
+      rename(CN = PREV_TRE_CN)
+    ) |>
+    distinct() |>
+    # remove already processed prev_tre_cns
+    anti_join(chunk, by = join_by(CN))
 }
 
 dbDisconnect(fia)
-remove(fia, plt_cns, fia_tree, prev_tre_cns)
+remove(fia, plt_cns, measyear_mixin, fia_tree, prev_tre_cns, progress_total)
 ```
 
 Walk the tree history to see what diameter we can get to.
@@ -568,7 +593,7 @@ while (nrow(prev_tre_cns) > 0) {
 
 How many trees ingrow with DBH>3?
 ```{r dbh_gt_3}
-starting_trees |> filter(DIA > 3) |> nrow()
+prev_tree |> filter(DIA > 3) |> nrow()
 ```
 
 How many of those are traceable back to when they had DBH <= 3?
@@ -579,7 +604,33 @@ starting_trees |> filter(DIA > 3 & FRST_DIA <= 3) |> nrow()
 For the remaining ~30,000 trees, we will need to back-project. TREE_GRM_COMPONENT
 provides annualized growth rates for both DIA and HT.
 
-> TODO Nik: Do these growth rates make sense? We can validate using our 705 trees.
+##### Back-Projecting Trees
+
+fia.TREE_GRM_COMPONENT.ANN_DIA_GROWTH specifies annual diameter growth rate.
+Looking at the values in this column, they seem small. We can check the
+stated growth rate for trees where we have a previous observation.
+
+```{r growth_rate}
+ingrowth_rate <- starting_trees |>
+  filter(FRST_DIA < DIA) |>
+  # Add on MEASYEAR for BEGIN
+  left_join(prev_tree |> select(CN, MEASYEAR), by = join_by(CN)) |>
+  rename(YEAR_END = MEASYEAR) |>
+  # Add on MEASYEAR for END
+  left_join(prev_tree |> select(CN, MEASYEAR), by = join_by(FRST_TRE_CN == CN)) |>
+  rename(YEAR_BEGIN = MEASYEAR) |>
+  # Add on growth rate
+  left_join(ingrowth |> select(TRE_CN, ANN_DIA_GROWTH), by = join_by(CN == TRE_CN)) |>
+  mutate(DIA_PROJ = DIA - (YEAR_END - YEAR_BEGIN) * ANN_DIA_GROWTH) |>
+  mutate(DIA_ERR = (DIA_PROJ - FRST_DIA) / FRST_DIA) |>
+  arrange(DIA_ERR)
+ingrowth_rate |> filter(abs(DIA_ERR) < 0.1) |> nrow() / ingrowth_rate |> nrow()
+```
+
+This shows that using the FIA growth rate, only 30% of trees back-project
+to within 10% of their first surveyed diameter.
+
+##### Translating to FVS
 
 For each timestep, we will find the trees that establish during that timestep,
 and add a record describing the tree at the time of establishment.
