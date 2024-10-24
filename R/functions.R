@@ -1,7 +1,6 @@
 northeastern_plots_filter <- function(.data) {
-  # Region or Station code (RSCD) consolidated multiple regions
-  # into region 24, Northeastern Research Station (NERS).
-  .data |> filter(RSCD == 24)
+  # FIA.PLOTGEOM.FVS_VARIANT tells which FVS variant to use for a given plot.
+  .data |> filter(FVS_VARIANT == 'NE')
 }
 
 modern_plots_filter <- function(.data) {

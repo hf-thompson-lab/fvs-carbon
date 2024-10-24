@@ -65,14 +65,14 @@ fia_plot <- tbl(fia, 'PLOT') |>
   # Narrow and rename columns to facilitate join
   select(CN, DESIGNCD, SRV_CN, MEASYEAR, ECOSUBCD) |>
   rename(PLT_CN = CN)
-fia_survey <- tbl(fia, 'SURVEY') |>
+fia_plotgeom <- tbl(fia, 'PLOTGEOM') |>
   # Narrow and rename columns to facilitate join
-  select(CN, RSCD) |>
-  rename(SRV_CN = CN)
+  select(CN, FVS_VARIANT) |>
+  rename(PLT_CN = CN)
 
 plot_grow_only <- fia_cond |>
   left_join(fia_plot, by = join_by(PLT_CN)) |>
-  left_join(fia_survey, by = join_by(SRV_CN)) |>
+  left_join(fia_plotgeom, by = join_by(PLT_CN)) |>
   northeastern_plots_filter() |>
   modern_plots_filter() |>
   has_trees_filter() |>
@@ -86,15 +86,15 @@ plot_grow_only <- fia_cond |>
   arrange(STATECD, COUNTYCD, PLOT)
 
 dbDisconnect(fia)
-remove(fia, fia_cond, fia_plot, fia_survey)
+remove(fia, fia_cond, fia_plot, fia_plotgeom)
 
 write_rds(plot_grow_only, 'data/intermediate/plot_grow_only.rds')
 
 nrow(plot_grow_only)
 ```
 
-This filters to 2816 plots.
- 
+This filters to 2808 plots.
+
 ### Locations
 
 Where are these plots?
@@ -479,7 +479,10 @@ fia_tree_cols <- function(.data) {
 
 # Start with the ingrown trees to walk back the chain of previous trees
 prev_tre_cns <- ingrowth |>
+# Ideally, we'd start with the trees themselves and walk back from there
 #  select(TRE_CN) |>
+# but that's wicked slow (hours), so we start with the imperfect record
+# in ingrowth
   select(PREV_TRE_CN) |> rename(TRE_CN = PREV_TRE_CN) |>
   filter(!is.na(TRE_CN)) |>
   rename(CN = TRE_CN) |>
@@ -804,7 +807,9 @@ for (partition in 1:8) {
   filename <- paste0("data/fvs/FVS_Northeastern_NONE_", partition, ".key")
   unlink(filename)
   apply(
-    stands_projected |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
+    stands_projected |> 
+      filter((as.numeric(STAND_ID) %% 8) == (partition - 1)) |>
+      arrange(STAND_ID),
     1,
     function(row) {
       write_lines(
@@ -854,7 +859,9 @@ for (partition in 1:8) {
   filename <- paste0("data/fvs/FVS_Northeastern_SRVY_", partition, ".key")
   unlink(filename)
   apply(
-    stands_surveyed |> filter((as.numeric(STAND_ID) %% 8) == (partition - 1)),
+    stands_surveyed |>
+      filter((as.numeric(STAND_ID) %% 8) == (partition - 1)) |>
+      arrange(STAND_ID),
     1,
     function(row) {
       write_lines(
@@ -875,6 +882,7 @@ for (partition in 1:8) {
   write_lines("Stop", filename, append = TRUE)
 }
 ```
+
 #### Run FVS.
 
 ```{r run_fvs}
