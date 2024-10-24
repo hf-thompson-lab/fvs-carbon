@@ -82,7 +82,8 @@ plot_grow_only <- fia_cond |>
   untreated_plots_filter() |>
   single_condition_plots_filter() |>
   distinct(STATECD, COUNTYCD, PLOT) |>
-  collect()
+  collect() |>
+  arrange(STATECD, COUNTYCD, PLOT)
 
 dbDisconnect(fia)
 remove(fia, fia_cond, fia_plot, fia_survey)
