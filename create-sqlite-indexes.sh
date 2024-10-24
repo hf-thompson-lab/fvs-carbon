@@ -24,7 +24,7 @@ echo "Creating indexes on primary keys" >&2
 ) | sqlite3 $db
 
 echo "Scanning for foreign keys"
-cat << ___EOF___ | sqlite3 --list data/raw/SQLite_FIADB_ENTIRE.db > $tmpfile
+cat << ___EOF___ | sqlite3 --list $db > $tmpfile
 SELECT t.name AS table_name, c.name AS column_name
 FROM sqlite_schema t
 CROSS JOIN pragma_table_info((t.name)) c
@@ -44,7 +44,7 @@ echo "Creating indexes on foreign keys" >&2
 ) | sqlite3 $db
 
 echo "Scanning for tables with plot columns"
-cat << ___EOF___ | sqlite3 --list data/raw/SQLite_FIADB_ENTIRE.db > $tmpfile
+cat << ___EOF___ | sqlite3 --list $db > $tmpfile
 SELECT
   table_name,
   SUM(has_statecd) & SUM(has_countycd) & SUM(has_plot) AS has_location
