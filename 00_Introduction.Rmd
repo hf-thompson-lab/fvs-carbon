@@ -77,7 +77,7 @@ remove(fia, column_query, columns, idx_col)
 
 Many tables have the three columns that uniquely locate a plot:
 STATECD, COUNTYCD, PLOT
-Index those beccause we often want to look up all the records pertaining to
+Index those because we often want to look up all the records pertaining to
 a plot by location.
 
 ```{r plot_location}
