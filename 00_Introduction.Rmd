@@ -9,6 +9,13 @@ editor_options:
     wrap: 72
 ---
 
+```{r setup, include=FALSE}
+library(tidyverse)
+library(RSQLite)
+library(dbplyr)
+```
+
+
 # Introduction
 
 In [@nunery2010], different management regimens were modeled to explore
@@ -17,6 +24,101 @@ Simulator (FVS) to model carbon storage. Other models exist to predict
 carbon storage; we seek to compare FVS with other models to understand
 their different predictions for carbon storage under different
 management regimens.
+
+# Database Preparation
+
+This project depends heavily on the SQLite version of the FIA data, distributed
+as SQLite_FIADB_ENTIRE.db. The database ships with most indexes missing, which
+makes most queries very slow.
+
+Create the appropriate indexes.
+
+## Primary and Foreign Keys
+
+Most tables with a simple primary key name that key "CN", for Control Number.
+Many tables have foreign keys named <table abbreviation>_CN.
+Create indexes on primary and foreign keys to facilitate joins.
+
+```{r primary_and_foreign_keys}
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+# We need to perform a correlated subquery through a pragma
+# (which looks like a table function); dbplyr doesn't support this.
+# We also need to do a cross join, which is also not supported by dbplyr.
+# So we run this query using raw DBI.
+column_query <- "
+  SELECT t.name AS table_name, c.name AS column_name
+  FROM sqlite_schema t
+  CROSS JOIN pragma_table_info((t.name)) c
+  WHERE column_name = 'CN' OR column_name LIKE '%_CN'
+  ORDER BY table_name, column_name;
+"
+
+columns <- DBI::dbGetQuery(fia, column_query)
+
+idx_col <- function(row) {
+  tbl <- row["table_name"]
+  col <- row["column_name"]
+  idx_name <- paste0("IDX_", tbl, "_", col)
+  sql <- paste(
+    "CREATE INDEX IF NOT EXISTS", idx_name, "ON", tbl, "(", col, ");",
+    sep = ' '
+  )
+  DBI::dbExecute(fia, sql)
+}
+
+apply(columns, 1, idx_col) |>
+  length()
+
+dbDisconnect(fia)
+remove(fia, column_query, columns, idx_col)
+```
+
+## Plot Identifiers
+
+Many tables have the three columns that uniquely locate a plot:
+STATECD, COUNTYCD, PLOT
+Index those beccause we often want to look up all the records pertaining to
+a plot by location.
+
+```{r plot_location}
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+table_query <- "
+  SELECT
+    table_name,
+    SUM(has_statecd) & SUM(has_countycd) & SUM(has_plot) AS has_location
+  FROM (
+    SELECT
+      t.name AS table_name,
+      IIF(c.name = 'STATECD', 1, 0) AS has_statecd,
+      IIF(c.name = 'COUNTYCD', 1, 0) AS has_countycd,
+      IIF(c.name = 'PLOT', 1, 0) AS has_plot
+    FROM sqlite_schema t
+    CROSS JOIN pragma_table_info((t.name)) c
+  )
+  GROUP BY table_name
+  HAVING has_location
+  ORDER BY table_name;
+"
+
+tables <- DBI::dbGetQuery(fia, table_query)
+
+idx_tbl <- function(row) {
+  tbl <- row["table_name"]
+  idx_name <- paste0("IDX_", tbl, "_PLOT")
+  sql <- paste(
+    "CREATE INDEX IF NOT EXISTS", idx_name, "ON", tbl, "(STATECD, COUNTYCD, PLOT);",
+    sep = ' '
+  )
+  DBI::dbExecute(fia, sql)
+}
+
+apply(tables, 1, idx_tbl) |>
+  length()
+
+dbDisconnect(fia)
+remove(fia, table_query, tables, idx_tbl)
+```
+
 
 # Project Plan
 ```{r}
