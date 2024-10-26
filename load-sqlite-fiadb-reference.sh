@@ -15,7 +15,7 @@ fi
 
 (
   for csv in $CSVS/*.csv ; do
-    tbl=`basename $csv | sed -E -e 's/.csv//'`
+    tbl=`basename -s .csv $csv`
     echo "Loading FIADB_REFERENCE.$tbl from $csv" >&2
     echo ".import $csv $tbl"
   done
