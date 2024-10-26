@@ -190,11 +190,6 @@ Single pixel, must match ecoregion,
 
 What species are in which ecosubregion?
 
-For this, we need the `FIADB Reference Table CSV Archive`.
-Download and unzip that into data/raw/FIADB_REFERENCE/
-then run `load-sqlite-fiadb-reference.sh` to create a SQLite3
-database from the CSV files.
-
 ```{r}
 
 # TREE.SPCD - species code
@@ -203,16 +198,6 @@ database from the CSV files.
 # TREE.PLT_CN - Plot Control Number
 # PLOT.CN - Plot Control Number
 # PLOT.ECOSUBCD
-
-fia_ref <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_REFERENCE.db')
-fia_ref_species <- tbl(fia_ref, 'REF_SPECIES') |> 
-  select(
-    SPCD, SCIENTIFIC_NAME, GENUS, SPECIES, COMMON_NAME
-  ) |>
-  collect() |> 
-  mutate(SPCD = as.integer(SPCD))
-dbDisconnect(fia_ref)
-
 
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 
@@ -223,19 +208,22 @@ fia_plot <- tbl(fia, 'PLOT') |>
   select(CN, SRV_CN, ECOSUBCD) |>
   rename(PLT_CN = CN)
 
-fia_survey <- tbl(fia, 'SURVEY') |>
-  select(CN, RSCD) |>
-  rename(SRV_CN = CN)
+fia_plotgeom <- tbl(fia, 'PLOTGEOM') |>
+  select(CN, FVS_VARIANT) |>
+  rename(PLT_CN = CN)
+
+fia_ref_species <- tbl(fia, 'REF_SPECIES') |> 
+  select(SPCD, SCIENTIFIC_NAME, GENUS, SPECIES, COMMON_NAME)
 
 species_by_ecosubcd <- fia_tree |>
   left_join(fia_plot, by = join_by(PLT_CN)) |>
-  left_join(fia_survey, by = join_by(SRV_CN)) |>
+  left_join(fia_plotgeom, by = join_by(PLT_CN)) |>
   northeastern_plots_filter() |>
-  distinct(ECOSUBCD, SPCD) |>
-  collect() |> 
-  left_join(fia_ref_species, by = join_by(SPCD))
+  distinct(ECOSUBCD, SPCD) |> 
+  left_join(fia_ref_species, by = join_by(SPCD)) |>
+  collect()
 
 dbDisconnect(fia)
-remove(fia, fia_tree, fia_plot, fia_survey, fia_ref, fia_ref_species)
+remove(fia, fia_tree, fia_plot, fia_plotgeom, fia_ref_species)
 ```
 
