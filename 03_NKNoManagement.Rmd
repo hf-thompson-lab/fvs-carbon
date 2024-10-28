@@ -102,17 +102,20 @@ table4_rot <- table4 |>
   rename(`Scientific Name`=name) |>
   left_join(fvs_species_codes, by=join_by(`Scientific Name`))
 
-# Values in NK are seedlings per hectare; FVS needs seedlings per acre
+# Values in NK are seedlings per hectare; FVS needs seedlings per acre.
+# To convert rates, do the reverse conversion, i.e. to convert from
+# per-hectare to per-acre, we convert using the inverse of the ratio
+# of hectare-to-acre, which is the same as the ratio from acre-to-hectare.
 table4_rot$Clearcut <-
-  round(conv_unit(table4_rot$Clearcut, 'hectare', 'acre'))
+  round(conv_unit(table4_rot$Clearcut, 'acre', 'hectare'))
 table4_rot$Shelterwood <-
-  round(conv_unit(table4_rot$Shelterwood, 'hectare', 'acre'))
+  round(conv_unit(table4_rot$Shelterwood, 'acre', 'hectare'))
 table4_rot$`ITS_Low Retention` <-
-  round(conv_unit(table4_rot$`ITS_Low Retention`, 'hectare', 'acre'))
+  round(conv_unit(table4_rot$`ITS_Low Retention`, 'acre', 'hectare'))
 table4_rot$`ITS_High Retention` <-
-  round(conv_unit(table4_rot$`ITS_High Retention`, 'hectare', 'acre'))
+  round(conv_unit(table4_rot$`ITS_High Retention`, 'acre', 'hectare'))
 table4_rot$Background <-
-  round(conv_unit(table4_rot$Background, 'hectare', 'acre'))
+  round(conv_unit(table4_rot$Background, 'acre', 'hectare'))
 
 knitr::kable(
   table4_rot |>
