@@ -21,6 +21,10 @@ library(measurements)
 library(maps)
 ```
 
+```{r source-functions}
+source('R/functions.R')
+```
+
 ## Grow-Only Plots in the Northeast
 
 Find all FIA plots in the northeastern region that are grow-only, that have
@@ -47,10 +51,7 @@ Grow-only is described previously:
 *  Plot was not disturbed: COND.DSTRBCD1 == 0 & COND.DSTRBCD2 == 0 & COND.DSTRBCD3 == 0
 *  Plot was not treated: COND.TRTCD1 == 0 & TRTCD2 == 0 & TRTCD3 == 0
 
-Load functions for these filters
-```{r source-functions}
-source('R/functions.R')
-```
+The functions in `functions.R` define these filters
 
 Execute the filters to create a list of matching plots.
 
@@ -757,35 +758,7 @@ information about a run and a stand.
 
 ```{r keywordfile_section}
 keywordfile_section <- function(Title, MgmtId, StandID, StandCN, FirstYear, LastYear, Partition) {
-  FirstYear <- as.integer(FirstYear)
-  LastYear <- as.integer(LastYear)#  + 1 #LastYear + 1 is the cycle boundary
-  NumCycles <- as.integer((LastYear - FirstYear) / 10) + 1
-  ShortCycle <- (LastYear - FirstYear) %% 10
-  TimeConfig <- NULL
-  if (NumCycles == 0) {
-    # Produce a single cycle of the necessary duration
-    TimeConfig <- c(
-      fvs_kwd1("InvYear", FirstYear),
-      fvs_kwd2("TimeInt", 0, ShortCycle),
-      fvs_kwd1("NumCycle", 1)
-    )
-  } else if (ShortCycle > 0) {
-    # Produce a single short cycle followed by 10-year cycles
-    NumCycles <- NumCycles + 1
-    TimeConfig <- c(
-      fvs_kwd1("InvYear", FirstYear),
-      fvs_kwd2("TimeInt", 0, 10),
-      fvs_kwd2("TimeInt", 1, ShortCycle),
-      fvs_kwd1("NumCycle", NumCycles)
-    )
-  } else {
-    # No need for an initial short cycle
-    TimeConfig <- c(
-      fvs_kwd1("InvYear", FirstYear),
-      fvs_kwd2("TimeInt", 0, 10),
-      fvs_kwd1("NumCycle", NumCycles)
-    )
-  }
+  TimeConfig <- fvs_TimeConfig(FirstYear, LastYear)
   c(
     fvs_kwd0("StdIdent"),
     paste0(StandID, " ", Title),

@@ -13,10 +13,11 @@ editor_options:
 library(tidyverse)
 library(reshape2) # for melt()
 library(RSQLite)
-library(htmltools)
-library(rmarkdown)
-library(dbplyr)
 library(measurements)
+```
+
+```{r source-functions}
+source('R/functions.R')
 ```
 
 # Reproducing the NoManagement Scenario
@@ -36,10 +37,31 @@ version <- fia_ref_fiadb_version |>
   head(1) |>
   collect()
 DBI::dbDisconnect(fia)
+remove(fia, fia_ref_fiadb_version)
 knitr::kable(version)
 ```
 
 ### Stands
+
+```{r nk_to_fia}
+nk_to_fia <- read_csv(
+  "data/intermediate/nk_to_fia.csv", 
+  col_types = cols(
+    `FIA plot code` = col_character(), 
+    NK_INVYR = col_character(),
+    STATECD = col_integer(), 
+    INVYR = col_integer(),
+    CYCLE = col_character(), 
+    SUBCYCLE = col_character(),
+    CONDID = col_character(), 
+    UNITCD = col_character(),
+    COUNTYCD = col_integer(), 
+    PLOT = col_integer()
+  )
+)
+```
+
+#### Via the UI
 
 Stands can be found in the FVS UI using FVS_STAND_ID from the table
 above.
@@ -52,7 +74,26 @@ above.
 Clicking `Find` will then filter to the single matching stand, which can
 be added to the run.
 
-Repeat for each of the above stands.
+#### Automatic
+
+What FVS calls "StandCN" is what FIA calls "PLOT.CN". Augment nk_to_fia
+to include this information.
+
+```{r stand_cn}
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+
+stand_cns <- tbl(fia, 'PLOT') |>
+  left_join(nk_to_fia, by = join_by(STATECD, COUNTYCD, PLOT, INVYR), copy = TRUE) |>
+  select(CN, STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR) |>
+  rename(STAND_CN = CN) |>
+  collect()
+
+nk_to_fia <- nk_to_fia |>
+  left_join(stand_cns, by = join_by(STATECD, COUNTYCD, PLOT, INVYR))
+
+DBI::dbDisconnect(fia)
+rm(fia, stand_cns)
+```
 
 ### Time
 
@@ -78,6 +119,11 @@ stands, independent of forest management activities."
 
 This background regeneration rate is in NK Table 4.
 
+Note that if *any* establishment is specified, whether Natural or Plant,
+FVS defaults to doing site prep. It generates a mix of mechanical and burn site
+prep based on site characteristics. For grow-only plots, it's important to turn
+this off by explicitly
+
 ```{r}
 table4 <- read_csv(
   "data/raw/NK_Table_4.csv",
@@ -99,30 +145,27 @@ fvs_species_codes <- read_csv(
 table4_rot <- table4 |>
   pivot_longer(cols = !`Management scenario`) |>
   pivot_wider(names_from = `Management scenario`) |>
-  rename(`Scientific Name`=name) |>
-  left_join(fvs_species_codes, by=join_by(`Scientific Name`))
-
-# Values in NK are seedlings per hectare; FVS needs seedlings per acre.
-# To convert rates, do the reverse conversion, i.e. to convert from
-# per-hectare to per-acre, we convert using the inverse of the ratio
-# of hectare-to-acre, which is the same as the ratio from acre-to-hectare.
-table4_rot$Clearcut <-
-  round(conv_unit(table4_rot$Clearcut, 'acre', 'hectare'))
-table4_rot$Shelterwood <-
-  round(conv_unit(table4_rot$Shelterwood, 'acre', 'hectare'))
-table4_rot$`ITS_Low Retention` <-
-  round(conv_unit(table4_rot$`ITS_Low Retention`, 'acre', 'hectare'))
-table4_rot$`ITS_High Retention` <-
-  round(conv_unit(table4_rot$`ITS_High Retention`, 'acre', 'hectare'))
-table4_rot$Background <-
-  round(conv_unit(table4_rot$Background, 'acre', 'hectare'))
+  rename(`Scientific Name` = name) |>
+  left_join(fvs_species_codes, by = join_by(`Scientific Name`)) |>
+  # Values in NK are seedlings per hectare; FVS needs seedlings per acre.
+  # To convert rates, do the reverse conversion, i.e. to convert from
+  # per-hectare to per-acre, we convert using the inverse of the ratio
+  # of hectare-to-acre, which is the same as the ratio from acre-to-hectare.
+  mutate(Clearcut = round(conv_unit(Clearcut, 'acre', 'hectare'))) |>
+  mutate(Shelterwood = round(conv_unit(Shelterwood, 'acre', 'hectare'))) |>
+  mutate(`ITS_Low Retention` = round(conv_unit(`ITS_Low Retention`, 'acre', 'hectare'))) |>
+  mutate(`ITS_High Retention` = round(conv_unit(`ITS_High Retention`, 'acre', 'hectare'))) |>
+  mutate(Background = round(conv_unit(Background, 'acre', 'hectare')))
 
 knitr::kable(
   table4_rot |>
-  select(`Scientific Name`, Background, `Species Code`, `Common Name`) |>
-  arrange(desc(Background))
+    filter(!is.na(Background)) |>
+    select(`Scientific Name`, Background, `Species Code`, `Common Name`) |>
+    arrange(desc(Background))
 )
 ```
+
+#### Via the UI
 
 In FVS, go to Simulate -\> Components -\> Management From Categories,
 select "Planting & Natural Regeneration" From Components, select
@@ -145,17 +188,26 @@ In freeform, this looks like:
 ```         
 Estab              0
 Sprout
-Natural            0        SM      1221      100.                             0
-Natural            0        AB       610      100.                             0
-Natural            0        EH       153      100.                             0
-Natural            0        RS       153      100.                             0
-Natural            0        YB       153      100.                             0
-Natural            0        RM       153      100.                             0
+Natural            0        SM       200      100.                             0
+Natural            0        AB       100      100.                             0
+Natural            0        EH        25      100.                             0
+Natural            0        RS        25      100.                             0
+Natural            0        YB        25      100.                             0
+Natural            0        RM        25      100.                             0
 ```
 
 Switch to freeform and add all the rows, fix the titles.
 
 Select `Save in run` to apply to `Grp: All_FIA_Plots`.
+
+#### Automatic
+
+```{r background_regen}
+background_regen <- table4_rot |>
+  rename(species = `Species Code`, seedlings = Background) |>
+  filter(!is.na(seedlings)) |>
+  fvs_Estab()
+```
 
 ### Carbon
 
@@ -165,18 +217,98 @@ hectare), go to Simulate -\> Components -\> Keywords, and select:
 -   Extensions: Fire and Fuels Extension
 -   Keywords: CarbCalc: Set the carbon accounting parameters.
 -   Component title: CarbCalc: Metric
--   Biomass predictions: 0 = Use FFE biomass predictions
+-   Biomass predictions: 1 = Use Jenkins biomass predictions
 -   Units: 1 = Metric (metric tons carbon/hectare)
 -   Note: Annual root decay rate (proportion per year) remains at its
     default value of 0.0425.
 
 Select `Save in run` to apply to `Grp: All_FIA_Plots`.
 
+## Keywordfile Generation
+
+```{r keywordfile_section}
+keywordfile_section <- function(Title, MgmtId, StandID, StandCN, FirstYear, LastYear) {
+  TimeConfig <- fvs_TimeConfig(FirstYear, LastYear)
+  c(
+    fvs_kwd0("StdIdent"),
+    paste0(StandID, " ", Title),
+    fvs_kwd0("StandCN"),
+    StandCN,
+    fvs_kwd0("MgmtId"),
+    MgmtId,
+    TimeConfig,
+    fvs_kwd0("FMIn"), # Fire and Fuels Extension
+    fvs_kwd0("CarbRept"),
+    fvs_kwd0("CarbCut"),
+    fvs_kwd5("CarbCalc", 1, 1, 0.0425, 9, 11),
+    fvs_kwd0("FuelOut"),
+    fvs_kwd0("FuelRept"),
+    fvs_kwd0("End"), # FMIn
+    fvs_kwd0("Database"), # Database extension
+    fvs_kwd0("DSNIn"),
+    "SQLite_FIADB_ENTIRE.db",
+    fvs_kwd0("StandSQL"),
+    "SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'",
+    fvs_kwd0("EndSQL"), # StandSQL
+    fvs_kwd0("TreeSQL"),
+    "SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'",
+    fvs_kwd0("EndSQL"), # TreeSQL
+    fvs_kwd0("DSNOut"),
+    paste0("FVS_", Title, "_", MgmtId, ".db"),
+    fvs_kwd1("Summary",  2),
+    fvs_kwd2("Computdb", 0, 1),
+    fvs_kwd1("MisRpts",  2),
+    fvs_kwd1("CarbReDB", 2),
+    fvs_kwd1("FuelReDB", 2),
+    fvs_kwd1("FuelsOut", 2),
+    fvs_kwd0("End"), # Database
+    background_regen,
+    fvs_kwd0("Process"),
+    recursive = TRUE
+  )
+}
+
+```
+
+```{r FVS_NKByPlot_NONE.key, include=FALSE}
+Title <- "NKByPlot"
+MgmtId <- "NONE"
+filename <- paste0("data/fvs/FVS_", Title, "_", MgmtId, ".key")
+unlink(filename)
+apply(
+  nk_to_fia,
+  1,
+  function(row) {
+    write_lines(
+      keywordfile_section(
+        Title,
+        MgmtId,
+        row['FIA plot code'],
+        row['STAND_CN'],
+        row['MEASYEAR'],
+        2165
+      ),
+      filename,
+      append = TRUE
+    )
+  }
+)
+write_lines("Stop", filename, append = TRUE)
+```
+
+
 ## Run FVS
 
 The main output will be Carbon and fuels. Stand visualization, Tree
 lists, and Inventory statistics may also be interesting.
 
+```
+REM Delete destination databases. FVS will otherwise append to them, leaving previous rows.
+for %%p in (FVS_%1_%2*.key) do del %%~np.db
+
+REM Start FVSne in the background on each partition
+for %%p in (FVS_%1_%2*.key) do start \FVS\FVSbin\FVSne.exe --keywordfile=%%p
+```
 
 ## Carbon Projection
 
@@ -189,13 +321,19 @@ NK states that Fig 2 sums carbon from aboveground live, standing dead,
 and down dead. We plot this, as well as just aboveground live and stand total
 carbon for comparison.
 
-```{r}
-NoManagement_Carbon_ByPlot <- read_csv(
-    "data/fvs/FVS_NKByPlot_NONE_Carbon.csv",
-    col_types = cols(
-      StandID = col_character()
-    )
-  ) |>
+```{r FVS_Carbon}
+fvs_out_db <- DBI::dbConnect(
+  RSQLite::SQLite(),
+  paste0('data/fvs/FVS_', Title, '_', MgmtId, '.db')
+)
+
+FVS_Carbon <- tbl(fvs_out_db, 'FVS_Carbon') |> collect()
+FVS_Summary2_East <- tbl(fvs_out_db, 'FVS_Summary2_East') |> collect()
+
+dbDisconnect(fvs_out_db)
+remove(fvs_out_db)
+
+NoManagement_Carbon_ByPlot <- FVS_Carbon |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
@@ -204,6 +342,11 @@ NoManagement_Carbon_ByPlot <- read_csv(
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
 knitr::kable(NoManagement_Carbon_ByPlot)
 ```
+
+
+Compare UI vs Batch
+
+
 
 Plot these against NK Fig 2 "NoManagement" scenario. NK Fig 2 has three
 different scales on the horizontal axis:

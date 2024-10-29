@@ -286,3 +286,65 @@ fvs_kwd6 <- function(kwd, arg1, arg2, arg3, arg4, arg5, arg6) {
   arg6 <- as.character(arg6)
   sprintf('%-10s%10s%10s%10s%10s%10s%10s', kwd, arg1, arg2, arg3, arg4, arg5, arg6)
 }
+
+fvs_kwd7 <- function(kwd, arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  arg1 <- as.character(arg1)
+  arg2 <- as.character(arg2)
+  arg3 <- as.character(arg3)
+  arg4 <- as.character(arg4)
+  arg5 <- as.character(arg5)
+  arg6 <- as.character(arg6)
+  arg7 <- as.character(arg7)
+  sprintf('%-10s%10s%10s%10s%10s%10s%10s%10s', kwd, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+}
+
+fvs_TimeConfig <- function(FirstYear, LastYear) {
+  FirstYear <- as.integer(FirstYear)
+  LastYear <- as.integer(LastYear)
+  # LastYear must be the first year of the last cycle, so
+  # add an extra cycle at the end
+  NumCycles <- as.integer((LastYear - FirstYear) / 10) + 1
+  ShortCycle <- (LastYear - FirstYear) %% 10
+  TimeConfig <- NULL
+  if (ShortCycle > 0) {
+    # Produce a single short cycle followed by 10-year cycles
+    NumCycles <- NumCycles + 1
+    TimeConfig <- c(
+      fvs_kwd1("InvYear", FirstYear),
+      fvs_kwd2("TimeInt", 0, 10),
+      fvs_kwd2("TimeInt", 1, ShortCycle),
+      fvs_kwd2("TimeInt", NumCycles, 1),
+      fvs_kwd1("NumCycle", NumCycles)
+    )
+  } else {
+    # No need for an initial short cycle
+    TimeConfig <- c(
+      fvs_kwd1("InvYear", FirstYear),
+      fvs_kwd2("TimeInt", 0, 10),
+      fvs_kwd2("TimeInt", NumCycles, 1),
+      fvs_kwd1("NumCycle", NumCycles)
+    )
+  }
+  return(TimeConfig)
+}
+
+fvs_Estab <- function(rows) {
+  natural_regen <- function(row) {
+    species <- row["species"]
+    density <- row["seedlings"] # per acre
+    fvs_kwd7("Natural", 0, species, density, 100, '', '', 0)
+  }
+  Estab <- c(
+    fvs_kwd1("If", 0),
+    fvs_kwd0("mod(cycle,1) eq 0"),
+    fvs_kwd0("Then"),
+    fvs_kwd1("Estab", 0),
+    fvs_kwd2("MechPrep", 0, 0),
+    fvs_kwd2("BurnPrep", 0, 0),
+    fvs_kwd0("Sprout"),
+    apply(rows, 1, natural_regen),
+    fvs_kwd0("End"),
+    fvs_kwd0("EndIf")
+  )
+  return(Estab)
+}
