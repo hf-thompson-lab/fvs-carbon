@@ -388,14 +388,12 @@ NoManagement_Carbon_ByPlot_ByYear <- NoManagement_Carbon_ByPlot |>
   full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
   rename(NK_Fig2_NoManagement = NoManagement)
 
-write_csv(NoManagement_Carbon_ByPlot_ByYear, "data/output/FVS_NKByPlot_ByYear_NONE_Carbon.csv")
-
 ggplot(
     data = melt(NoManagement_Carbon_ByPlot_ByYear, id.vars = "Year"),
     mapping = aes(x = Year, y = value, color = variable, linetype = variable)
   ) +
   ggtitle("FVS Carbon Projection for NK Plots") +
-  ylab("Carbon (Mg/ha)") +
+  ylab(bquote("Carbon " ~(Mg %*% ha^{-1}))) +
 #  theme(legend.title = element_blank()) +
   theme(legend.title = element_blank(), legend.position = "bottom") +
   scale_linetype_manual(values = c("solid", "solid", "solid", "dashed")) +
@@ -475,7 +473,7 @@ ggplot(
     mapping = aes(x = Year, y = value, color = variable)
   ) +
   ggtitle("FVS Carbon Projection by FIA Subplot") +
-  ylab("Carbon (Mg/ha)") +
+  ylab(bquote("Carbon " ~(Mg %*% ha^{-1}))) +
   theme(legend.title = element_blank()) +
   geom_line() +
   coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 320)) +
@@ -546,7 +544,7 @@ ggplot(
     mapping = aes(x = Year, y = value, color = variable)
   ) +
   ggtitle("FVS Carbon Projection by FIA Condition") +
-  ylab("Carbon (Mg/ha)") +
+  ylab(bquote("Carbon " ~(Mg %*% ha^{-1}))) +
   theme(legend.title = element_blank()) +
   geom_line() +
   coord_cartesian(xlim = c(2005, 2165), ylim = c(0, 320)) +
