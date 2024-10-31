@@ -343,11 +343,6 @@ NoManagement_Carbon_ByPlot <- FVS_Carbon |>
 knitr::kable(NoManagement_Carbon_ByPlot)
 ```
 
-
-Compare UI vs Batch
-
-
-
 Plot these against NK Fig 2 "NoManagement" scenario. NK Fig 2 has three
 different scales on the horizontal axis:
 
