@@ -1,14 +1,34 @@
-northeastern_plots_filter <- function(.data) {
+fvsne_plots_filter <- function(.data) {
   # FIA.PLOTGEOM.FVS_VARIANT tells which FVS variant to use for a given plot.
   .data |> filter(FVS_VARIANT == 'NE')
+}
+
+ners_plots_filter <- function(.data) {
+  # FIA.SURVEY.RCSD tells which research station administers a plot.
+  .data |> filter(RSCD == 24)
 }
 
 modern_plots_filter <- function(.data) {
   # FIADB database description Appendix G describes plot designs.
   # DESIGNCD 1 is the modern plot design.
-  # Many other plot designs may be compatible with DESIGNCD == 1,
-  # but there are enough with DESIGNCD==1 that we can keep our lives simple.
-  .data |> filter(DESIGNCD == 1)
+  # Many other plot designs are compatible with DESIGNCD == 1
+  #.data |> filter(
+  #  (DESIGNCD == 1) |
+  #  (DESIGNCD > 100 & DESIGNCD < 200) |
+  #  (DESIGNCD >= 220 & DESIGNCD < 299) |
+  #  (DESIGNCD > 300 & DESIGNCD < 325) |
+  #  (DESIGNCD == 328) |
+  #  (DESIGNCD > 500 & DESIGNCD < 550) |
+  #  (DESIGNCD == 553) |
+  #  (DESIGNCD == 554) |
+  #  (DESIGNCD > 600 & DESIGNCD < 700)
+  #)
+  # ---
+  # If the plot was part of the 2005 or later inventories, it's modern.
+  .data |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    filter(max(INVYR, na.rm = TRUE) >= 2005) |>
+    ungroup()
 }
 
 long_measurement_filter <- function(.data) {
@@ -21,7 +41,8 @@ long_measurement_filter <- function(.data) {
 
 forested_plots_filter <- function(.data) {
   # Condition status is forested
-  # Filter out the entire plot if it was not forested for the entire period
+  # Filter out the entire plot if any condition was not forested for
+  # any part of the period
   .data |>
     group_by(STATECD, COUNTYCD, PLOT) |>
     filter(max(COND_STATUS_CD, na.rm = TRUE) == 1) |>

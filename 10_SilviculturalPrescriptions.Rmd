@@ -44,15 +44,15 @@ fia_survey <- tbl(fia, 'SURVEY') |>
 plot_forested <- fia_cond |>
   left_join(fia_plot, by = join_by(PLT_CN)) |>
   left_join(fia_survey, by = join_by(SRV_CN)) |>
-  northeastern_plots_filter() |>
+  ners_plots_filter() |>
   modern_plots_filter() |>
   long_measurement_filter() |>
   forested_plots_filter() |>
   undisturbed_plots_filter() |>
-  harvested_plots_filter() |>
+  # harvested_plots_filter() |>
   no_unnatural_regen_filter() |> 
   measured_pre_post_harvest_filter() |>
-  single_condition_plots_filter() |>
+  # single_condition_plots_filter() |>
   distinct(STATECD, COUNTYCD, PLOT) |>
   collect()
 

@@ -74,14 +74,14 @@ fia_plotgeom <- tbl(fia, 'PLOTGEOM') |>
 plot_grow_only <- fia_cond |>
   left_join(fia_plot, by = join_by(PLT_CN)) |>
   left_join(fia_plotgeom, by = join_by(PLT_CN)) |>
-  northeastern_plots_filter() |>
+  fvsne_plots_filter() |>
   modern_plots_filter() |>
   has_trees_filter() |>
   long_measurement_filter() |>
   forested_plots_filter() |>
   undisturbed_plots_filter() |>
   untreated_plots_filter() |>
-  single_condition_plots_filter() |>
+  # single_condition_plots_filter() |>
   distinct(STATECD, COUNTYCD, PLOT) |>
   collect() |>
   arrange(STATECD, COUNTYCD, PLOT)
@@ -93,8 +93,6 @@ write_rds(plot_grow_only, 'data/intermediate/plot_grow_only.rds')
 
 nrow(plot_grow_only)
 ```
-
-This filters to 2808 plots.
 
 ### Locations
 
