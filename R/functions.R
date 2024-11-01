@@ -322,29 +322,38 @@ fvs_kwd7 <- function(kwd, arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
 fvs_TimeConfig <- function(FirstYear, LastYear) {
   FirstYear <- as.integer(FirstYear)
   LastYear <- as.integer(LastYear)
-  # LastYear must be the first year of the last cycle, so
-  # add an extra cycle at the end
-  NumCycles <- as.integer((LastYear - FirstYear) / 10) + 1
-  ShortCycle <- (LastYear - FirstYear) %% 10
   TimeConfig <- NULL
-  if (ShortCycle > 0) {
-    # Produce a single short cycle followed by 10-year cycles
-    NumCycles <- NumCycles + 1
+  if (FirstYear == LastYear) {
+    # Produce a single one-year cycle
     TimeConfig <- c(
       fvs_kwd1("InvYear", FirstYear),
-      fvs_kwd2("TimeInt", 0, 10),
-      fvs_kwd2("TimeInt", 1, ShortCycle),
-      fvs_kwd2("TimeInt", NumCycles, 1),
-      fvs_kwd1("NumCycle", NumCycles)
-    )
+      fvs_kwd2("TimeInt", 0, 1),
+      fvs_kwd1("NumCycle", 1)
+    )      
   } else {
-    # No need for an initial short cycle
-    TimeConfig <- c(
-      fvs_kwd1("InvYear", FirstYear),
-      fvs_kwd2("TimeInt", 0, 10),
-      fvs_kwd2("TimeInt", NumCycles, 1),
-      fvs_kwd1("NumCycle", NumCycles)
-    )
+    # LastYear must be the first year of the last cycle, so
+    # add an extra cycle at the end
+    NumCycles <- as.integer((LastYear - FirstYear) / 10) + 1
+    ShortCycle <- (LastYear - FirstYear) %% 10
+    if (ShortCycle > 0) {
+      # Produce a single short cycle followed by 10-year cycles
+      NumCycles <- NumCycles + 1
+      TimeConfig <- c(
+        fvs_kwd1("InvYear", FirstYear),
+        fvs_kwd2("TimeInt", 0, 10),
+        fvs_kwd2("TimeInt", 1, ShortCycle),
+        fvs_kwd2("TimeInt", NumCycles, 1),
+        fvs_kwd1("NumCycle", NumCycles)
+      )
+    } else {
+      # No need for an initial short cycle
+      TimeConfig <- c(
+        fvs_kwd1("InvYear", FirstYear),
+        fvs_kwd2("TimeInt", 0, 10),
+        fvs_kwd2("TimeInt", NumCycles, 1),
+        fvs_kwd1("NumCycle", NumCycles)
+      )
+    }
   }
   return(TimeConfig)
 }
