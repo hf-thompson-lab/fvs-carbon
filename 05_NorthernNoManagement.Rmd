@@ -713,6 +713,8 @@ if (file.exists(rds_file)) {
   # FIA.TREE.DIA - current diameter
   # FIA.TREE.DIAHTCD - where diameter was taken, 1 = DBH
   # FIA.TREE.HT - height
+  # FIA.TREE.SPGRPCD is broader than SPCD, group by that instead
+  # FIA.TREE.CCLCD - Crown Class code
   # We want ingrowth for all the plots in plot_grow_only
   
   fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
@@ -754,8 +756,8 @@ if (file.exists(rds_file)) {
     filter(!is.na(PREV_TRE_CN)) |>
     select(
       CN, PREV_TRE_CN, PLT_CN, PREV_PLT_CN,
-      STATECD, COUNTYCD, PLOT, SUBP, TREE, SPCD, SCIENTIFIC_NAME,
-      MEASYEAR, PREV_MEASYEAR, DIA, PREV_DIA, DIA_INCR, AGE_INCR, ANN_DIA_GROWTH
+      STATECD, COUNTYCD, PLOT, SUBP, TREE, SPGRPCD, SPCD, SCIENTIFIC_NAME,
+      MEASYEAR, PREV_MEASYEAR, CCLCD, DIA, PREV_DIA, DIA_INCR, AGE_INCR, ANN_DIA_GROWTH
     ) |>
     arrange(STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR) |>
     collect()
@@ -767,16 +769,70 @@ if (file.exists(rds_file)) {
 }
 ```
 
+TODO:
+- TREE.SPGRPCD is broader than SPCD, group by that instead
+- TREE.CCLCD - Crown Class code
+  - 1 - Open grown - full light from above and all sides for most of their life
+  - 2 - Dominant - crown above general canopy
+  - 3 - Codominant - crown part of general canopy
+  - 4 - Intermediate - crown either below or extending into the canopy
+  - 5 - Overtopped - crown entirely below general canopy
+
 ```{r tree_growth_rate}
-tree_growth_rate <- tree_growth |>
+tree_growth_nondom <- tree_growth |>
+  filter(CCLCD > 3) |>
   group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD) |>
   summarize(
-    PREV_MEASYEAR = min(PREV_MEASYEAR, na.rm = TRUE),
-    DIA_INCR = mean(DIA_INCR, na.rm = TRUE),
-    ANN_DIA_GROWTH = mean(ANN_DIA_GROWTH, na.rm = TRUE),
+    DIA_INCR_NONDOM = mean(DIA_INCR, na.rm = TRUE),
     .groups = 'keep'
   ) |>
   ungroup()
+tree_growth_spcd <- tree_growth |>
+  group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD) |>
+  summarize(
+    DIA_INCR_SPCD = mean(DIA_INCR, na.rm = TRUE),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+tree_growth_spgrpcd <- tree_growth |>
+  group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPGRPCD) |>
+  summarize(
+    DIA_INCR_SPGRPCD = mean(DIA_INCR, na.rm = TRUE),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+tree_growth_multiyear <- tree_growth |>
+  group_by(STATECD, COUNTYCD, PLOT, SPGRPCD) |>
+  summarize(
+    DIA_INCR_MULTIYEAR = mean(DIA_INCR, na.rm = TRUE),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+prev_measyear_mixin <- tree_growth |>
+  group_by(STATECD, COUNTYCD, PLOT, MEASYEAR) |>
+  summarize(
+    PREV_MEASYEAR = min(PREV_MEASYEAR, na.rm = TRUE),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+tree_growth_rate <- tree_growth |>
+  group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPGRPCD, SPCD) |>
+  summarize(.groups = 'keep') |>
+  ungroup() |>
+  left_join(prev_measyear_mixin, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR)) |>
+  left_join(tree_growth_nondom, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)) |>
+  left_join(tree_growth_spcd, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)) |>
+  left_join(tree_growth_spgrpcd, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPGRPCD)) |>
+  left_join(tree_growth_multiyear, by = join_by(STATECD, COUNTYCD, PLOT, SPGRPCD)) |>
+  mutate(
+    DIA_INCR = coalesce(
+      DIA_INCR_NONDOM,
+      DIA_INCR_SPCD,
+      DIA_INCR_SPGRPCD,
+      DIA_INCR_MULTIYEAR,
+    ),
+    ANN_DIA_GROWTH = DIA_INCR / (MEASYEAR - PREV_MEASYEAR)
+  )
 ```
 
 Can we use that to back-project ingrown trees?
@@ -863,7 +919,8 @@ while (nrow(prev_tre_cns) > 0) {
     mutate(DIA_ERR = abs((DIA - DIA_EST) / DIA)) |>
     # Estimate the next previous tree diameter
     mutate(PREV_DIA_EST = DIA_EST - DIA_INCR)
-  manual_back_projection <- bind_rows(manual_back_projection, tmp_trees)
+  manual_back_projection <- bind_rows(manual_back_projection, tmp_trees) |>
+    distinct()
   # The next set of prev_tre_cns is:
   prev_tre_cns <- manual_back_projection |>
     # All PREV_TRE_CN mentioned
@@ -884,7 +941,65 @@ manual_back_projection |> filter(abs(DIA_ERR) < 0.1) |> nrow() /
   manual_back_projection |> nrow()
 ```
 
-Up to 70% WOOOO!!!
+```{r}
+manual_back_projection |>
+  group_by(CN) |>
+  filter(1 < n()) |>
+  ungroup() |> nrow()
+```
+
+```{r}
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+species_mixin <- tbl(fia, 'REF_SPECIES') |>
+  select(SPCD, E_SPGRPCD, SCIENTIFIC_NAME) |>
+  left_join(
+    tbl(fia, 'REF_SPECIES_GROUP') |> distinct(SPGRPCD, NAME),
+    by = join_by(E_SPGRPCD == SPGRPCD)
+  ) |>
+  rename(SPGRP_NAME = NAME) |>
+  collect()
+
+x <- starting_trees |>
+  filter(MEASYEAR != FRST_MEASYEAR) |>
+  left_join(
+    manual_back_projection |>
+      select(CN, SPCD, DIA_EST),
+    by = join_by(FRST_TRE_CN == CN)
+  ) |>
+  mutate(DIA_ERR = abs(FRST_DIA - DIA_EST)) |>
+  mutate(ANN_DIA_ERR = DIA_ERR / (MEASYEAR - FRST_MEASYEAR)) |>
+  mutate(ANN_DIA_ERR = conv_unit(ANN_DIA_ERR, "in", "cm")) |>
+  left_join(scientific_name_mixin, by = join_by(SPCD)) |>
+  filter(!is.na(DIA_ERR)) |>
+  left_join(species_mixin, by = join_by(SPCD))
+
+ggplot(
+    x,
+    aes(ANN_DIA_ERR, fct_rev(fct_infreq(SPGRP_NAME)))
+  ) +
+  geom_vline(xintercept = 0, color = 'red') +
+  geom_boxplot() + #varwidth = TRUE) +
+# scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  geom_point(
+    data = x |>
+      group_by(SPGRP_NAME) |> 
+      summarize(
+        ANN_DIA_GROWTH = mean((DIA - FRST_DIA) / (MEASYEAR - FRST_MEASYEAR)),
+        .groups = 'keep'
+      ) |> 
+      ungroup() |>
+      mutate(ANN_DIA_GROWTH = conv_unit(ANN_DIA_GROWTH, "in", "cm"))
+    ,
+    aes(ANN_DIA_GROWTH),
+    color = 'blue',
+    shape = 4,
+    size = 3
+  ) +
+  ggtitle("Annual error in back-projected diameter") +
+  xlab(bquote("Error " ~(cm %*% year^{-1}))) +
+  ylab("Species Group")
+
+```
 
 ##### Translating to FVS
 
