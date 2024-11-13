@@ -479,7 +479,8 @@ ingrowth <- tbl(fia, 'TREE_GRM_COMPONENT') |>
   collect() # It ends up faster to materialize and copy back for pre_ingrowth
 dbDisconnect(fia)
 rm(fia, plt_cns)
-nrow(ingrowth)
+print(nrow(ingrowth))
+print(nrow(ingrowth |> filter(DIA_END > 3)))
 ```
 
 There are ~55,000 trees that ingrow over the 20 years, so about one tree per
@@ -636,7 +637,7 @@ rm(trees_rhs, prev_tre_cns, tmp_trees, iterations)
 
 How many trees ingrow with DBH>3?
 ```{r dbh_gt_3}
-prev_tree |> filter(DIA > 3) |> nrow()
+starting_trees |> filter(DIA > 3) |> nrow()
 ```
 
 How many of those are traceable back to when they had DBH <= 3?
@@ -644,14 +645,15 @@ How many of those are traceable back to when they had DBH <= 3?
 starting_trees |> filter(DIA > 3 & FRST_DIA <= 3) |> nrow() 
 ```
 
-For the remaining ~44,500 trees, we will need to back-project. TREE_GRM_COMPONENT
-provides annualized growth rates for both DIA and HT.
+For the remaining ~40,000 trees, we will need to back-project.
 
 ##### Back-Projecting Trees
 
 fia.TREE_GRM_COMPONENT.ANN_DIA_GROWTH specifies annual diameter growth rate.
 Looking at the values in this column, they seem small. We can check the
-stated growth rate for trees where we have a previous observation.
+growth rate for trees where we have a previous observation by projecting
+diameter growth backwards to the first MEASYEAR and seeing how close we
+get to the first observed diameter.
 
 ```{r fia_growth_rate}
 fia_growth_rate <- starting_trees |>
@@ -673,8 +675,6 @@ growth rate when we don't have previous tree records for an ingrown tree.
 
 Ideas:
 
-* use the earliest ANN_DIA_GROWTH to back-project
-* compute our own growth rate from a subsequent tree record
 * compute our own species-wide growth rate for the date range and site
   * can look at seedling / sapling growth rates and use them
   * can look at seedling / sapling growth rates and correlate them with
@@ -696,10 +696,86 @@ Notes:
 * "composition is stabilized by local landforms and that diversity increases
   with hydrologic catchment area"
 
-> TODO Nik: get subsequent trees the same way we got previous trees. Use
-> DIA to compute a growth rate. Back-project that and see how accurate it is.
-
 Find the diameter growth rate, per species, per plot, over time.
+
+```{r tree_negative_growth}
+rds_file <- 'data/intermediate/tree_negative_growth.rds'
+if (file.exists(rds_file)) {
+  tree_growth <- read_rds(rds_file)
+} else {
+  fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+  
+  next_tre_mixin <- tbl(fia, 'TREE') |>
+    select(CN, PREV_TRE_CN) |>
+    rename(
+      NEXT_TRE_CN = CN,
+      CN = PREV_TRE_CN
+    )
+  
+  tree_negative_growth <- tbl(fia, 'TREE') |>
+    semi_join(
+      plot_grow_only |> arrange(STATECD, COUNTYCD, PLOT),
+      by = join_by(STATECD, COUNTYCD, PLOT),
+      copy = TRUE
+    ) |>
+    # Live trees
+    filter(CONDID == 1) |>
+    select(CN, DIA, PREV_TRE_CN) |>
+    left_join(next_tre_mixin, by = join_by(CN)) |>
+    # Filter to only the most recent trees (which have no next tree)
+    filter(is.na(NEXT_TRE_CN)) |>
+    mutate(FRST_TRE_CN = CN, FRST_DIA = DIA) |>
+    select(CN, DIA, PREV_TRE_CN, FRST_TRE_CN, FRST_DIA) |>
+    collect()
+  
+  prev_tre_cns <- tree_negative_growth |>
+    select(PREV_TRE_CN) |>
+    filter(!is.na(PREV_TRE_CN)) |>
+    distinct()
+  
+  iterations <- 0
+  while (nrow(prev_tre_cns) > 0) {
+    print(paste0(
+      "Iteration: ",
+      iterations <- iterations + 1,
+      ", CNs: ",
+      nrow(prev_tre_cns)
+    ))
+    tmp_trees <- tbl(fia, 'TREE') |>
+      # Process chunks of 1000 trees, since SQLite has a hard time
+      # doing the semi join on more records than that
+      semi_join(prev_tre_cns |> head(1000), by = join_by(CN == PREV_TRE_CN), copy = TRUE) |>
+      rename(PREV_DIA = DIA) |>
+      select(CN, PREV_DIA, PREV_TRE_CN) |>
+      collect()
+    tree_negative_growth <- tree_negative_growth |>
+      left_join(tmp_trees, by = join_by(PREV_TRE_CN == CN)) |>
+      mutate( # Update FRST_DIA if there is a new one
+        FRST_DIA = coalesce(PREV_DIA, FRST_DIA)
+      ) |>
+      mutate( # Update FRST_TRE_CN if there is a new one
+        FRST_TRE_CN = coalesce(PREV_TRE_CN.y, FRST_TRE_CN)
+      ) |>
+      mutate( # Move PREV_TRE_CN one time hop on records that joined
+        PREV_TRE_CN = if_else(is.na(PREV_DIA), PREV_TRE_CN, PREV_TRE_CN.y)
+      ) |>
+      select(CN, PREV_TRE_CN, DIA, FRST_TRE_CN, FRST_DIA)
+    prev_tre_cns <- tree_negative_growth |>
+      select(PREV_TRE_CN) |>
+      filter(!is.na(PREV_TRE_CN)) |>
+      distinct()
+  }
+
+  dbDisconnect(fia)  
+  rm(next_tre_mixin, prev_tre_cns, tmp_trees, iterations)
+  
+  tree_negative_growth <- tree_negative_growth |>
+    filter(DIA < FRST_DIA)
+  
+  write_rds(tree_negative_growth, rds_file)
+}
+```
+
 
 ```{r tree_growth}
 rds_file <- 'data/intermediate/tree_growth.rds'
@@ -743,6 +819,8 @@ if (file.exists(rds_file)) {
     ) |>
     # Live trees
     filter(CONDID == 1) |>
+    # Trees that don't shrink
+    anti_join(tree_negative_growth |> select(CN), by = join_by(CN), copy = TRUE) |>
     # Self-join to previous tree to get growth increment
     left_join(prev_tre_mixin, by = join_by(PREV_TRE_CN)) |>
     left_join(species_mixin, by = join_by(SPCD)) |>
@@ -826,7 +904,9 @@ tree_growth_rate <- tree_growth |>
   left_join(tree_growth_multiyear, by = join_by(STATECD, COUNTYCD, PLOT, SPGRPCD)) |>
   mutate(
     DIA_INCR = coalesce(
-      DIA_INCR_NONDOM,
+      # It actually does better without restricting to non-dominant trees
+      # ("better" means 69% back-project well, vs. 62%)
+      # DIA_INCR_NONDOM,
       DIA_INCR_SPCD,
       DIA_INCR_SPGRPCD,
       DIA_INCR_MULTIYEAR,
@@ -854,7 +934,7 @@ manual_back_projection |> filter(abs(DIA_ERR) < 0.1) |> nrow() /
   manual_back_projection |> nrow()
 ```
 
-44%, which is less awful. Also, 36 trees end up with no ANN_DIA_GROWTH.
+37%, which is marginally less awful. Also, 35 trees end up with no ANN_DIA_GROWTH.
 Next up:
 * walk back using multiple growth rates
 * back-project to when the tree was 3" DBH
@@ -871,7 +951,7 @@ manual_back_projection <- prev_tree |>
   select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, PREV_TRE_CN, NEXT_TRE_CN, DIA) |>
   # This will add: PREV_MEASYEAR, DIA_INCR, ANN_DIA_GROWTH
   left_join(
-    growth_rate |> select(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, DIA_INCR),
+    tree_growth_rate |> select(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, DIA_INCR),
     by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)
   ) |>
   # We can get a perfect estimate if we know the actual value :-D
@@ -906,7 +986,7 @@ while (nrow(prev_tre_cns) > 0) {
     select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, PREV_TRE_CN, NEXT_TRE_CN, DIA) |>
     # Join on growth rates
     left_join(
-      growth_rate |> select(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, DIA_INCR),
+      tree_growth_rate |> select(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, DIA_INCR),
       by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)
     ) |>
     # Join on previously estimated diameter
@@ -948,7 +1028,7 @@ manual_back_projection |>
   ungroup() |> nrow()
 ```
 
-```{r}
+```{r projected_vs_measured_annual_growth}
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 species_mixin <- tbl(fia, 'REF_SPECIES') |>
   select(SPCD, E_SPGRPCD, SCIENTIFIC_NAME) |>
@@ -959,30 +1039,36 @@ species_mixin <- tbl(fia, 'REF_SPECIES') |>
   rename(SPGRP_NAME = NAME) |>
   collect()
 
-x <- starting_trees |>
+projected_annual_growth <- starting_trees |>
   filter(MEASYEAR != FRST_MEASYEAR) |>
   left_join(
     manual_back_projection |>
       select(CN, SPCD, DIA_EST),
     by = join_by(FRST_TRE_CN == CN)
   ) |>
-  mutate(DIA_ERR = abs(FRST_DIA - DIA_EST)) |>
+  mutate(ANN_DIA = (DIA - FRST_DIA) / (MEASYEAR - FRST_MEASYEAR)) |>
+  mutate(DIA_ERR = (FRST_DIA - DIA_EST)) |>
+  mutate(ANN_DIA_PROJ = (DIA - DIA_EST) / (MEASYEAR - FRST_MEASYEAR)) |>
+  mutate(ANN_DIA_PROJ = conv_unit(ANN_DIA_PROJ, "in", "cm")) |>
   mutate(ANN_DIA_ERR = DIA_ERR / (MEASYEAR - FRST_MEASYEAR)) |>
   mutate(ANN_DIA_ERR = conv_unit(ANN_DIA_ERR, "in", "cm")) |>
-  left_join(scientific_name_mixin, by = join_by(SPCD)) |>
+  #left_join(scientific_name_mixin, by = join_by(SPCD)) |>
   filter(!is.na(DIA_ERR)) |>
-  left_join(species_mixin, by = join_by(SPCD))
+  left_join(species_mixin, by = join_by(SPCD)) |>
+  group_by(SPGRP_NAME) |>
+  mutate(GROUP_NAME = paste0(SPGRP_NAME, ", n=", n())) |>
+  ungroup()
 
 ggplot(
-    x,
-    aes(ANN_DIA_ERR, fct_rev(fct_infreq(SPGRP_NAME)))
+    projected_annual_growth,
+    aes(ANN_DIA_PROJ, fct_rev(fct_infreq(GROUP_NAME)))
   ) +
   geom_vline(xintercept = 0, color = 'red') +
-  geom_boxplot() + #varwidth = TRUE) +
+  geom_boxplot(varwidth = TRUE) +
 # scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
   geom_point(
-    data = x |>
-      group_by(SPGRP_NAME) |> 
+    data = projected_annual_growth |>
+      group_by(GROUP_NAME) |> 
       summarize(
         ANN_DIA_GROWTH = mean((DIA - FRST_DIA) / (MEASYEAR - FRST_MEASYEAR)),
         .groups = 'keep'
@@ -995,10 +1081,23 @@ ggplot(
     shape = 4,
     size = 3
   ) +
-  ggtitle("Annual error in back-projected diameter") +
-  xlab(bquote("Error " ~(cm %*% year^{-1}))) +
+  ggtitle("Projected vs. Measured Annual Growth of Ingrown Trees") +
+  xlab(bquote("Annual Growth " ~(cm %*% year^{-1}))) +
   ylab("Species Group")
 
+```
+
+```{r}
+ggplot(
+    projected_annual_growth,
+    aes(ANN_DIA_PROJ, fct_rev(fct_infreq(SPGRP_NAME)))
+  ) +
+  geom_boxplot(aes(ANN_DIA), varwidth = TRUE, color = 'blue', position = position_nudge(y = -.25)) +
+  geom_boxplot(varwidth = TRUE, color = 'black') +
+  geom_vline(xintercept = 0, color = 'red') +
+  ggtitle("Projected vs. Measured Annual Growth of Ingrown Trees") +
+  xlab(bquote("Annual Growth " ~(cm %*% year^{-1}))) +
+  ylab("Species Group")
 ```
 
 ##### Translating to FVS
@@ -1120,8 +1219,12 @@ keywordfile_section is a function to generate a keywordfile section from
 information about a run and a stand.
 
 ```{r keywordfile_section}
-keywordfile_section <- function(Title, MgmtId, StandID, StandCN, FirstYear, LastYear, Partition) {
-  TimeConfig <- fvs_TimeConfig(FirstYear, LastYear)
+keywordfile_section <- function(
+    Title, MgmtId, StandID, StandCN,
+    FirstYear, LastYear, Timestep,
+    Partition
+  ) {
+  TimeConfig <- fvs_TimeConfig(FirstYear, LastYear, Timestep)
   c(
     fvs_kwd0("StdIdent"),
     paste0(StandID, " ", Title),
@@ -1203,7 +1306,7 @@ for (partition in 1:8) {
   apply(
     stands_projected |> 
       filter((as.numeric(STAND_ID) %% 8) == (partition - 1)) |>
-      arrange(STAND_ID),
+      arrange(STAND_ID, FIRSTYEAR),
     1,
     function(row) {
       write_lines(
@@ -1255,7 +1358,7 @@ for (partition in 1:8) {
   apply(
     stands_surveyed |>
       filter((as.numeric(STAND_ID) %% 8) == (partition - 1)) |>
-      arrange(STAND_ID),
+      arrange(STAND_ID, MEASYEAR),
     1,
     function(row) {
       write_lines(
@@ -1295,8 +1398,10 @@ Load the output from all FVS partitions into a single dataframe
 ```{r FVS_Carbon}
 FVS_Carbon_NONE <- NULL
 FVS_Carbon_SRVY <- NULL
+FVS_Carbon_ANNL <- NULL
 FVS_Summary2_East_NONE <- NULL
 FVS_Summary2_East_SRVY <- NULL
+FVS_Summary2_East_ANNL <- NULL
 
 for (partition in 1:8) {
   fvs_out_db <- DBI::dbConnect(
@@ -1326,6 +1431,21 @@ for (partition in 1:8) {
   FVS_Summary2_East_SRVY <- bind_rows(FVS_Summary2_East_SRVY, fvs_summary2_east_tbl |> collect())
   
   dbDisconnect(fvs_out_db)
+  
+  fvs_out_db <- DBI::dbConnect(
+    RSQLite::SQLite(),
+    paste0('data/fvs/FVS_NRSAnnual_NONE_', partition, '.db')
+  )
+  fvs_carbon_tbl = tbl(fvs_out_db, 'FVS_Carbon') |>
+    mutate(Partition = partition)
+  fvs_summary2_east_tbl = tbl(fvs_out_db, 'FVS_Summary2_East') |>
+    mutate(Partition = partition)
+
+  FVS_Carbon_ANNL <- bind_rows(FVS_Carbon_ANNL, fvs_carbon_tbl |> collect())
+  FVS_Summary2_East_ANNL <- bind_rows(FVS_Summary2_East_ANNL, fvs_summary2_east_tbl |> collect())
+  
+  dbDisconnect(fvs_out_db)
+  
 }
 
 remove(fvs_out_db, fvs_carbon_tbl, fvs_summary2_east_tbl)
@@ -1371,6 +1491,85 @@ remove(
   missing_end
 )
 ```
+
+### Annual vs. Decadal Projections
+
+```{r annual_vs_decadal}
+decadal_carbon_tmp <- FVS_Carbon_NONE |>
+  rename(Decadal_Carbon = Total_Stand_Carbon) |>
+  mutate(STAND_ID = paste0(
+     substring(StandID, 1, 2),
+     substring(StandID, 5, 12)
+  )) |>
+  select(STAND_ID, Year, Decadal_Carbon)
+
+annual_carbon_tmp <- FVS_Carbon_ANNL |>
+  rename(Annual_Carbon = Total_Stand_Carbon) |>
+  mutate(STAND_ID = paste0(
+     substring(StandID, 1, 2),
+     substring(StandID, 5, 12)
+  )) |>
+  select(STAND_ID, Year, Annual_Carbon)
+
+annual_vs_decadal <- stand_stats |>
+  mutate(STAND_ID = sprintf(paste0(
+    '%02d',  '%03d',   '%05d'),
+    STATECD, COUNTYCD, PLOT
+  )) |>
+  rename(Year = MEASYEAR) |>
+  select(
+    STAND_ID, Year,
+    STDAGE, `Forest Type`, `Forest Type Group`, ECOSUBCD
+  ) |>
+  left_join(decadal_carbon_tmp, by = join_by(STAND_ID, Year)) |>
+  left_join(annual_carbon_tmp, by = join_by(STAND_ID, Year)) |>
+  consolidate_forest_type_groups_filter() |>
+  group_by(STAND_ID) |>
+  mutate(
+    ECOCD = substr(ECOSUBCD, 1, nchar(ECOSUBCD) - 1),
+    First_Year = min(Year, na.rm = TRUE),
+    Last_Year = max(Year, na.rm = TRUE),
+    Starting_Carbon = max(if_else(Year == First_Year, Decadal_Carbon, 0), na.rm = TRUE),
+    Decadal_Carbon_Delta = Decadal_Carbon - Starting_Carbon,
+    Decadal_Carbon_Flux = if_else(Year == First_Year, 0, Decadal_Carbon_Delta / (Year - First_Year)),
+    Annual_Carbon_Delta = Annual_Carbon - Starting_Carbon,
+    Annual_Carbon_Flux = if_else(Year == First_Year, 0, Annual_Carbon_Delta / (Year - First_Year))
+  ) |>
+  ungroup() |>
+  filter(Year == First_Year | Year == Last_Year) |>
+  filter(!is.na(Decadal_Carbon) & !is.na(Annual_Carbon)) |>
+  mutate(Projection_Years = Year - First_Year) |>
+  mutate(Carbon_Residual = Decadal_Carbon - Annual_Carbon) |>
+  mutate(Carbon_Error = 2 * abs(Carbon_Residual) / (Decadal_Carbon + Annual_Carbon)) |>
+  mutate(Carbon_Delta_Residual = Decadal_Carbon_Delta - Annual_Carbon_Delta) |>
+  mutate(Carbon_Flux_Residual = Decadal_Carbon_Flux - Annual_Carbon_Flux)
+
+remove(
+  decadal_carbon_tmp,
+  annual_carbon_tmp
+)
+```
+
+```{r plot_decadal_vs_annual}
+ggplot(
+    annual_vs_decadal |> filter(Projection_Years > 0),
+    aes(x = Decadal_Carbon_Flux, y = Annual_Carbon_Flux, color = Projection_Years)
+  ) +
+  geom_point(
+    size = 2,
+    alpha = 0.25,
+  ) +
+  geom_abline(intercept = 0, slope = 1, color = "red") +
+  facet_wrap(~`Forest Type Group`) +
+  ggtitle(bquote("Annual Carbon Flux for 1- vs. 10-year Timestep")) +
+  # coord_cartesian(xlim = c(0, 300), ylim = c(0, 300))
+  ylab(bquote("1-Year Timestep Annual Carbon Flux" ~ (Mg %*% ha^-1))) +
+  xlab(bquote("10-Year Timestep Annual Carbon Flux" ~ (Mg %*% ha^-1)))
+```
+
+
+
+### Projected vs. Measured
 
 Filter projections to corresponding observations
 
@@ -1567,6 +1766,36 @@ ggplot(
   coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
 ```
 
+```{r projected-vs-measured-carbon-flux}
+ggplot(
+    projected_vs_measured |> filter(Projection_Years > 0),
+    aes(Projected_Carbon_Flux, fct_reorder(`Forest Type Group`, Measured_Carbon, .fun = sum))
+  ) +
+  geom_vline(xintercept = 0, color = 'red') +
+  geom_boxplot(varwidth = TRUE) +
+  # scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  geom_point(
+    data = projected_vs_measured |>
+      filter(Projection_Years > 0) |> 
+      group_by(`Forest Type Group`) |> 
+      summarize(
+        Measured_Carbon_Flux = mean(Measured_Carbon_Flux),
+        Measured_Carbon = sum(Measured_Carbon),
+        .groups = 'keep'
+      ) |> 
+      ungroup(),
+    aes(Measured_Carbon_Flux),
+    color = 'blue',
+    shape = 4,
+    size = 3
+  ) +
+  ggtitle(bquote("Projected vs. Measured Carbon Flux")) +
+  xlab(bquote("Carbon Flux" ~(Mg %*% ha^-1 %*% year^-1))) +
+  ylab("Forest Type Group")
+
+```
+
+
 #### Residuals
 
 Let's look at carbon flux residuals.
@@ -1632,8 +1861,8 @@ ggplot(
     size = 3
   ) +
 #  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
-  coord_cartesian(xlim = c(-2, 2)) +
-  scale_x_continuous(breaks = c(-2, -1, 0, 1, 2)) +
+  coord_cartesian(xlim = c(-5, 5)) +
+  scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5)) +
   ggtitle(paste0(
     "FVS Projected Carbon Flux Residual by Forest Type Group",
     "\n",
@@ -1655,8 +1884,8 @@ ggplot(
   geom_vline(xintercept = 0, color = 'red') +
   geom_boxplot(varwidth = TRUE) +
 #  scale_y_discrete(guide = guide_axis(n.dodge = 2)) +
-  coord_cartesian(xlim = c(-2, 2)) +
-  scale_x_continuous(breaks = c(-2, -1, 0, 1, 2)) +
+  coord_cartesian(xlim = c(-5, 5)) +
+  scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5)) +
   ggtitle("Grow-Only Stands\nCarbon Flux Residual by Ecoregion") +
   xlab("Carbon Flux Residual (Mg/ha/year)")
 ```
