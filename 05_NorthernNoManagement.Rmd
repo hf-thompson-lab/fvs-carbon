@@ -19,6 +19,7 @@ library(rmarkdown)
 library(dbplyr)
 library(measurements)
 library(maps)
+library(pbapply) # Progress bar for long operations
 ```
 
 ```{r source-functions}
@@ -360,101 +361,20 @@ seen_types |>
   xlab("Carbon")
 ```
 
-## Run FVS
-
-### Generate Keyfile
-
-An FVS run is scripted by a keyfile. The keyfile describes how to run the
-model and extensions, including where to read input, all parameters to
-control processing, and where to write output.
-
-The keyfile is structured by stand; each stand is a separate run of the
-model.
-
-To run in parallel, a separate keyfile must be generated for each partition
-to be run in parallel. Each partition must send its output to a separate
-location, and these can be assembled into a single output as a post-
-processing step.
-
-#### Stand Identification
-
-For each stand, we need:
-
--  StdIdent: Stand Identifier, from fia.FVS_STANDINIT_PLOT.FVS_STAND_ID
--  StandCN: Stand control number, from fia.PLOT.CN
--  MgmtId: Management ID, for no treatment, this is NONE
-
-#### Time
-
-We will run the model from first measurement year to last measurement year,
-with as many 10-year timesteps as we can get. We will add an initial timestep
-that is less than 10 years to get to a 10 year boundary. We choose a 10-year
-timestep because FVSne is calibrated to 10 years, and running with a different
-length timestep introduces bias. The bias is less with shorter timesteps than
-with longer timesteps, so using a short timestep to adjust length introduces
-less bias than using a long timestep.
-
-There are two years of interest for each plot: FIRSTYEAR, which is
-the minimum fia.PLOT.MEASYEAR for the modern plot design; and
-LASTYEAR, which is the maximum of the same.
-
--  InvYear: Inventory Year, set to FIRSTYEAR
--  TimeInt: Time Interval, there may be two entries:
-   -  TimeInt 0: Default time interval, 10 years
-   -  TimeInt 1: First cycle time interval, (LASTYEAR - FIRSTYEAR) %% 10
--  NumCycle: Number of cycles to run, int((LASTYEAR - FIRSTYEAR) / 10) + 1,
-   and +1 again if there is a TimeInt 1.
-
-Note that the number of cycles is the number of full 10-year cycles
-plus one if there is a short first cycle. Since metrics are printed at the start
-of each cycle, we need LASTYEAR to be the first year of a cycle, and work
-backwards from that.
-
-#### Input
-
-There are two inputs, Stand and Tree. Both are configured to use a database
-query.
-
-Within a Database subsection:
-
--  DSNIn: Data Source Name (DSN) for input; SQLite filename
--  StandSQL: SQL query to fetch a stand, given %Stand_CN%
--  TreeSQL: SQL query to fetch all trees for a stand, given %Stand_CN%
-
-#### Fire and Fuels
-
-Carbon is calculated by the fire and fuels extension.
-
--  FMIn: Starts configuration of Fire and Fuels extension
--  CarbRept: Carbon Report; save to database (2)
--  CarbCut: Harvested Carbon Report; disable (0)
--  CarbCalc: Carbon calculation; metric (1)
--  FuelOut: Fuel Output, disable (0)
--  FuelRept: Fuel Report, disable (0)
-
-Fire and Fuels also interacts with the database extension; it provides additional
-Database keywords to configure Fire and Fuels output to the database.
-
-Within a Database section:
-
--  CarbReDB: FVS_Carbon and FVS_Hrv_Carbon tables: database (2)
--  FuelReDB: FVS_Consumption table: database (2)
--  FuelsOut: FVS_Fuels table: database (2)
-
-#### Regeneration, Ingrowth, and Establishment
+### Regeneration, Ingrowth, and Establishment
 
 The Northeastern variant is a partial establishment model, so it does not
 automatically perform natural regeneration. We will therefore use actual
 ingrowth from the FIA data.
 
-##### Observed Ingrowth
+#### Observed Ingrowth
 
 fia.TREE_GRM_COMPONENT.MICR_COMPONENT_AL_FOREST is set to 'INGROWTH' when
 the tree is judged to be 'established'. Only one record for the tree will
 be marked 'INGROWTH'; it may have other records with other components, e.g.
 'SURVIVOR'.
 
-```{r ingrowth}
+```{r tree_ingrown}
 # We want ingrowth for all the plots in plot_grow_only
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 
@@ -467,7 +387,7 @@ plt_cns <- tbl(fia, 'PLOT') |>
 
 # Get all the Tree Growth, Removal, and Mortality entries for those plots,
 # where MICR_COMPONENT_AL_FOREST = 'INGROWTH'
-ingrowth <- tbl(fia, 'TREE_GRM_COMPONENT') |>
+tree_ingrown <- tbl(fia, 'TREE_GRM_COMPONENT') |>
   semi_join(plt_cns, by = join_by(PLT_CN)) |>
   ingrowth_filter() |>
   select(
@@ -479,24 +399,34 @@ ingrowth <- tbl(fia, 'TREE_GRM_COMPONENT') |>
   collect() # It ends up faster to materialize and copy back for pre_ingrowth
 dbDisconnect(fia)
 rm(fia, plt_cns)
-print(nrow(ingrowth))
-print(nrow(ingrowth |> filter(DIA_END > 3)))
+print(paste0("Ingrown trees: ", tree_ingrown |> nrow()))
+print(paste0("Ingrown trees over 3\" DBH: ", tree_ingrown |> filter(DIA_END > 3) |> nrow()))
 ```
 
 There are ~55,000 trees that ingrow over the 20 years, so about one tree per
 plot per year.
 Most of these trees are over the 3"DBH diameter limit on ingrowth set by FVS.
 
-##### Ingrown Tree History
+#### Tree History
 
 Trees >1" DBH that grow on the microplot are in the TREE table in FIA,
 so in some cases we should be able to follow a tree back to the point when it
-was <=3"DBH.
+was <=3" DBH.
 
-```{r prev_tree}
-rds_file <- 'data/intermediate/prev_tree.rds'
+For this section, we'll use the following terminology:
+
+- Tree - an individual observation of a tree; a single record in the TREE table
+- Tree History - a sequence of Trees linked by CN / PREV_TRE_CN in the TREE table
+- First Tree - the Tree in a Tree History with the earliest INVYEAR
+- Last Tree - the Tree in a Tree History with the latest INVYEAR
+
+We identify a Tree History by the CN of the last tree in the history.
+
+
+```{r tree_ingrown_prev}
+rds_file <- 'data/intermediate/tree_ingrown_prev.rds'
 if (file.exists(rds_file)) {
-  prev_tree <- read_rds(rds_file)
+  tree_ingrown_prev <- read_rds(rds_file)
 } else {
   fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
   fia_tree <- tbl(fia, 'TREE')
@@ -524,7 +454,7 @@ if (file.exists(rds_file)) {
   # SQLite3 takes days to do the semi_join at scale (despite joining on an index),
   # so we run in chunks of 1000 which completes in about 30 minutes.
   progress_total = nrow(prev_tre_cns)
-  prev_tree <- NULL
+  tree_ingrown_prev <- NULL
   while (nrow(prev_tre_cns) > 0) {
     progress_remaining = nrow(prev_tre_cns)
     print(paste0(
@@ -539,7 +469,7 @@ if (file.exists(rds_file)) {
       left_join(measyear_mixin, by = join_by(PLT_CN)) |>
       fia_tree_cols() |>
       collect()
-    prev_tree <- rbind(prev_tree, more_prev_trees) |>
+    tree_ingrown_prev <- rbind(tree_ingrown_prev, more_prev_trees) |>
       distinct() # Should be redundant, but isn't
   
     # Add all new prev_tre_cn to the pool
@@ -555,11 +485,11 @@ if (file.exists(rds_file)) {
       anti_join(chunk, by = join_by(CN))
   }
   
-  next_tre_mixin <- prev_tree |>
+  next_tre_mixin <- tree_ingrown_prev |>
     select(CN, PREV_TRE_CN) |>
     rename(NEXT_TRE_CN = CN, CN = PREV_TRE_CN)
 
-  prev_tree <- prev_tree |>
+  tree_ingrown_prev <- tree_ingrown_prev |>
     left_join(next_tre_mixin, by = join_by(CN))
   
   dbDisconnect(fia)
@@ -567,44 +497,44 @@ if (file.exists(rds_file)) {
          progress_total, progress_remaining, chunk,
          more_prev_trees, next_tre_mixin)
 
-  write_rds(prev_tree, rds_file)
+  write_rds(tree_ingrown_prev, rds_file)
 }
 ```
 
 Walk the tree history to see what diameter we can get to.
 
-```{r starting_trees}
+```{r tree_ingrown_last}
 # CN - the latest CN for this tree
 # DIA - the latest DIA for this tree
-# PREV_TRE_CN - the next earlier CN for this tree, if any
-# FRST_DIA - the earliest available DIA for this tree
-# FRST_TRE_CN - the earliest available CN for this tree
-starting_trees <- ingrowth |>
+# PREV_TRE_CN - the next earlier CN in this tree history, if any
+# FRST_DIA - the earliest available DIA in this tree history
+# FRST_TRE_CN - the earliest available CN in this tree history
+tree_ingrown_last <- tree_ingrown |>
   select(TRE_CN, PREV_TRE_CN, DIA_END) |>
   rename(CN = TRE_CN, DIA = DIA_END) |>
   # Initialize FRST_TRE_CN to CN; we'll overwrite this
   # as we walk the chain of PREV_TRE_CNs
   mutate(FRST_DIA = DIA, FRST_TRE_CN = CN)
 
-trees_rhs <- prev_tree |>
+trees_rhs <- tree_ingrown_prev |>
   select(CN, PREV_TRE_CN, DIA)
 
-prev_tre_cns <- starting_trees |>
+tree_cns_todo <- tree_ingrown_last |>
   select(PREV_TRE_CN) |>
   filter(!is.na(PREV_TRE_CN)) |>
   distinct()
 
 iterations <- 0
-while (nrow(prev_tre_cns) > 0) {
+while (nrow(tree_cns_todo) > 0) {
   print(paste0(
     "Iteration: ",
     iterations <- iterations + 1,
     ", CNs: ",
-    nrow(prev_tre_cns)
+    nrow(tree_cns_todo)
   ))
-  tmp_trees <- starting_trees |>
+  tmp_trees <- tree_ingrown_last |>
     left_join(trees_rhs, by = join_by(PREV_TRE_CN == CN))
-  starting_trees <- tmp_trees |>
+  tree_ingrown_last <- tmp_trees |>
     rename(DIA = DIA.x) |>
     mutate( # Update FRST_DIA
       FRST_DIA = if_else(is.na(DIA.y), FRST_DIA, DIA.y)
@@ -616,38 +546,40 @@ while (nrow(prev_tre_cns) > 0) {
       PREV_TRE_CN = PREV_TRE_CN.y
     ) |>
     select(CN, PREV_TRE_CN, DIA, FRST_TRE_CN, FRST_DIA)
-  prev_tre_cns <- tmp_trees |>
+  tree_cns_todo <- tmp_trees |>
     select(PREV_TRE_CN.y) |>
     rename(PREV_TRE_CN = PREV_TRE_CN.y) |>
     filter(!is.na(PREV_TRE_CN))
 }
 
-measyear_mixin <- prev_tree |>
+measyear_mixin <- tree_ingrown_prev |>
   select(CN, MEASYEAR)
 
-starting_trees <- starting_trees |>
+tree_ingrown_last <- tree_ingrown_last |>
   left_join(measyear_mixin, by = join_by(CN)) |>
   left_join(
     measyear_mixin |> rename(FRST_MEASYEAR = MEASYEAR),
     by = join_by(FRST_TRE_CN == CN)
   )
 
-rm(trees_rhs, prev_tre_cns, tmp_trees, iterations)
+rm(trees_rhs, tree_cns_todo, tmp_trees, iterations)
 ```
 
 How many trees ingrow with DBH>3?
 ```{r dbh_gt_3}
-starting_trees |> filter(DIA > 3) |> nrow()
+tree_ingrown_last |> filter(DIA > 3) |> nrow()
 ```
 
 How many of those are traceable back to when they had DBH <= 3?
 ```{r dbh_le_3}
-starting_trees |> filter(DIA > 3 & FRST_DIA <= 3) |> nrow() 
+tree_ingrown_last |> filter(DIA > 3 & FRST_DIA <= 3) |> nrow() 
 ```
 
-For the remaining ~40,000 trees, we will need to back-project.
+For the remaining trees we will need to back-project.
 
-##### Back-Projecting Trees
+#### Back-Projecting Trees
+
+##### FIA Estimated Growth Rate
 
 fia.TREE_GRM_COMPONENT.ANN_DIA_GROWTH specifies annual diameter growth rate.
 Looking at the values in this column, they seem small. We can check the
@@ -655,21 +587,24 @@ growth rate for trees where we have a previous observation by projecting
 diameter growth backwards to the first MEASYEAR and seeing how close we
 get to the first observed diameter.
 
-```{r fia_growth_rate}
-fia_growth_rate <- starting_trees |>
+```{r tree_growth_fia}
+tree_growth_fia <- tree_ingrown_last |>
   filter(FRST_DIA < DIA) |>
   # Add on FIA growth rate
-  left_join(ingrowth |> select(TRE_CN, ANN_DIA_GROWTH), by = join_by(CN == TRE_CN)) |>
+  left_join(tree_ingrown |> select(TRE_CN, ANN_DIA_GROWTH), by = join_by(CN == TRE_CN)) |>
   mutate(DIA_PROJ = DIA - (MEASYEAR - FRST_MEASYEAR) * ANN_DIA_GROWTH) |>
-  mutate(DIA_ERR = (DIA_PROJ - FRST_DIA) / FRST_DIA) |>
+  mutate(DIA_ERR = abs(100 * (DIA_PROJ - FRST_DIA) / FRST_DIA)) |>
   arrange(DIA_ERR)
 
-# How many of these get within 10% of starting diameter?
-fia_growth_rate |> filter(abs(DIA_ERR) < 0.1) |> nrow() /
-  fia_growth_rate |> nrow()
+ggplot(tree_growth_fia, aes(DIA_ERR, after_stat(100 * count / sum(count)))) +
+  geom_histogram(binwidth = 10, position = position_nudge(5)) +
+  #geom_freqpoly() +
+  ggtitle("Diameter Projection Error using FIA Growth Rate") +
+  ylab("Frequency (%)") +
+  xlab("Error (%) (binwidth = 10%)")
 ```
 
-This shows that using the FIA growth rate, only 34% of trees back-project
+This shows that using the FIA growth rate, only 20% of trees back-project
 to within 10% of their first surveyed diameter, so we can't rely on the FIA
 growth rate when we don't have previous tree records for an ingrown tree.
 
@@ -696,86 +631,201 @@ Notes:
 * "composition is stabilized by local landforms and that diversity increases
   with hydrologic catchment area"
 
+##### Computed Estimated Growth
+
 Find the diameter growth rate, per species, per plot, over time.
 
 ```{r tree_negative_growth}
 rds_file <- 'data/intermediate/tree_negative_growth.rds'
 if (file.exists(rds_file)) {
-  tree_growth <- read_rds(rds_file)
+  tree_negative_growth <- read_rds(rds_file)
 } else {
   fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-  
-  next_tre_mixin <- tbl(fia, 'TREE') |>
-    select(CN, PREV_TRE_CN) |>
-    rename(
-      NEXT_TRE_CN = CN,
-      CN = PREV_TRE_CN
-    )
-  
-  tree_negative_growth <- tbl(fia, 'TREE') |>
-    semi_join(
-      plot_grow_only |> arrange(STATECD, COUNTYCD, PLOT),
-      by = join_by(STATECD, COUNTYCD, PLOT),
-      copy = TRUE
-    ) |>
-    # Live trees
-    filter(CONDID == 1) |>
-    select(CN, DIA, PREV_TRE_CN) |>
-    left_join(next_tre_mixin, by = join_by(CN)) |>
-    # Filter to only the most recent trees (which have no next tree)
-    filter(is.na(NEXT_TRE_CN)) |>
-    mutate(FRST_TRE_CN = CN, FRST_DIA = DIA) |>
-    select(CN, DIA, PREV_TRE_CN, FRST_TRE_CN, FRST_DIA) |>
-    collect()
-  
-  prev_tre_cns <- tree_negative_growth |>
-    select(PREV_TRE_CN) |>
-    filter(!is.na(PREV_TRE_CN)) |>
-    distinct()
-  
-  iterations <- 0
-  while (nrow(prev_tre_cns) > 0) {
-    print(paste0(
-      "Iteration: ",
-      iterations <- iterations + 1,
-      ", CNs: ",
-      nrow(prev_tre_cns)
-    ))
-    tmp_trees <- tbl(fia, 'TREE') |>
-      # Process chunks of 1000 trees, since SQLite has a hard time
-      # doing the semi join on more records than that
-      semi_join(prev_tre_cns |> head(1000), by = join_by(CN == PREV_TRE_CN), copy = TRUE) |>
-      rename(PREV_DIA = DIA) |>
-      select(CN, PREV_DIA, PREV_TRE_CN) |>
+  fetch_trees <- function(row) {
+    statecd <- row[["STATECD"]]
+    countycd <- row[["COUNTYCD"]]
+    plot <- row[["PLOT"]]
+    #print(paste("Plot", statecd, countycd, plot, sep = " "))
+    trees <- tbl(fia, 'TREE') |>
+      filter(
+        STATECD == statecd &
+        COUNTYCD == countycd &
+        PLOT == plot
+      ) |>
+      filter(CONDID == 1) |>
+      select(CN, DIA, PREV_TRE_CN) |>
       collect()
-    tree_negative_growth <- tree_negative_growth |>
-      left_join(tmp_trees, by = join_by(PREV_TRE_CN == CN)) |>
-      mutate( # Update FRST_DIA if there is a new one
-        FRST_DIA = coalesce(PREV_DIA, FRST_DIA)
-      ) |>
-      mutate( # Update FRST_TRE_CN if there is a new one
-        FRST_TRE_CN = coalesce(PREV_TRE_CN.y, FRST_TRE_CN)
-      ) |>
-      mutate( # Move PREV_TRE_CN one time hop on records that joined
-        PREV_TRE_CN = if_else(is.na(PREV_DIA), PREV_TRE_CN, PREV_TRE_CN.y)
-      ) |>
-      select(CN, PREV_TRE_CN, DIA, FRST_TRE_CN, FRST_DIA)
-    prev_tre_cns <- tree_negative_growth |>
+
+    has_next_tree <- trees |>
+      select(PREV_TRE_CN) |>
+      rename(CN = PREV_TRE_CN)
+
+    tree_growth <- trees |>
+      # start with trees that have no next tree
+      anti_join(has_next_tree, by = join_by(CN)) |>
+      mutate(FRST_TRE_CN = CN, FRST_DIA = DIA)
+
+    #print(paste0("  ", nrow(tree_growth), " trees"))
+
+    prev_tre_cns <- tree_growth |>
       select(PREV_TRE_CN) |>
       filter(!is.na(PREV_TRE_CN)) |>
       distinct()
+
+    iterations <- 0
+    while (nrow(prev_tre_cns) > 0) {
+      #print(paste0(
+      #  "  Iteration: ",
+      #  iterations <- iterations + 1,
+      #  ", CNs: ",
+      #  nrow(prev_tre_cns)
+      #))
+  
+      tmp_trees <- trees |>
+        semi_join(prev_tre_cns, by = join_by(CN == PREV_TRE_CN)) |>
+        rename(PREV_DIA = DIA) |>
+        select(CN, PREV_DIA, PREV_TRE_CN)
+
+      tree_growth <- tree_growth |>
+        left_join(tmp_trees, by = join_by(PREV_TRE_CN == CN)) |>
+        mutate( # Update FRST_DIA if there is a new one
+          FRST_DIA = coalesce(PREV_DIA, FRST_DIA)
+        ) |>
+        mutate( # Update FRST_TRE_CN if there is a new one
+          FRST_TRE_CN = coalesce(PREV_TRE_CN.y, FRST_TRE_CN)
+        ) |>
+        mutate( # Move PREV_TRE_CN one time hop on records that joined
+          PREV_TRE_CN = if_else(is.na(PREV_DIA), PREV_TRE_CN, PREV_TRE_CN.y)
+        ) |>
+        select(CN, PREV_TRE_CN, DIA, FRST_TRE_CN, FRST_DIA)
+      prev_tre_cns <- tmp_trees |>
+        select(PREV_TRE_CN) |>
+        filter(!is.na(PREV_TRE_CN)) |>
+        distinct()
+    }
+
+    return(tree_growth)
   }
+  
+  tree_negative_growth <- reduce(
+      pbapply(plot_grow_only, 1, fetch_trees),
+      bind_rows
+    ) |>
+    filter(DIA < FRST_DIA) |>
+    arrange(CN)
 
   dbDisconnect(fia)  
-  rm(next_tre_mixin, prev_tre_cns, tmp_trees, iterations)
-  
-  tree_negative_growth <- tree_negative_growth |>
-    filter(DIA < FRST_DIA)
-  
+
   write_rds(tree_negative_growth, rds_file)
 }
+
+ggplot(tree_negative_growth, aes(DIA - FRST_DIA)) + #, after_stat(100 * count / sum(count)))) +
+  geom_histogram(binwidth = 1, position = position_nudge(-0.5)) +
+  #geom_freqpoly() +
+  ggtitle("Observed Negative Growth") +
+  ylab("Count") +
+  xlab("Growth (inches)")
+
 ```
 
+Negative growth is a problem.
+
+To remove negative growth, we need to find all the CNs in each tree history.
+
+```{r tree_history}
+rds_file <- 'data/intermediate/tree_history.rds'
+if (file.exists(rds_file)) {
+  tree_history <- read_rds(rds_file)
+} else {
+  # Re-using a single connection 
+  fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+
+  fetch_trees <- function(row) {
+    statecd <- row[["STATECD"]]
+    countycd <- row[["COUNTYCD"]]
+    plot <- row[["PLOT"]]
+    #print(paste("Plot", statecd, countycd, plot, sep = " "))
+    trees <- tbl(fia, 'TREE') |>
+      filter(
+        STATECD == statecd &
+        COUNTYCD == countycd &
+        PLOT == plot
+      ) |>
+      filter(CONDID == 1) |>
+      select(CN, DIA, PREV_TRE_CN) |>
+      collect()
+
+    has_next_tree <- trees |>
+      select(PREV_TRE_CN) |>
+      rename(CN = PREV_TRE_CN)
+
+    tree_growth <- trees |>
+      # histories start with trees that have no next tree
+      anti_join(has_next_tree, by = join_by(CN)) |>
+      mutate(FRST_TRE_CN = CN, FRST_DIA = DIA)
+
+    #print(paste0("  ", nrow(tree_growth), " trees"))
+
+    prev_tre_cns <- tree_growth |>
+      select(PREV_TRE_CN) |>
+      filter(!is.na(PREV_TRE_CN)) |>
+      distinct()
+
+    iterations <- 0
+    while (nrow(prev_tre_cns) > 0) {
+      #print(paste0(
+      #  "  Iteration: ",
+      #  iterations <- iterations + 1,
+      #  ", CNs: ",
+      #  nrow(prev_tre_cns)
+      #))
+  
+      tmp_trees <- trees |>
+        semi_join(prev_tre_cns, by = join_by(CN == PREV_TRE_CN)) |>
+        rename(PREV_DIA = DIA) |>
+        select(CN, PREV_DIA, PREV_TRE_CN)
+
+      tree_growth <- tree_growth |>
+        left_join(tmp_trees, by = join_by(PREV_TRE_CN == CN)) |>
+        mutate( # Update FRST_DIA if there is a new one
+          FRST_DIA = coalesce(PREV_DIA, FRST_DIA)
+        ) |>
+        mutate( # Update FRST_TRE_CN if there is a new one
+          FRST_TRE_CN = coalesce(PREV_TRE_CN.y, FRST_TRE_CN)
+        ) |>
+        mutate( # Move PREV_TRE_CN one time hop on records that joined
+          PREV_TRE_CN = if_else(is.na(PREV_DIA), PREV_TRE_CN, PREV_TRE_CN.y)
+        ) |>
+        select(CN, PREV_TRE_CN, DIA, FRST_TRE_CN, FRST_DIA)
+      prev_tre_cns <- tmp_trees |>
+        select(PREV_TRE_CN) |>
+        filter(!is.na(PREV_TRE_CN)) |>
+        distinct()
+    }
+
+    return(tree_growth)
+  }
+  
+  tree_history <- reduce(
+      pbapply(plot_grow_only, 1, fetch_trees),
+      bind_rows
+    ) |>
+    filter(DIA < FRST_DIA) |>
+    arrange(CN)
+
+  dbDisconnect(fia)  
+
+  write_rds(tree_history, rds_file)
+}
+
+ggplot(tree_history, aes(DIA - FRST_DIA)) + #, after_stat(100 * count / sum(count)))) +
+  geom_histogram(binwidth = 1, position = position_nudge(-0.5)) +
+  #geom_freqpoly() +
+  ggtitle("Observed Negative Growth") +
+  ylab("Count") +
+  xlab("Growth (inches)")
+
+```
 
 ```{r tree_growth}
 rds_file <- 'data/intermediate/tree_growth.rds'
@@ -820,7 +870,7 @@ if (file.exists(rds_file)) {
     # Live trees
     filter(CONDID == 1) |>
     # Trees that don't shrink
-    anti_join(tree_negative_growth |> select(CN), by = join_by(CN), copy = TRUE) |>
+    # anti_join(tree_negative_growth |> select(CN), by = join_by(CN), copy = TRUE) |>
     # Self-join to previous tree to get growth increment
     left_join(prev_tre_mixin, by = join_by(PREV_TRE_CN)) |>
     left_join(species_mixin, by = join_by(SPCD)) |>
@@ -832,6 +882,8 @@ if (file.exists(rds_file)) {
     ) |>
     # Many trees will have no previous tree, filter those out.
     filter(!is.na(PREV_TRE_CN)) |>
+    # Filter out trees that shrink
+    filter(DIA_INCR >= 0) |>
     select(
       CN, PREV_TRE_CN, PLT_CN, PREV_PLT_CN,
       STATECD, COUNTYCD, PLOT, SUBP, TREE, SPGRPCD, SPCD, SCIENTIFIC_NAME,
@@ -857,6 +909,14 @@ TODO:
   - 5 - Overtopped - crown entirely below general canopy
 
 ```{r tree_growth_rate}
+tree_growth_dom <- tree_growth |>
+  filter(CCLCD < 4) |>
+  group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD) |>
+  summarize(
+    DIA_INCR_DOM = mean(DIA_INCR, na.rm = TRUE),
+    .groups = 'keep'
+  ) |>
+  ungroup()
 tree_growth_nondom <- tree_growth |>
   filter(CCLCD > 3) |>
   group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD) |>
@@ -898,6 +958,7 @@ tree_growth_rate <- tree_growth |>
   summarize(.groups = 'keep') |>
   ungroup() |>
   left_join(prev_measyear_mixin, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR)) |>
+  left_join(tree_growth_dom, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)) |>
   left_join(tree_growth_nondom, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)) |>
   left_join(tree_growth_spcd, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)) |>
   left_join(tree_growth_spgrpcd, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPGRPCD)) |>
@@ -907,6 +968,7 @@ tree_growth_rate <- tree_growth |>
       # It actually does better without restricting to non-dominant trees
       # ("better" means 69% back-project well, vs. 62%)
       # DIA_INCR_NONDOM,
+      DIA_INCR_DOM,
       DIA_INCR_SPCD,
       DIA_INCR_SPGRPCD,
       DIA_INCR_MULTIYEAR,
@@ -926,6 +988,8 @@ manual_back_projection <- starting_trees |>
   left_join(location_mixin, by = join_by(CN)) |>
   # Add on growth rate
   left_join(tree_growth_rate, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)) |>
+  # This is wrong - uses the growth for a single inventory period, not
+  # the overall growth.
   mutate(DIA_PROJ = DIA - (MEASYEAR - FRST_MEASYEAR) * ANN_DIA_GROWTH) |>
   mutate(DIA_ERR = (DIA_PROJ - FRST_DIA) / FRST_DIA) |>
   arrange(DIA_ERR)
@@ -1030,14 +1094,21 @@ manual_back_projection |>
 
 ```{r projected_vs_measured_annual_growth}
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+jenkins_spgrpcd <- read_csv(
+  "data/raw/FIADB_11.5.17_JENKINS_SPGRPCD.csv", 
+  col_types = cols(JENKINS_SPGRPCD = col_integer())
+)
+
 species_mixin <- tbl(fia, 'REF_SPECIES') |>
-  select(SPCD, E_SPGRPCD, SCIENTIFIC_NAME) |>
+  select(SPCD, E_SPGRPCD, JENKINS_SPGRPCD, SCIENTIFIC_NAME) |>
   left_join(
     tbl(fia, 'REF_SPECIES_GROUP') |> distinct(SPGRPCD, NAME),
     by = join_by(E_SPGRPCD == SPGRPCD)
   ) |>
   rename(SPGRP_NAME = NAME) |>
-  collect()
+  collect() |>
+  left_join(jenkins_spgrpcd, by = join_by(JENKINS_SPGRPCD)) |>
+  rename(JENKINS_SPGRP_NAME = NAME)
 
 projected_annual_growth <- starting_trees |>
   filter(MEASYEAR != FRST_MEASYEAR) |>
@@ -1046,12 +1117,15 @@ projected_annual_growth <- starting_trees |>
       select(CN, SPCD, DIA_EST),
     by = join_by(FRST_TRE_CN == CN)
   ) |>
+  # Be metric
+  mutate(DIA = conv_unit(DIA, "in", "cm")) |>
+  mutate(FRST_DIA = conv_unit(FRST_DIA, "in", "cm")) |>
+  mutate(DIA_EST = conv_unit(DIA_EST, "in", "cm")) |>
+
   mutate(ANN_DIA = (DIA - FRST_DIA) / (MEASYEAR - FRST_MEASYEAR)) |>
   mutate(DIA_ERR = (FRST_DIA - DIA_EST)) |>
   mutate(ANN_DIA_PROJ = (DIA - DIA_EST) / (MEASYEAR - FRST_MEASYEAR)) |>
-  mutate(ANN_DIA_PROJ = conv_unit(ANN_DIA_PROJ, "in", "cm")) |>
   mutate(ANN_DIA_ERR = DIA_ERR / (MEASYEAR - FRST_MEASYEAR)) |>
-  mutate(ANN_DIA_ERR = conv_unit(ANN_DIA_ERR, "in", "cm")) |>
   #left_join(scientific_name_mixin, by = join_by(SPCD)) |>
   filter(!is.na(DIA_ERR)) |>
   left_join(species_mixin, by = join_by(SPCD)) |>
@@ -1099,6 +1173,95 @@ ggplot(
   xlab(bquote("Annual Growth " ~(cm %*% year^{-1}))) +
   ylab("Species Group")
 ```
+
+
+## Run FVS
+
+### Generate Keyfile
+
+An FVS run is scripted by a keyfile. The keyfile describes how to run the
+model and extensions, including where to read input, all parameters to
+control processing, and where to write output.
+
+The keyfile is structured by stand; each stand is a separate run of the
+model.
+
+To run in parallel, a separate keyfile must be generated for each partition
+to be run in parallel. Each partition must send its output to a separate
+location, and these can be assembled into a single output as a post-
+processing step.
+
+#### Stand Identification
+
+For each stand, we need:
+
+-  StdIdent: Stand Identifier, from fia.FVS_STANDINIT_PLOT.FVS_STAND_ID
+-  StandCN: Stand control number, from fia.PLOT.CN
+-  MgmtId: Management ID, for no treatment, this is NONE
+
+#### Time
+
+We will run the model from first measurement year to last measurement year,
+with as many 10-year timesteps as we can get. We will add an initial timestep
+that is less than 10 years to get to a 10 year boundary. We choose a 10-year
+timestep because FVSne is calibrated to 10 years, and running with a different
+length timestep introduces bias. The bias is less with shorter timesteps than
+with longer timesteps, so using a short timestep to adjust length introduces
+less bias than using a long timestep.
+
+There are two years of interest for each plot: FIRSTYEAR, which is
+the minimum fia.PLOT.MEASYEAR for the modern plot design; and
+LASTYEAR, which is the maximum of the same.
+
+-  InvYear: Inventory Year, set to FIRSTYEAR
+-  TimeInt: Time Interval, there may be two entries:
+   -  TimeInt 0: Default time interval, 10 years
+   -  TimeInt 1: First cycle time interval, (LASTYEAR - FIRSTYEAR) %% 10
+-  NumCycle: Number of cycles to run, int((LASTYEAR - FIRSTYEAR) / 10) + 1,
+   and +1 again if there is a TimeInt 1.
+
+Note that the number of cycles is the number of full 10-year cycles
+plus one if there is a short first cycle. Since metrics are printed at the start
+of each cycle, we need LASTYEAR to be the first year of a cycle, and work
+backwards from that.
+
+#### Input
+
+There are two inputs, Stand and Tree. Both are configured to use a database
+query.
+
+Within a Database subsection:
+
+-  DSNIn: Data Source Name (DSN) for input; SQLite filename
+-  StandSQL: SQL query to fetch a stand, given %Stand_CN%
+-  TreeSQL: SQL query to fetch all trees for a stand, given %Stand_CN%
+
+#### Regeneration, Ingrowth, and Establishment
+
+The Northeastern variant is a partial establishment model, so it does not
+automatically perform natural regeneration. We will therefore use actual
+ingrowth from the FIA data.
+
+#### Fire and Fuels
+
+Carbon is calculated by the fire and fuels extension.
+
+-  FMIn: Starts configuration of Fire and Fuels extension
+-  CarbRept: Carbon Report; save to database (2)
+-  CarbCut: Harvested Carbon Report; disable (0)
+-  CarbCalc: Carbon calculation; metric (1)
+-  FuelOut: Fuel Output, disable (0)
+-  FuelRept: Fuel Report, disable (0)
+
+Fire and Fuels also interacts with the database extension; it provides additional
+Database keywords to configure Fire and Fuels output to the database.
+
+Within a Database section:
+
+-  CarbReDB: FVS_Carbon and FVS_Hrv_Carbon tables: database (2)
+-  FuelReDB: FVS_Consumption table: database (2)
+-  FuelsOut: FVS_Fuels table: database (2)
+
 
 ##### Translating to FVS
 
@@ -1222,9 +1385,14 @@ information about a run and a stand.
 keywordfile_section <- function(
     Title, MgmtId, StandID, StandCN,
     FirstYear, LastYear, Timestep,
-    Partition
+    Partition, RandSeed = NA
   ) {
   TimeConfig <- fvs_TimeConfig(FirstYear, LastYear, Timestep)
+  if (!is.na(RandSeed)) {
+    RandSeed <- fvs_kwd1("RANNSEED", RandSeed)
+  } else {
+    RandSeed <- c()
+  }
   c(
     fvs_kwd0("StdIdent"),
     paste0(StandID, " ", Title),
@@ -1233,6 +1401,7 @@ keywordfile_section <- function(
     fvs_kwd0("MgmtId"),
     MgmtId,
     TimeConfig,
+    RandSeed,
     fvs_kwd0("FMIn"), # Fire and Fuels Extension
     fvs_kwd0("CarbRept"),
     fvs_kwd0("CarbCut"),
@@ -1512,6 +1681,7 @@ annual_carbon_tmp <- FVS_Carbon_ANNL |>
   select(STAND_ID, Year, Annual_Carbon)
 
 annual_vs_decadal <- stand_stats |>
+  filter(DESIGNCD == 1) |>
   mutate(STAND_ID = sprintf(paste0(
     '%02d',  '%03d',   '%05d'),
     STATECD, COUNTYCD, PLOT
@@ -1523,21 +1693,24 @@ annual_vs_decadal <- stand_stats |>
   ) |>
   left_join(decadal_carbon_tmp, by = join_by(STAND_ID, Year)) |>
   left_join(annual_carbon_tmp, by = join_by(STAND_ID, Year)) |>
+  # There's something funny going on with plots; i've yet to figure it out.
+  filter(!is.na(Decadal_Carbon) & !is.na(Annual_Carbon)) |>
   consolidate_forest_type_groups_filter() |>
   group_by(STAND_ID) |>
   mutate(
     ECOCD = substr(ECOSUBCD, 1, nchar(ECOSUBCD) - 1),
     First_Year = min(Year, na.rm = TRUE),
     Last_Year = max(Year, na.rm = TRUE),
-    Starting_Carbon = max(if_else(Year == First_Year, Decadal_Carbon, 0), na.rm = TRUE),
-    Decadal_Carbon_Delta = Decadal_Carbon - Starting_Carbon,
+    Decadal_Starting_Carbon = max(if_else(Year == First_Year, Decadal_Carbon, 0), na.rm = TRUE),
+    Decadal_Carbon_Delta = Decadal_Carbon - Decadal_Starting_Carbon,
     Decadal_Carbon_Flux = if_else(Year == First_Year, 0, Decadal_Carbon_Delta / (Year - First_Year)),
-    Annual_Carbon_Delta = Annual_Carbon - Starting_Carbon,
+    Annual_Starting_Carbon = max(if_else(Year == First_Year, Annual_Carbon, 0), na.rm = TRUE),
+    Annual_Carbon_Delta = Annual_Carbon - Annual_Starting_Carbon,
     Annual_Carbon_Flux = if_else(Year == First_Year, 0, Annual_Carbon_Delta / (Year - First_Year))
   ) |>
   ungroup() |>
-  filter(Year == First_Year | Year == Last_Year) |>
-  filter(!is.na(Decadal_Carbon) & !is.na(Annual_Carbon)) |>
+  filter(First_Year != Last_Year) |>
+  filter(Year == Last_Year | Year == First_Year) |>
   mutate(Projection_Years = Year - First_Year) |>
   mutate(Carbon_Residual = Decadal_Carbon - Annual_Carbon) |>
   mutate(Carbon_Error = 2 * abs(Carbon_Residual) / (Decadal_Carbon + Annual_Carbon)) |>
@@ -1552,7 +1725,7 @@ remove(
 
 ```{r plot_decadal_vs_annual}
 ggplot(
-    annual_vs_decadal |> filter(Projection_Years > 0),
+    annual_vs_decadal |> filter(Projection_Years > 0) |> arrange(Projection_Years),
     aes(x = Decadal_Carbon_Flux, y = Annual_Carbon_Flux, color = Projection_Years)
   ) +
   geom_point(
@@ -1562,7 +1735,7 @@ ggplot(
   geom_abline(intercept = 0, slope = 1, color = "red") +
   facet_wrap(~`Forest Type Group`) +
   ggtitle(bquote("Annual Carbon Flux for 1- vs. 10-year Timestep")) +
-  # coord_cartesian(xlim = c(0, 300), ylim = c(0, 300))
+  coord_cartesian(xlim = c(-1, 12), ylim = c(-1, 12)) +
   ylab(bquote("1-Year Timestep Annual Carbon Flux" ~ (Mg %*% ha^-1))) +
   xlab(bquote("10-Year Timestep Annual Carbon Flux" ~ (Mg %*% ha^-1)))
 ```
