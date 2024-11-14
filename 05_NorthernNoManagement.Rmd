@@ -1454,7 +1454,6 @@ fia_fvs_standinit_plot <- tbl(fia, 'FVS_StandInit_Plot') |>
   select(STAND_CN, STAND_ID)
 
 stands_projected <- tbl(fia, 'PLOT') |>
-  filter(DESIGNCD == 1) |>
   select(CN, STATECD, COUNTYCD, PLOT, INVYR) |>
   rename(STAND_CN = CN) |>
   inner_join(timeframe, by = join_by(STATECD, COUNTYCD, PLOT, INVYR), copy = TRUE) |>
@@ -1468,32 +1467,40 @@ remove(fia, fia_fvs_standinit_plot)
 The first run is to project from the first measurement year to 2025. These
 are given management ID "NONE".
 
-```{r FVS_Northeastern_NONE_part.key}
-for (partition in 1:8) {
-  filename <- paste0("data/fvs/FVS_Northeastern_NONE_", partition, ".key")
-  unlink(filename)
-  apply(
-    stands_projected |> 
-      filter((as.numeric(STAND_ID) %% 8) == (partition - 1)) |>
-      arrange(STAND_ID, FIRSTYEAR),
-    1,
-    function(row) {
-      write_lines(
-        keywordfile_section(
-          "Northeastern",
-          "NONE",
-          row['STAND_ID'],
-          row['STAND_CN'],
-          row['FIRSTYEAR'],
-          row['LASTYEAR'],
-          partition
-        ),
-        filename,
-        append = TRUE
+```{r NRSGrowOnlyPrj-10year}
+for (timestep in c(1, 10)) {
+  for (rannseed in c(1,3,5)) {
+    for (partition in 1:8) {
+      title <- "NRSGrowOnly"
+      mgmtid <- paste0(timestep, "Y", rannseed)
+      filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".key")
+      unlink(filename)
+      apply(
+        stands_projected |> 
+          filter((as.numeric(STAND_ID) %% 8) == (partition - 1)) |>
+          arrange(STAND_ID, FIRSTYEAR),
+        1,
+        function(row) {
+          write_lines(
+            keywordfile_section(
+              title,
+              mgmtid,
+              row['STAND_ID'],
+              row['STAND_CN'],
+              row['FIRSTYEAR'],
+              row['LASTYEAR'],
+              timestep,
+              partition,
+              rannseed # Random Seed
+            ),
+            filename,
+            append = TRUE
+          )
+        }
       )
+      write_lines("Stop", filename, append = TRUE)
     }
-  )
-  write_lines("Stop", filename, append = TRUE)
+  }
 }
 ```
 
@@ -1520,9 +1527,12 @@ remove(fia, fia_fvs_standinit_plot)
 The second run is to do a 0-year projection for each measurement year. These
 are given management ID "SRVY".
 
-```{r FVS_Northeastern_SRVY_part.key}
+```{r NRSGrowOnlyObs-0year}
+timestep <- 1
 for (partition in 1:8) {
-  filename <- paste0("data/fvs/FVS_Northeastern_SRVY_", partition, ".key")
+  title <- "NRSGrowOnly"
+  mgmtid <- "0Y0"
+  filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".key")
   unlink(filename)
   apply(
     stands_surveyed |>
@@ -1532,12 +1542,13 @@ for (partition in 1:8) {
     function(row) {
       write_lines(
         keywordfile_section(
-          "Northeastern",
-          "SRVY",
+          title,
+          mgmtid,
           row['STAND_ID'],
           row['STAND_CN'],
           row['MEASYEAR'],
           row['MEASYEAR'],
+          timestep,
           partition
         ),
         filename,
@@ -1565,62 +1576,71 @@ for (partition in 1:8) {
 Load the output from all FVS partitions into a single dataframe
 
 ```{r FVS_Carbon}
-FVS_Carbon_NONE <- NULL
-FVS_Carbon_SRVY <- NULL
-FVS_Carbon_ANNL <- NULL
-FVS_Summary2_East_NONE <- NULL
-FVS_Summary2_East_SRVY <- NULL
-FVS_Summary2_East_ANNL <- NULL
+FVS_Carbon <- NULL
+FVS_Summary2_East <- NULL
 
-for (partition in 1:8) {
-  fvs_out_db <- DBI::dbConnect(
-    RSQLite::SQLite(),
-    paste0('data/fvs/FVS_Northeastern_NONE_', partition, '.db')
-  )
-  fvs_carbon_tbl = tbl(fvs_out_db, 'FVS_Carbon') |>
-    mutate(Partition = partition)
-  fvs_summary2_east_tbl = tbl(fvs_out_db, 'FVS_Summary2_East') |>
-    mutate(Partition = partition)
+title <- "NRSGrowOnly"
+for (timestep in c(0, 1, 10)) {
+  for (rannseed in c(0, 1, 3, 5)) {
+    for (partition in 1:8) {
+      mgmtid <- paste0(timestep, "Y", rannseed)
+      filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".db")
+      if (file.exists(filename)) {
+        print(paste0("Reading ", filename))
+        fvs_out_db <- DBI::dbConnect(RSQLite::SQLite(), filename)
+        fvs_carbon_tbl = tbl(fvs_out_db, 'FVS_Carbon') |>
+          mutate(
+            Title = title,
+            MgmtId = mgmtid,
+            Timestep = timestep,
+            RanNSeed = rannseed,
+            Partition = partition
+          ) |>
+          collect()
+        FVS_Carbon <- bind_rows(FVS_Carbon, fvs_carbon_tbl)
 
-  FVS_Carbon_NONE <- bind_rows(FVS_Carbon_NONE, fvs_carbon_tbl |> collect())
-  FVS_Summary2_East_NONE <- bind_rows(FVS_Summary2_East_NONE, fvs_summary2_east_tbl |> collect())
+        fvs_summary2_east_tbl = tbl(fvs_out_db, 'FVS_Summary2_East') |>
+          mutate(
+            Title = title,
+            MgmtId = mgmtid,
+            RanNSeed = rannseed,
+            Partition = partition
+          ) |>
+          collect()
+        FVS_Summary2_East <- bind_rows(FVS_Summary2_East, fvs_summary2_east_tbl)
   
-  dbDisconnect(fvs_out_db)
-
-  fvs_out_db <- DBI::dbConnect(
-    RSQLite::SQLite(),
-    paste0('data/fvs/FVS_Northeastern_SRVY_', partition, '.db')
-  )
-  fvs_carbon_tbl = tbl(fvs_out_db, 'FVS_Carbon') |>
-    mutate(Partition = partition)
-  fvs_summary2_east_tbl = tbl(fvs_out_db, 'FVS_Summary2_East') |>
-    mutate(Partition = partition)
-
-  FVS_Carbon_SRVY <- bind_rows(FVS_Carbon_SRVY, fvs_carbon_tbl |> collect())
-  FVS_Summary2_East_SRVY <- bind_rows(FVS_Summary2_East_SRVY, fvs_summary2_east_tbl |> collect())
-  
-  dbDisconnect(fvs_out_db)
-  
-  fvs_out_db <- DBI::dbConnect(
-    RSQLite::SQLite(),
-    paste0('data/fvs/FVS_NRSAnnual_NONE_', partition, '.db')
-  )
-  fvs_carbon_tbl = tbl(fvs_out_db, 'FVS_Carbon') |>
-    mutate(Partition = partition)
-  fvs_summary2_east_tbl = tbl(fvs_out_db, 'FVS_Summary2_East') |>
-    mutate(Partition = partition)
-
-  FVS_Carbon_ANNL <- bind_rows(FVS_Carbon_ANNL, fvs_carbon_tbl |> collect())
-  FVS_Summary2_East_ANNL <- bind_rows(FVS_Summary2_East_ANNL, fvs_summary2_east_tbl |> collect())
-  
-  dbDisconnect(fvs_out_db)
-  
+        dbDisconnect(fvs_out_db)
+      } else {
+        print(paste0("Skipping ", filename))
+      }
+    }
+  }
 }
 
 remove(fvs_out_db, fvs_carbon_tbl, fvs_summary2_east_tbl)
 ```
+Consolidate outputs; average the multiple runs with different random seeds.
+
+```{r}
+FVS_Carbon_NONE <- FVS_Carbon |>
+  filter(Timestep == 10) |>
+  group_by(StandID, Year) |>
+  summarize(Aboveground_Total_Live = mean(Aboveground_Total_Live), .groups = 'keep') |>
+  ungroup()
+
+FVS_Carbon_ANNL <- FVS_Carbon |>
+  filter(Timestep == 1) |>
+  group_by(StandID, Year) |>
+  summarize(Aboveground_Total_Live = mean(Aboveground_Total_Live), .groups = 'keep') |>
+  ungroup()
+
+# There is no projection for the observed run, so no need to average
+FVS_Carbon_SRVY <- FVS_Carbon |>  
+  filter(Timestep == 0)
+```
 
 Sanity check: did we get the outputs we requested?
+
 ```{r sanity-check-expected-output}
 matched_carbon_tmp <- stands_projected |>
   left_join(

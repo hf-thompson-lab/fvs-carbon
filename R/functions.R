@@ -319,9 +319,10 @@ fvs_kwd7 <- function(kwd, arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   sprintf('%-10s%10s%10s%10s%10s%10s%10s%10s', kwd, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 }
 
-fvs_TimeConfig <- function(FirstYear, LastYear) {
+fvs_TimeConfig <- function(FirstYear, LastYear, Timestep) {
   FirstYear <- as.integer(FirstYear)
   LastYear <- as.integer(LastYear)
+  Timestep <- as.integer(Timestep)
   TimeConfig <- NULL
   if (FirstYear == LastYear) {
     # Produce a single one-year cycle
@@ -333,14 +334,14 @@ fvs_TimeConfig <- function(FirstYear, LastYear) {
   } else {
     # LastYear must be the first year of the last cycle, so
     # add an extra cycle at the end
-    NumCycles <- as.integer((LastYear - FirstYear) / 10) + 1
-    ShortCycle <- (LastYear - FirstYear) %% 10
+    NumCycles <- as.integer((LastYear - FirstYear) / Timestep) + 1
+    ShortCycle <- (LastYear - FirstYear) %% Timestep
     if (ShortCycle > 0) {
       # Produce a single short cycle followed by 10-year cycles
       NumCycles <- NumCycles + 1
       TimeConfig <- c(
         fvs_kwd1("InvYear", FirstYear),
-        fvs_kwd2("TimeInt", 0, 10),
+        fvs_kwd2("TimeInt", 0, Timestep),
         fvs_kwd2("TimeInt", 1, ShortCycle),
         fvs_kwd2("TimeInt", NumCycles, 1),
         fvs_kwd1("NumCycle", NumCycles)
@@ -349,7 +350,7 @@ fvs_TimeConfig <- function(FirstYear, LastYear) {
       # No need for an initial short cycle
       TimeConfig <- c(
         fvs_kwd1("InvYear", FirstYear),
-        fvs_kwd2("TimeInt", 0, 10),
+        fvs_kwd2("TimeInt", 0, Timestep),
         fvs_kwd2("TimeInt", NumCycles, 1),
         fvs_kwd1("NumCycle", NumCycles)
       )
