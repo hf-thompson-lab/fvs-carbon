@@ -288,7 +288,8 @@ ggplot(map_states, aes(long, lat, group = group)) +
     mapping = aes(long, lat, group = group, color = ECOCD),
 #    show.legend = FALSE
   ) +
-  coord_quickmap()
+  coord_quickmap() +
+  ggtitle("Plot Location with Ecoregion")
 
 remove(plot_location_tmp)
 ```
@@ -299,7 +300,8 @@ ggplot(map_states, aes(long, lat, group = group)) +
   geom_point(
     plot_location_type,
     mapping = aes(long, lat, group = group, color = `Forest Type Group`)) +
-  coord_quickmap()
+  coord_quickmap() +
+  ggtitle("Plot Location with Forest Type")
 ```
 
 Look at BA over time; first, by stand age, then as change over calendar time.
@@ -980,10 +982,10 @@ tree_growth_rate <- tree_growth |>
 Can we use that to back-project ingrown trees?
 
 ```{r manual_back_projection}
-location_mixin <- prev_tree |>
+location_mixin <- tree_ingrown_prev |>
   select(CN, STATECD, COUNTYCD, PLOT, SPCD)
 
-manual_back_projection <- starting_trees |>
+manual_back_projection <- tree_ingrown_last |>
   filter(FRST_DIA < DIA) |>
   left_join(location_mixin, by = join_by(CN)) |>
   # Add on growth rate
@@ -1008,7 +1010,7 @@ We can fill in a DIA_EST using the growth interval, and iterate until
 they're all filled in. Or 4 times, which is safer.
 
 ```{r init_stepwise_manual_back_projection}
-manual_back_projection <- prev_tree |>
+manual_back_projection <- tree_ingrown_prev |>
   # Start with trees that have a previous tree (so we can back-project from them),
   # but have no next tree (so nothing can back-project to them)
   filter(!is.na(PREV_TRE_CN) & is.na(NEXT_TRE_CN)) |>
@@ -1045,7 +1047,7 @@ while (nrow(prev_tre_cns) > 0) {
     ", CNs: ",
     nrow(prev_tre_cns)
   ))
-  tmp_trees <- prev_tree |>
+  tmp_trees <- tree_ingrown_prev |>
     semi_join(prev_tre_cns, by = join_by(CN == PREV_TRE_CN)) |>
     select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, PREV_TRE_CN, NEXT_TRE_CN, DIA) |>
     # Join on growth rates
@@ -1110,7 +1112,7 @@ species_mixin <- tbl(fia, 'REF_SPECIES') |>
   left_join(jenkins_spgrpcd, by = join_by(JENKINS_SPGRPCD)) |>
   rename(JENKINS_SPGRP_NAME = NAME)
 
-projected_annual_growth <- starting_trees |>
+projected_annual_growth <- tree_ingrown_last |>
   filter(MEASYEAR != FRST_MEASYEAR) |>
   left_join(
     manual_back_projection |>
@@ -1625,13 +1627,21 @@ Consolidate outputs; average the multiple runs with different random seeds.
 FVS_Carbon_NONE <- FVS_Carbon |>
   filter(Timestep == 10) |>
   group_by(StandID, Year) |>
-  summarize(Aboveground_Total_Live = mean(Aboveground_Total_Live), .groups = 'keep') |>
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    Total_Stand_Carbon = mean(Total_Stand_Carbon),
+    .groups = 'keep'
+  ) |>
   ungroup()
 
 FVS_Carbon_ANNL <- FVS_Carbon |>
   filter(Timestep == 1) |>
   group_by(StandID, Year) |>
-  summarize(Aboveground_Total_Live = mean(Aboveground_Total_Live), .groups = 'keep') |>
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    Total_Stand_Carbon = mean(Total_Stand_Carbon),
+    .groups = 'keep'
+  ) |>
   ungroup()
 
 # There is no projection for the observed run, so no need to average
@@ -1756,8 +1766,8 @@ ggplot(
   facet_wrap(~`Forest Type Group`) +
   ggtitle(bquote("Annual Carbon Flux for 1- vs. 10-year Timestep")) +
   coord_cartesian(xlim = c(-1, 12), ylim = c(-1, 12)) +
-  ylab(bquote("1-Year Timestep Annual Carbon Flux" ~ (Mg %*% ha^-1))) +
-  xlab(bquote("10-Year Timestep Annual Carbon Flux" ~ (Mg %*% ha^-1)))
+  ylab(bquote("1-Year Timestep Annual Carbon Flux" ~ (Mg %*% ha^-1 %*% year^-1))) +
+  xlab(bquote("10-Year Timestep Annual Carbon Flux" ~ (Mg %*% ha^-1 %*% year^-1)))
 ```
 
 
@@ -1886,7 +1896,7 @@ ggplot(
 
 ```{r projected_carbon_vs_measured_carbon_with_trendline}
 ggplot(
-    projected_vs_measured |> filter(Projection_Years > 0),
+    projected_vs_measured |> filter(Projection_Years > 0) |> arrange(Projection_Years),
     aes(x = Measured_Carbon, y = Projected_Carbon, color = Projection_Years)
   ) +
   geom_point(
@@ -1903,7 +1913,9 @@ ggplot(
     se = FALSE
   ) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nProjected vs. Measured Carbon (Mg/ha)") +
+  ggtitle("Grow-Only Stands FVS Projected vs. Measured Carbon") +
+  xlab(bquote("Projected Stand Carbon" ~(Mg %*% ha^-1))) +
+  ylab(bquote("Measured Stand Carbon" ~(Mg %*% ha^-1))) +
   coord_cartesian(xlim = c(0, 300), ylim = c(0, 300))
 ```
 
@@ -1915,7 +1927,7 @@ vs. projected carbon change.
 
 ```{r measured_vs_projected_carbon_change}
 ggplot(
-    projected_vs_measured |> filter(Projection_Years > 0),
+    projected_vs_measured |> filter(Projection_Years > 0) |> arrange(Projection_Years),
     aes(x = Measured_Carbon_Delta, y = Projected_Carbon_Delta, color = Projection_Years)
   ) +
   geom_point(
@@ -1932,13 +1944,15 @@ ggplot(
     se = FALSE
   ) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nProjected vs. Measured Carbon Change (Mg/ha)") +
+  ggtitle("Grow-Only Stands FVS Projected vs. Measured Carbon Flux") +
+  ylab(bquote("Projected Carbon Delta" ~(Mg %*% ha^-1))) +
+  xlab(bquote("Measured Carbon Delta" ~(Mg %*% ha^-1))) +
   coord_cartesian(xlim = c(-100, 100), ylim = c(-100, 100))
 ```
 
 ```{r measured_vs_projected_carbon_flux}
 ggplot(
-    projected_vs_measured |> filter(Projection_Years > 0),
+    projected_vs_measured |> filter(Projection_Years > 0) |> arrange(Projection_Years),
     aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux, color = Projection_Years)
   ) +
   geom_point(
@@ -1955,21 +1969,28 @@ ggplot(
     se = FALSE
   ) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nProjected vs. Measured Carbon Flux (Mg/ha/year)") +
+  ggtitle("Grow-Only Stands  FVS Projected vs. Measured Annual Carbon Flux") +
+  xlab(bquote("Measured Annual Carbon Flux" ~(Mg %*% ha^-1 %*% year^-1))) +
+  ylab(bquote("Projected Annual Carbon Flux" ~(Mg %*% ha^-1 %*% year^-1))) +
   coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
 ```
 
 ```{r projected-vs-measured-carbon-flux}
+projected_vs_measured_with_n <- projected_vs_measured |>
+  filter(Projection_Years > 0) |>
+  group_by(`Forest Type Group`) |>
+  mutate(`Forest Type Group` = paste0(`Forest Type Group`, ", n=", n())) |>
+  ungroup()
+  
 ggplot(
-    projected_vs_measured |> filter(Projection_Years > 0),
+    projected_vs_measured_with_n,
     aes(Projected_Carbon_Flux, fct_reorder(`Forest Type Group`, Measured_Carbon, .fun = sum))
   ) +
   geom_vline(xintercept = 0, color = 'red') +
   geom_boxplot(varwidth = TRUE) +
   # scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
   geom_point(
-    data = projected_vs_measured |>
-      filter(Projection_Years > 0) |> 
+    data = projected_vs_measured_with_n |>
       group_by(`Forest Type Group`) |> 
       summarize(
         Measured_Carbon_Flux = mean(Measured_Carbon_Flux),
@@ -1982,7 +2003,7 @@ ggplot(
     shape = 4,
     size = 3
   ) +
-  ggtitle(bquote("Projected vs. Measured Carbon Flux")) +
+  ggtitle(bquote("Projected vs. Measured Annual Carbon Flux")) +
   xlab(bquote("Carbon Flux" ~(Mg %*% ha^-1 %*% year^-1))) +
   ylab("Forest Type Group")
 
