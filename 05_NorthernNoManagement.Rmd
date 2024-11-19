@@ -633,7 +633,7 @@ Notes:
 * "composition is stabilized by local landforms and that diversity increases
   with hydrologic catchment area"
 
-##### Computed Estimated Growth
+##### Estimated Growth
 
 Find the diameter growth rate, per species, per plot, over time.
 
@@ -851,7 +851,7 @@ if (file.exists(rds_file)) {
     rename(PLT_CN = CN)
   
   species_mixin <- tbl(fia, 'REF_SPECIES') |>
-    select(SPCD, SCIENTIFIC_NAME)
+    select(SPCD, GENUS, SPECIES, SCIENTIFIC_NAME, JENKINS_SPGRPCD)
   
   prev_tre_mixin <- tbl(fia, 'TREE') |>
     select(CN, PLT_CN, DIA) |>
@@ -871,8 +871,6 @@ if (file.exists(rds_file)) {
     ) |>
     # Live trees
     filter(CONDID == 1) |>
-    # Trees that don't shrink
-    # anti_join(tree_negative_growth |> select(CN), by = join_by(CN), copy = TRUE) |>
     # Self-join to previous tree to get growth increment
     left_join(prev_tre_mixin, by = join_by(PREV_TRE_CN)) |>
     left_join(species_mixin, by = join_by(SPCD)) |>
@@ -884,34 +882,82 @@ if (file.exists(rds_file)) {
     ) |>
     # Many trees will have no previous tree, filter those out.
     filter(!is.na(PREV_TRE_CN)) |>
-    # Filter out trees that shrink
-    filter(DIA_INCR >= 0) |>
     select(
       CN, PREV_TRE_CN, PLT_CN, PREV_PLT_CN,
-      STATECD, COUNTYCD, PLOT, SUBP, TREE, SPGRPCD, SPCD, SCIENTIFIC_NAME,
+      STATECD, COUNTYCD, PLOT, SUBP, TREE,
+      SPGRPCD, JENKINS_SPGRPCD, SPCD, GENUS, SPECIES, SCIENTIFIC_NAME,
       MEASYEAR, PREV_MEASYEAR, CCLCD, DIA, PREV_DIA, DIA_INCR, AGE_INCR, ANN_DIA_GROWTH
     ) |>
     arrange(STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR) |>
     collect()
   
   dbDisconnect(fia)
-  rm(fia, measyear_mixin, species_mixin, prev_tre_mixin)
-  
+
+  jenkins_spgrpcd_mixin <- read_csv(
+      "data/raw/FIADB_11.5.17_JENKINS_SPGRPCD.csv", 
+      col_types = cols(JENKINS_SPGRPCD = col_integer())
+    ) |>
+    select(JENKINS_SPGRPCD, NAME) |>
+    rename(JENKINS_SPGRP_NAME = NAME)
+
+  tree_growth <- tree_growth |>
+    left_join(jenkins_spgrpcd_mixin, by = join_by(JENKINS_SPGRPCD))
+
+  rm(fia, measyear_mixin, species_mixin, prev_tre_mixin, jenkins_spgrpcd_mixin)
+
   write_rds(tree_growth, rds_file)
 }
 ```
 
-TODO:
-- TREE.SPGRPCD is broader than SPCD, group by that instead
-- TREE.CCLCD - Crown Class code
-  - 1 - Open grown - full light from above and all sides for most of their life
-  - 2 - Dominant - crown above general canopy
-  - 3 - Codominant - crown part of general canopy
-  - 4 - Intermediate - crown either below or extending into the canopy
-  - 5 - Overtopped - crown entirely below general canopy
+```{r}
+one_pct <- 0.01
+two_pct <- 0.025
+y <- tree_growth |>
+  filter(!is.na(ANN_DIA_GROWTH)) |>
+  group_by(SPCD) |>
+  arrange(ANN_DIA_GROWTH) |>
+  mutate(
+    ONE_LOWER_BOUND = n() * one_pct,
+    TWO_LOWER_BOUND = n() * two_pct,
+    ROW_NUMBER = row_number(),
+    TWO_UPPER_BOUND = n() - n() * two_pct,
+    ONE_UPPER_BOUND = n() - n() * one_pct,
+    ONE_OUTLIER = (row_number() < (n() * one_pct)) | (row_number() > (n() - n() * one_pct)),
+    TWO_OUTLIER = (row_number() < (n() * two_pct)) | (row_number() > (n() - n() * two_pct))
+  ) |>
+  ungroup()
+x <- y |> mutate(OUTLIERS_REMOVED = "0%") |>
+  union_all(y |> filter(!ONE_OUTLIER) |> mutate(OUTLIERS_REMOVED = "1%")) |>
+  union_all(y |> filter(!TWO_OUTLIER) |> mutate(OUTLIERS_REMOVED = "2.5%")) |>
+  group_by(OUTLIERS_REMOVED) |>
+  mutate(OUTLIERS_REMOVED = paste0(OUTLIERS_REMOVED, ", n=", n())) |>
+  ungroup()
+```
+
+
+```{r}
+ggplot(
+    x,
+    aes(ANN_DIA_GROWTH, color = OUTLIERS_REMOVED)
+  ) +
+  geom_boxplot() +
+  coord_cartesian(x = c(-1, 1)) +
+  scale_y_continuous(breaks = NULL)
+
+```
+
+##### Estimated Growth Rate
 
 ```{r tree_growth_rate}
-tree_growth_dom <- tree_growth |>
+filtered_growth <- tree_growth |>
+  filter(!is.na(ANN_DIA_GROWTH)) |>
+  group_by(SPCD) |>
+  arrange(ANN_DIA_GROWTH) |>
+  mutate(OUTLIER = (row_number() < (n() * 0.01)) | (row_number() > (n() - n() * 0.01))) |>
+  ungroup() |>
+  filter(!OUTLIER)
+
+tree_growth_dom <- filtered_growth |>
   filter(CCLCD < 4) |>
   group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD) |>
   summarize(
@@ -919,7 +965,7 @@ tree_growth_dom <- tree_growth |>
     .groups = 'keep'
   ) |>
   ungroup()
-tree_growth_nondom <- tree_growth |>
+tree_growth_nondom <- filtered_growth |>
   filter(CCLCD > 3) |>
   group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD) |>
   summarize(
@@ -927,27 +973,29 @@ tree_growth_nondom <- tree_growth |>
     .groups = 'keep'
   ) |>
   ungroup()
-tree_growth_spcd <- tree_growth |>
+tree_growth_spcd <- filtered_growth |>
   group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD) |>
   summarize(
     DIA_INCR_SPCD = mean(DIA_INCR, na.rm = TRUE),
     .groups = 'keep'
   ) |>
   ungroup()
-tree_growth_spgrpcd <- tree_growth |>
+tree_growth_spgrpcd <- filtered_growth |>
   group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPGRPCD) |>
   summarize(
     DIA_INCR_SPGRPCD = mean(DIA_INCR, na.rm = TRUE),
     .groups = 'keep'
   ) |>
   ungroup()
-tree_growth_multiyear <- tree_growth |>
+tree_growth_multiyear <- filtered_growth |>
   group_by(STATECD, COUNTYCD, PLOT, SPGRPCD) |>
   summarize(
     DIA_INCR_MULTIYEAR = mean(DIA_INCR, na.rm = TRUE),
     .groups = 'keep'
   ) |>
   ungroup()
+# prev_measyear_mixin does not use filtered_growth
+# so that we don't project across multiple inventories
 prev_measyear_mixin <- tree_growth |>
   group_by(STATECD, COUNTYCD, PLOT, MEASYEAR) |>
   summarize(
@@ -955,7 +1003,7 @@ prev_measyear_mixin <- tree_growth |>
     .groups = 'keep'
   ) |>
   ungroup()
-tree_growth_rate <- tree_growth |>
+tree_growth_rate <- filtered_growth |>
   group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPGRPCD, SPCD) |>
   summarize(.groups = 'keep') |>
   ungroup() |>
@@ -979,6 +1027,8 @@ tree_growth_rate <- tree_growth |>
   )
 ```
 
+##### One-Shot Back-Projection
+
 Can we use that to back-project ingrown trees?
 
 ```{r manual_back_projection}
@@ -1001,6 +1051,9 @@ manual_back_projection |> filter(abs(DIA_ERR) < 0.1) |> nrow() /
 ```
 
 37%, which is marginally less awful. Also, 35 trees end up with no ANN_DIA_GROWTH.
+
+##### Stepwise Back-Projection
+
 Next up:
 * walk back using multiple growth rates
 * back-project to when the tree was 3" DBH
@@ -1012,8 +1065,9 @@ they're all filled in. Or 4 times, which is safer.
 ```{r init_stepwise_manual_back_projection}
 manual_back_projection <- tree_ingrown_prev |>
   # Start with trees that have a previous tree (so we can back-project from them),
-  # but have no next tree (so nothing can back-project to them)
-  filter(!is.na(PREV_TRE_CN) & is.na(NEXT_TRE_CN)) |>
+  # in the inventory in which they're marked as ingrowth
+  semi_join(tree_ingrown |> select(TRE_CN), by = join_by(CN == TRE_CN)) |>
+  filter(!is.na(PREV_TRE_CN)) |>
   select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, PREV_TRE_CN, NEXT_TRE_CN, DIA) |>
   # This will add: PREV_MEASYEAR, DIA_INCR, ANN_DIA_GROWTH
   left_join(
@@ -1024,6 +1078,14 @@ manual_back_projection <- tree_ingrown_prev |>
   mutate(DIA_EST = DIA) |>
   mutate(PREV_DIA_EST = DIA - DIA_INCR) |>
   mutate(DIA_ERR = abs((DIA - DIA_EST) / DIA))
+
+# Remove post-ingrowth inventories of ingrown trees
+manual_back_projection <- manual_back_projection |>
+  anti_join(
+    manual_back_projection |> select(NEXT_TRE_CN) |> distinct(),
+    by = join_by(CN == NEXT_TRE_CN)
+  )
+
 # Back-projectable trees:
 manual_back_projection |> nrow()
 ```
@@ -1033,11 +1095,6 @@ prev_tre_cns <- manual_back_projection |>
   select(PREV_TRE_CN) |>
   filter(!is.na(PREV_TRE_CN)) |>
   distinct()
-
-checkpoint <- function(.data, message) {
-  print(message)
-  .data
-}
 
 iterations <- 0
 while (nrow(prev_tre_cns) > 0) {
@@ -1094,6 +1151,8 @@ manual_back_projection |>
   ungroup() |> nrow()
 ```
 
+##### Apply Back-Projection
+
 ```{r projected_vs_measured_annual_growth}
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 jenkins_spgrpcd <- read_csv(
@@ -1128,11 +1187,12 @@ projected_annual_growth <- tree_ingrown_last |>
   mutate(DIA_ERR = (FRST_DIA - DIA_EST)) |>
   mutate(ANN_DIA_PROJ = (DIA - DIA_EST) / (MEASYEAR - FRST_MEASYEAR)) |>
   mutate(ANN_DIA_ERR = DIA_ERR / (MEASYEAR - FRST_MEASYEAR)) |>
-  #left_join(scientific_name_mixin, by = join_by(SPCD)) |>
   filter(!is.na(DIA_ERR)) |>
   left_join(species_mixin, by = join_by(SPCD)) |>
-  group_by(SPGRP_NAME) |>
-  mutate(GROUP_NAME = paste0(SPGRP_NAME, ", n=", n())) |>
+  #group_by(SPGRP_NAME) |>
+  # mutate(GROUP_NAME = paste0(SPGRP_NAME, ", n=", n())) |>
+  group_by(JENKINS_SPGRP_NAME) |>
+  mutate(GROUP_NAME = paste0(JENKINS_SPGRP_NAME, ", n=", n())) |>
   ungroup()
 
 ggplot(
@@ -1146,13 +1206,12 @@ ggplot(
     data = projected_annual_growth |>
       group_by(GROUP_NAME) |> 
       summarize(
-        ANN_DIA_GROWTH = mean((DIA - FRST_DIA) / (MEASYEAR - FRST_MEASYEAR)),
+        ANN_DIA = mean(ANN_DIA),
         .groups = 'keep'
       ) |> 
-      ungroup() |>
-      mutate(ANN_DIA_GROWTH = conv_unit(ANN_DIA_GROWTH, "in", "cm"))
+      ungroup()
     ,
-    aes(ANN_DIA_GROWTH),
+    aes(ANN_DIA),
     color = 'blue',
     shape = 4,
     size = 3
@@ -1165,12 +1224,19 @@ ggplot(
 
 ```{r}
 ggplot(
-    projected_annual_growth,
-    aes(ANN_DIA_PROJ, fct_rev(fct_infreq(SPGRP_NAME)))
+    projected_annual_growth |>
+      select(CN, GROUP_NAME, ANN_DIA, ANN_DIA_PROJ) |>
+      rename(Measured = ANN_DIA, Projected = ANN_DIA_PROJ) |>
+      melt(
+        id.vars = c("CN", "GROUP_NAME"),
+        variable.name = "Method",
+        value.name = "Diameter"),
+    aes(Diameter, fct_rev(fct_infreq(GROUP_NAME)), color = Method)
   ) +
-  geom_boxplot(aes(ANN_DIA), varwidth = TRUE, color = 'blue', position = position_nudge(y = -.25)) +
-  geom_boxplot(varwidth = TRUE, color = 'black') +
-  geom_vline(xintercept = 0, color = 'red') +
+  geom_boxplot() +
+  scale_color_manual(values = c("blue", "black")) +
+  # facet_wrap("GROUP_NAME") +
+  # scale_y_continuous(breaks = NULL) +
   ggtitle("Projected vs. Measured Annual Growth of Ingrown Trees") +
   xlab(bquote("Annual Growth " ~(cm %*% year^{-1}))) +
   ylab("Species Group")
@@ -1626,6 +1692,7 @@ Consolidate outputs; average the multiple runs with different random seeds.
 ```{r}
 FVS_Carbon_NONE <- FVS_Carbon |>
   filter(Timestep == 10) |>
+#  filter(RanNSeed == 1)
   group_by(StandID, Year) |>
   summarize(
     Aboveground_Total_Live = mean(Aboveground_Total_Live),
@@ -1636,6 +1703,7 @@ FVS_Carbon_NONE <- FVS_Carbon |>
 
 FVS_Carbon_ANNL <- FVS_Carbon |>
   filter(Timestep == 1) |>
+#  filter(RanNSeed == 1)
   group_by(StandID, Year) |>
   summarize(
     Aboveground_Total_Live = mean(Aboveground_Total_Live),
@@ -1695,7 +1763,7 @@ remove(
 
 ```{r annual_vs_decadal}
 decadal_carbon_tmp <- FVS_Carbon_NONE |>
-  rename(Decadal_Carbon = Total_Stand_Carbon) |>
+  rename(Decadal_Carbon = Aboveground_Total_Live) |>
   mutate(STAND_ID = paste0(
      substring(StandID, 1, 2),
      substring(StandID, 5, 12)
@@ -1703,7 +1771,7 @@ decadal_carbon_tmp <- FVS_Carbon_NONE |>
   select(STAND_ID, Year, Decadal_Carbon)
 
 annual_carbon_tmp <- FVS_Carbon_ANNL |>
-  rename(Annual_Carbon = Total_Stand_Carbon) |>
+  rename(Annual_Carbon = Aboveground_Total_Live) |>
   mutate(STAND_ID = paste0(
      substring(StandID, 1, 2),
      substring(StandID, 5, 12)
@@ -1758,19 +1826,21 @@ ggplot(
     annual_vs_decadal |> filter(Projection_Years > 0) |> arrange(Projection_Years),
     aes(x = Decadal_Carbon_Flux, y = Annual_Carbon_Flux, color = Projection_Years)
   ) +
+  geom_abline(intercept = 0, slope = 1, color = "red") +
   geom_point(
     size = 2,
     alpha = 0.25,
   ) +
-  geom_abline(intercept = 0, slope = 1, color = "red") +
   facet_wrap(~`Forest Type Group`) +
   ggtitle(bquote("Annual Carbon Flux for 1- vs. 10-year Timestep")) +
-  coord_cartesian(xlim = c(-1, 12), ylim = c(-1, 12)) +
-  ylab(bquote("1-Year Timestep Annual Carbon Flux" ~ (Mg %*% ha^-1 %*% year^-1))) +
-  xlab(bquote("10-Year Timestep Annual Carbon Flux" ~ (Mg %*% ha^-1 %*% year^-1)))
+  coord_cartesian(xlim = c(-1, 8), ylim = c(-1, 8)) +
+  ylab(bquote("1-Year Timestep Annual Carbon Flux" ~ (MgC %*% ha^-1 %*% year^-1))) +
+  xlab(bquote("10-Year Timestep Annual Carbon Flux" ~ (MgC %*% ha^-1 %*% year^-1)))
 ```
 
-
+```{r}
+summary(annual_vs_decadal[,c("Annual_Carbon_Flux", "Decadal_Carbon_Flux")])
+```
 
 ### Projected vs. Measured
 
@@ -1872,7 +1942,7 @@ ggplot(
     alpha = 0.25,
   ) +
   geom_abline(intercept = 0, slope = 0) +
-  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
+  #scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
   facet_wrap(~`Forest Type Group`) +
   ggtitle("Grow-Only Stands\nChange in FVS Measured BA (m² / ha) vs. Projection Years")
 ```
@@ -2278,6 +2348,7 @@ ggplot(
   geom_point(
     alpha = 0.25
   ) +
+  scale_x_log10() +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
