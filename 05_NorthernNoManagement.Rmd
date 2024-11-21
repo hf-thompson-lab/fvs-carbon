@@ -26,6 +26,31 @@ library(pbapply) # Progress bar for long operations
 source('R/functions.R')
 ```
 
+```{r species_mixin}
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+
+jenkins_spgrpcd_mixin <- read_csv(
+    "data/raw/FIADB_11.5.17_JENKINS_SPGRPCD.csv", 
+    col_types = cols(JENKINS_SPGRPCD = col_integer())
+  ) |>
+  select(JENKINS_SPGRPCD, NAME) |>
+  rename(JENKINS_SPGRP_NAME = NAME)
+
+species_mixin <- tbl(fia, 'REF_SPECIES') |>
+  select(SPCD, GENUS, SPECIES, E_SPGRPCD, JENKINS_SPGRPCD, SCIENTIFIC_NAME) |>
+  left_join(
+    tbl(fia, 'REF_SPECIES_GROUP') |> distinct(SPGRPCD, NAME),
+    by = join_by(E_SPGRPCD == SPGRPCD)
+  ) |>
+  rename(SPGRPCD = E_SPGRPCD, SPGRP_NAME = NAME) |>
+  collect() |>
+  left_join(jenkins_spgrpcd_mixin, by = join_by(JENKINS_SPGRPCD))
+
+dbDisconnect(fia)
+
+rm(fia, jenkins_spgrpcd_mixin)
+```
+
 ## Grow-Only Plots in the Northeast
 
 Find all FIA plots in the northeastern region that are grow-only, that have
@@ -371,51 +396,127 @@ ingrowth from the FIA data.
 
 #### Observed Ingrowth
 
-fia.TREE_GRM_COMPONENT.MICR_COMPONENT_AL_FOREST is set to 'INGROWTH' when
-the tree is judged to be 'established'. Only one record for the tree will
-be marked 'INGROWTH'; it may have other records with other components, e.g.
-'SURVIVOR'.
+fia.TREE_GRM_COMPONENT will mark a tree as 'INGROWTH' when
+the tree is judged to be 'established', with a corresponding TREE record.
+A tree marked 'INGROWTH' may have multiple TREE records if it is inventoried
+after ingrowth, and if it grows on a microplot, in which case it will be
+tracked from the time it is 1" DBH. If the tree grows on the microplot, then
+its ingrowth is marked in MICR_COMPONENT_AL_FOREST; otherwise it is marked
+in SUBP_COMPONENT_AL_FOREST. Multiple TREE_GRM_COMPONENT records for the tree
+can be marked 'INGROWTH', in different inventories. It may also have other
+records with other components, e.g. trees on the microplot will have a
+'SURVIVOR' record in each inventory prior to ingrowth.
 
-```{r tree_ingrown}
+```{r grm_ingrown}
 # We want ingrowth for all the plots in plot_grow_only
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 
 # Get PLT_CN for all plots in plot_grow_only, for all valid INVYR
-plt_cns <- tbl(fia, 'PLOT') |>
+plt_cns_mixin <- tbl(fia, 'PLOT') |>
   semi_join(plot_grow_only, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
-  select(CN) |>
+  select(CN, MEASYEAR) |>
   distinct() |> # should be redundant, but doesn't appear to be
   rename(PLT_CN = CN)
 
-# Get all the Tree Growth, Removal, and Mortality entries for those plots,
-# where MICR_COMPONENT_AL_FOREST = 'INGROWTH'
-tree_ingrown <- tbl(fia, 'TREE_GRM_COMPONENT') |>
-  semi_join(plt_cns, by = join_by(PLT_CN)) |>
+tree_mixin <- tbl(fia, 'TREE') |>
+  select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR) |>
+  rename(TRE_CN = CN)
+
+# Get all the Tree Growth, Removal, and Mortality entries for those plots that
+# are marked as INGROWTH, either on a microplot or subplot.
+grm_ingrown <- tbl(fia, 'TREE_GRM_COMPONENT') |>
+  inner_join(plt_cns_mixin, by = join_by(PLT_CN)) |>
   ingrowth_filter() |>
   select(
-    TRE_CN, PREV_TRE_CN, PLT_CN,# STATECD, COUNTYCD, PLOT,
+    TRE_CN, PREV_TRE_CN, PLT_CN, MEASYEAR,
     DIA_BEGIN, DIA_MIDPT, DIA_END, ANN_DIA_GROWTH, ANN_HT_GROWTH,
     MICR_COMPONENT_AL_FOREST, MICR_TPAGROW_UNADJ_AL_FOREST,
     SUBP_COMPONENT_AL_FOREST, SUBP_TPAGROW_UNADJ_AL_FOREST
   ) |>
-  collect() # It ends up faster to materialize and copy back for pre_ingrowth
+  # Pick only the first ingrowth record
+  left_join(tree_mixin, by = join_by(TRE_CN)) |>
+  group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
+  filter(INVYR == min(INVYR, na.rm = TRUE)) |>
+  ungroup() |>
+  collect()
 dbDisconnect(fia)
-rm(fia, plt_cns)
-print(paste0("Ingrown trees: ", tree_ingrown |> nrow()))
-print(paste0("Ingrown trees over 3\" DBH: ", tree_ingrown |> filter(DIA_END > 3) |> nrow()))
+rm(fia, plt_cns_mixin)
+print(paste0("Ingrown trees: ", grm_ingrown |> nrow()))
+print(paste0(
+  "  ",
+  nrow(grm_ingrown) /
+    nrow(plot_grow_only) /
+    (max(grm_ingrown$MEASYEAR) - min(grm_ingrown$MEASYEAR)),
+  " ingrown trees / plot / year"))
+print(paste0("Ingrown trees over 3\" DBH: ", grm_ingrown |> filter(DIA_END > 3) |> nrow()))
 ```
 
-There are ~55,000 trees that ingrow over the 20 years, so about one tree per
-plot per year.
+#### FVS Restrictions on Ingrowth
+
+FIA marks a tree as INGROWTH when it reaches 5" DBH; FVS Establishment
+is restricted to trees <= 3" DBH:
+
+Trees are injected into FVS via the Regeneration and Establishment model,
+using the `Estab` keyword. This allows trees to be added to a plot during
+a run. Normally these trees are seedlings, which the model will then grow;
+the HTADJ keyword overrides the seedling processing and allows injection of
+saplings.
+
+The FVS guide to the Regeneration and Establishment model,
+Appendix C on details for keywords, for HTADJ, says:
+
+> Adjust regeneration tree heights before they are passed
+> to the Prognosis Model. Heights after adjustment are
+> bounded between the minimum establishment height
+> listed in table 1 and the height of a tree 3 inches d.b.h.
+
+```{r grm_ingrown_histogram}
+grm_ingrown |>
+  mutate(
+    `> 3" DBH` = if_else(DIA_END > 3, MEASYEAR, NA),
+    `≤ 3" DBH` = if_else(DIA_END <= 3, MEASYEAR, NA)
+  ) |>
+  select(TRE_CN, `> 3" DBH`, `≤ 3" DBH`) |>
+  melt(
+    id.vars = c('TRE_CN'),
+    variable.name = 'Diameter at Ingrowth',
+    value.name = 'Year'
+  ) |>
+  filter(!is.na(Year)) |>
+  ggplot(aes(Year, fill = `Diameter at Ingrowth`)) +
+    geom_histogram(binwidth = 1) +
+    scale_fill_manual(values = c("red", "blue")) +
+    ggtitle('Ingrown trees on NRS grow-only plots') +
+    xlab('Year') +
+    ylab('Count')
+
+```
+
+```{r grm_ingrown_boxplot}
+grm_ingrown |>
+  select(DIA_END) |>
+  ggplot(aes(DIA_END)) +
+  geom_boxplot() +
+  scale_y_continuous(breaks = NULL) +
+  xlab('Diameter at Ingrowth (inches)') +
+  geom_vline(xintercept = 3, color = 'red')
+```
+
+There are ~55,000 trees that ingrow over the 25 years, so about 2 trees per
+plot per 3 years.
 Most of these trees are over the 3"DBH diameter limit on ingrowth set by FVS.
 
 #### Tree History
 
-Trees >1" DBH that grow on the microplot are in the TREE table in FIA,
+Trees >=1" DBH that grow on the microplot are in the TREE table in FIA,
 so in some cases we should be able to follow a tree back to the point when it
-was <=3" DBH.
+was <=3" DBH. The microplot is ~8% of the plot, so we would expect ~8% of
+ingrown trees to have observations prior to ingrowth, assuming that it
+normally takes more than the average inter-inventory timespan (5 years) for
+a tree to reach ingrowth size.
 
-For this section, we'll use the following terminology:
+For this section, we'll use the following terminology, aligned with the FIA
+database:
 
 - Tree - an individual observation of a tree; a single record in the TREE table
 - Tree History - a sequence of Trees linked by CN / PREV_TRE_CN in the TREE table
@@ -424,82 +525,90 @@ For this section, we'll use the following terminology:
 
 We identify a Tree History by the CN of the last tree in the history.
 
+tree_ingrown - all tree records for ingrown trees, including pre- and
+               post-ingrowth
 
-```{r tree_ingrown_prev}
-rds_file <- 'data/intermediate/tree_ingrown_prev.rds'
+NB: This takes about 5 minutes on a laptop.
+
+```{r tree_ingrown}
+rds_file <- 'data/intermediate/tree_ingrown.rds'
 if (file.exists(rds_file)) {
-  tree_ingrown_prev <- read_rds(rds_file)
+  tree_ingrown <- read_rds(rds_file)
 } else {
+  # CNs of the ingrown trees; these will be the heads of the tree histories
+  grm_ingrown_cns <- grm_ingrown |>
+    select(TRE_CN) |>
+    rename(CN = TRE_CN)
+  
+  # Re-use the database connection
   fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-  fia_tree <- tbl(fia, 'TREE')
-  fia_tree_cols <- function(.data) {
-    .data |>
+
+  # fetch_trees - fetch all of the trees that have ever been live on a plot
+  fetch_trees <- function(row) {
+    statecd <- row[["STATECD"]]
+    countycd <- row[["COUNTYCD"]]
+    plot <- row[["PLOT"]]
+
+    measyear_mixin <- tbl(fia, 'PLOT') |>
+      select(CN, MEASYEAR) |>
+      rename(PLT_CN = CN)
+  
+    all_trees <- tbl(fia, 'TREE') |>
+      filter(
+        STATECD == statecd &
+        COUNTYCD == countycd &
+        PLOT == plot
+      ) |>
+      # Only live trees
+      filter(CONDID == 1) |>
+      left_join(measyear_mixin, by = join_by(PLT_CN)) |>
       select(
         CN, PLT_CN, PREV_TRE_CN,
         INVYR, MEASYEAR, STATECD, COUNTYCD, PLOT, SUBP, TREE, CONDID,
         STATUSCD, SPCD, DIA, DIAHTCD, HT, HTCD, ACTUALHT, BHAGE, TOTAGE, SITREE,
         PREVDIA, P2A_GRM_FLG, PREV_STATUS_CD, TPA_UNADJ
-      )
-  }
-  
-  measyear_mixin <- tbl(fia, 'PLOT') |>
-    select(CN, MEASYEAR) |>
-    rename(PLT_CN = CN)
-
-    # Start with the ingrown trees to walk back the chain of previous trees
-  prev_tre_cns <- ingrowth |>
-    select(TRE_CN) |>
-    filter(!is.na(TRE_CN)) |>
-    rename(CN = TRE_CN) |>
-    distinct()
-  
-  # SQLite3 takes days to do the semi_join at scale (despite joining on an index),
-  # so we run in chunks of 1000 which completes in about 30 minutes.
-  progress_total = nrow(prev_tre_cns)
-  tree_ingrown_prev <- NULL
-  while (nrow(prev_tre_cns) > 0) {
-    progress_remaining = nrow(prev_tre_cns)
-    print(paste0(
-      progress_remaining,
-      " / ",
-      progress_total,
-      " remaining"
-    ))
-    chunk <- prev_tre_cns |> head(1000)
-    more_prev_trees <- fia_tree |>
-      semi_join(chunk, by = join_by(CN), copy = TRUE) |>
-      left_join(measyear_mixin, by = join_by(PLT_CN)) |>
-      fia_tree_cols() |>
+      ) |>
       collect()
-    tree_ingrown_prev <- rbind(tree_ingrown_prev, more_prev_trees) |>
-      distinct() # Should be redundant, but isn't
-  
-    # Add all new prev_tre_cn to the pool
-    prev_tre_cns <- prev_tre_cns |>
-      union_all(
-        more_prev_trees |>
+    
+    # Start with the trees at the time of ingrowth
+    tree_ingrown <- all_trees |>
+      semi_join(grm_ingrown_cns, by = join_by(CN))
+
+    prev_tre_cns <- tree_ingrown |>
+      select(PREV_TRE_CN) |>
+      filter(!is.na(PREV_TRE_CN)) |>
+      distinct() 
+
+    while (nrow(prev_tre_cns) > 0) {
+      more_trees <- all_trees |>
+        semi_join(prev_tre_cns, by = join_by(CN == PREV_TRE_CN))
+      tree_ingrown <- rbind(tree_ingrown, more_trees) |>
+        distinct() # Should be redundant, but isn't
+      prev_tre_cns <- more_trees |>
         select(PREV_TRE_CN) |>
         filter(!is.na(PREV_TRE_CN)) |>
-        rename(CN = PREV_TRE_CN)
-      ) |>
-      distinct() |>
-      # remove already processed prev_tre_cns
-      anti_join(chunk, by = join_by(CN))
+        distinct()
+    }
+    return(tree_ingrown)
   }
+
+  tree_ingrown <- reduce(
+    pbapply(plot_grow_only, 1, fetch_trees),
+    bind_rows
+  )
   
-  next_tre_mixin <- tree_ingrown_prev |>
+  next_tre_mixin <- tree_ingrown |>
     select(CN, PREV_TRE_CN) |>
     rename(NEXT_TRE_CN = CN, CN = PREV_TRE_CN)
 
-  tree_ingrown_prev <- tree_ingrown_prev |>
+  tree_ingrown <- tree_ingrown |>
     left_join(next_tre_mixin, by = join_by(CN))
   
   dbDisconnect(fia)
-  remove(fia, fia_tree, fia_tree_cols, measyear_mixin, prev_tre_cns,
-         progress_total, progress_remaining, chunk,
-         more_prev_trees, next_tre_mixin)
 
-  write_rds(tree_ingrown_prev, rds_file)
+  remove(fia, grm_ingrown_cns, next_tre_mixin)
+
+  write_rds(tree_ingrown, rds_file)
 }
 ```
 
@@ -511,14 +620,14 @@ Walk the tree history to see what diameter we can get to.
 # PREV_TRE_CN - the next earlier CN in this tree history, if any
 # FRST_DIA - the earliest available DIA in this tree history
 # FRST_TRE_CN - the earliest available CN in this tree history
-tree_ingrown_last <- tree_ingrown |>
+tree_ingrown_last <- grm_ingrown |>
   select(TRE_CN, PREV_TRE_CN, DIA_END) |>
   rename(CN = TRE_CN, DIA = DIA_END) |>
   # Initialize FRST_TRE_CN to CN; we'll overwrite this
   # as we walk the chain of PREV_TRE_CNs
   mutate(FRST_DIA = DIA, FRST_TRE_CN = CN)
 
-trees_rhs <- tree_ingrown_prev |>
+trees_rhs <- tree_ingrown |>
   select(CN, PREV_TRE_CN, DIA)
 
 tree_cns_todo <- tree_ingrown_last |>
@@ -554,7 +663,7 @@ while (nrow(tree_cns_todo) > 0) {
     filter(!is.na(PREV_TRE_CN))
 }
 
-measyear_mixin <- tree_ingrown_prev |>
+measyear_mixin <- tree_ingrown |>
   select(CN, MEASYEAR)
 
 tree_ingrown_last <- tree_ingrown_last |>
@@ -593,9 +702,10 @@ get to the first observed diameter.
 tree_growth_fia <- tree_ingrown_last |>
   filter(FRST_DIA < DIA) |>
   # Add on FIA growth rate
-  left_join(tree_ingrown |> select(TRE_CN, ANN_DIA_GROWTH), by = join_by(CN == TRE_CN)) |>
-  mutate(DIA_PROJ = DIA - (MEASYEAR - FRST_MEASYEAR) * ANN_DIA_GROWTH) |>
-  mutate(DIA_ERR = abs(100 * (DIA_PROJ - FRST_DIA) / FRST_DIA)) |>
+  left_join(grm_ingrown |> select(TRE_CN, ANN_DIA_GROWTH), by = join_by(CN == TRE_CN)) |>
+  mutate(DIA_EST = DIA - (MEASYEAR - FRST_MEASYEAR) * ANN_DIA_GROWTH) |>
+  mutate(DIA_ERR = abs(100 * (DIA_EST - FRST_DIA) / FRST_DIA)) |>
+  filter(!is.na(DIA_ERR)) |>
   arrange(DIA_ERR)
 
 ggplot(tree_growth_fia, aes(DIA_ERR, after_stat(100 * count / sum(count)))) +
@@ -610,224 +720,33 @@ This shows that using the FIA growth rate, only 20% of trees back-project
 to within 10% of their first surveyed diameter, so we can't rely on the FIA
 growth rate when we don't have previous tree records for an ingrown tree.
 
-Ideas:
-
-* compute our own species-wide growth rate for the date range and site
-  * can look at seedling / sapling growth rates and use them
-  * can look at seedling / sapling growth rates and correlate them with
-    growth rates for trees with DBH>=5, then use those modeled rates
-  * can compute a species-wide growth rate for a date range
-* plot change in dbh by age class, see if it is uniform
-  * maybe look at the difference in annual diameter growth across classes
-    within the same plot, in order to normalize for plot?
-  * by species
-  * by stand class - new growth / secondary / tertiary / old growth
-
 Notes:
 
 * Regeneration is heavily influenced by many things, from canopy structure
   to seed availability to predation to timing of canopy opening
 * See competing articles on "Oh no! We get only sugar maple and no beech!"
   vs. "Oh no! We get only beech and no sugar maple!"
-* The best indicator of regeneration will unquestionably be actual regeneration
-* "composition is stabilized by local landforms and that diversity increases
+* "composition is stabilized by local landforms and [...] diversity increases
   with hydrologic catchment area"
+* The best indicator of regeneration will unquestionably be actual regeneration
 
-##### Estimated Growth
+##### Observed Growth Rates
 
-Find the diameter growth rate, per species, per plot, over time.
+To estimate the time at which an ingrown tree was 3" DBH, we can project
+growth backward in time based on the growth rates of similar trees. Defining
+"similar" needs to be done with care. We can validate a model using the 8% of
+ingrown trees for which we have measurements prior to ingrowth. We can use
+our method to project these trees back in time to the earliest measurement,
+and see how close we get to the measured value.
 
-```{r tree_negative_growth}
-rds_file <- 'data/intermediate/tree_negative_growth.rds'
-if (file.exists(rds_file)) {
-  tree_negative_growth <- read_rds(rds_file)
-} else {
-  fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-  fetch_trees <- function(row) {
-    statecd <- row[["STATECD"]]
-    countycd <- row[["COUNTYCD"]]
-    plot <- row[["PLOT"]]
-    #print(paste("Plot", statecd, countycd, plot, sep = " "))
-    trees <- tbl(fia, 'TREE') |>
-      filter(
-        STATECD == statecd &
-        COUNTYCD == countycd &
-        PLOT == plot
-      ) |>
-      filter(CONDID == 1) |>
-      select(CN, DIA, PREV_TRE_CN) |>
-      collect()
+To do this, we need to caputre how much each tree grew in each inventory.
 
-    has_next_tree <- trees |>
-      select(PREV_TRE_CN) |>
-      rename(CN = PREV_TRE_CN)
-
-    tree_growth <- trees |>
-      # start with trees that have no next tree
-      anti_join(has_next_tree, by = join_by(CN)) |>
-      mutate(FRST_TRE_CN = CN, FRST_DIA = DIA)
-
-    #print(paste0("  ", nrow(tree_growth), " trees"))
-
-    prev_tre_cns <- tree_growth |>
-      select(PREV_TRE_CN) |>
-      filter(!is.na(PREV_TRE_CN)) |>
-      distinct()
-
-    iterations <- 0
-    while (nrow(prev_tre_cns) > 0) {
-      #print(paste0(
-      #  "  Iteration: ",
-      #  iterations <- iterations + 1,
-      #  ", CNs: ",
-      #  nrow(prev_tre_cns)
-      #))
+tree_growth - adds DIA/HT_DELTA, AGE_DELTA, and ANN_DIA/HT_DELTA to each tree
+  *_DELTA - diameter change since previous inventory
+  *_DELTA - age change since previous inventory
+  ANN_*_DELTA - annualize rate of diameter change since previous inventory
   
-      tmp_trees <- trees |>
-        semi_join(prev_tre_cns, by = join_by(CN == PREV_TRE_CN)) |>
-        rename(PREV_DIA = DIA) |>
-        select(CN, PREV_DIA, PREV_TRE_CN)
-
-      tree_growth <- tree_growth |>
-        left_join(tmp_trees, by = join_by(PREV_TRE_CN == CN)) |>
-        mutate( # Update FRST_DIA if there is a new one
-          FRST_DIA = coalesce(PREV_DIA, FRST_DIA)
-        ) |>
-        mutate( # Update FRST_TRE_CN if there is a new one
-          FRST_TRE_CN = coalesce(PREV_TRE_CN.y, FRST_TRE_CN)
-        ) |>
-        mutate( # Move PREV_TRE_CN one time hop on records that joined
-          PREV_TRE_CN = if_else(is.na(PREV_DIA), PREV_TRE_CN, PREV_TRE_CN.y)
-        ) |>
-        select(CN, PREV_TRE_CN, DIA, FRST_TRE_CN, FRST_DIA)
-      prev_tre_cns <- tmp_trees |>
-        select(PREV_TRE_CN) |>
-        filter(!is.na(PREV_TRE_CN)) |>
-        distinct()
-    }
-
-    return(tree_growth)
-  }
-  
-  tree_negative_growth <- reduce(
-      pbapply(plot_grow_only, 1, fetch_trees),
-      bind_rows
-    ) |>
-    filter(DIA < FRST_DIA) |>
-    arrange(CN)
-
-  dbDisconnect(fia)  
-
-  write_rds(tree_negative_growth, rds_file)
-}
-
-ggplot(tree_negative_growth, aes(DIA - FRST_DIA)) + #, after_stat(100 * count / sum(count)))) +
-  geom_histogram(binwidth = 1, position = position_nudge(-0.5)) +
-  #geom_freqpoly() +
-  ggtitle("Observed Negative Growth") +
-  ylab("Count") +
-  xlab("Growth (inches)")
-
-```
-
-Negative growth is a problem.
-
-To remove negative growth, we need to find all the CNs in each tree history.
-
-```{r tree_history}
-rds_file <- 'data/intermediate/tree_history.rds'
-if (file.exists(rds_file)) {
-  tree_history <- read_rds(rds_file)
-} else {
-  # Re-using a single connection 
-  fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-
-  fetch_trees <- function(row) {
-    statecd <- row[["STATECD"]]
-    countycd <- row[["COUNTYCD"]]
-    plot <- row[["PLOT"]]
-    #print(paste("Plot", statecd, countycd, plot, sep = " "))
-    trees <- tbl(fia, 'TREE') |>
-      filter(
-        STATECD == statecd &
-        COUNTYCD == countycd &
-        PLOT == plot
-      ) |>
-      filter(CONDID == 1) |>
-      select(CN, DIA, PREV_TRE_CN) |>
-      collect()
-
-    has_next_tree <- trees |>
-      select(PREV_TRE_CN) |>
-      rename(CN = PREV_TRE_CN)
-
-    tree_growth <- trees |>
-      # histories start with trees that have no next tree
-      anti_join(has_next_tree, by = join_by(CN)) |>
-      mutate(FRST_TRE_CN = CN, FRST_DIA = DIA)
-
-    #print(paste0("  ", nrow(tree_growth), " trees"))
-
-    prev_tre_cns <- tree_growth |>
-      select(PREV_TRE_CN) |>
-      filter(!is.na(PREV_TRE_CN)) |>
-      distinct()
-
-    iterations <- 0
-    while (nrow(prev_tre_cns) > 0) {
-      #print(paste0(
-      #  "  Iteration: ",
-      #  iterations <- iterations + 1,
-      #  ", CNs: ",
-      #  nrow(prev_tre_cns)
-      #))
-  
-      tmp_trees <- trees |>
-        semi_join(prev_tre_cns, by = join_by(CN == PREV_TRE_CN)) |>
-        rename(PREV_DIA = DIA) |>
-        select(CN, PREV_DIA, PREV_TRE_CN)
-
-      tree_growth <- tree_growth |>
-        left_join(tmp_trees, by = join_by(PREV_TRE_CN == CN)) |>
-        mutate( # Update FRST_DIA if there is a new one
-          FRST_DIA = coalesce(PREV_DIA, FRST_DIA)
-        ) |>
-        mutate( # Update FRST_TRE_CN if there is a new one
-          FRST_TRE_CN = coalesce(PREV_TRE_CN.y, FRST_TRE_CN)
-        ) |>
-        mutate( # Move PREV_TRE_CN one time hop on records that joined
-          PREV_TRE_CN = if_else(is.na(PREV_DIA), PREV_TRE_CN, PREV_TRE_CN.y)
-        ) |>
-        select(CN, PREV_TRE_CN, DIA, FRST_TRE_CN, FRST_DIA)
-      prev_tre_cns <- tmp_trees |>
-        select(PREV_TRE_CN) |>
-        filter(!is.na(PREV_TRE_CN)) |>
-        distinct()
-    }
-
-    return(tree_growth)
-  }
-  
-  tree_history <- reduce(
-      pbapply(plot_grow_only, 1, fetch_trees),
-      bind_rows
-    ) |>
-    filter(DIA < FRST_DIA) |>
-    arrange(CN)
-
-  dbDisconnect(fia)  
-
-  write_rds(tree_history, rds_file)
-}
-
-ggplot(tree_history, aes(DIA - FRST_DIA)) + #, after_stat(100 * count / sum(count)))) +
-  geom_histogram(binwidth = 1, position = position_nudge(-0.5)) +
-  #geom_freqpoly() +
-  ggtitle("Observed Negative Growth") +
-  ylab("Count") +
-  xlab("Growth (inches)")
-
-```
+Note that tree_growth is all trees, not just ingrown trees.
 
 ```{r tree_growth}
 rds_file <- 'data/intermediate/tree_growth.rds'
@@ -850,19 +769,17 @@ if (file.exists(rds_file)) {
     select(CN, MEASYEAR) |>
     rename(PLT_CN = CN)
   
-  species_mixin <- tbl(fia, 'REF_SPECIES') |>
-    select(SPCD, GENUS, SPECIES, SCIENTIFIC_NAME, JENKINS_SPGRPCD)
-  
   prev_tre_mixin <- tbl(fia, 'TREE') |>
-    select(CN, PLT_CN, DIA) |>
+    select(CN, PLT_CN, DIA, HT) |>
     left_join(measyear_mixin, by = join_by(PLT_CN)) |>
     rename(
       PREV_TRE_CN = CN,
       PREV_PLT_CN = PLT_CN,
       PREV_MEASYEAR = MEASYEAR,
-      PREV_DIA = DIA
+      PREV_DIA = DIA,
+      PREV_HT = HT
     )
-  
+
   tree_growth <- tbl(fia, 'TREE') |>
     semi_join(
       plot_grow_only |> arrange(STATECD, COUNTYCD, PLOT),
@@ -871,160 +788,295 @@ if (file.exists(rds_file)) {
     ) |>
     # Live trees
     filter(CONDID == 1) |>
-    # Self-join to previous tree to get growth increment
-    left_join(prev_tre_mixin, by = join_by(PREV_TRE_CN)) |>
-    left_join(species_mixin, by = join_by(SPCD)) |>
-    left_join(measyear_mixin, by = join_by(PLT_CN)) |>
-    mutate(
-      DIA_INCR = DIA - PREV_DIA,
-      AGE_INCR = MEASYEAR - PREV_MEASYEAR,
-      ANN_DIA_GROWTH = DIA_INCR / AGE_INCR
-    ) |>
     # Many trees will have no previous tree, filter those out.
     filter(!is.na(PREV_TRE_CN)) |>
+    # Self-join to previous tree to get growth increment
+    left_join(prev_tre_mixin, by = join_by(PREV_TRE_CN)) |>
+    left_join(measyear_mixin, by = join_by(PLT_CN)) |>
+    mutate(
+      DIA_DELTA = DIA - PREV_DIA,
+      AGE_DELTA = MEASYEAR - PREV_MEASYEAR,
+      ANN_DIA_DELTA = DIA_DELTA / AGE_DELTA,
+      HT_DELTA = HT - PREV_HT,
+      ANN_HT_DELTA = HT_DELTA / AGE_DELTA
+    ) |>
     select(
       CN, PREV_TRE_CN, PLT_CN, PREV_PLT_CN,
-      STATECD, COUNTYCD, PLOT, SUBP, TREE,
-      SPGRPCD, JENKINS_SPGRPCD, SPCD, GENUS, SPECIES, SCIENTIFIC_NAME,
-      MEASYEAR, PREV_MEASYEAR, CCLCD, DIA, PREV_DIA, DIA_INCR, AGE_INCR, ANN_DIA_GROWTH
+      STATECD, COUNTYCD, PLOT, SUBP, TREE, SPCD,
+      MEASYEAR, PREV_MEASYEAR, CCLCD, DIA, PREV_DIA, HT, PREV_HT,
+      AGE_DELTA, DIA_DELTA, ANN_DIA_DELTA, HT_DELTA, ANN_HT_DELTA
     ) |>
     arrange(STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR) |>
     collect()
   
   dbDisconnect(fia)
 
-  jenkins_spgrpcd_mixin <- read_csv(
-      "data/raw/FIADB_11.5.17_JENKINS_SPGRPCD.csv", 
-      col_types = cols(JENKINS_SPGRPCD = col_integer())
-    ) |>
-    select(JENKINS_SPGRPCD, NAME) |>
-    rename(JENKINS_SPGRP_NAME = NAME)
-
   tree_growth <- tree_growth |>
-    left_join(jenkins_spgrpcd_mixin, by = join_by(JENKINS_SPGRPCD))
+    left_join(species_mixin, by = join_by(SPCD))
 
-  rm(fia, measyear_mixin, species_mixin, prev_tre_mixin, jenkins_spgrpcd_mixin)
+  rm(fia, measyear_mixin, prev_tre_mixin)
 
   write_rds(tree_growth, rds_file)
 }
 ```
 
-```{r}
-one_pct <- 0.01
-two_pct <- 0.025
-y <- tree_growth |>
-  filter(!is.na(ANN_DIA_GROWTH)) |>
-  group_by(SPCD) |>
-  arrange(ANN_DIA_GROWTH) |>
+Measurement is imperfect, leading to some outliers in the growth table. We
+can look at different outlier removal strategies and the resulting distribution
+of observations:
+
+```{r plot_tree_growth}
+tree_growth |>
+  select(CN, SPGRPCD, JENKINS_SPGRP_NAME, ANN_DIA_DELTA) |>
+  filter(!is.na(ANN_DIA_DELTA)) |>
+  group_by(SPGRPCD) |>
+  arrange(ANN_DIA_DELTA) |>
   mutate(
-    ONE_LOWER_BOUND = n() * one_pct,
-    TWO_LOWER_BOUND = n() * two_pct,
-    ROW_NUMBER = row_number(),
-    TWO_UPPER_BOUND = n() - n() * two_pct,
-    ONE_UPPER_BOUND = n() - n() * one_pct,
-    ONE_OUTLIER = (row_number() < (n() * one_pct)) | (row_number() > (n() - n() * one_pct)),
-    TWO_OUTLIER = (row_number() < (n() * two_pct)) | (row_number() > (n() - n() * two_pct))
+    ONE_OUTLIER = (row_number() < (n() * 0.01)) | (row_number() > (n() - n() * 0.01)),
+    TWO_OUTLIER = (row_number() < (n() * 0.025)) | (row_number() > (n() - n() * 0.025))
   ) |>
-  ungroup()
-x <- y |> mutate(OUTLIERS_REMOVED = "0%") |>
-  union_all(y |> filter(!ONE_OUTLIER) |> mutate(OUTLIERS_REMOVED = "1%")) |>
-  union_all(y |> filter(!TWO_OUTLIER) |> mutate(OUTLIERS_REMOVED = "2.5%")) |>
-  group_by(OUTLIERS_REMOVED) |>
-  mutate(OUTLIERS_REMOVED = paste0(OUTLIERS_REMOVED, ", n=", n())) |>
-  ungroup()
+  ungroup() |>
+  group_by(JENKINS_SPGRP_NAME) |>
+  mutate(
+    GROUP_NAME = paste0(JENKINS_SPGRP_NAME, ", n=", n())
+  ) |>
+  ungroup() |>
+  mutate(
+    `1%` = if_else(!ONE_OUTLIER, ANN_DIA_DELTA, NA),
+    `2.5%` = if_else(!TWO_OUTLIER, ANN_DIA_DELTA, NA),
+    `0%` = ANN_DIA_DELTA
+  ) |>
+  select(CN, GROUP_NAME, `1%`, `2.5%`, `0%`) |>
+  melt(
+    id.vars = c("CN", "GROUP_NAME"),
+    variable.name = "Outliers Removed",
+    value.name = "Growth Rate"
+  ) |>
+  filter(!is.na(`Growth Rate`)) |>
+  mutate(`Outliers Removed` = factor(`Outliers Removed`, levels = c("0%", "1%", "2.5%"))) |>
+  ggplot(
+      aes(`Growth Rate`, fct_rev(fct_infreq(GROUP_NAME)), fill = `Outliers Removed`)
+    ) +
+    geom_boxplot() +
+    scale_fill_discrete(breaks = c("2.5%", "1%", "0%")) +
+    ggtitle("Measured Annual Growth with Outliers Removed by Species") +
+    xlab(bquote("Annual Growth " ~(inches %*% year^{-1}))) +
+    ylab("Species Group")
+
 ```
 
 
-```{r}
-ggplot(
-    x,
-    aes(ANN_DIA_GROWTH, color = OUTLIERS_REMOVED)
-  ) +
-  geom_boxplot() +
-  coord_cartesian(x = c(-1, 1)) +
-  scale_y_continuous(breaks = NULL)
-
-```
 
 ##### Estimated Growth Rate
 
-```{r tree_growth_rate}
-filtered_growth <- tree_growth |>
-  filter(!is.na(ANN_DIA_GROWTH)) |>
-  group_by(SPCD) |>
-  arrange(ANN_DIA_GROWTH) |>
-  mutate(OUTLIER = (row_number() < (n() * 0.01)) | (row_number() > (n() - n() * 0.01))) |>
-  ungroup() |>
-  filter(!OUTLIER)
+From the observed growth with outliers removed, we can compute per-species,
+per-plot, per-inventory growth rates. We can then apply these growth rates
+to ingrown trees to back-project them to their starting diameter.
 
-tree_growth_dom <- filtered_growth |>
-  filter(CCLCD < 4) |>
-  group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD) |>
-  summarize(
-    DIA_INCR_DOM = mean(DIA_INCR, na.rm = TRUE),
-    .groups = 'keep'
+For each ingrown tree, we pick the best estimate of growth rate based on
+other trees on the plot, after filtering out growth outliers:
+
+1. The mean growth rate of at least 3 dominant trees of the same species during the inventory;
+2. The mean growth rate of at least 3 trees of any dominance of the same species during the inventory;
+3. The mean growth rate of at least 3 trees of any dominance of the same species group during the inventory;
+4. The mean growth rate of at least 3 trees of any dominance of the same species group on the plot during any inventory.
+
+```{r tree_growth_rate}
+tree_growth_with_outliers <- tree_growth |>
+  filter(!is.na(ANN_DIA_DELTA)) |>
+  group_by(SPCD) |>
+  arrange(ANN_DIA_DELTA) |>
+  mutate(
+    OUTLIER_ONE = (row_number() > (n() * 0.01)) & (row_number() < (n() - n() * 0.01)),
+    DIA_DELTA_ONE = if_else(OUTLIER_ONE, DIA_DELTA, NA),
+    OUTLIER_TWO = (row_number() > (n() * 0.025)) & (row_number() < (n() - n() * 0.025)),
+    DIA_DELTA_TWO = if_else(OUTLIER_TWO, DIA_DELTA, NA)
   ) |>
   ungroup()
-tree_growth_nondom <- filtered_growth |>
-  filter(CCLCD > 3) |>
+
+tree_growth_dom <- tree_growth_with_outliers |>
+  filter(CCLCD <= 3) |>
   group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD) |>
   summarize(
-    DIA_INCR_NONDOM = mean(DIA_INCR, na.rm = TRUE),
+    DIA_DELTA = mean(DIA_DELTA, na.rm = TRUE),
+    COUNT = n(),
+    COUNT_ONE = sum(OUTLIER_ONE, na.rm = TRUE),
+    COUNT_TWO = sum(OUTLIER_TWO, na.rm = TRUE),
+    DIA_DELTA_DOM = mean(DIA_DELTA, na.rm = TRUE),
+    DIA_DELTA_DOM_ONE = mean(DIA_DELTA_ONE, na.rm = TRUE),
+    DIA_DELTA_DOM_TWO = mean(DIA_DELTA_TWO, na.rm = TRUE),
     .groups = 'keep'
   ) |>
-  ungroup()
-tree_growth_spcd <- filtered_growth |>
+  ungroup() |>
+  mutate(
+    DIA_DELTA_DOM = if_else(COUNT >= 3, DIA_DELTA_DOM, NA),
+    DIA_DELTA_DOM_ONE = if_else(COUNT_ONE >= 3, DIA_DELTA_DOM_ONE, NA),
+    DIA_DELTA_DOM_TWO = if_else(COUNT_TWO >= 3, DIA_DELTA_DOM_TWO, NA)
+  ) |>
+  select(
+    STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD,
+    DIA_DELTA_DOM, DIA_DELTA_DOM_ONE, DIA_DELTA_DOM_TWO
+    )
+
+tree_growth_spcd <- tree_growth_with_outliers |>
   group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD) |>
   summarize(
-    DIA_INCR_SPCD = mean(DIA_INCR, na.rm = TRUE),
+    DIA_DELTA = mean(DIA_DELTA, na.rm = TRUE),
+    COUNT = n(),
+    COUNT_ONE = sum(OUTLIER_ONE, na.rm = TRUE),
+    COUNT_TWO = sum(OUTLIER_TWO, na.rm = TRUE),
+    DIA_DELTA_SPCD = mean(DIA_DELTA, na.rm = TRUE),
+    DIA_DELTA_SPCD_ONE = mean(DIA_DELTA_ONE, na.rm = TRUE),
+    DIA_DELTA_SPCD_TWO = mean(DIA_DELTA_TWO, na.rm = TRUE),
     .groups = 'keep'
   ) |>
-  ungroup()
-tree_growth_spgrpcd <- filtered_growth |>
+  ungroup() |>
+  mutate(
+    DIA_DELTA_SPCD = if_else(COUNT >= 3, DIA_DELTA_SPCD, NA),
+    DIA_DELTA_SPCD_ONE = if_else(COUNT_ONE >= 3, DIA_DELTA_SPCD_ONE, NA),
+    DIA_DELTA_SPCD_TWO = if_else(COUNT_TWO >= 3, DIA_DELTA_SPCD_TWO, NA)
+  ) |>
+  select(
+    STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD,
+    DIA_DELTA_SPCD, DIA_DELTA_SPCD_ONE, DIA_DELTA_SPCD_TWO
+  )
+
+tree_growth_spgrpcd <- tree_growth_with_outliers |>
   group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPGRPCD) |>
   summarize(
-    DIA_INCR_SPGRPCD = mean(DIA_INCR, na.rm = TRUE),
+    DIA_DELTA = mean(DIA_DELTA, na.rm = TRUE),
+    COUNT = n(),
+    COUNT_ONE = sum(OUTLIER_ONE, na.rm = TRUE),
+    COUNT_TWO = sum(OUTLIER_TWO, na.rm = TRUE),
+    DIA_DELTA_SPGRPCD = mean(DIA_DELTA, na.rm = TRUE),
+    DIA_DELTA_SPGRPCD_ONE = mean(DIA_DELTA_ONE, na.rm = TRUE),
+    DIA_DELTA_SPGRPCD_TWO = mean(DIA_DELTA_TWO, na.rm = TRUE),
     .groups = 'keep'
   ) |>
-  ungroup()
-tree_growth_multiyear <- filtered_growth |>
+  ungroup() |>
+  mutate(
+    DIA_DELTA_SPGRPCD = if_else(COUNT >= 3, DIA_DELTA_SPGRPCD, NA),
+    DIA_DELTA_SPGRPCD_ONE = if_else(COUNT_ONE >= 3, DIA_DELTA_SPGRPCD_ONE, NA),
+    DIA_DELTA_SPGRPCD_TWO = if_else(COUNT_TWO >= 3, DIA_DELTA_SPGRPCD_TWO, NA)
+  ) |>
+  select(
+    STATECD, COUNTYCD, PLOT, MEASYEAR, SPGRPCD,
+    DIA_DELTA_SPGRPCD, DIA_DELTA_SPGRPCD_ONE, DIA_DELTA_SPGRPCD_TWO
+  )
+
+tree_growth_multiyear <- tree_growth_with_outliers |>
+  mutate(
+    ANN_DIA_DELTA = DIA_DELTA / (MEASYEAR - PREV_MEASYEAR),
+    ANN_DIA_DELTA_ONE = DIA_DELTA_ONE / (MEASYEAR - PREV_MEASYEAR),
+    ANN_DIA_DELTA_TWO = DIA_DELTA_TWO / (MEASYEAR - PREV_MEASYEAR)
+  ) |>
   group_by(STATECD, COUNTYCD, PLOT, SPGRPCD) |>
   summarize(
-    DIA_INCR_MULTIYEAR = mean(DIA_INCR, na.rm = TRUE),
+    COUNT = n(),
+    COUNT_ONE = sum(OUTLIER_ONE, na.rm = TRUE),
+    COUNT_TWO = sum(OUTLIER_TWO, na.rm = TRUE),
+    ANN_DIA_DELTA_MULTIYEAR = mean(ANN_DIA_DELTA, na.rm = TRUE),
+    ANN_DIA_DELTA_MULTIYEAR_ONE = mean(ANN_DIA_DELTA_ONE, na.rm = TRUE),
+    ANN_DIA_DELTA_MULTIYEAR_TWO = mean(ANN_DIA_DELTA_TWO, na.rm = TRUE),
     .groups = 'keep'
   ) |>
-  ungroup()
-# prev_measyear_mixin does not use filtered_growth
-# so that we don't project across multiple inventories
-prev_measyear_mixin <- tree_growth |>
-  group_by(STATECD, COUNTYCD, PLOT, MEASYEAR) |>
-  summarize(
-    PREV_MEASYEAR = min(PREV_MEASYEAR, na.rm = TRUE),
-    .groups = 'keep'
-  ) |>
-  ungroup()
-tree_growth_rate <- filtered_growth |>
-  group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPGRPCD, SPCD) |>
-  summarize(.groups = 'keep') |>
   ungroup() |>
-  left_join(prev_measyear_mixin, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR)) |>
+  mutate(
+    ANN_DIA_DELTA_MULTIYEAR = if_else(COUNT >= 3, ANN_DIA_DELTA_MULTIYEAR, NA),
+    ANN_DIA_DELTA_MULTIYEAR_ONE = if_else(COUNT_ONE >= 3, ANN_DIA_DELTA_MULTIYEAR_ONE, NA),
+    ANN_DIA_DELTA_MULTIYEAR_TWO = if_else(COUNT_TWO >= 3, ANN_DIA_DELTA_MULTIYEAR_TWO, NA)
+  ) |>
+  select(
+    STATECD, COUNTYCD, PLOT, SPGRPCD,
+    ANN_DIA_DELTA_MULTIYEAR, ANN_DIA_DELTA_MULTIYEAR_ONE, ANN_DIA_DELTA_MULTIYEAR_TWO
+  )
+
+tree_growth_rate <- tree_growth_with_outliers |>
+  distinct(STATECD, COUNTYCD, PLOT, MEASYEAR, PREV_MEASYEAR, SPCD) |>
+  left_join(species_mixin, by = join_by(SPCD)) |>
   left_join(tree_growth_dom, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)) |>
-  left_join(tree_growth_nondom, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)) |>
   left_join(tree_growth_spcd, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)) |>
   left_join(tree_growth_spgrpcd, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPGRPCD)) |>
   left_join(tree_growth_multiyear, by = join_by(STATECD, COUNTYCD, PLOT, SPGRPCD)) |>
   mutate(
-    DIA_INCR = coalesce(
-      # It actually does better without restricting to non-dominant trees
-      # ("better" means 69% back-project well, vs. 62%)
-      # DIA_INCR_NONDOM,
-      DIA_INCR_DOM,
-      DIA_INCR_SPCD,
-      DIA_INCR_SPGRPCD,
-      DIA_INCR_MULTIYEAR,
+    DIA_DELTA = coalesce(
+      DIA_DELTA_DOM,
+      DIA_DELTA_SPCD,
+      DIA_DELTA_SPGRPCD
     ),
-    ANN_DIA_GROWTH = DIA_INCR / (MEASYEAR - PREV_MEASYEAR)
+    ANN_DIA_DELTA = coalesce(
+      DIA_DELTA / (MEASYEAR - PREV_MEASYEAR),
+      ANN_DIA_DELTA_MULTIYEAR
+    ),
+    DIA_DELTA_ONE = coalesce(
+      DIA_DELTA_DOM_ONE,
+      DIA_DELTA_SPCD_ONE,
+      DIA_DELTA_SPGRPCD_ONE
+    ),
+    ANN_DIA_DELTA_ONE = coalesce(
+      DIA_DELTA_ONE / (MEASYEAR - PREV_MEASYEAR),
+      ANN_DIA_DELTA_MULTIYEAR_ONE
+    ),
+    DIA_DELTA_TWO = coalesce(
+      DIA_DELTA_DOM_TWO,
+      DIA_DELTA_SPCD_TWO,
+      DIA_DELTA_SPGRPCD_TWO
+    ),
+    ANN_DIA_DELTA_TWO = coalesce(
+      DIA_DELTA_TWO / (MEASYEAR - PREV_MEASYEAR),
+      ANN_DIA_DELTA_MULTIYEAR_TWO
+    )
   )
+```
+
+```{r tree_growth_rate_boxplot}
+tree_growth_rate |>
+  group_by(JENKINS_SPGRP_NAME) |>
+  mutate(
+    GROUP_NAME = paste0(JENKINS_SPGRP_NAME, ", n=", n())
+  ) |>
+  ungroup() |>
+  select(GROUP_NAME, ANN_DIA_DELTA, ANN_DIA_DELTA_ONE, ANN_DIA_DELTA_TWO) |>
+  rename(`0%` = ANN_DIA_DELTA, `1%` = ANN_DIA_DELTA_ONE, `2.5%` = ANN_DIA_DELTA_TWO) |>
+  melt(id.vars = c("GROUP_NAME"), value.name = "ANN_DIA_DELTA", variable.name = "Outliers Removed") |>
+  filter(!is.na(ANN_DIA_DELTA)) |>
+  ggplot(
+      aes(ANN_DIA_DELTA, fct_rev(fct_infreq(GROUP_NAME)), fill = `Outliers Removed`)
+    ) +
+    geom_boxplot() +
+    geom_vline(xintercept = 0, linetype = "dashed") +
+    scale_fill_discrete(breaks = c("2.5%", "1%", "0%")) +
+    coord_cartesian(xlim = c(-1, 1)) +
+    theme_bw() +
+    ggtitle("Measured Annual Diameter Growth of Ingrown Trees") +
+    xlab(bquote("Annual Diameter Growth " ~(inches %*% year^{-1}))) +
+    ylab("Species Group")
+
+```
+
+```{r tree_growth_rate_boxplot_metric}
+tree_growth_rate |>
+  group_by(JENKINS_SPGRP_NAME) |>
+  mutate(
+    GROUP_NAME = paste0(JENKINS_SPGRP_NAME, ", n=", n())
+  ) |>
+  ungroup() |>
+  select(GROUP_NAME, ANN_DIA_DELTA, ANN_DIA_DELTA_ONE, ANN_DIA_DELTA_TWO) |>
+  rename(`0%` = ANN_DIA_DELTA, `1%` = ANN_DIA_DELTA_ONE, `2.5%` = ANN_DIA_DELTA_TWO) |>
+  melt(id.vars = c("GROUP_NAME"), value.name = "ANN_DIA_DELTA", variable.name = "Outliers Removed") |>
+  filter(!is.na(ANN_DIA_DELTA)) |>
+  mutate(ANN_DIA_DELTA = conv_unit(ANN_DIA_DELTA, "inch", "meter") * pi * 2) |>
+  ggplot(
+      aes(ANN_DIA_DELTA, fct_rev(fct_infreq(GROUP_NAME)), fill = `Outliers Removed`)
+    ) +
+    geom_boxplot() +
+    geom_vline(xintercept = 0, linetype = "dashed") +
+    scale_fill_discrete(breaks = c("2.5%", "1%", "0%")) +
+    coord_cartesian(xlim = c(-0.2, 0.2)) +
+    theme_bw() +
+    ggtitle("Measured Annual Basal Area Growth of Ingrown Trees") +
+    xlab(bquote("Annual Basal Area Growth " ~(m^2 %*% year^{-1}))) +
+    ylab("Species Group")
+
 ```
 
 ##### One-Shot Back-Projection
@@ -1032,58 +1084,83 @@ tree_growth_rate <- filtered_growth |>
 Can we use that to back-project ingrown trees?
 
 ```{r manual_back_projection}
-location_mixin <- tree_ingrown_prev |>
+location_mixin <- tree_ingrown |>
   select(CN, STATECD, COUNTYCD, PLOT, SPCD)
 
 manual_back_projection <- tree_ingrown_last |>
-  filter(FRST_DIA < DIA) |>
+  filter(FRST_DIA < DIA) |> # Trees that grow
   left_join(location_mixin, by = join_by(CN)) |>
   # Add on growth rate
   left_join(tree_growth_rate, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)) |>
-  # This is wrong - uses the growth for a single inventory period, not
-  # the overall growth.
-  mutate(DIA_PROJ = DIA - (MEASYEAR - FRST_MEASYEAR) * ANN_DIA_GROWTH) |>
-  mutate(DIA_ERR = (DIA_PROJ - FRST_DIA) / FRST_DIA) |>
+  mutate(
+    DIA_EST = DIA - (MEASYEAR - FRST_MEASYEAR) * ANN_DIA_DELTA_MULTIYEAR,
+    DIA_ERR = (DIA_EST - FRST_DIA) / FRST_DIA,
+    DIA_EST_ONE = DIA - (MEASYEAR - FRST_MEASYEAR) * ANN_DIA_DELTA_MULTIYEAR_ONE,
+    DIA_ERR_ONE = (DIA_EST_ONE - FRST_DIA) / FRST_DIA,
+    DIA_EST_TWO = DIA - (MEASYEAR - FRST_MEASYEAR) * ANN_DIA_DELTA_MULTIYEAR_TWO,
+    DIA_ERR_TWO = (DIA_EST_TWO - FRST_DIA) / FRST_DIA
+  ) |>
   arrange(DIA_ERR)
-print(manual_back_projection|>filter(is.na(DIA_ERR))|>nrow())
-manual_back_projection |> filter(abs(DIA_ERR) < 0.1) |> nrow() /
-  manual_back_projection |> nrow()
+
+manual_back_projection |>
+  group_by() |>
+  summarize(
+    COUNT = n(),
+    MISSING = sum(is.na(DIA_EST), na.rm = TRUE) / COUNT,
+    MISSING_ONE = sum(is.na(DIA_EST_ONE), na.rm = TRUE) / COUNT,
+    MISSING_TWO = sum(is.na(DIA_EST_TWO), na.rm = TRUE) / COUNT,
+    HIT = sum(abs(DIA_ERR) < 0.1, na.rm = TRUE) / COUNT,
+    HIT_ONE = sum(abs(DIA_ERR_ONE) < 0.1, na.rm = TRUE) / COUNT,
+    HIT_TWO = sum(abs(DIA_ERR_TWO) < 0.1, na.rm = TRUE) / COUNT,
+    .groups = 'keep'
+  ) |>
+  ungroup() |>
+  pivot_longer(everything()) |>
+  knitr::kable()
 ```
 
-37%, which is marginally less awful. Also, 35 trees end up with no ANN_DIA_GROWTH.
+Still less than half the trees back-project to within 10% of their first
+measured diameter.
 
 ##### Stepwise Back-Projection
 
-Next up:
-* walk back using multiple growth rates
-* back-project to when the tree was 3" DBH
+Rather than try to project back to starting diameter in one step, we can
+project the diameter back to the estimated diameter at the previous measurement,
+and repeat back in time until we get to the starting diameter. This will
+better use per-inventory diameters.
 
-prev_tree has one tree record for each year the tree was inventoried.
+tree_ingrown has one tree record for each year an ingrown tree was inventoried.
 We can fill in a DIA_EST using the growth interval, and iterate until
-they're all filled in. Or 4 times, which is safer.
+they're all filled in.
 
 ```{r init_stepwise_manual_back_projection}
-manual_back_projection <- tree_ingrown_prev |>
-  # Start with trees that have a previous tree (so we can back-project from them),
-  # in the inventory in which they're marked as ingrowth
-  semi_join(tree_ingrown |> select(TRE_CN), by = join_by(CN == TRE_CN)) |>
-  filter(!is.na(PREV_TRE_CN)) |>
-  select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, PREV_TRE_CN, NEXT_TRE_CN, DIA) |>
-  # This will add: PREV_MEASYEAR, DIA_INCR, ANN_DIA_GROWTH
+manual_back_projection <- tree_ingrown |>
+  # Start with actually ingrown trees
+  semi_join(grm_ingrown, by = join_by(CN == TRE_CN)) |>
+  select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, PREV_TRE_CN, DIA) |>
   left_join(
-    tree_growth_rate |> select(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, DIA_INCR),
+    tree_growth_rate |>
+      select(
+        STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD,
+        DIA_DELTA, DIA_DELTA_ONE, DIA_DELTA_TWO
+      ),
     by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)
   ) |>
   # We can get a perfect estimate if we know the actual value :-D
-  mutate(DIA_EST = DIA) |>
-  mutate(PREV_DIA_EST = DIA - DIA_INCR) |>
-  mutate(DIA_ERR = abs((DIA - DIA_EST) / DIA))
-
-# Remove post-ingrowth inventories of ingrown trees
-manual_back_projection <- manual_back_projection |>
-  anti_join(
-    manual_back_projection |> select(NEXT_TRE_CN) |> distinct(),
-    by = join_by(CN == NEXT_TRE_CN)
+  mutate(
+    DIA_EST = DIA,
+    DIA_EST_ONE = DIA,
+    DIA_EST_TWO = DIA
+  ) |>
+  mutate(
+    PREV_DIA_EST = DIA - DIA_DELTA,
+    PREV_DIA_EST_ONE = DIA - DIA_DELTA_ONE,
+    PREV_DIA_EST_TWO = DIA - DIA_DELTA_TWO
+  ) |>
+  mutate(
+    DIA_ERR = abs((DIA - DIA_EST) / DIA),
+    DIA_ERR_ONE = abs((DIA - DIA_EST_ONE) / DIA),
+    DIA_ERR_TWO = abs((DIA - DIA_EST_TWO) / DIA),
   )
 
 # Back-projectable trees:
@@ -1093,8 +1170,7 @@ manual_back_projection |> nrow()
 ```{r stepwise_manual_back_projection}
 prev_tre_cns <- manual_back_projection |>
   select(PREV_TRE_CN) |>
-  filter(!is.na(PREV_TRE_CN)) |>
-  distinct()
+  filter(!is.na(PREV_TRE_CN))
 
 iterations <- 0
 while (nrow(prev_tre_cns) > 0) {
@@ -1104,26 +1180,53 @@ while (nrow(prev_tre_cns) > 0) {
     ", CNs: ",
     nrow(prev_tre_cns)
   ))
-  tmp_trees <- tree_ingrown_prev |>
+  tmp_trees <- tree_ingrown |>
     semi_join(prev_tre_cns, by = join_by(CN == PREV_TRE_CN)) |>
-    select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, PREV_TRE_CN, NEXT_TRE_CN, DIA) |>
-    # Join on growth rates
+    select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, PREV_TRE_CN, DIA) |>
+        # Join on growth rates
     left_join(
-      tree_growth_rate |> select(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, DIA_INCR),
+      tree_growth_rate |>
+        select(
+          STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD,
+          DIA_DELTA, DIA_DELTA_ONE, DIA_DELTA_TWO
+        ),
       by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)
     ) |>
     # Join on previously estimated diameter
     left_join(
       manual_back_projection |>
-        select(PREV_TRE_CN, PREV_DIA_EST) |>
-        rename(CN = PREV_TRE_CN, DIA_EST = PREV_DIA_EST),
+        select(PREV_TRE_CN, PREV_DIA_EST, PREV_DIA_EST_ONE, PREV_DIA_EST_TWO) |>
+        rename(
+          CN = PREV_TRE_CN,
+          DIA_EST = PREV_DIA_EST,
+          DIA_EST_ONE = PREV_DIA_EST_ONE,
+          DIA_EST_TWO = PREV_DIA_EST_TWO
+        ),
       by = join_by(CN)
     ) |>
-    mutate(DIA_ERR = abs((DIA - DIA_EST) / DIA)) |>
+    mutate(
+      DIA_ERR = abs(DIA - DIA_EST) / DIA,
+      DIA_ERR_ONE = abs(DIA - DIA_EST_ONE) / DIA,
+      DIA_ERR_TWO = abs(DIA - DIA_EST_TWO) / DIA
+    ) |>
     # Estimate the next previous tree diameter
-    mutate(PREV_DIA_EST = DIA_EST - DIA_INCR)
-  manual_back_projection <- bind_rows(manual_back_projection, tmp_trees) |>
-    distinct()
+    mutate(
+      PREV_DIA_EST = DIA_EST - DIA_DELTA,
+      PREV_DIA_EST_ONE = DIA_EST_ONE - DIA_DELTA_ONE,
+      PREV_DIA_EST_TWO = DIA_EST_TWO - DIA_DELTA_TWO
+    )
+  # Apparently, some trees can be tracked back before the end of time
+  # or something, so we can end up with some PREV_TRE_CNs that are
+  # dangling refrences.
+  if (nrow(tmp_trees) == 0) {
+    break
+  }
+  manual_back_projection <- bind_rows(manual_back_projection, tmp_trees)
+  num_duplicate_cns <- manual_back_projection |>
+    group_by(CN) |>
+    filter(n() > 1) |>
+    ungroup() |> nrow()
+  stopifnot(num_duplicate_cns == 0)
   # The next set of prev_tre_cns is:
   prev_tre_cns <- manual_back_projection |>
     # All PREV_TRE_CN mentioned
@@ -1139,109 +1242,90 @@ while (nrow(prev_tre_cns) > 0) {
       by = join_by(PREV_TRE_CN == CN)
     )
 }
-print(manual_back_projection|>filter(is.na(DIA_ERR))|>nrow())
-manual_back_projection |> filter(abs(DIA_ERR) < 0.1) |> nrow() /
-  manual_back_projection |> nrow()
-```
-
-```{r}
 manual_back_projection |>
-  group_by(CN) |>
-  filter(1 < n()) |>
-  ungroup() |> nrow()
+  group_by() |>
+  summarize(
+    COUNT = n(),
+    MISSING = sum(is.na(DIA_EST), na.rm = TRUE) / COUNT,
+    MISSING_ONE = sum(is.na(DIA_EST_ONE), na.rm = TRUE) / COUNT,
+    MISSING_TWO = sum(is.na(DIA_EST_TWO), na.rm = TRUE) / COUNT,
+    HIT = sum(abs(DIA_ERR) < 0.1, na.rm = TRUE) / COUNT,
+    HIT_ONE = sum(abs(DIA_ERR_ONE) < 0.1, na.rm = TRUE) / COUNT,
+    HIT_TWO = sum(abs(DIA_ERR_TWO) < 0.1, na.rm = TRUE) / COUNT,
+    .groups = 'keep'
+  ) |>
+  ungroup() |>
+  pivot_longer(everything()) |>
+  knitr::kable()
+
 ```
 
 ##### Apply Back-Projection
 
 ```{r projected_vs_measured_annual_growth}
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-jenkins_spgrpcd <- read_csv(
-  "data/raw/FIADB_11.5.17_JENKINS_SPGRPCD.csv", 
-  col_types = cols(JENKINS_SPGRPCD = col_integer())
-)
-
-species_mixin <- tbl(fia, 'REF_SPECIES') |>
-  select(SPCD, E_SPGRPCD, JENKINS_SPGRPCD, SCIENTIFIC_NAME) |>
-  left_join(
-    tbl(fia, 'REF_SPECIES_GROUP') |> distinct(SPGRPCD, NAME),
-    by = join_by(E_SPGRPCD == SPGRPCD)
-  ) |>
-  rename(SPGRP_NAME = NAME) |>
-  collect() |>
-  left_join(jenkins_spgrpcd, by = join_by(JENKINS_SPGRPCD)) |>
-  rename(JENKINS_SPGRP_NAME = NAME)
 
 projected_annual_growth <- tree_ingrown_last |>
   filter(MEASYEAR != FRST_MEASYEAR) |>
   left_join(
     manual_back_projection |>
-      select(CN, SPCD, DIA_EST),
+      select(CN, SPCD, DIA_EST, DIA_EST_ONE, DIA_EST_TWO),
     by = join_by(FRST_TRE_CN == CN)
   ) |>
-  # Be metric
-  mutate(DIA = conv_unit(DIA, "in", "cm")) |>
-  mutate(FRST_DIA = conv_unit(FRST_DIA, "in", "cm")) |>
-  mutate(DIA_EST = conv_unit(DIA_EST, "in", "cm")) |>
 
-  mutate(ANN_DIA = (DIA - FRST_DIA) / (MEASYEAR - FRST_MEASYEAR)) |>
-  mutate(DIA_ERR = (FRST_DIA - DIA_EST)) |>
-  mutate(ANN_DIA_PROJ = (DIA - DIA_EST) / (MEASYEAR - FRST_MEASYEAR)) |>
-  mutate(ANN_DIA_ERR = DIA_ERR / (MEASYEAR - FRST_MEASYEAR)) |>
+  # Be metric
+  mutate(
+    DIA = conv_unit(DIA, "in", "cm"),
+    FRST_DIA = conv_unit(FRST_DIA, "in", "cm"),
+    DIA_EST = conv_unit(DIA_EST, "in", "cm"),
+    DIA_EST_ONE = conv_unit(DIA_EST_ONE, "in", "cm"),
+    DIA_EST_TWO = conv_unit(DIA_EST_TWO, "in", "cm"),
+  ) |>
+
+  mutate(
+    ANN_DIA = (DIA - FRST_DIA) / (MEASYEAR - FRST_MEASYEAR),
+    DIA_ERR = (FRST_DIA - DIA_EST),
+    ANN_DIA_EST = (DIA - DIA_EST) / (MEASYEAR - FRST_MEASYEAR),
+    ANN_DIA_ERR = DIA_ERR / (MEASYEAR - FRST_MEASYEAR),
+    DIA_ERR_ONE = (FRST_DIA - DIA_EST_ONE),
+    ANN_DIA_EST_ONE = (DIA - DIA_EST_ONE) / (MEASYEAR - FRST_MEASYEAR),
+    ANN_DIA_ERR_ONE = DIA_ERR_ONE / (MEASYEAR - FRST_MEASYEAR),
+    DIA_ERR_TWO = (FRST_DIA - DIA_EST_TWO),
+    ANN_DIA_EST_TWO = (DIA - DIA_EST_TWO) / (MEASYEAR - FRST_MEASYEAR),
+    ANN_DIA_ERR_TWO = DIA_ERR_TWO / (MEASYEAR - FRST_MEASYEAR),
+  ) |>
   filter(!is.na(DIA_ERR)) |>
   left_join(species_mixin, by = join_by(SPCD)) |>
-  #group_by(SPGRP_NAME) |>
-  # mutate(GROUP_NAME = paste0(SPGRP_NAME, ", n=", n())) |>
   group_by(JENKINS_SPGRP_NAME) |>
   mutate(GROUP_NAME = paste0(JENKINS_SPGRP_NAME, ", n=", n())) |>
-  ungroup()
-
+  ungroup() |>
+  select(CN, GROUP_NAME, ANN_DIA, ANN_DIA_EST, ANN_DIA_EST_ONE, ANN_DIA_EST_TWO) |>
+  rename(
+    `Measured` = ANN_DIA,
+    `Estimated` = ANN_DIA_EST,
+    `Est - 1%` = ANN_DIA_EST_ONE,
+    `Est - 2.5%` = ANN_DIA_EST_TWO
+  ) |>
+  melt(
+    id.vars = c("CN", "GROUP_NAME"),
+    variable.name = "Series",
+    value.name = "Growth"
+  ) |>
+  filter(!is.na(Growth)) |>
+  mutate(Growth = conv_unit(Growth, "in", "m") * pi * 2)
 ggplot(
-    projected_annual_growth,
-    aes(ANN_DIA_PROJ, fct_rev(fct_infreq(GROUP_NAME)))
-  ) +
-  geom_vline(xintercept = 0, color = 'red') +
-  geom_boxplot(varwidth = TRUE) +
-# scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
-  geom_point(
-    data = projected_annual_growth |>
-      group_by(GROUP_NAME) |> 
-      summarize(
-        ANN_DIA = mean(ANN_DIA),
-        .groups = 'keep'
-      ) |> 
-      ungroup()
-    ,
-    aes(ANN_DIA),
-    color = 'blue',
-    shape = 4,
-    size = 3
-  ) +
-  ggtitle("Projected vs. Measured Annual Growth of Ingrown Trees") +
-  xlab(bquote("Annual Growth " ~(cm %*% year^{-1}))) +
-  ylab("Species Group")
-
-```
-
-```{r}
-ggplot(
-    projected_annual_growth |>
-      select(CN, GROUP_NAME, ANN_DIA, ANN_DIA_PROJ) |>
-      rename(Measured = ANN_DIA, Projected = ANN_DIA_PROJ) |>
-      melt(
-        id.vars = c("CN", "GROUP_NAME"),
-        variable.name = "Method",
-        value.name = "Diameter"),
-    aes(Diameter, fct_rev(fct_infreq(GROUP_NAME)), color = Method)
-  ) +
+  projected_annual_growth,
+  aes(Growth, fct_rev(fct_infreq(GROUP_NAME)), fill = `Series`)
+) +
   geom_boxplot() +
-  scale_color_manual(values = c("blue", "black")) +
-  # facet_wrap("GROUP_NAME") +
-  # scale_y_continuous(breaks = NULL) +
-  ggtitle("Projected vs. Measured Annual Growth of Ingrown Trees") +
-  xlab(bquote("Annual Growth " ~(cm %*% year^{-1}))) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  scale_fill_discrete(breaks = rev(levels(projected_annual_growth$Series))) +
+  #coord_cartesian(xlim = c(-0.2, 0.2)) +
+  theme_bw() +
+  ggtitle("Projected Annual Basal Area Growth of Ingrown Trees") +
+  xlab(bquote("Annual Basal Area Growth " ~(m^2 %*% year^{-1}))) +
   ylab("Species Group")
 ```
-
 
 ## Run FVS
 
