@@ -1260,7 +1260,7 @@ manual_back_projection |>
 
 ```
 
-##### Apply Back-Projection
+Apply Back-Projection
 
 ```{r projected_vs_measured_annual_growth}
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
@@ -1317,14 +1317,144 @@ ggplot(
   projected_annual_growth,
   aes(Growth, fct_rev(fct_infreq(GROUP_NAME)), fill = `Series`)
 ) +
-  geom_boxplot() +
+  geom_boxplot(outlier.size = 0.1) +
   geom_vline(xintercept = 0, linetype = "dashed") +
   scale_fill_discrete(breaks = rev(levels(projected_annual_growth$Series))) +
   #coord_cartesian(xlim = c(-0.2, 0.2)) +
   theme_bw() +
-  ggtitle("Projected Annual Basal Area Growth of Ingrown Trees") +
-  xlab(bquote("Annual Basal Area Growth " ~(m^2 %*% year^{-1}))) +
+  ggtitle("Projected Annual Growth of Ingrown Trees") +
+  xlab(bquote("Change in Basal Area " ~(m^2 %*% year^{-1}))) +
   ylab("Species Group")
+```
+
+This looks usable.
+
+##### Back-Project to 3" DBH
+
+Using estimated diameter, what portion of ingrown trees
+can we project back to 3" DBH before the first MEASYEAR?
+
+```{r init_tree_ingrown_three}
+prev_measyear_mixin <- tree_growth |>
+  distinct(STATECD, COUNTYCD, PLOT, MEASYEAR, PREV_MEASYEAR)
+
+tree_ingrown_three <- tree_ingrown |>
+  # Start with actually ingrown trees
+  semi_join(grm_ingrown, by = join_by(CN == TRE_CN)) |>
+  select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, PREV_TRE_CN, DIA) |>
+  left_join(prev_measyear_mixin, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR)) |>
+  left_join(
+    tree_growth_rate |>
+      select(
+        STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD,
+        DIA_DELTA, DIA_DELTA_ONE, DIA_DELTA_TWO
+      ),
+    by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)
+  ) |>
+  # We can get a perfect estimate if we know the actual value :-D
+  mutate(
+    DIA_EST = DIA,
+    DIA_EST_ONE = DIA,
+    DIA_EST_TWO = DIA
+  ) |>
+  mutate(
+    PREV_DIA_EST = DIA - DIA_DELTA,
+    PREV_DIA_EST_ONE = DIA - DIA_DELTA_ONE,
+    PREV_DIA_EST_TWO = DIA - DIA_DELTA_TWO
+  )
+```
+
+```{r tree_ingrown_three}
+# need to walk back by PREV_MEASYEAR
+prev_measyears <- tree_ingrown_three |>
+  distinct(STATECD, COUNTYCD, PLOT, PREV_MEASYEAR) |>
+  rename(MEASYEAR = PREV_MEASYEAR)
+
+iterations <- 0
+while (nrow(prev_tre_cns) > 0) {
+  print(paste0(
+    "Iteration: ",
+    iterations <- iterations + 1,
+    ", CNs: ",
+    nrow(prev_tre_cns)
+  ))
+  tmp_trees <- tree_ingrown |>
+    semi_join(prev_tre_cns, by = join_by(CN == PREV_TRE_CN)) |>
+    select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, PREV_TRE_CN, DIA) |>
+        # Join on growth rates
+    left_join(
+      tree_growth_rate |>
+        select(
+          STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD,
+          DIA_DELTA, DIA_DELTA_ONE, DIA_DELTA_TWO
+        ),
+      by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)
+    ) |>
+    # Join on previously estimated diameter
+    left_join(
+      manual_back_projection |>
+        select(PREV_TRE_CN, PREV_DIA_EST, PREV_DIA_EST_ONE, PREV_DIA_EST_TWO) |>
+        rename(
+          CN = PREV_TRE_CN,
+          DIA_EST = PREV_DIA_EST,
+          DIA_EST_ONE = PREV_DIA_EST_ONE,
+          DIA_EST_TWO = PREV_DIA_EST_TWO
+        ),
+      by = join_by(CN)
+    ) |>
+    mutate(
+      DIA_ERR = abs(DIA - DIA_EST) / DIA,
+      DIA_ERR_ONE = abs(DIA - DIA_EST_ONE) / DIA,
+      DIA_ERR_TWO = abs(DIA - DIA_EST_TWO) / DIA
+    ) |>
+    # Estimate the next previous tree diameter
+    mutate(
+      PREV_DIA_EST = DIA_EST - DIA_DELTA,
+      PREV_DIA_EST_ONE = DIA_EST_ONE - DIA_DELTA_ONE,
+      PREV_DIA_EST_TWO = DIA_EST_TWO - DIA_DELTA_TWO
+    )
+  # Apparently, some trees can be tracked back before the end of time
+  # or something, so we can end up with some PREV_TRE_CNs that are
+  # dangling refrences.
+  if (nrow(tmp_trees) == 0) {
+    break
+  }
+  manual_back_projection <- bind_rows(manual_back_projection, tmp_trees)
+  num_duplicate_cns <- manual_back_projection |>
+    group_by(CN) |>
+    filter(n() > 1) |>
+    ungroup() |> nrow()
+  stopifnot(num_duplicate_cns == 0)
+  # The next set of prev_tre_cns is:
+  prev_tre_cns <- manual_back_projection |>
+    # All PREV_TRE_CN mentioned
+    select(PREV_TRE_CN) |>
+    filter(!is.na(PREV_TRE_CN)) |>
+    distinct() |>
+    # that have not already been processed
+    anti_join(
+      manual_back_projection |>
+        select(CN) |>
+        filter(!is.na(CN)) |>
+        distinct(),
+      by = join_by(PREV_TRE_CN == CN)
+    )
+}
+manual_back_projection |>
+  group_by() |>
+  summarize(
+    COUNT = n(),
+    MISSING = sum(is.na(DIA_EST), na.rm = TRUE) / COUNT,
+    MISSING_ONE = sum(is.na(DIA_EST_ONE), na.rm = TRUE) / COUNT,
+    MISSING_TWO = sum(is.na(DIA_EST_TWO), na.rm = TRUE) / COUNT,
+    HIT = sum(abs(DIA_ERR) < 0.1, na.rm = TRUE) / COUNT,
+    HIT_ONE = sum(abs(DIA_ERR_ONE) < 0.1, na.rm = TRUE) / COUNT,
+    HIT_TWO = sum(abs(DIA_ERR_TWO) < 0.1, na.rm = TRUE) / COUNT,
+    .groups = 'keep'
+  ) |>
+  ungroup() |>
+  pivot_longer(everything()) |>
+  knitr::kable()
 ```
 
 ## Run FVS
@@ -1755,6 +1885,7 @@ for (timestep in c(0, 1, 10)) {
           mutate(
             Title = title,
             MgmtId = mgmtid,
+            Timestep = timestep,
             RanNSeed = rannseed,
             Partition = partition
           ) |>
@@ -1773,7 +1904,7 @@ remove(fvs_out_db, fvs_carbon_tbl, fvs_summary2_east_tbl)
 ```
 Consolidate outputs; average the multiple runs with different random seeds.
 
-```{r}
+```{r FVS_Carbon_NONE}
 FVS_Carbon_NONE <- FVS_Carbon |>
   filter(Timestep == 10) |>
 #  filter(RanNSeed == 1)
@@ -1922,18 +2053,33 @@ ggplot(
   xlab(bquote("10-Year Timestep Annual Carbon Flux" ~ (MgC %*% ha^-1 %*% year^-1)))
 ```
 
-```{r}
+```{r carbon_flux_stats}
 summary(annual_vs_decadal[,c("Annual_Carbon_Flux", "Decadal_Carbon_Flux")])
 ```
 
 ### Projected vs. Measured
 
-Filter projections to corresponding observations
+Filter projections to corresponding observations.
+
+projected_vs_measured has the projection and measurement for the quantities
+of interest in the first and last year, and nothing in between.
 
 ```{r projected_vs_measured}
 projected_carbon_tmp <- FVS_Carbon_NONE |>
   select(StandID, Year, Total_Stand_Carbon) |>
   rename(Projected_Carbon = Total_Stand_Carbon)
+
+FVS_Summary2_East_NONE <- FVS_Summary2_East |>
+  filter(Timestep == 10) |>
+  group_by(StandID, Year) |>
+  summarize(
+    BA = mean(BA),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+
+FVS_Summary2_East_SRVY <- FVS_Summary2_East |>  
+  filter(Timestep == 0)
 
 projected_ba_tmp <- FVS_Summary2_East_NONE |>
   select(StandID, Year, BA) |>
@@ -1998,6 +2144,7 @@ projected_vs_measured <- stand_stats |>
   mutate(BA_Residual = Projected_BA - Measured_BA) |>
   mutate(BA_Error = 2 * abs(BA_Residual) / (Projected_BA + Measured_BA)) |>
   mutate(BA_Delta_Residual = Projected_BA_Delta - Measured_BA_Delta) |>
+  mutate(BA_Flux_Residual = BA_Delta_Residual / Projection_Years) |>
   mutate(Carbon_Residual = Projected_Carbon - Measured_Carbon) |>
   mutate(Carbon_Error = 2 * abs(Carbon_Residual) / (Projected_Carbon + Measured_Carbon)) |>
   mutate(Carbon_Delta_Residual = Projected_Carbon_Delta - Measured_Carbon_Delta) |>
@@ -2466,6 +2613,62 @@ ggplot(
   facet_wrap(~`Forest Type Group`) +
   ggtitle("Grow-Only Stands\nProjected vs. Measured Basal Area (m²/ha)")
 ```
+
+```{r basal_area_trend}
+ggplot(
+    projected_vs_measured |>
+      filter(Projection_Years > 0) |>
+      mutate(
+        BA_Range = cut(Measured_BA, 0:19 * 5)
+      ) |>
+      group_by(`Forest Type Group`) |>
+      mutate(`Forest Type Group` = paste0(`Forest Type Group`, ", n=", n())) |>
+      ungroup()
+    ,
+    aes(x = BA_Range, y = BA_Flux_Residual)
+  ) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
+  scale_fill_discrete(name = "Forest Type Group") +
+  ggtitle("Measured vs. Projected BA for Grow-Only Stands") +
+  ylab(bquote("BA Residual " (m^2 %*% hectare^-1 %*% year^-1))) +
+  xlab(bquote("Measured Stand BA " (m^2 %*% hectare^-1)))
+
+```
+
+Can we plot plot location with size proportional to BA?
+
+```{r plot_location_by_ecotype}
+plot_location_tmp <- plot_location |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  filter(INVYR == min(INVYR, na.rm = TRUE)) |>
+  ungroup() |>
+  select(STATECD, COUNTYCD, PLOT, long, lat, group)
+
+plot_location_type <- stand_stats |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  filter(INVYR == max(INVYR, na.rm = TRUE)) |>
+  ungroup() |>
+  consolidate_forest_type_groups_filter() |>
+  select(STATECD, COUNTYCD, PLOT, INVYR, BALIVE, `Forest Type Group`) |>
+  left_join(plot_location_tmp, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  mutate(
+    BA = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare")
+  )
+
+ggplot(map_states, aes(long, lat, group = group)) +
+  geom_polygon(fill = "white", color = "black") + 
+  geom_point(
+    plot_location_type,
+    mapping = aes(long, lat, group = group, color = `Forest Type Group`, size = BA)
+  ) +
+  scale_size_binned_area(max_size = 3) +
+  coord_quickmap() +
+  ggtitle("Plot Location with Forest Type")
+
+remove(plot_location_tmp)
+```
+
 
 #### Residuals vs. Years Projected
 
