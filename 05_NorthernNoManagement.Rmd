@@ -872,13 +872,18 @@ From the observed growth with outliers removed, we can compute per-species,
 per-plot, per-inventory growth rates. We can then apply these growth rates
 to ingrown trees to back-project them to their starting diameter.
 
-For each ingrown tree, we pick the best estimate of growth rate based on
-other trees on the plot, after filtering out growth outliers:
+For each plot/species/inventory, we compute the growth rate of that species
+on that plot in that inventory, based on the trees of that species on that plot
+during that inventory. Some variations filter out growth outliers.
 
-1. The mean growth rate of at least 3 dominant trees of the same species during the inventory;
-2. The mean growth rate of at least 3 trees of any dominance of the same species during the inventory;
-3. The mean growth rate of at least 3 trees of any dominance of the same species group during the inventory;
-4. The mean growth rate of at least 3 trees of any dominance of the same species group on the plot during any inventory.
+For growth rate, we prioritize:
+
+1. The mean growth rate of at least 3 dominant trees of the species during the inventory;
+2. The mean growth rate of at least 3 trees of any dominance of the species during the inventory;
+3. The mean growth rate of at least 3 trees of any dominance of the species group during the inventory;
+4. The mean growth rate of at least 3 trees of any dominance of the species group on the plot during any inventory.
+
+tree_growth_rate - all computable growth rates for all plot/species/inventory
 
 ```{r tree_growth_rate}
 tree_growth_with_outliers <- tree_growth |>
@@ -1329,127 +1334,115 @@ ggplot(
 
 This looks usable.
 
-##### Back-Project to 3" DBH
+##### Back-Project to <= 3" DBH
 
 Using estimated diameter, what portion of ingrown trees
 can we project back to 3" DBH before the first MEASYEAR?
 
 ```{r init_tree_ingrown_three}
-prev_measyear_mixin <- tree_growth |>
-  distinct(STATECD, COUNTYCD, PLOT, MEASYEAR, PREV_MEASYEAR)
-
 tree_ingrown_three <- tree_ingrown |>
   # Start with actually ingrown trees
   semi_join(grm_ingrown, by = join_by(CN == TRE_CN)) |>
-  select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, PREV_TRE_CN, DIA) |>
-  left_join(prev_measyear_mixin, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR)) |>
+  select(CN, STATECD, COUNTYCD, PLOT, TREE, MEASYEAR, SPCD, DIA) |>
   left_join(
     tree_growth_rate |>
       select(
         STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD,
+        PREV_MEASYEAR,
         DIA_DELTA, DIA_DELTA_ONE, DIA_DELTA_TWO
       ),
     by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)
   ) |>
-  # We can get a perfect estimate if we know the actual value :-D
+  # Fill in estimated diameters
   mutate(
-    DIA_EST = DIA,
-    DIA_EST_ONE = DIA,
-    DIA_EST_TWO = DIA
+    FRST_MEASYEAR = if_else(DIA > 3, PREV_MEASYEAR, MEASYEAR),
+    FRST_DIA_EST = if_else(DIA > 3, DIA - DIA_DELTA, DIA),
+    FRST_DIA_EST_ONE = if_else(DIA > 3, DIA - DIA_DELTA_ONE, DIA),
+    FRST_DIA_EST_TWO = if_else(DIA > 3, DIA - DIA_DELTA_TWO, DIA)
   ) |>
   mutate(
-    PREV_DIA_EST = DIA - DIA_DELTA,
-    PREV_DIA_EST_ONE = DIA - DIA_DELTA_ONE,
-    PREV_DIA_EST_TWO = DIA - DIA_DELTA_TWO
+    PREV_MEASYEAR = if_else(FRST_DIA_EST > 3, PREV_MEASYEAR, NA)
   )
 ```
 
 ```{r tree_ingrown_three}
-# need to walk back by PREV_MEASYEAR
+# Graft on the growth for the previous inventory
+# project back that growth
+# calculate the estimated diameter
+# anything that's at 3", or that doesn't have a prev_measyear, gets filtered out
+# (set to NULL?)
+# move prev_measyear back a notch
+# repeat
 prev_measyears <- tree_ingrown_three |>
-  distinct(STATECD, COUNTYCD, PLOT, PREV_MEASYEAR) |>
-  rename(MEASYEAR = PREV_MEASYEAR)
+  filter(!is.na(PREV_MEASYEAR)) |>
+  select(CN, PREV_MEASYEAR)
 
+# Less efficient, but amusing and probably worth it:
+# run prev_measyear back by max(prev_measyears), so
+# we can print the year we're projecting. Then
+# do the join on tree_ingrown_three and tree_growth_rate
+# with appropriate measyears.
 iterations <- 0
-while (nrow(prev_tre_cns) > 0) {
+while (nrow(prev_measyears) > 0) {
   print(paste0(
     "Iteration: ",
     iterations <- iterations + 1,
-    ", CNs: ",
-    nrow(prev_tre_cns)
+    ", Trees: ",
+    nrow(prev_measyears),
+    ", Years: ",
+    min(prev_measyears$PREV_MEASYEAR),
+    " - ",
+    max(prev_measyears$PREV_MEASYEAR)
   ))
-  tmp_trees <- tree_ingrown |>
-    semi_join(prev_tre_cns, by = join_by(CN == PREV_TRE_CN)) |>
-    select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, PREV_TRE_CN, DIA) |>
-        # Join on growth rates
+
+  tree_ingrown_three <- tree_ingrown_three |>
+    select(!starts_with("DIA_DELTA")) |>
     left_join(
       tree_growth_rate |>
         select(
           STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD,
+          PREV_MEASYEAR,
           DIA_DELTA, DIA_DELTA_ONE, DIA_DELTA_TWO
         ),
-      by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)
+      by = join_by(STATECD, COUNTYCD, PLOT, PREV_MEASYEAR == MEASYEAR, SPCD)
     ) |>
-    # Join on previously estimated diameter
-    left_join(
-      manual_back_projection |>
-        select(PREV_TRE_CN, PREV_DIA_EST, PREV_DIA_EST_ONE, PREV_DIA_EST_TWO) |>
-        rename(
-          CN = PREV_TRE_CN,
-          DIA_EST = PREV_DIA_EST,
-          DIA_EST_ONE = PREV_DIA_EST_ONE,
-          DIA_EST_TWO = PREV_DIA_EST_TWO
-        ),
-      by = join_by(CN)
+    select(!"PREV_MEASYEAR") |>
+    rename(PREV_MEASYEAR = PREV_MEASYEAR.y) |>
+    # Update estimated diameters, but only if growth joined on
+    mutate(
+      FRST_MEASYEAR = if_else(!is.na(DIA_DELTA), PREV_MEASYEAR, FRST_MEASYEAR),
+      FRST_DIA_EST =
+        if_else(!is.na(DIA_DELTA), FRST_DIA_EST - DIA_DELTA, FRST_DIA_EST),
+      FRST_DIA_EST_ONE =
+        if_else(!is.na(DIA_DELTA), FRST_DIA_EST_ONE - DIA_DELTA_ONE, FRST_DIA_EST_ONE),
+      FRST_DIA_EST_TWO =
+        if_else(!is.na(DIA_DELTA), FRST_DIA_EST_TWO - DIA_DELTA_TWO, FRST_DIA_EST_TWO)
     ) |>
     mutate(
-      DIA_ERR = abs(DIA - DIA_EST) / DIA,
-      DIA_ERR_ONE = abs(DIA - DIA_EST_ONE) / DIA,
-      DIA_ERR_TWO = abs(DIA - DIA_EST_TWO) / DIA
-    ) |>
-    # Estimate the next previous tree diameter
-    mutate(
-      PREV_DIA_EST = DIA_EST - DIA_DELTA,
-      PREV_DIA_EST_ONE = DIA_EST_ONE - DIA_DELTA_ONE,
-      PREV_DIA_EST_TWO = DIA_EST_TWO - DIA_DELTA_TWO
+      PREV_MEASYEAR = if_else(!is.na(DIA_DELTA) & FRST_DIA_EST > 3, PREV_MEASYEAR, NA)
     )
-  # Apparently, some trees can be tracked back before the end of time
-  # or something, so we can end up with some PREV_TRE_CNs that are
-  # dangling refrences.
-  if (nrow(tmp_trees) == 0) {
+
+  # This generally completes in 4 iterations; if we hit 10 something's wrong.
+  if (iterations > 10) {
+    print("Too many iterations")
     break
   }
-  manual_back_projection <- bind_rows(manual_back_projection, tmp_trees)
-  num_duplicate_cns <- manual_back_projection |>
-    group_by(CN) |>
-    filter(n() > 1) |>
-    ungroup() |> nrow()
-  stopifnot(num_duplicate_cns == 0)
-  # The next set of prev_tre_cns is:
-  prev_tre_cns <- manual_back_projection |>
-    # All PREV_TRE_CN mentioned
-    select(PREV_TRE_CN) |>
-    filter(!is.na(PREV_TRE_CN)) |>
-    distinct() |>
-    # that have not already been processed
-    anti_join(
-      manual_back_projection |>
-        select(CN) |>
-        filter(!is.na(CN)) |>
-        distinct(),
-      by = join_by(PREV_TRE_CN == CN)
-    )
+
+  prev_measyears <- tree_ingrown_three |>
+    filter(!is.na(PREV_MEASYEAR)) |>
+    select(CN, PREV_MEASYEAR)
 }
-manual_back_projection |>
+
+tree_ingrown_three |>
   group_by() |>
   summarize(
     COUNT = n(),
-    MISSING = sum(is.na(DIA_EST), na.rm = TRUE) / COUNT,
-    MISSING_ONE = sum(is.na(DIA_EST_ONE), na.rm = TRUE) / COUNT,
-    MISSING_TWO = sum(is.na(DIA_EST_TWO), na.rm = TRUE) / COUNT,
-    HIT = sum(abs(DIA_ERR) < 0.1, na.rm = TRUE) / COUNT,
-    HIT_ONE = sum(abs(DIA_ERR_ONE) < 0.1, na.rm = TRUE) / COUNT,
-    HIT_TWO = sum(abs(DIA_ERR_TWO) < 0.1, na.rm = TRUE) / COUNT,
+    MISSING = sum(is.na(FRST_DIA_EST), na.rm = TRUE) / COUNT,
+    MISSING_ONE = sum(is.na(FRST_DIA_EST_ONE), na.rm = TRUE) / COUNT,
+    MISSING_TWO = sum(is.na(FRST_DIA_EST_TWO), na.rm = TRUE) / COUNT,
+    HIT = sum(FRST_DIA_EST <= 3, na.rm = TRUE) / COUNT,
+    HIT_ONE = sum(FRST_DIA_EST_ONE <= 3, na.rm = TRUE) / COUNT,
+    HIT_TWO = sum(FRST_DIA_EST_TWO <= 3, na.rm = TRUE) / COUNT,
     .groups = 'keep'
   ) |>
   ungroup() |>
