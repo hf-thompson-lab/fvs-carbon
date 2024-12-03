@@ -2726,3 +2726,155 @@ ggplot(
   facet_wrap(~`Forest Type Group`) +
   ggtitle("Grow-Only Stands\nBA Projection Residual (m²/ha) vs. Measured QMD (cm)")
 ```
+
+## Addenda
+
+### Eastern Hemlock
+
+
+```{r eastern_hemlock}
+rds_file <- 'data/intermediate/eastern_hemlock.rds'
+if (FALSE & file.exists(rds_file)) {
+  eastern_hemlock <- read_rds(rds_file)
+} else {
+  tsuga_canadensis <- species_mixin |>
+    filter(GENUS == "Tsuga" & SPECIES == "canadensis") |>
+    select(SPCD) |>
+    pull()
+  
+  # FIA.TREE.CN - sequence number - 0 NA
+  # FIA.TREE.TREE - TREE number
+  # FIA.TREE.CONDID - condition class; 1 = live tree
+  # FIA.TREE.SPCD - species code
+  # FIA.TREE.SPGRPCD is broader than SPCD, group by that instead
+  # FIA.TREE.DIA - current diameter - 1693 NA
+  # FIA.TREE.DIAHTCD - where diameter was taken, 1 = DBH
+  # FIA.TREE.HT - height, including height of missing parts - 2605 NA
+  # FIA.TREE.ACTUALHT - actual height, excluding height of missing parts - 4076 NA
+  # FIA.TREE.CR - Compacted Crown Ratio, relative to ACTUALHT - 3576 NA
+  # FIA.TREE.UNCRCD - Uncompacted Crown Ratio - 28268 NA
+  # FIA.TREE.CCLCD - Crown Class code - 3421 NA
+  #     1 - Open; 2 - Dominant; 3 - Codominant; 4 - Intermediate; 5 - Overtopped
+  # FIA.TREE.CPOSCD - Crown Position Code - 29717 NA
+  #     1 - Superstory; 2 - Over; 3 - Under; 4 - Open
+  # FIA.TREE.CLIGHTCD - Light code - 29717 NA
+  #     0 - 5, # of sides and top receiving light
+  # FIA.TREE.CDENCD - Crown Density Code, % - 29820 NA
+
+  fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+  measyear_mixin <- tbl(fia, 'PLOT') |>
+    select(CN, MEASYEAR) |>
+    rename(PLT_CN = CN)
+  
+  canopy_height_mixin <- tbl(fia, 'TREE') |>
+    semi_join(
+      plot_grow_only |> arrange(STATECD, COUNTYCD, PLOT),
+      by = join_by(STATECD, COUNTYCD, PLOT),
+      copy = TRUE
+    ) |>
+    # Live trees
+    filter(CONDID == 1) |>
+    # Codominant
+    filter(CCLCD == 3) |>
+    group_by(PLT_CN) |>
+    summarize(CANOPY_HT = mean(HT, na.rm = TRUE)) |>
+    ungroup()
+  
+  eastern_hemlock <- tbl(fia, 'TREE') |>
+    semi_join(
+      plot_grow_only |> arrange(STATECD, COUNTYCD, PLOT),
+      by = join_by(STATECD, COUNTYCD, PLOT),
+      copy = TRUE
+    ) |>
+    # Live trees
+    filter(CONDID == 1) |>
+    # Eastern Hemlock
+    filter(SPCD == tsuga_canadensis) |>
+    left_join(measyear_mixin, by = join_by(PLT_CN)) |>
+    left_join(canopy_height_mixin, by = join_by(PLT_CN)) |>
+    select(
+      CN,
+      STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, MEASYEAR,
+      SPCD,
+      DIA, DIAHTCD,
+      HT, ACTUALHT, CANOPY_HT,
+      CR, UNCRCD, CCLCD, CPOSCD, CLIGHTCD, CDENCD
+    ) |>
+    arrange(STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR) |>
+    collect()
+  
+  dbDisconnect(fia)
+
+  eastern_hemlock <- eastern_hemlock |>
+    left_join(species_mixin, by = join_by(SPCD)) |>
+    large_end_diameter_class_filter() |>
+    decode_cclcd_filter()
+
+  rm(fia, measyear_mixin, tsuga_canadensis)
+
+  write_rds(eastern_hemlock, rds_file)
+}
+```
+
+Looks like we have a meaningful number of trees with CCLCD and CR, so let's
+compare those.
+
+```{r plot_ccl_vs_cr}
+eastern_hemlock |>
+  filter(!is.na(CCL) & !is.na(CR)) |>
+  mutate(CCL = factor(CCL, levels = c("Open grown", "Dominant", "Codominant", "Intermediate", "Overtopped"))) |>
+  ggplot(aes(x = CCL, y = CR)) +
+  geom_boxplot() +
+  ylab("Crown Ratio (%)") +
+  xlab("Crown Class") +
+  ggtitle("Eastern Hemlock Crown Ratio vs. Crown Class")
+  
+```
+
+> TODO: Danelle points out that e.g. for two trees that are 40' tall, the
+> Codominant one will be in a forest with a 40' canopy, whereas the Intermediate
+> one will be under a higher canopy. So, instead of plotting this by tree height,
+> we could plot it by canopy height.
+> We could estimate canopy height for a plot by looking at the mean height of
+> codominant trees.
+
+> TODO: Danelle thinks that the missing bars are due to missing data. Can I insert
+> something for missing classes?
+
+
+```{r plot_cr_vs_ht_by_ccl}
+plot_eastern_hemlock <- eastern_hemlock |>
+  filter(!is.na(CCL) & !is.na(CANOPY_HT) & !is.na(CR)) |>
+  # filter(CANOPY_HT > 30 & CANOPY_HT < 100) |>
+  mutate(CCL = factor(CCL, levels = rev(c("Open grown", "Dominant", "Codominant", "Intermediate", "Overtopped")))) |>
+  mutate(HT_GROUP = factor(as.integer(CANOPY_HT / 10) * 10))
+missing_classes <- plot_eastern_hemlock |> distinct(CCL) |>
+  cross_join(plot_eastern_hemlock |> distinct(HT_GROUP)) |>
+  anti_join(plot_eastern_hemlock |> distinct(HT_GROUP, CCL), by = join_by(HT_GROUP, CCL)) |>
+  mutate(CR = -10) # Give missing classes a negative crown ratio so it can be cropped out
+plot_eastern_hemlock <- plot_eastern_hemlock |>
+  select(HT_GROUP, CCL, CR) |>
+  union_all(missing_classes)
+plot_eastern_hemlock_counts <- plot_eastern_hemlock |>
+  group_by(HT_GROUP, CCL) |>
+  summarize(COUNT = n(), CR = mean(CR), .groups = "keep") |>
+  ungroup()
+```
+```{r}
+plot_eastern_hemlock |>
+  ggplot(aes(CR, HT_GROUP, fill = CCL)) +
+  theme_bw() +
+  geom_boxplot(outlier.size = 0.1) +
+  geom_text(
+    data = plot_eastern_hemlock_counts,
+    mapping = aes(label = COUNT),
+    position = position_dodge(width = .75),
+    color = 'white'
+  ) +
+  scale_fill_discrete(name = "Crown Class", breaks = rev(levels(plot_eastern_hemlock$CCL))) +
+  coord_cartesian(xlim = c(0, 100)) + # crop out "trees" with a negative crown ratio
+  xlab("Crown Ratio (%)") +
+  ylab("Canopy Height (feet)") +
+  ggtitle("Eastern Hemlock Crown Ratio vs. Canopy Height by Crown Class")
+  
+```

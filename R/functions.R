@@ -218,6 +218,34 @@ consolidate_forest_type_groups_filter <- function(.data) {
     )
 }
 
+large_end_diameter_class_filter <- function(.data) {
+  .data |>
+    mutate(
+      LARGE_END_DIA_CLASS = case_when(
+        DIA < 3 ~ "0.0 - 2.9",
+        DIA < 5 ~ "3.0 - 4.9",
+        DIA < 9 ~ "5.0 - 8.9",
+        DIA < 15 ~ "9.0 - 14.9",
+        DIA < 21 ~ "15.0 - 20.9",
+        DIA < 40 ~ "21.0 - 39.9",
+        .default = "40.0 +"
+      )
+    )
+}
+
+decode_cclcd_filter <- function(.data) {
+  .data |>
+    mutate(
+      CCL = case_when(
+        CCLCD == 1 ~"Open grown",
+        CCLCD == 2 ~"Dominant",
+        CCLCD == 3 ~"Codominant",
+        CCLCD == 4 ~"Intermediate",
+        CCLCD == 5 ~"Overtopped"
+      )
+    )
+}
+
 hectare_at <- function(lat, lon) {
   old_axis_order <- st_axis_order()
   st_axis_order(TRUE)
