@@ -389,9 +389,18 @@ fvs_TimeConfig <- function(FirstYear, LastYear, Timestep) {
 
 fvs_Estab <- function(rows) {
   natural_regen <- function(row) {
+    year <- 0
     species <- row["species"]
-    density <- row["seedlings"] # per acre
-    fvs_kwd7("Natural", 0, species, density, 100, '', '', 0)
+    density <- row["density"] # TPA
+    survival <- 100 # percent
+    age <- ''
+    if ("height" %in% names(row)) {
+      height <- row["height"]
+    } else {
+      height <- ''
+    }
+    shade <- 0
+    fvs_kwd7("Natural", year, species, density, survival, age, height, shade)
   }
   Estab <- c(
     fvs_kwd1("If", 0),

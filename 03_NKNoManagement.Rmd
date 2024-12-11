@@ -207,8 +207,8 @@ Select `Save in run` to apply to `Grp: All_FIA_Plots`.
 
 ```{r background_regen}
 background_regen <- table4_rot |>
-  rename(species = `Species Code`, seedlings = Background) |>
-  filter(!is.na(seedlings)) |>
+  rename(species = `Species Code`, density = Background) |>
+  filter(!is.na(density)) |>
   fvs_Estab()
 ```
 
@@ -231,7 +231,7 @@ Select `Save in run` to apply to `Grp: All_FIA_Plots`.
 
 ```{r keywordfile_section}
 keywordfile_section <- function(Title, MgmtId, StandID, StandCN, FirstYear, LastYear) {
-  TimeConfig <- fvs_TimeConfig(FirstYear, LastYear)
+  TimeConfig <- fvs_TimeConfig(FirstYear, LastYear, 10)
   c(
     fvs_kwd0("StdIdent"),
     paste0(StandID, " ", Title),
