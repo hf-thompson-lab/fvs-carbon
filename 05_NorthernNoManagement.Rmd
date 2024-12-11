@@ -2,8 +2,8 @@
 title: "Nunery Keeton Revisited"
 author: "Nikolaus Bates-Haus"
 output:
-  word_document: default
   html_document: default
+  word_document: default
   pdf_document: default
 editor_options:
   markdown:
@@ -20,6 +20,7 @@ library(dbplyr)
 library(measurements)
 library(maps)
 library(pbapply) # Progress bar for long operations
+options(scipen = 9) # Use integer notation for numbers under 9 digits
 ```
 
 ```{r source-functions}
@@ -37,7 +38,7 @@ jenkins_spgrpcd_mixin <- read_csv(
   rename(JENKINS_SPGRP_NAME = NAME)
 
 species_mixin <- tbl(fia, 'REF_SPECIES') |>
-  select(SPCD, GENUS, SPECIES, E_SPGRPCD, JENKINS_SPGRPCD, SCIENTIFIC_NAME) |>
+  select(SPCD, GENUS, SPECIES, E_SPGRPCD, JENKINS_SPGRPCD, SCIENTIFIC_NAME, COMMON_NAME) |>
   left_join(
     tbl(fia, 'REF_SPECIES_GROUP') |> distinct(SPGRPCD, NAME),
     by = join_by(E_SPGRPCD == SPGRPCD)
@@ -326,7 +327,7 @@ ggplot(map_states, aes(long, lat, group = group)) +
     plot_location_type,
     mapping = aes(long, lat, group = group, color = `Forest Type Group`)) +
   coord_quickmap() +
-  ggtitle("Plot Location with Forest Type")
+  ggtitle("FIA Grow-Only Plots in the Northeast Region")
 ```
 
 Look at BA over time; first, by stand age, then as change over calendar time.
@@ -419,7 +420,7 @@ plt_cns_mixin <- tbl(fia, 'PLOT') |>
   rename(PLT_CN = CN)
 
 tree_mixin <- tbl(fia, 'TREE') |>
-  select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR) |>
+  select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD) |>
   rename(TRE_CN = CN)
 
 # Get all the Tree Growth, Removal, and Mortality entries for those plots that
@@ -748,6 +749,9 @@ tree_growth - adds DIA/HT_DELTA, AGE_DELTA, and ANN_DIA/HT_DELTA to each tree
   
 Note that tree_growth is all trees, not just ingrown trees.
 
+This also fetches trees with only a single observation; these are useful
+for calculating ingrowth.
+
 ```{r tree_growth}
 rds_file <- 'data/intermediate/tree_growth.rds'
 if (file.exists(rds_file)) {
@@ -762,6 +766,7 @@ if (file.exists(rds_file)) {
   # FIA.TREE.HT - height
   # FIA.TREE.SPGRPCD is broader than SPCD, group by that instead
   # FIA.TREE.CCLCD - Crown Class code
+  # FIA.TREE.TPA_UNADJ - Trees Per Acre (Unadjusted)
   # We want ingrowth for all the plots in plot_grow_only
   
   fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
@@ -788,8 +793,8 @@ if (file.exists(rds_file)) {
     ) |>
     # Live trees
     filter(CONDID == 1) |>
-    # Many trees will have no previous tree, filter those out.
-    filter(!is.na(PREV_TRE_CN)) |>
+    # Many trees will have no previous tree, don't filter those out.
+    # filter(!is.na(PREV_TRE_CN)) |>
     # Self-join to previous tree to get growth increment
     left_join(prev_tre_mixin, by = join_by(PREV_TRE_CN)) |>
     left_join(measyear_mixin, by = join_by(PLT_CN)) |>
@@ -802,7 +807,7 @@ if (file.exists(rds_file)) {
     ) |>
     select(
       CN, PREV_TRE_CN, PLT_CN, PREV_PLT_CN,
-      STATECD, COUNTYCD, PLOT, SUBP, TREE, SPCD,
+      STATECD, COUNTYCD, PLOT, SUBP, TREE, SPCD, TPA_UNADJ,
       MEASYEAR, PREV_MEASYEAR, CCLCD, DIA, PREV_DIA, HT, PREV_HT,
       AGE_DELTA, DIA_DELTA, ANN_DIA_DELTA, HT_DELTA, ANN_HT_DELTA
     ) |>
@@ -863,8 +868,6 @@ tree_growth |>
     ylab("Species Group")
 
 ```
-
-
 
 ##### Estimated Growth Rate
 
@@ -1343,7 +1346,7 @@ can we project back to 3" DBH before the first MEASYEAR?
 tree_ingrown_three <- tree_ingrown |>
   # Start with actually ingrown trees
   semi_join(grm_ingrown, by = join_by(CN == TRE_CN)) |>
-  select(CN, STATECD, COUNTYCD, PLOT, TREE, MEASYEAR, SPCD, DIA) |>
+  select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR, SPCD, DIA) |>
   left_join(
     tree_growth_rate |>
       select(
@@ -1450,6 +1453,341 @@ tree_ingrown_three |>
   knitr::kable()
 ```
 
+How'd we do?
+
+```{r plot_tree_ingrown_three}
+tree_ingrown_three_validation <- tree_ingrown_three |>
+  select(CN, MEASYEAR, SPCD, # STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR, SPCD,
+         FRST_MEASYEAR, FRST_DIA_EST, FRST_DIA_EST_ONE, FRST_DIA_EST_TWO) |>
+  filter(FRST_MEASYEAR != MEASYEAR) |>
+  #head(1000) |>
+#  left_join(
+#    tree_ingrown |> select(STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR, DIA),
+#    by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, FRST_MEASYEAR == MEASYEAR)
+#  ) |>
+  left_join(species_mixin, by = join_by(SPCD)) |>
+  group_by(JENKINS_SPGRP_NAME) |>
+  mutate(GROUP_NAME = paste0(JENKINS_SPGRP_NAME, ", n=", n())) |>
+  ungroup() |>
+  select(CN, GROUP_NAME, FRST_DIA_EST, FRST_DIA_EST_ONE, FRST_DIA_EST_TWO) |>
+  rename(
+#    `Measured` = DIA,
+    `Estimated` = FRST_DIA_EST,
+    `Est - 1%` = FRST_DIA_EST_ONE,
+    `Est - 2.5%` = FRST_DIA_EST_TWO
+  ) |>
+  melt(
+    id.vars = c("CN", "GROUP_NAME"),
+    variable.name = "Series",
+    value.name = "Growth"
+  ) |>
+  filter(!is.na(Growth))
+ggplot(
+  tree_ingrown_three_validation,
+  aes(Growth, fct_rev(fct_infreq(GROUP_NAME)), fill = `Series`)
+) +
+  geom_vline(xintercept = 3, linetype = "dashed") +
+  geom_vline(xintercept = 5, linetype = "dotted") +
+  geom_boxplot(outlier.size = 0.1) +
+  scale_fill_discrete(breaks = rev(levels(tree_ingrown_three_validation$Series))) +
+  theme_bw() +
+  ggtitle("Smallest Projected Diameter in Simulation Window") +
+  xlab(bquote("Diameter " ~(inches))) +
+  ylab("Species Group")
+```
+
+Looks good, but what we actually needed was height, not diameter.
+
+#### Ingrowth Rate
+
+Possible ways of doing ingrowth by rate:
+
+* Ingrowth by Stem Rate
+* Ingrowth by BAI
+
+_Ingrowth by Stem Rate_
+
+Compute a per-species, per-plot "trees-per-year" rate of ingrowth. Then, for each timestep, I can compute the number of trees that should ingrow during that timestep. They would be added as maximum size trees: 3" DBH.
+
+Advantages:
+
+- Tree-level simulation plays well with FVS
+- In the long term, this will converge on a population of trees indistinguishable from the "inject specific trees" approach.
+
+Disadvantages:
+
+- At the start of simulation there may be a dip in stand-level biomass since pre-simulation trees ingrow at 5" DBH, and once the simulation starts they ingrow at 3" DBH. Essentially, all the trees between 3" and 5" DBH at the start of the simulation are "forgotten", unless we do something to try to make up for that. But see below for the caveat re: crowding.
+
+_Ingrowth by BAI_
+
+Compute a per-species, per-plot "basal area per year" rate of ingrowth. Then, for each timestep, I can compute the number of 3" DBH trees that should ingrow during that timestep to provide the target BA.
+
+BAI - Basal Area Increment - m^2 x ha^-1 x year^-1
+
+Advantages:
+
+- No dip in biomass at the start of simulation, since we're adding the right amount of biomass.
+
+Disadvantages:
+
+- Adds more trees. FVS is pretty assertive about killing trees due to crowding, so this is likely to result in more trees dying than would be observed on the plot. This could result in net lower biomass in the long term, especially since FVS will kill larger trees as well as smaller trees.
+
+##### Stem Ingrowth Rate
+
+We want:
+
+* stems
+* of each species
+* per acre
+* per year (or does this vary over time?)
+* on each plot
+
+Complication:
+
+Some saplings have unidentified species, flagged as SPECIES == "spp."
+In theory we could walk forward in time for some of these trees and
+find a later record for the tree that identifies the specific species.
+This will not work for trees that ingrow in the latest inventory.
+For now, we use the simple method of imputing the most common non-spp.
+species of the genus on the plot for all spp. trees.
+
+```{r tree_growth_with_fixed_spcd}
+mcs_plot <- tree_growth |>
+  filter(SPECIES != "spp.") |>
+  group_by(STATECD, COUNTYCD, PLOT, GENUS, SPCD) |>
+  summarize(COUNT = n(), .groups = "keep") |>
+  ungroup() |>
+  group_by(STATECD, COUNTYCD, PLOT, GENUS) |>
+  filter(COUNT == max(COUNT)) |>
+  filter(SPCD == min(SPCD)) |> # break ties by SPCD
+  ungroup() |>
+  select(!COUNT) |>
+  rename(SPCD_PLOT = SPCD)
+
+mcs_county <- tree_growth |>
+  filter(SPECIES != "spp.") |>
+  group_by(STATECD, COUNTYCD, GENUS, SPCD) |>
+  summarize(COUNT = n(), .groups = "keep") |>
+  ungroup() |>
+  group_by(STATECD, COUNTYCD, GENUS) |>
+  filter(COUNT == max(COUNT)) |>
+  filter(SPCD == min(SPCD)) |> # break ties by SPCD
+  ungroup() |>
+  select(!COUNT) |>
+  rename(SPCD_COUNTY = SPCD)
+
+mcs_state <- tree_growth |>
+  filter(SPECIES != "spp.") |>
+  group_by(STATECD, GENUS, SPCD) |>
+  summarize(COUNT = n(), .groups = "keep") |>
+  ungroup() |>
+  group_by(STATECD, GENUS) |>
+  filter(COUNT == max(COUNT)) |>
+  filter(SPCD == min(SPCD)) |> # break ties by SPCD
+  ungroup() |>
+  select(!COUNT) |>
+  rename(SPCD_STATE = SPCD)
+
+mcs_overall <- tree_growth |>
+  filter(SPECIES != "spp.") |>
+  group_by(GENUS, SPCD) |>
+  summarize(COUNT = n(), .groups = "keep") |>
+  ungroup() |>
+  group_by(GENUS) |>
+  filter(COUNT == max(COUNT)) |>
+  filter(SPCD == min(SPCD)) |> # break ties by SPCD
+  ungroup() |>
+  select(!COUNT) |>
+  rename(SPCD_OVERALL = SPCD)
+
+# Note that this leaves Crataegus (Hawthorn) as spp. - apparently FIA has
+# passed on trying to identify species in Crataegus.
+tree_growth_with_fixed_spcd <- tree_growth |>
+  left_join(mcs_plot, by = join_by(STATECD, COUNTYCD, PLOT, GENUS)) |>
+  left_join(mcs_county, by = join_by(STATECD, COUNTYCD, GENUS)) |>
+  left_join(mcs_state, by = join_by(STATECD, GENUS)) |>
+  left_join(mcs_overall, by = join_by(GENUS)) |>
+  rename(SPCD_ORIG = SPCD) |>
+  mutate(SPCD = coalesce(SPCD_PLOT, SPCD_COUNTY, SPCD_STATE, SPCD_OVERALL, SPCD_ORIG)) |>
+  select(SPCD | !any_of(names(species_mixin))) |>
+  left_join(species_mixin, by = join_by(SPCD))
+```
+
+How'd we do?
+
+```{r check fix to spcd}
+rbind(
+  tree_growth |>
+    filter(SPECIES == "spp.") |>
+    group_by(GENUS) |>
+    summarize(TREE_COUNT = n()) |>
+    ungroup() |>
+    mutate(SERIES = "Uncorrected"),
+  tree_growth_with_fixed_spcd |>
+    filter(SPECIES == "spp.") |>
+    group_by(GENUS) |>
+    summarize(TREE_COUNT = n()) |>
+    ungroup() |>
+    mutate(SERIES = "Corrected")
+) |>
+  group_by(SERIES) |>
+  summarise(SPECIES_COUNT = n(), TREE_COUNT = sum(TREE_COUNT))
+```
+
+Of note, FIA seems to not note species of Hawthorn or Pear in NE:
+```{r unfixed spcd}
+tree_growth_with_fixed_spcd |>
+  filter(SPECIES == "spp.") |>
+  group_by(SPCD) |>
+  summarize(TREE_COUNT = n()) |>
+  ungroup() |>
+  left_join(species_mixin, by = join_by(SPCD)) |>
+  select(SCIENTIFIC_NAME, COMMON_NAME, TREE_COUNT)
+```
+
+Let's find out how many stems of each (corrected) species ingrow per year.
+
+```{r ingrowth_stem_rate}
+ingrowth_stem_rate <- tree_growth_with_fixed_spcd |>
+  semi_join(grm_ingrown, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR)) |>
+  # If PREV_MEASYEAR isn't filled in, estimate it as 5 years prior.
+  mutate(PREV_MEASYEAR = if_else(is.na(PREV_MEASYEAR), MEASYEAR - 5, PREV_MEASYEAR)) |>
+  group_by(STATECD, COUNTYCD, PLOT, SPCD) |>
+  summarize(
+    FIRST_YEAR = min(PREV_MEASYEAR),
+    LAST_YEAR = max(MEASYEAR),
+    COUNT = n(),
+    COUNT_PER_ACRE = COUNT * 6, # Don't use TPA_UNADJ; microplot multipliers are inaccurate here.
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  left_join(species_mixin, by = join_by(SPCD)) |>
+  group_by(JENKINS_SPGRPCD) |>
+  mutate(
+    NUM_PLOTS = n(),
+    GROUP_NAME = paste0(JENKINS_SPGRP_NAME, ", n=", NUM_PLOTS)
+  ) |>
+  ungroup() |>
+  mutate(
+    COUNT_PER_HECTARE = conv_unit(COUNT_PER_ACRE, "hectare", "acre"),
+    RATE = COUNT / (LAST_YEAR - FIRST_YEAR),
+    RATE_PER_ACRE = COUNT_PER_ACRE / (LAST_YEAR - FIRST_YEAR),
+    RATE_PER_HECTARE = COUNT_PER_HECTARE / (LAST_YEAR - FIRST_YEAR)
+  )
+```
+
+```{r plot-ingrowth_stem_rate}
+ingrowth_stem_rate |>
+  ggplot(aes(y = RATE_PER_ACRE, fill = fct_rev(reorder(GROUP_NAME, NUM_PLOTS)))) +
+  geom_boxplot(outlier.size = 0.1) +
+  scale_fill_discrete(
+    name = "Species Group"
+  ) +
+  scale_x_continuous(labels = NULL) +
+  theme_bw() +
+  ylab(bquote("Ingrowth Rate" ~(stems %*% acre^-1 %*% year^-1))) +
+  ggtitle("Per-Plot Ingrowth Stem Rate")
+```
+
+##### Ingrowth Height
+
+For FVS ingrowth, we also need height when the tree is 3" DBH. FVS will 
+adjust this, so it only needs to be close.
+
+We pick a few trees closest to 3" DBH, do a linear interpolation of their
+height to what it might be at 3" DBH, and average them.
+
+```{r tree_growth_ht}
+tree_growth_ht_plot <- tree_growth_with_fixed_spcd |>
+  # Overcome a data issue: some trees have no HT, but have PREV_HT
+  mutate(HT = coalesce(HT, PREV_HT), DIA = coalesce(DIA, PREV_DIA)) |>
+  filter(!is.na(HT) & !is.na(DIA)) |>
+  group_by(STATECD, COUNTYCD, PLOT, SPCD) |>
+  arrange(abs(DIA - 3)) |>
+  filter(row_number() <= 9) |>
+  mutate(HT_PLOT = HT * 3 / DIA) |>
+  filter(n() >= 3) |>
+  summarize(HT_PLOT = mean(HT_PLOT), .groups = "keep") |>
+  ungroup()
+
+tree_growth_ht_state <- tree_growth_with_fixed_spcd |>
+  mutate(HT = coalesce(HT, PREV_HT), DIA = coalesce(DIA, PREV_DIA)) |>
+  filter(!is.na(HT) & !is.na(DIA)) |>
+  group_by(STATECD, SPCD) |>
+  arrange(abs(DIA - 3)) |>
+  filter(row_number() <= 9) |>
+  mutate(HT_STATE = HT * 3 / DIA) |>
+  filter(n() >= 3) |>
+  summarize(HT_STATE = mean(HT_STATE), .groups = "keep") |>
+  ungroup()
+
+tree_growth_ht_ne <- tree_growth_with_fixed_spcd |>
+  mutate(HT = coalesce(HT, PREV_HT), DIA = coalesce(DIA, PREV_DIA)) |>
+  filter(!is.na(HT) & !is.na(DIA)) |>
+  group_by(SPCD) |>
+  arrange(abs(DIA - 3)) |>
+  filter(row_number() <= 9) |>
+  mutate(HT_NE = HT * 3 / DIA) |>
+  filter(n() >= 3) |>
+  summarize(HT_NE = mean(HT_NE), .groups = "keep") |>
+  ungroup()
+
+tree_growth_ht_min <- tree_growth_with_fixed_spcd |>
+  mutate(HT = coalesce(HT, PREV_HT), DIA = coalesce(DIA, PREV_DIA)) |>
+  filter(!is.na(HT) & !is.na(DIA)) |>
+  select(SPCD, DIA, HT) |>
+  group_by(SPCD) |>
+  arrange(abs(DIA - 3)) |> # closest to 3" first
+  filter(row_number() <= 9) |> 
+  mutate(HT_MIN = HT * 3 / DIA) |>
+  summarize(HT_MIN = mean(HT_MIN)) |>
+  ungroup()
+
+tree_growth_ht <- tree_growth_with_fixed_spcd |>
+  semi_join(grm_ingrown, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)) |>
+  distinct(STATECD, COUNTYCD, PLOT, SPCD) |>
+  left_join(tree_growth_ht_plot, by = join_by(STATECD, COUNTYCD, PLOT, SPCD)) |>
+  left_join(tree_growth_ht_state, by = join_by(STATECD, SPCD)) |>
+  left_join(tree_growth_ht_ne, by = join_by(SPCD)) |>
+  left_join(tree_growth_ht_min, by = join_by(SPCD)) |>
+  mutate(HT = coalesce(HT_PLOT, HT_STATE, HT_NE, HT_MIN))
+```
+
+Are we missing height for any ingrowth?
+```{r validate height projection}
+stopifnot(
+  ingrowth_stem_rate |>
+    distinct(STATECD, COUNTYCD, PLOT, SPCD) |> 
+    left_join(tree_growth_ht, by = join_by(STATECD, COUNTYCD, PLOT, SPCD)) |>
+    filter(is.na(HT)) |>
+    nrow() == 0
+)
+```
+
+```{r ingrowth_by_stem}
+ingrowth_by_stem <- ingrowth_stem_rate |>
+  left_join(tree_growth_ht, by = join_by(STATECD, COUNTYCD, PLOT, SPCD))
+ ingrowth_by_stem |>
+  group_by(JENKINS_SPGRPCD) |>
+  mutate(
+    PLOT_COUNT = n(),
+    GROUP_NAME = paste0(JENKINS_SPGRP_NAME, ", n=", n())
+  ) |>
+  ungroup() |>
+  ggplot(aes(
+    fct_rev(reorder(GROUP_NAME, PLOT_COUNT)),
+    HT,
+    fill = fct_rev(reorder(GROUP_NAME, PLOT_COUNT))
+  )) +
+  geom_boxplot(outlier.size = 0.1) +
+  scale_x_discrete(labels = NULL) +
+  theme_bw() +
+  xlab("Species Group") +
+  ylab("Height at 3\" DBH (feet)") +
+  scale_fill_discrete(name = "Species Group") +
+  ggtitle("Tree Height for FVS Ingrowth")
+```
+
 ## Run FVS
 
 ### Generate Keyfile
@@ -1514,8 +1852,82 @@ Within a Database subsection:
 #### Regeneration, Ingrowth, and Establishment
 
 The Northeastern variant is a partial establishment model, so it does not
-automatically perform natural regeneration. We will therefore use actual
+automatically perform natural regeneration. We will therefore use modeled
 ingrowth from the FIA data.
+
+Example from estab model docs:
+```
+IF
+(FRAC(CYCLE/2) EQ 0 AND CYCLE GT 3)
+THEN
+ESTAB
+NATURAL 0.0 10.0 50.0
+NATURAL 0.0 3.0 20.0
+MERCHPREP 0.0 0.0
+TALLYONE 9.0
+END
+ENDIF
+```
+
+> This
+> Event Monitor file will add the 70 trees per acre every 20 years after
+> cycle 3. Cycle lengths are assumed to be 10 years. A MECHPREP or
+> BURNPREP keyword record specifying 0.0 percent site preparation is
+> needed to keep all plots untreated.
+
+Under the NATURAL keyword:
+
+> Heights are bounded
+> between the minimum establishment height
+> listed in table 1 and the height of a tree
+> 3 inches d.b.h. Heights are assigned at the
+> end of the cycle unless the cycle length is
+> longer than 5 years. In this case, tree heights
+> are assigned at 6 years, then a height incre-
+> ment is predicted for years 6 through the end
+> of the cycle. See figure 6 for an example of
+> assigning heights.
+
+Figure 6:
+```
+STDIDENT
+EXAMPLE2 USING THE “NATURAL” KEYWORD
+DESIGN 10.0 0.0
+STDINFO 104.0 260.0 0.0 315.0 30.0 45.0
+INVYEAR 2000.0
+TIMEINT 1.0 5.0
+TIMEINT 2.0 5.0
+NUMCYCLE 10.0
+NOTREES
+ESTAAB 2000.0
+NATURAL 2009.0 3.0 250.0 . . 5.5
+NATURAL 2009.0 7.0 75.0  . . 8.0
+NATURAL 2009.0 10.0 120.0 . . 6.0
+END
+PROCESS
+STOP
+```
+
+In this example, STOCKADJ is ignored / not needed - STOCKADJ only affects
+built-in regeneration. TALLYONE 9.0 ensures that all NATURAL trees are
+promoted prior to the end of the cycle. From the example output, a TALLYTWO
+is automatically scheduled, presumably in response to the TALLYONE.
+
+So, I think we need:
+
+- IF ... (every cycle)
+- THEN
+- ESTAB
+# NATURAL 1:YEAR 2:SPECIES 3:TPA 4:SURVIVAL 5:AGE 6:HEIGHT 7:SHADE_CODE
+- NATURAL 0 SPECIES TPA [no age] [no %] HEIGHT
+- MERCHPREP 0
+- BURNPREP 0
+- TALLYONE 9
+- END
+- ENDIF
+
+...which will insert TPA trees of SPECIES at HEIGHT at year 6 of the cycle,
+and establish them at year 9.
 
 #### Fire and Fuels
 
@@ -2067,6 +2479,7 @@ FVS_Summary2_East_NONE <- FVS_Summary2_East |>
   group_by(StandID, Year) |>
   summarize(
     BA = mean(BA),
+    Tpa = mean(Tpa),
     .groups = 'keep'
   ) |>
   ungroup()
@@ -2075,8 +2488,9 @@ FVS_Summary2_East_SRVY <- FVS_Summary2_East |>
   filter(Timestep == 0)
 
 projected_ba_tmp <- FVS_Summary2_East_NONE |>
-  select(StandID, Year, BA) |>
-  mutate(Projected_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare"))
+  select(StandID, Year, BA, Tpa) |>
+  mutate(Projected_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
+  rename(Projected_Tpa = Tpa)
 
 projected_tmp <- projected_carbon_tmp |>
   full_join(projected_ba_tmp, by = join_by(StandID, Year)) |>
@@ -2084,15 +2498,16 @@ projected_tmp <- projected_carbon_tmp |>
      substring(StandID, 1, 2),
      substring(StandID, 5, 12)
   )) |>
-  select(STAND_ID, Year, Projected_Carbon, Projected_BA)
+  select(STAND_ID, Year, Projected_Carbon, Projected_BA, Projected_Tpa)
 
 surveyed_carbon_tmp <- FVS_Carbon_SRVY |>
   select(StandID, Year, Total_Stand_Carbon) |>
   rename(Measured_Carbon = Total_Stand_Carbon)
 
 surveyed_ba_tmp <- FVS_Summary2_East_SRVY |>
-  select(StandID, Year, BA) |>
-  mutate(Measured_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare"))
+  select(StandID, Year, BA, Tpa) |>
+  mutate(Measured_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
+  rename(Measured_Tpa = Tpa)
 
 surveyed_tmp <- surveyed_carbon_tmp |>
   full_join(surveyed_ba_tmp, by = join_by(StandID, Year)) |>
@@ -2100,7 +2515,7 @@ surveyed_tmp <- surveyed_carbon_tmp |>
      substring(StandID, 1, 2),
      substring(StandID, 5, 12)
   )) |>
-  select(STAND_ID, Year, Measured_Carbon, Measured_BA)
+  select(STAND_ID, Year, Measured_Carbon, Measured_BA, Measured_Tpa)
 
 projected_vs_measured <- stand_stats |>
   mutate(STAND_ID = sprintf(paste0(
@@ -2631,7 +3046,7 @@ ggplot(
 
 Can we plot plot location with size proportional to BA?
 
-```{r plot_location_by_ecotype}
+```{r plot_location_by_ecotype_with_carbon}
 plot_location_tmp <- plot_location |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   filter(INVYR == min(INVYR, na.rm = TRUE)) |>
@@ -2643,21 +3058,39 @@ plot_location_type <- stand_stats |>
   filter(INVYR == max(INVYR, na.rm = TRUE)) |>
   ungroup() |>
   consolidate_forest_type_groups_filter() |>
-  select(STATECD, COUNTYCD, PLOT, INVYR, BALIVE, `Forest Type Group`) |>
+  select(STATECD, COUNTYCD, PLOT, INVYR, CARBON_METRIC, `Forest Type Group`) |>
   left_join(plot_location_tmp, by = join_by(STATECD, COUNTYCD, PLOT)) |>
-  mutate(
-    BA = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare")
-  )
+  rename(
+    `Stand Carbon` = CARBON_METRIC,
+    `Forest Type` = `Forest Type Group`
+  ) |>
+  group_by(`Forest Type`) |>
+  mutate(n = n()) |>
+  ungroup() |>
+  mutate(`Forest Type` = if_else(n < 144, 'Other', `Forest Type`))
 
 ggplot(map_states, aes(long, lat, group = group)) +
   geom_polygon(fill = "white", color = "black") + 
   geom_point(
     plot_location_type,
-    mapping = aes(long, lat, group = group, color = `Forest Type Group`, size = BA)
+    mapping = aes(long, lat, group = group, color = fct_infreq(`Forest Type`), size = `Stand Carbon`)
   ) +
   scale_size_binned_area(max_size = 3) +
   coord_quickmap() +
-  ggtitle("Plot Location with Forest Type")
+  ggtitle("FIA Grow-Only Plots in the Northeast Region") +
+  scale_color_hue(name = "Forest Type", breaks = c(
+    'Maple / beech / birch',
+    'Elm / ash / cottonwood',
+    'Aspen / birch',
+    'Oak / hickory',
+    'Scarlet oak',
+    'Spruce / fir',
+    'White / red / jack pine',
+    'Other'
+  )) +
+  theme_bw()
+
+  #scale_fill_discrete(breaks = rev(levels(projected_annual_growth$Series)))
 
 remove(plot_location_tmp)
 ```
@@ -2726,6 +3159,83 @@ ggplot(
   facet_wrap(~`Forest Type Group`) +
   ggtitle("Grow-Only Stands\nBA Projection Residual (m²/ha) vs. Measured QMD (cm)")
 ```
+
+```{r qmd_trend}
+ggplot(
+    projected_vs_measured |>
+      filter(Projection_Years > 0) |>
+      mutate(
+        QMD_Range = cut(QMD_METRIC, 0:19 * 5)
+      ) |>
+      group_by(`Forest Type Group`) |>
+      mutate(`Forest Type Group` = paste0(`Forest Type Group`, ", n=", n())) |>
+      ungroup()
+    ,
+    aes(x = QMD_Range, y = BA_Flux_Residual)
+  ) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
+  scale_fill_discrete(name = "Forest Type Group") +
+  theme_bw() +
+  ggtitle("Measured QMD vs. Projected BA for Grow-Only Stands") +
+  ylab(bquote("BA Residual " (m^2 %*% hectare^-1 %*% year^-1))) +
+  xlab(bquote("Measured Stand QMD " (m)))
+
+```
+#### Residuals vs. TPA
+
+```{r ba_residual_vs_qmd}
+ggplot(
+    projected_vs_measured |> filter(Projection_Years > 0),
+    aes(x = Measured_Tpa, y = Projected_Tpa)
+  ) +
+  geom_bin_2d(
+    binwidth = 500
+    #alpha = 0.25
+  ) +
+  scale_fill_gradient(
+    name = "count",
+    trans = "log",
+    breaks = c(1, 10, 100),
+    labels = c(1, 10, 100)
+  ) +
+  geom_smooth(
+    method = lm,
+    formula = 'y ~ x',
+    fullrange = TRUE,
+    se = FALSE,
+    color = 'brown'
+  ) +
+  coord_cartesian( xlim = c(0, 40000), ylim = c(0, 25000)) +
+  theme_bw() +
+  #facet_wrap(~`Forest Type Group`) +
+  ggtitle("Grow-Only Stands\nProjected vs. Measured Tpa (trees / acre)")
+```
+
+```{r qmd_trend}
+options(scipen = 9)
+ggplot(
+    projected_vs_measured |>
+      filter(Projection_Years > 0) |>
+      mutate(
+        Tpa_Range = cut(Measured_Tpa, 0:10 * 2000, labels = (1:10 * 2000))
+      ) |>
+      group_by(`Forest Type Group`) |>
+      mutate(`Forest Type Group` = paste0(`Forest Type Group`, ", n=", n())) |>
+      ungroup()
+    ,
+    aes(x = Tpa_Range, y = BA_Flux_Residual)
+  ) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_boxplot(outlier.size = 0.1, varwidth = TRUE, position = position_nudge(x = -0.5)) +
+  scale_fill_discrete(name = "Forest Type Group") +
+  theme_bw() +
+  ggtitle("Measured Tpa vs. Residula in Projected BA for Grow-Only Stands") +
+  ylab(bquote("BA Residual " (m^2 %*% hectare^-1 %*% year^-1))) +
+  xlab(bquote("Measured Stand Tpa " (trees / acre)))
+
+```
+
 
 ## Addenda
 
