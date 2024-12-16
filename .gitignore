@@ -57,3 +57,7 @@ rsconnect/
 
 # MacOS Metadata
 .DS_Store
+
+# Intermediate datasets
+data/fvs
+data/intermediate
