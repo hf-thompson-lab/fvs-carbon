@@ -27,6 +27,17 @@ options(scipen = 9) # Use integer notation for numbers under 9 digits
 source('R/functions.R')
 ```
 
+# Use Cache
+
+Some datasets take a long time to compute; these are normally cached and
+read from cache. Set `USE_CACHE` to `FALSE` to re-compute everything, and
+`TRUE` to use cached values if available.
+
+```{r USE_CACHE}
+USE_CACHE <- TRUe
+```
+
+
 ```{r species_mixin}
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 
@@ -37,6 +48,13 @@ jenkins_spgrpcd_mixin <- read_csv(
   select(JENKINS_SPGRPCD, NAME) |>
   rename(JENKINS_SPGRP_NAME = NAME)
 
+fvs_spcd_mixin <- read_csv(
+    "data/raw/FVSne_Overview_Table_3.2.1.csv",
+    col_types = "iiciccc"
+  ) |>
+  select(`FIA Code`, `Species Code`) |>
+  rename(SPCD = `FIA Code`, FVS_SPCD = `Species Code`)
+
 species_mixin <- tbl(fia, 'REF_SPECIES') |>
   select(SPCD, GENUS, SPECIES, E_SPGRPCD, JENKINS_SPGRPCD, SCIENTIFIC_NAME, COMMON_NAME) |>
   left_join(
@@ -45,11 +63,12 @@ species_mixin <- tbl(fia, 'REF_SPECIES') |>
   ) |>
   rename(SPGRPCD = E_SPGRPCD, SPGRP_NAME = NAME) |>
   collect() |>
-  left_join(jenkins_spgrpcd_mixin, by = join_by(JENKINS_SPGRPCD))
+  left_join(jenkins_spgrpcd_mixin, by = join_by(JENKINS_SPGRPCD)) |>
+  left_join(fvs_spcd_mixin, by = join_by(SPCD))
 
 dbDisconnect(fia)
 
-rm(fia, jenkins_spgrpcd_mixin)
+rm(fia, jenkins_spgrpcd_mixin, fvs_spcd_mixin)
 ```
 
 ## Grow-Only Plots in the Northeast
@@ -84,7 +103,7 @@ Execute the filters to create a list of matching plots.
 
 ```{r plot_grow_only}
 rds_file <- 'data/intermediate/plot_grow_only.rds'
-if (file.exists(rds_file)) {
+if (USE_CACHE & file.exists(rds_file)) {
   plot_grow_only <- read_rds(rds_file)
 } else {
   fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
@@ -124,6 +143,51 @@ if (file.exists(rds_file)) {
 }
 nrow(plot_grow_only)
 ```
+
+Many plots have trees that are not supported by FVSne; filter to plots
+where the most recent measurement shows at least 90% of basal area
+is in trees supported by FVSne.
+
+```{r}
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+
+fia_tree_mixin <- tbl(fia, 'tree') |>
+  select(PLT_CN, SPCD, DIA)
+
+fvs_species_mixin <- species_mixin |>
+  filter(!is.na(FVS_SPCD)) |>
+  select(SPCD, FVS_SPCD)
+
+plot_fvs_frac <- tbl(fia, 'PLOT') |>
+  semi_join(plot_grow_only, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  filter(MEASYEAR == max(MEASYEAR, na.rm = TRUE)) |>
+  ungroup() |>
+  select(CN, STATECD, COUNTYCD, PLOT) |>
+  rename(PLT_CN = CN) |>
+  left_join(fia_tree_mixin, by = join_by(PLT_CN)) |>
+  left_join(fvs_species_mixin, by = join_by(SPCD), copy = TRUE) |>
+  mutate(DIA_FVS = if_else(!is.na(FVS_SPCD), DIA, 0.0)) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  summarize(
+    BA_FVS = sum(6 * pi * DIA_FVS^2, na.rm = TRUE),
+    BA_TOTAL = sum(6 * pi * DIA^2, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  mutate(BA_FVS_FRAC = BA_FVS / BA_TOTAL) |>
+  collect()
+
+dbDisconnect(fia)
+
+rm(fia, fia_tree_mixin, fvs_species_mixin)
+
+# Replace plot_grow_only with the shortened list
+plot_grow_only <- plot_fvs_frac |>
+  filter(BA_FVS_FRAC > 0.9) |>
+  select(STATECD, COUNTYCD, PLOT)
+```
+
 
 ### Locations
 
@@ -199,7 +263,7 @@ data for these plots over time.
 
 ```{r stand_stats}
 rds_file <- 'data/intermediate/stand_stats.rds'
-if (file.exists(rds_file)) {
+if (USE_CACHE & file.exists(rds_file)) {
   stand_stats <- read_rds(rds_file)
 } else {
   fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
@@ -247,7 +311,10 @@ if (file.exists(rds_file)) {
     left_join(tree_stats, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
     left_join(forest_type, by = join_by(FORTYPCD)) |>
     rename(`Forest Type` = FORTYPE) |>
-    mutate(FORTYPCD = floor(FORTYPCD / 10) * 10) |>
+    mutate(
+      STDAGE = if_else(STDAGE == -999, NA, STDAGE),
+      FORTYPCD = floor(FORTYPCD / 10) * 10
+    ) |>
     left_join(forest_type, by = join_by(FORTYPCD)) |>
     rename(`Forest Type Group` = FORTYPE) |>
     collect() |>
@@ -339,7 +406,7 @@ ggplot(
       filter(!is.na(STDAGE)),
     mapping = aes(x = STDAGE, y = BALIVE_METRIC)
   ) +
-  geom_point(alpha = 0.25) +
+  geom_bin2d() +
   facet_wrap(~`Forest Type Group`) +
   ggtitle("Grow-Only Stands\nMeasured BA (m²/ha) vs Stand Age")
 ```
@@ -348,15 +415,14 @@ ggplot(
 ggplot(
     stand_stats |>
       consolidate_forest_type_groups_filter() |>
-      filter(YEARS > 10),
+      group_by(STATECD, COUNTYCD, PLOT) |>
+      filter(MEASYEAR == max(MEASYEAR)) |>
+      ungroup(),
     aes(x = YEARS, y = BALIVE_DELTA)
   ) +
-  geom_point(
-    size = 2,
-    alpha = 0.25,
-  ) +
-  geom_abline(intercept = 0, slope = 0) +
-  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
+  geom_bin2d() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  #scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
   facet_wrap(~`Forest Type Group`) +
   ggtitle("Grow-Only Stands\nChange in FIA Measured BA (m² / ha) vs. Projection Years")
 ```
@@ -533,7 +599,7 @@ NB: This takes about 5 minutes on a laptop.
 
 ```{r tree_ingrown}
 rds_file <- 'data/intermediate/tree_ingrown.rds'
-if (file.exists(rds_file)) {
+if (USE_CACHE & file.exists(rds_file)) {
   tree_ingrown <- read_rds(rds_file)
 } else {
   # CNs of the ingrown trees; these will be the heads of the tree histories
@@ -754,7 +820,7 @@ for calculating ingrowth.
 
 ```{r tree_growth}
 rds_file <- 'data/intermediate/tree_growth.rds'
-if (file.exists(rds_file)) {
+if (USE_CACHE & file.exists(rds_file)) {
   tree_growth <- read_rds(rds_file)
 } else {
   # FIA.TREE.CN - sequence number
@@ -1542,18 +1608,31 @@ We want:
 * per year (or does this vary over time?)
 * on each plot
 
-Complication:
+Complications:
 
-Some saplings have unidentified species, flagged as SPECIES == "spp."
-In theory we could walk forward in time for some of these trees and
-find a later record for the tree that identifies the specific species.
-This will not work for trees that ingrow in the latest inventory.
-For now, we use the simple method of imputing the most common non-spp.
-species of the genus on the plot for all spp. trees.
+* Some saplings have unidentified species, flagged as SPECIES == "spp."
+  In theory we could walk forward in time for some of these trees and
+  find a later record for the tree that identifies the specific species.
+  This will not work for trees that ingrow in the latest inventory.
+  For now, we impute the most common non-spp. species of the genus on the plot.
+
+* Some species that ingrow are not supported by FVSne.
+  When finding the most common species on a plot, restrict to those
+  species supported by FVSne.
+  
+* Some genuses (Amelanchier, Crataegus, Malus) are handled only at the genus
+  level by FVSne. There are many more that have both genus and species level
+  handling. For things that are handled at the genus level, we have the option
+  of invoking that.
+
+We find the most common thing that is both inventoried on the plot AND
+supported by FVSne, and move things that are not supported into the most
+common.
 
 ```{r tree_growth_with_fixed_spcd}
+# mcs == Most Common Species
 mcs_plot <- tree_growth |>
-  filter(SPECIES != "spp.") |>
+  filter(!is.na(FVS_SPCD)) |>
   group_by(STATECD, COUNTYCD, PLOT, GENUS, SPCD) |>
   summarize(COUNT = n(), .groups = "keep") |>
   ungroup() |>
@@ -1565,7 +1644,7 @@ mcs_plot <- tree_growth |>
   rename(SPCD_PLOT = SPCD)
 
 mcs_county <- tree_growth |>
-  filter(SPECIES != "spp.") |>
+  filter(!is.na(FVS_SPCD)) |>
   group_by(STATECD, COUNTYCD, GENUS, SPCD) |>
   summarize(COUNT = n(), .groups = "keep") |>
   ungroup() |>
@@ -1577,7 +1656,7 @@ mcs_county <- tree_growth |>
   rename(SPCD_COUNTY = SPCD)
 
 mcs_state <- tree_growth |>
-  filter(SPECIES != "spp.") |>
+  filter(!is.na(FVS_SPCD)) |>
   group_by(STATECD, GENUS, SPCD) |>
   summarize(COUNT = n(), .groups = "keep") |>
   ungroup() |>
@@ -1589,7 +1668,7 @@ mcs_state <- tree_growth |>
   rename(SPCD_STATE = SPCD)
 
 mcs_overall <- tree_growth |>
-  filter(SPECIES != "spp.") |>
+  filter(!is.na(FVS_SPCD)) |>
   group_by(GENUS, SPCD) |>
   summarize(COUNT = n(), .groups = "keep") |>
   ungroup() |>
@@ -1618,13 +1697,13 @@ How'd we do?
 ```{r check fix to spcd}
 rbind(
   tree_growth |>
-    filter(SPECIES == "spp.") |>
+    filter(is.na(FVS_SPCD)) |>
     group_by(GENUS) |>
     summarize(TREE_COUNT = n()) |>
     ungroup() |>
     mutate(SERIES = "Uncorrected"),
   tree_growth_with_fixed_spcd |>
-    filter(SPECIES == "spp.") |>
+    filter(is.na(FVS_SPCD)) |>
     group_by(GENUS) |>
     summarize(TREE_COUNT = n()) |>
     ungroup() |>
@@ -1634,15 +1713,63 @@ rbind(
   summarise(SPECIES_COUNT = n(), TREE_COUNT = sum(TREE_COUNT))
 ```
 
-Of note, FIA seems to not note species of Hawthorn or Pear in NE:
+These are the cases where we're unable to find a species code for FVSne:
 ```{r unfixed spcd}
-tree_growth_with_fixed_spcd |>
-  filter(SPECIES == "spp.") |>
+plot_count_mixin <- tree_growth_with_fixed_spcd |>
+  filter(is.na(FVS_SPCD)) |>
+  distinct(STATECD, COUNTYCD, PLOT, SPCD) |>
   group_by(SPCD) |>
-  summarize(TREE_COUNT = n()) |>
+  summarize(PLOT_COUNT = n()) |>
+  ungroup()
+
+fvsne_unhandled_trees <- tree_growth_with_fixed_spcd |>
+  # Filter to the most recent record for each tree
+  group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
+  arrange(desc(MEASYEAR)) |>
+  filter(row_number() == 1) |>
   ungroup() |>
+  mutate(BA = conv_multiunit(6 * pi * DIA ^ 2, "ft2 / acre", "m2 / hectare")) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  mutate(TOTAL_STAND_BA = sum(BA, na.rm = TRUE)) |>
+  ungroup() |>
+  filter(is.na(FVS_SPCD)) |>
+  mutate(BA_FRAC = BA / TOTAL_STAND_BA) |>
+  group_by(STATECD, COUNTYCD, PLOT, SPCD) |>
+  summarize(
+    BA = sum(BA, na.rm = TRUE),
+    TOTAL_STAND_BA = max(TOTAL_STAND_BA, na.rm = TRUE),
+    BA_FRAC = sum(BA_FRAC, na.rm = TRUE),
+    .groups = 'keep'
+  ) |>
+  ungroup() |>
+#  group_by(SPCD) |>
+#  summarize(
+#    TREE_COUNT = n(),
+#    BA_FRAC = max(BA_FRAC, na.rm = TRUE)
+#  ) |>
+#  ungroup() |>
+#  filter(BA_FRAC > 0) |>
+  left_join(plot_count_mixin, by = join_by(SPCD)) |>
   left_join(species_mixin, by = join_by(SPCD)) |>
-  select(SCIENTIFIC_NAME, COMMON_NAME, TREE_COUNT)
+  mutate(SCIENTIFIC_NAME = factor(SCIENTIFIC_NAME)) |>
+  select(SCIENTIFIC_NAME, BA, BA_FRAC, TOTAL_STAND_BA)
+```
+
+```{r}
+fvsne_unhandled_trees |>
+  group_by(SCIENTIFIC_NAME) |>
+  mutate(Species = paste0(SCIENTIFIC_NAME, ", n=", n())) |>
+  ungroup() |>
+  ggplot(aes(y = BA_FRAC, fill = Species)) +
+  geom_boxplot() +
+  scale_x_continuous(breaks = NULL) +
+  scale_y_log10() +
+  theme_bw() +
+  ggtitle("Basal Area of tree species not handled by FVSne") +
+  xlab("Species") +
+  ylab("Basal Area (fraction of total plot BA)")
+  
+  
 ```
 
 Let's find out how many stems of each (corrected) species ingrow per year.
@@ -1928,6 +2055,14 @@ So, I think we need:
 
 ...which will insert TPA trees of SPECIES at HEIGHT at year 6 of the cycle,
 and establish them at year 9.
+
+```
+background_regen <- table4_rot |>
+  rename(species = `Species Code`, density = Background) |>
+  filter(!is.na(density)) |>
+  fvs_Estab()
+```
+
 
 #### Fire and Fuels
 
@@ -3237,14 +3372,14 @@ ggplot(
 ```
 
 
-## Addenda
+# Addenda
 
-### Eastern Hemlock
+## Eastern Hemlock
 
 
 ```{r eastern_hemlock}
 rds_file <- 'data/intermediate/eastern_hemlock.rds'
-if (FALSE & file.exists(rds_file)) {
+if (USE_CACHE & file.exists(rds_file)) {
   eastern_hemlock <- read_rds(rds_file)
 } else {
   tsuga_canadensis <- species_mixin |>
@@ -3371,6 +3506,7 @@ plot_eastern_hemlock_counts <- plot_eastern_hemlock |>
   ungroup()
 ```
 ```{r}
+
 plot_eastern_hemlock |>
   ggplot(aes(CR, HT_GROUP, fill = CCL)) +
   theme_bw() +
@@ -3386,5 +3522,42 @@ plot_eastern_hemlock |>
   xlab("Crown Ratio (%)") +
   ylab("Canopy Height (feet)") +
   ggtitle("Eastern Hemlock Crown Ratio vs. Canopy Height by Crown Class")
+  
+```
+
+```{r}
+plot_eastern_hemlock <- eastern_hemlock |>
+  filter(!is.na(CCL) & !is.na(CANOPY_HT) & !is.na(CDENCD)) |>
+  # filter(CANOPY_HT > 30 & CANOPY_HT < 100) |>
+  mutate(HT_GROUP = factor(as.integer(CANOPY_HT / 10) * 10))
+missing_classes <- eastern_hemlock |> distinct(CCL) |>
+  cross_join(plot_eastern_hemlock |> distinct(HT_GROUP)) |>
+  anti_join(plot_eastern_hemlock |> distinct(HT_GROUP, CCL), by = join_by(HT_GROUP, CCL)) |>
+  mutate(CDENCD = -10) # Give missing classes a negative crown ratio so it can be cropped out
+plot_eastern_hemlock <- plot_eastern_hemlock |>
+  select(HT_GROUP, CCL, CDENCD) |>
+  union_all(missing_classes) |>
+  mutate(CCL = factor(CCL, levels = rev(c("Open grown", "Dominant", "Codominant", "Intermediate", "Overtopped"))))
+
+plot_eastern_hemlock_counts <- plot_eastern_hemlock |>
+  group_by(HT_GROUP, CCL) |>
+  summarize(COUNT = n(), CDENCD = mean(CDENCD), .groups = "keep") |>
+  ungroup()
+
+plot_eastern_hemlock |>
+  ggplot(aes(CDENCD, HT_GROUP, fill = CCL)) +
+  theme_bw() +
+  geom_boxplot(outlier.size = 0.1) +
+  geom_text(
+    data = plot_eastern_hemlock_counts,
+    mapping = aes(label = COUNT),
+    position = position_dodge(width = .75),
+    color = 'white'
+  ) +
+  scale_fill_discrete(name = "Crown Density", breaks = rev(levels(plot_eastern_hemlock$CCL))) +
+  coord_cartesian(xlim = c(0, 100)) + # crop out "trees" with a negative crown ratio
+  xlab("Crown Density (%)") +
+  ylab("Canopy Height (feet)") +
+  ggtitle("Eastern Hemlock Crown Density vs. Canopy Height by Crown Class")
   
 ```
