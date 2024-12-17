@@ -1714,7 +1714,7 @@ rbind(
 ```
 
 These are the cases where we're unable to find a species code for FVSne:
-```{r unfixed spcd}
+```{r fvsne_unhandled_trees}
 plot_count_mixin <- tree_growth_with_fixed_spcd |>
   filter(is.na(FVS_SPCD)) |>
   distinct(STATECD, COUNTYCD, PLOT, SPCD) |>
@@ -1748,14 +1748,14 @@ fvsne_unhandled_trees <- tree_growth_with_fixed_spcd |>
 #    BA_FRAC = max(BA_FRAC, na.rm = TRUE)
 #  ) |>
 #  ungroup() |>
-#  filter(BA_FRAC > 0) |>
+  filter(BA_FRAC > 0) |>
   left_join(plot_count_mixin, by = join_by(SPCD)) |>
   left_join(species_mixin, by = join_by(SPCD)) |>
   mutate(SCIENTIFIC_NAME = factor(SCIENTIFIC_NAME)) |>
   select(SCIENTIFIC_NAME, BA, BA_FRAC, TOTAL_STAND_BA)
 ```
 
-```{r}
+```{r plot fvsne_unhandled_trees}
 fvsne_unhandled_trees |>
   group_by(SCIENTIFIC_NAME) |>
   mutate(Species = paste0(SCIENTIFIC_NAME, ", n=", n())) |>
@@ -1777,14 +1777,24 @@ Let's find out how many stems of each (corrected) species ingrow per year.
 ```{r ingrowth_stem_rate}
 ingrowth_stem_rate <- tree_growth_with_fixed_spcd |>
   semi_join(grm_ingrown, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR)) |>
-  # If PREV_MEASYEAR isn't filled in, estimate it as 5 years prior.
-  mutate(PREV_MEASYEAR = if_else(is.na(PREV_MEASYEAR), MEASYEAR - 5, PREV_MEASYEAR)) |>
-  group_by(STATECD, COUNTYCD, PLOT, SPCD) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  mutate(
+    # Ingrowth is often observed in the first inventory, for which we have no
+    # previous measurement year. Create a synthetic measurement year 5 years
+    # prior to the first measurement to accommodate this.
+    FIRST_YEAR = min(MEASYEAR) - 5,
+    LAST_YEAR = max(MEASYEAR)
+  ) |>
+  ungroup() |>
+  group_by(STATECD, COUNTYCD, PLOT, SPCD, FIRST_YEAR, LAST_YEAR) |>
   summarize(
-    FIRST_YEAR = min(PREV_MEASYEAR),
-    LAST_YEAR = max(MEASYEAR),
     COUNT = n(),
-    COUNT_PER_ACRE = COUNT * 6, # Don't use TPA_UNADJ; microplot multipliers are inaccurate here.
+    # Don't use TPA_UNADJ; microplot multipliers are inaccurate here.
+    # Reason: once a tree reaches 5" DBH, its peers on the rest of the subplot
+    # are inventoried in the TREE table, so multiplying by the microplot
+    # multiplier would replicate microplot trees across the subplots AND
+    # count the trees on subplots, which is double-counting, which is wrong.
+    COUNT_PER_ACRE = COUNT * 6,
     .groups = "keep"
   ) |>
   ungroup() |>
@@ -2056,14 +2066,6 @@ So, I think we need:
 ...which will insert TPA trees of SPECIES at HEIGHT at year 6 of the cycle,
 and establish them at year 9.
 
-```
-background_regen <- table4_rot |>
-  rename(species = `Species Code`, density = Background) |>
-  filter(!is.na(density)) |>
-  fvs_Estab()
-```
-
-
 #### Fire and Fuels
 
 Carbon is calculated by the fire and fuels extension.
@@ -2197,6 +2199,66 @@ We gather two series of stands:
 -  stands_surveyed is a list of stands and inventory years to grow for 0 years
    in each survey year.
 
+
+Find the stands we want to project; these are the grow-only stands starting
+in their first measurement year.
+
+```{r stands_projected}
+timeframe <- stand_stats |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  summarize(
+    INVYR = min(INVYR),
+    FIRSTYEAR = min(MEASYEAR, na.rm = TRUE),
+    LASTYEAR = max(MEASYEAR, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+fia_fvs_standinit_plot <- tbl(fia, 'FVS_StandInit_Plot') |>
+  select(STAND_CN, STAND_ID)
+
+stands_projected <- tbl(fia, 'PLOT') |>
+  select(CN, STATECD, COUNTYCD, PLOT, INVYR) |>
+  rename(STAND_CN = CN) |>
+  inner_join(timeframe, by = join_by(STATECD, COUNTYCD, PLOT, INVYR), copy = TRUE) |>
+  left_join(fia_fvs_standinit_plot, by = join_by(STAND_CN)) |>
+  collect()
+
+dbDisconnect(fia)
+remove(fia, fia_fvs_standinit_plot)
+```
+
+
+```{r regen_table}
+regen_table <- ingrowth_by_stem |>
+  filter(!is.na(FVS_SPCD)) |>
+  left_join(stands_projected, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  rename(
+    species = FVS_SPCD,
+    density = COUNT_PER_ACRE,
+    height = HT
+  ) |>
+  select(STAND_ID, species, density, height)
+keyfile_regen_section <- function(StandID, Timestep) {
+  pertinent <- regen_table |>
+    filter(STAND_ID == as.character(StandID)) |>
+    mutate(
+      density = floor(density * Timestep),
+      height = floor(height)
+    ) |>
+    filter(density > 0)
+  if (nrow(pertinent) > 0) {
+    fvs_Estab(pertinent)
+  } else {
+    ''
+  }
+}
+```
+
+
+
 When generating keyword files, we create one per partition,
 distributing across partitions using round-robin on STAND_ID.
 
@@ -2249,41 +2311,12 @@ keywordfile_section <- function(
     fvs_kwd1("FuelReDB", 2),
     fvs_kwd1("FuelsOut", 2),
     fvs_kwd0("End"), # Database
+    keyfile_regen_section(StandID, Timestep),
     fvs_kwd0("Process"),
     recursive = TRUE
   )
 }
 
-```
-
-Find the stands we want to project; these are the grow-only stands starting
-in their first measurement year.
-
-```{r stands_projected}
-timeframe <- stand_stats |>
-  group_by(STATECD, COUNTYCD, PLOT) |>
-  summarize(
-    INVYR = min(INVYR),
-    FIRSTYEAR = min(MEASYEAR, na.rm = TRUE),
-    LASTYEAR = max(MEASYEAR, na.rm = TRUE),
-    .groups = "keep"
-  ) |>
-  ungroup()
-
-
-fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-fia_fvs_standinit_plot <- tbl(fia, 'FVS_StandInit_Plot') |>
-  select(STAND_CN, STAND_ID)
-
-stands_projected <- tbl(fia, 'PLOT') |>
-  select(CN, STATECD, COUNTYCD, PLOT, INVYR) |>
-  rename(STAND_CN = CN) |>
-  inner_join(timeframe, by = join_by(STATECD, COUNTYCD, PLOT, INVYR), copy = TRUE) |>
-  left_join(fia_fvs_standinit_plot, by = join_by(STAND_CN)) |>
-  collect()
-
-dbDisconnect(fia)
-remove(fia, fia_fvs_standinit_plot)
 ```
 
 The first run is to project from the first measurement year to 2025. These
@@ -2405,8 +2438,9 @@ title <- "NRSGrowOnly"
 for (timestep in c(0, 1, 10)) {
   for (rannseed in c(0, 1, 3, 5)) {
     for (partition in 1:8) {
+      for (regen in c("", "_noregen")) {
       mgmtid <- paste0(timestep, "Y", rannseed)
-      filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".db")
+      filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, regen, ".db")
       if (file.exists(filename)) {
         print(paste0("Reading ", filename))
         fvs_out_db <- DBI::dbConnect(RSQLite::SQLite(), filename)
@@ -2416,7 +2450,8 @@ for (timestep in c(0, 1, 10)) {
             MgmtId = mgmtid,
             Timestep = timestep,
             RanNSeed = rannseed,
-            Partition = partition
+            Partition = partition,
+            Regen = regen
           ) |>
           collect()
         FVS_Carbon <- bind_rows(FVS_Carbon, fvs_carbon_tbl)
@@ -2427,7 +2462,8 @@ for (timestep in c(0, 1, 10)) {
             MgmtId = mgmtid,
             Timestep = timestep,
             RanNSeed = rannseed,
-            Partition = partition
+            Partition = partition,
+            Regen = regen
           ) |>
           collect()
         FVS_Summary2_East <- bind_rows(FVS_Summary2_East, fvs_summary2_east_tbl)
@@ -2435,6 +2471,7 @@ for (timestep in c(0, 1, 10)) {
         dbDisconnect(fvs_out_db)
       } else {
         print(paste0("Skipping ", filename))
+      }
       }
     }
   }
@@ -2447,6 +2484,19 @@ Consolidate outputs; average the multiple runs with different random seeds.
 ```{r FVS_Carbon_NONE}
 FVS_Carbon_NONE <- FVS_Carbon |>
   filter(Timestep == 10) |>
+  filter(Regen == "") |>
+#  filter(RanNSeed == 1)
+  group_by(StandID, Year) |>
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    Total_Stand_Carbon = mean(Total_Stand_Carbon),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+
+FVS_Carbon_REGEN <- FVS_Carbon |>
+  filter(Timestep == 10) |>
+  filter(Regen == "_noregen") |>
 #  filter(RanNSeed == 1)
   group_by(StandID, Year) |>
   summarize(
@@ -2458,6 +2508,7 @@ FVS_Carbon_NONE <- FVS_Carbon |>
 
 FVS_Carbon_ANNL <- FVS_Carbon |>
   filter(Timestep == 1) |>
+  filter(Regen == "") |>
 #  filter(RanNSeed == 1)
   group_by(StandID, Year) |>
   summarize(
@@ -2589,13 +2640,58 @@ ggplot(
   facet_wrap(~`Forest Type Group`) +
   ggtitle(bquote("Annual Carbon Flux for 1- vs. 10-year Timestep")) +
   coord_cartesian(xlim = c(-1, 8), ylim = c(-1, 8)) +
-  ylab(bquote("1-Year Timestep Annual Carbon Flux" ~ (MgC %*% ha^-1 %*% year^-1))) +
-  xlab(bquote("10-Year Timestep Annual Carbon Flux" ~ (MgC %*% ha^-1 %*% year^-1)))
+  ylab(bquote("1-Year Timestep Annual Carbon Flux" ~ (`Mg C` %*% ha^-1 %*% year^-1))) +
+  xlab(bquote("10-Year Timestep Annual Carbon Flux" ~ (`Mg C` %*% ha^-1 %*% year^-1)))
 ```
 
 ```{r carbon_flux_stats}
 summary(annual_vs_decadal[,c("Annual_Carbon_Flux", "Decadal_Carbon_Flux")])
 ```
+
+### Regeneration vs. None
+
+Look at carbon projections with vs. without regeneration
+
+```{r regen_vs_none}
+tmp_regen <- FVS_Carbon_NONE |>
+  select(StandID, Year, Total_Stand_Carbon) |>
+  rename(Carbon_With_Regen = Total_Stand_Carbon)
+
+tmp_noregen <- FVS_Carbon_REGEN |>
+  select(StandID, Year, Total_Stand_Carbon) |>
+  rename(Carbon_Without_Regen = Total_Stand_Carbon)
+
+regen_vs_noregen <- tmp_regen |>
+  left_join(tmp_noregen, by = join_by(StandID, Year)) |>
+  group_by(StandID) |>
+  filter(Year == max(Year)) |>
+  ungroup()
+
+regen_vs_noregen |>
+  ggplot(aes(Carbon_Without_Regen, Carbon_With_Regen)) +
+  geom_bin2d(binwidth = 10) +
+  geom_abline(slope = 1, linetype = "dashed", color = "red") +
+  coord_cartesian(xlim = c(0, 800), ylim = c(0, 800)) +
+  theme_bw() +
+  scale_fill_continuous(name = "Number of Plots", transform = "log10") +
+  ggtitle("FVS Projected Carbon with vs. without regeneration") +
+  xlab(bquote("Carbon Without Regeneration" ~ (`Mg C` %*% ha^-1))) +
+  ylab(bquote("Carbon With Regeneration" ~ (`Mg C` %*% ha^-1)))
+
+```
+```{r}
+regen_vs_noregen |>
+  mutate(Ratio = Carbon_With_Regen / Carbon_Without_Regen) |>
+  ggplot(aes(x = Ratio)) +
+  geom_histogram() +
+  scale_x_continuous(transform = "log10") +
+  scale_y_continuous(transform = "log10") +
+  theme_bw() +
+  ggtitle("Ratio of FVS Projected Carbon with vs. without regeneration") +
+  ylab("Number of Plots") +
+  xlab("Ratio of Projected Carbon With to Without Regeneration")
+```
+
 
 ### Projected vs. Measured
 
@@ -2726,16 +2822,13 @@ ggplot(
 ```{r projected_carbon_vs_measured_carbon}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
-    aes(x = Measured_Carbon, y = Projected_Carbon, color = Projection_Years)
+    aes(x = Measured_Carbon, y = Projected_Carbon)
   ) +
-  geom_point(
-#    size = 2,
-    alpha = 0.25,
-  ) +
-  geom_abline(intercept = 0, slope = 1) +
+  geom_bin2d() +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nProjected vs. Measured Carbon (Mg/ha)") +
-  coord_cartesian(xlim = c(0, 300), ylim = c(0, 300))
+  ggtitle("Grow-Only Stands\nProjected vs. Measured Carbon (Mg/ha)") #+
+  #coord_cartesian(xlim = c(0, 1000), ylim = c(0, 800))
 ```
 
 ```{r projected_carbon_vs_measured_carbon_with_trendline}
