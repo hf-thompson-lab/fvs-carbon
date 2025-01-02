@@ -2551,7 +2551,7 @@ keywordfile_section <- function(
 The first set of keyword files is to project from the first measurement year to 2025.
 
 ```{r NRSGrowOnly GROW}
-num_partitions <- 8 # The number of simultaneous processes to use
+num_partitions <- 30 # The number of simultaneous processes to use
 title <- "NRSGrowOnly"
 mgmtid <- "GROW"
 for (partition in 1:num_partitions) {
