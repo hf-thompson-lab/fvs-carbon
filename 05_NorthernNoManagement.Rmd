@@ -2468,13 +2468,18 @@ keyfile_regen_section <- function(StandID, Timestep) {
 }
 ```
 
-
-
 When generating keyword files, we create one per partition,
 distributing across partitions using round-robin on STAND_ID.
 
 keywordfile_section is a function to generate a keywordfile section from
 information about a run and a stand.
+
+It cooks a StdIdent that can be parsed later:
+
+- The input StandID
+- _Y followed by the number of years in a timestep
+- _R followed by the random seed
+
 
 ```{r keywordfile_section}
 keywordfile_section <- function(
@@ -2482,21 +2487,35 @@ keywordfile_section <- function(
     FirstYear, LastYear, Timestep,
     Partition, RandSeed = NA
   ) {
-  TimeConfig <- fvs_TimeConfig(FirstYear, LastYear, Timestep)
   if (!is.na(RandSeed)) {
-    RandSeed <- fvs_kwd1("RANNSEED", RandSeed)
+    StdIdent <- c(
+      fvs_kwd0("StdIdent"),
+      paste0(StandID, "_Y", Timestep, "_R", RandSeed, " ", Title)
+    )
+    # Careful: RannSeed != RandSeed
+    RannSeed <- fvs_kwd1("RANNSEED", RandSeed)
   } else {
-    RandSeed <- c()
+    StdIdent <- c(
+      fvs_kwd0("StdIdent"),
+      # RannSeed isn't 0, but 0 is an illegal random seed so a fine flag value
+      paste0(StandID, "_Y", Timestep, "_R0", " ", Title))
+    # Careful: RannSeed != RandSeed
+    RannSeed <- c()
+  }
+  TimeConfig <- fvs_TimeConfig(FirstYear, LastYear, Timestep)
+  if (FirstYear == LastYear) {
+    Regen <- c() # Don't do regen for 0-year runs
+  } else {
+    Regen <- keyfile_regen_section(StandID, Timestep)
   }
   c(
-    fvs_kwd0("StdIdent"),
-    paste0(StandID, " ", Title),
+    StdIdent,
     fvs_kwd0("StandCN"),
     StandCN,
     fvs_kwd0("MgmtId"),
     MgmtId,
     TimeConfig,
-    RandSeed,
+    RannSeed,
     fvs_kwd0("FMIn"), # Fire and Fuels Extension
     fvs_kwd0("CarbRept"),
     fvs_kwd0("CarbCut"),
@@ -2522,29 +2541,33 @@ keywordfile_section <- function(
     fvs_kwd1("FuelReDB", 2),
     fvs_kwd1("FuelsOut", 2),
     fvs_kwd0("End"), # Database
-    keyfile_regen_section(StandID, Timestep),
-    fvs_kwd0("Process"),
-    recursive = TRUE
+    Regen,
+    fvs_kwd0("Process")
   )
 }
 
 ```
 
-The first run is to project from the first measurement year to 2025. These
-are given management ID "NONE".
+The first set of keyword files is to project from the first measurement year to 2025.
 
-```{r NRSGrowOnlyPrj-10year}
-for (timestep in c(1, 10)) {
-  for (rannseed in c(1,3,5)) {
-    for (partition in 1:8) {
-      title <- "NRSGrowOnly"
-      mgmtid <- paste0(timestep, "Y", rannseed)
-      filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".key")
-      if (!USE_CACHE | !file.exists(rds_file)) {
-        unlink(filename)
+```{r NRSGrowOnly GROW}
+num_partitions <- 8 # The number of simultaneous processes to use
+title <- "NRSGrowOnly"
+mgmtid <- "GROW"
+for (partition in 1:num_partitions) {
+  filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".key")
+  if (!USE_CACHE | !file.exists(filename)) {
+    unlink(filename)
+    print(paste0("Writing ", filename))
+    pbapply(
+      expand.grid(timestep = c(1, 10), rannseed = c(1, 3, 5)),
+      1,
+      \(runconfig) {
+        timestep <- runconfig["timestep"]
+        rannseed <- runconfig["rannseed"]
         apply(
           stands_projected |> 
-            filter((as.numeric(STAND_ID) %% 8) == (partition - 1)) |>
+            filter((as.numeric(STAND_ID) %% num_partitions) == (partition - 1)) |>
             arrange(STAND_ID, FIRSTYEAR),
           1,
           function(row) {
@@ -2558,7 +2581,7 @@ for (timestep in c(1, 10)) {
                 row['LASTYEAR'],
                 timestep,
                 partition,
-                rannseed # Random Seed
+                rannseed
               ),
               filename,
               append = TRUE
@@ -2567,7 +2590,7 @@ for (timestep in c(1, 10)) {
         )
         write_lines("Stop", filename, append = TRUE)
       }
-    }
+    )
   }
 }
 ```
@@ -2595,17 +2618,20 @@ remove(fia, fia_fvs_standinit_plot)
 The second run is to do a 0-year projection for each measurement year. These
 are given management ID "SRVY".
 
-```{r NRSGrowOnlyObs-0year}
+```{r NRSGrowOnly SRVY}
+# We're running 0-year timesteps, but FVS requires us to run at least one
+# year, so we run 0-year timesteps for 1 year.
 timestep <- 1
-for (partition in 1:8) {
-  title <- "NRSGrowOnly"
-  mgmtid <- "0Y0"
+title <- "NRSGrowOnly"
+mgmtid <- "SRVY"
+for (partition in 1:num_partitions) {
   filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".key")
-  if (!USE_CACHE | !file.exists(rds_file)) {
+  if (!USE_CACHE | !file.exists(filename)) {
     unlink(filename)
+    print(paste0("Writing ", filename))
     apply(
       stands_surveyed |>
-        filter((as.numeric(STAND_ID) %% 8) == (partition - 1)) |>
+        filter((as.numeric(STAND_ID) %% num_partitions) == (partition - 1)) |>
         arrange(STAND_ID, MEASYEAR),
       1,
       function(row) {
@@ -2650,44 +2676,39 @@ FVS_Carbon <- NULL
 FVS_Summary2_East <- NULL
 
 title <- "NRSGrowOnly"
-for (timestep in c(0, 1, 10)) {
-  for (rannseed in c(0, 1, 3, 5)) {
-    for (partition in 1:8) {
-      for (regen in c("", "_noregen")) {
-      mgmtid <- paste0(timestep, "Y", rannseed)
-      filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, regen, ".db")
-      if (file.exists(filename)) {
-        print(paste0("Reading ", filename))
-        fvs_out_db <- DBI::dbConnect(RSQLite::SQLite(), filename)
-        fvs_carbon_tbl = tbl(fvs_out_db, 'FVS_Carbon') |>
-          mutate(
-            Title = title,
-            MgmtId = mgmtid,
-            Timestep = timestep,
-            RanNSeed = rannseed,
-            Partition = partition,
-            Regen = regen
-          ) |>
-          collect()
-        FVS_Carbon <- bind_rows(FVS_Carbon, fvs_carbon_tbl)
-
-        fvs_summary2_east_tbl = tbl(fvs_out_db, 'FVS_Summary2_East') |>
-          mutate(
-            Title = title,
-            MgmtId = mgmtid,
-            Timestep = timestep,
-            RanNSeed = rannseed,
-            Partition = partition,
-            Regen = regen
-          ) |>
-          collect()
-        FVS_Summary2_East <- bind_rows(FVS_Summary2_East, fvs_summary2_east_tbl)
+for (mgmtid in c("GROW", "SRVY")) {
+  for (partition in 1:num_partitions) {
+    filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, regen, ".db")
+    if (file.exists(filename)) {
+      print(paste0("Reading ", filename))
+      fvs_out_db <- DBI::dbConnect(RSQLite::SQLite(), filename)
+      fvs_carbon_tbl = tbl(fvs_out_db, 'FVS_Carbon') |>
+        collect() |>
+        mutate(
+          Title = title,
+          MgmtId = mgmtid,
+          Timestep = sub("^.*_Y([^_]+)_.*$", "\\1", StandID), # Extract timestep
+          RanNSeed = sub("^.*_R([^_]+)_.*$", "\\1", StandID), # Extract random seed
+          Partition = partition,
+          StandID = sub("^([^_]+)_.*$", "\\1", StandID) # Extract stand ID
+        )
+      FVS_Carbon <- bind_rows(FVS_Carbon, fvs_carbon_tbl)
   
+      fvs_summary2_east_tbl = tbl(fvs_out_db, 'FVS_Summary2_East') |>
+        collect() |>
+        mutate(
+          Title = title,
+          MgmtId = mgmtid,
+          Timestep = sub("^.*_Y([^_]+)_.*$", "\\1", StandID), # Extract timestep
+          RanNSeed = sub("^.*_R([^_]+)_.*$", "\\1", StandID), # Extract random seed
+          Partition = partition,
+          StandID = sub("^([^_]+)_.*$", "\\1", StandID) # Extract stand ID
+        )
+        FVS_Summary2_East <- bind_rows(FVS_Summary2_East, fvs_summary2_east_tbl)
+    
         dbDisconnect(fvs_out_db)
-      } else {
-        print(paste0("Skipping ", filename))
-      }
-      }
+    } else {
+      print(paste0("Skipping ", filename))
     }
   }
 }
@@ -2699,20 +2720,6 @@ Consolidate outputs; average the multiple runs with different random seeds.
 ```{r FVS_Carbon_NONE}
 FVS_Carbon_NONE <- FVS_Carbon |>
   filter(Timestep == 10) |>
-  filter(Regen == "") |>
-#  filter(RanNSeed == 1)
-  group_by(StandID, Year) |>
-  summarize(
-    Aboveground_Total_Live = mean(Aboveground_Total_Live),
-    Total_Stand_Carbon = mean(Total_Stand_Carbon),
-    .groups = 'keep'
-  ) |>
-  ungroup()
-
-FVS_Carbon_REGEN <- FVS_Carbon |>
-  filter(Timestep == 10) |>
-  filter(Regen == "_noregen") |>
-#  filter(RanNSeed == 1)
   group_by(StandID, Year) |>
   summarize(
     Aboveground_Total_Live = mean(Aboveground_Total_Live),
@@ -2723,8 +2730,6 @@ FVS_Carbon_REGEN <- FVS_Carbon |>
 
 FVS_Carbon_ANNL <- FVS_Carbon |>
   filter(Timestep == 1) |>
-  filter(Regen == "") |>
-#  filter(RanNSeed == 1)
   group_by(StandID, Year) |>
   summarize(
     Aboveground_Total_Live = mean(Aboveground_Total_Live),
