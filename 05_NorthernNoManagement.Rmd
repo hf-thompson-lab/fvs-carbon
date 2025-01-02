@@ -10,6 +10,8 @@ editor_options:
     wrap: 72
 ---
 
+# Setup
+
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(reshape2) # for melt()
@@ -27,7 +29,7 @@ options(scipen = 9) # Use integer notation for numbers under 9 digits
 source('R/functions.R')
 ```
 
-# Use Cache
+## Use Cache
 
 Some datasets take a long time to compute; these are normally cached and
 read from cache. Set `USE_CACHE` to `FALSE` to re-compute everything, and
@@ -37,7 +39,7 @@ read from cache. Set `USE_CACHE` to `FALSE` to re-compute everything, and
 USE_CACHE <- TRUE
 ```
 
-# Species Table
+## Species Table
 
 ```{r species_mixin}
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
@@ -90,7 +92,7 @@ dbDisconnect(fia)
 rm(fia, jenkins_spgrpcd_mixin, fvs_spcd_mixin)
 ```
 
-## Grow-Only Plots in the Northeast
+# Grow-Only Plots in the Northeast
 
 Find all FIA plots in the northeastern region that are grow-only, that have
 a measurement year between 1999 and 2004, and have at least two measurements
@@ -208,7 +210,7 @@ plot_grow_only <- plot_fvs_frac |>
 ```
 
 
-### Locations
+## Locations
 
 Where are these plots?
 
@@ -275,7 +277,7 @@ ggplot(map_states, aes(long, lat, group = group)) +
   coord_quickmap()
 ```
 
-### Stand Statistics
+## Stand Statistics
 
 We can gather per-stand statistics such as BALIVE and CARBON_AG from the FIA
 data for these plots over time.
@@ -474,13 +476,13 @@ seen_types |>
   xlab("Carbon")
 ```
 
-### Regeneration, Ingrowth, and Establishment
+## Regeneration, Ingrowth, and Establishment
 
 The Northeastern variant is a partial establishment model, so it does not
 automatically perform natural regeneration. We will therefore use actual
 ingrowth from the FIA data.
 
-#### Observed Ingrowth
+### Observed Ingrowth
 
 fia.TREE_GRM_COMPONENT will mark a tree as 'INGROWTH' when
 the tree is judged to be 'established', with a corresponding TREE record.
@@ -537,7 +539,7 @@ print(paste0(
 print(paste0("Ingrown trees over 3\" DBH: ", grm_ingrown |> filter(DIA_END > 3) |> nrow()))
 ```
 
-#### FVS Restrictions on Ingrowth
+### FVS Restrictions on Ingrowth
 
 FIA marks a tree as INGROWTH when it reaches 5" DBH; FVS Establishment
 is restricted to trees <= 3" DBH:
@@ -592,7 +594,7 @@ There are ~55,000 trees that ingrow over the 25 years, so about 2 trees per
 plot per 3 years.
 Most of these trees are over the 3"DBH diameter limit on ingrowth set by FVS.
 
-#### Tree History
+### Tree History
 
 Trees >=1" DBH that grow on the microplot are in the TREE table in FIA,
 so in some cases we should be able to follow a tree back to the point when it
@@ -774,9 +776,9 @@ tree_ingrown_last |> filter(DIA > 3 & FRST_DIA <= 3) |> nrow()
 
 For the remaining trees we will need to back-project.
 
-#### Back-Projecting Trees
+### Back-Projecting Trees
 
-##### FIA Estimated Growth Rate
+#### FIA Estimated Growth Rate
 
 fia.TREE_GRM_COMPONENT.ANN_DIA_GROWTH specifies annual diameter growth rate.
 Looking at the values in this column, they seem small. We can check the
@@ -816,7 +818,7 @@ Notes:
   with hydrologic catchment area"
 * The best indicator of regeneration will unquestionably be actual regeneration
 
-##### Observed Growth Rates
+#### Observed Growth Rates
 
 To estimate the time at which an ingrown tree was 3" DBH, we can project
 growth backward in time based on the growth rates of similar trees. Defining
@@ -962,7 +964,7 @@ tree_growth |>
 
 ```
 
-##### Estimated Growth Rate
+#### Estimated Growth Rate
 
 From the observed growth with outliers removed, we can compute per-species,
 per-plot, per-inventory growth rates. We can then apply these growth rates
@@ -1180,7 +1182,7 @@ tree_growth_rate |>
 
 ```
 
-##### One-Shot Back-Projection
+#### One-Shot Back-Projection
 
 Can we use that to back-project ingrown trees?
 
@@ -1223,7 +1225,7 @@ manual_back_projection |>
 Still less than half the trees back-project to within 10% of their first
 measured diameter.
 
-##### Stepwise Back-Projection
+#### Stepwise Back-Projection
 
 Rather than try to project back to starting diameter in one step, we can
 project the diameter back to the estimated diameter at the previous measurement,
@@ -1430,7 +1432,7 @@ ggplot(
 
 This looks usable.
 
-##### Back-Project to <= 3" DBH
+#### Back-Project to <= 3" DBH
 
 Using estimated diameter, what portion of ingrown trees
 can we project back to 3" DBH before the first MEASYEAR?
@@ -1591,7 +1593,7 @@ ggplot(
 
 Looks good, but what we actually needed was height, not diameter.
 
-#### Ingrowth Rate
+### Ingrowth Rate
 
 Possible ways of doing ingrowth by rate:
 
@@ -1625,7 +1627,7 @@ Disadvantages:
 
 - Adds more trees. FVS is pretty assertive about killing trees due to crowding, so this is likely to result in more trees dying than would be observed on the plot. This could result in net lower biomass in the long term, especially since FVS will kill larger trees as well as smaller trees.
 
-##### Stem Ingrowth Rate
+#### Stem Ingrowth Rate
 
 We want:
 
@@ -1887,7 +1889,7 @@ View(plot_206)
 summary(ingrowth_stem_rate)
 ```
 
-##### Ingrowth Height
+#### Ingrowth Height
 
 For FVS ingrowth, we also need height when the tree is 3" DBH. FVS will 
 adjust this, so it only needs to be close.
@@ -2073,10 +2075,15 @@ stopifnot(
 )
 ```
 
+### Ingrowth Model
+
+Combining
+
 ```{r ingrowth_by_stem}
 ingrowth_by_stem <- ingrowth_stem_rate |>
   left_join(tree_growth_ht, by = join_by(STATECD, COUNTYCD, PLOT, SPCD))
- ingrowth_by_stem |>
+
+ingrowth_by_stem |>
   group_by(JENKINS_SPGRPCD) |>
   mutate(
     PLOT_COUNT = n(),
@@ -2101,31 +2108,14 @@ ingrowth_by_stem <- ingrowth_stem_rate |>
 summary(ingrowth_by_stem)
 ```
 
-We can compare this to
-> WILLARD H. CARMEAN, JEROLD T. HAHN, & RODNEY D. JACOBS,
->  SITE INDEX CURVES FOR FOREST TREE SPECIES IN THE EASTERN UNITED 
->  STATES. USDA FOREST SERVICE, NORTH CENTRAL FOREST EXPERIMENT STATION,
->  GTR: NC-128. 142P.
-
-The equation is:
-
-H = BH + B1*S^B2*(1-e^(B3*A))^(B4*S^B5)
-where:
-H = Height
-BH = 0 when A is total age, and 4.5 when A is d.b.h age
-S = site index
-A = age
-e = base of natural log
-
-
-## Run FVS
+# Run FVS
 
 > TODO nik: How does FVS UI deal with stand replication? Should be able
 > to re-jigger this to run everything in one pass.
 > If necessary, output can be separated using the per-stand output
 > specifications, but the UI should give a model for how to do replicas.
 
-### Generate Keyfile
+## Generate Keyfile
 
 An FVS run is scripted by a keyfile. The keyfile describes how to run the
 model and extensions, including where to read input, all parameters to
@@ -2139,7 +2129,7 @@ to be run in parallel. Each partition must send its output to a separate
 location, and these can be assembled into a single output as a post-
 processing step.
 
-#### Stand Identification
+### Stand Identification
 
 For each stand, we need:
 
@@ -2147,7 +2137,7 @@ For each stand, we need:
 -  StandCN: Stand control number, from fia.PLOT.CN
 -  MgmtId: Management ID, for no treatment, this is NONE
 
-#### Time
+### Time
 
 We will run the model from first measurement year to last measurement year,
 with as many 10-year timesteps as we can get. We will add an initial timestep
@@ -2173,7 +2163,7 @@ plus one if there is a short first cycle. Since metrics are printed at the start
 of each cycle, we need LASTYEAR to be the first year of a cycle, and work
 backwards from that.
 
-#### Input
+### FIA Inputs
 
 There are two inputs, Stand and Tree. Both are configured to use a database
 query.
@@ -2184,7 +2174,7 @@ Within a Database subsection:
 -  StandSQL: SQL query to fetch a stand, given %Stand_CN%
 -  TreeSQL: SQL query to fetch all trees for a stand, given %Stand_CN%
 
-#### Regeneration, Ingrowth, and Establishment
+### Regeneration, Ingrowth, and Establishment
 
 The Northeastern variant is a partial establishment model, so it does not
 automatically perform natural regeneration. We will therefore use modeled
@@ -2248,13 +2238,15 @@ built-in regeneration. TALLYONE 9.0 ensures that all NATURAL trees are
 promoted prior to the end of the cycle. From the example output, a TALLYTWO
 is automatically scheduled, presumably in response to the TALLYONE.
 
+NB: The structure of the NATURAL keyword is:
+> NATURAL 1:YEAR 2:SPECIES 3:TPA 4:SURVIVAL 5:AGE 6:HEIGHT 7:SHADE_CODE
+
 So, I think we need:
 
 - IF ... (every cycle)
 - THEN
 - ESTAB
-# NATURAL 1:YEAR 2:SPECIES 3:TPA 4:SURVIVAL 5:AGE 6:HEIGHT 7:SHADE_CODE
-- NATURAL 0 SPECIES TPA [no age] [no %] HEIGHT
+- NATURAL 0 SPECIES TPA [no survival] [no age] HEIGHT [no shade]
 - MERCHPREP 0
 - BURNPREP 0
 - TALLYONE 9
@@ -2264,7 +2256,7 @@ So, I think we need:
 ...which will insert TPA trees of SPECIES at HEIGHT at year 6 of the cycle,
 and establish them at year 9.
 
-#### Fire and Fuels
+### Fire and Fuels
 
 Carbon is calculated by the fire and fuels extension.
 
@@ -2285,7 +2277,7 @@ Within a Database section:
 -  FuelsOut: FVS_Fuels table: database (2)
 
 
-##### Translating to FVS
+#### Translating to FVS
 
 For each timestep, we will find the trees that establish during that timestep,
 and add a record describing the tree at the time of establishment.
@@ -2315,7 +2307,7 @@ trees are on each. There does not appear to be a way to designate which
 subplot a tree establishes on; presumably, the TPA is distributed across
 subplots.
 
-#### Output
+### Output
 
 We use database output; it is easiest to work with. Many output options take
 a parameter that is 0 to disable output, 1 for file output, 2 for database
@@ -2328,14 +2320,14 @@ Within a Database section:
 -  Computdb: Configure FVS_Compute; disable
 -  MisRpts: Configure Mistletoe reports; disable
 
-#### Processing Order
+### Processing Order
 
 Each stand has its own section of the keyword file, including everything from
 StdIdent to Process. Each stand is processed before moving to the next stand.
 
 At the end of all stands, the Stop keyword tells FVS to exit cleanly.
 
-#### Example
+### Example
 
 ```
 StdIdent
@@ -2387,7 +2379,7 @@ Process
 Stop
 ```
 
-#### Keword File Generation
+### Keword File Generation
 
 Gather stand IDs and CNs for keywordfile generation.
 
@@ -2617,7 +2609,7 @@ for (partition in 1:8) {
 }
 ```
 
-#### Run FVS.
+### Run FVS
 
 ```{r run_fvs}
 # TODO nik: Run FVS directly from R.
@@ -2626,9 +2618,9 @@ for (partition in 1:8) {
 # for %%p in (FVS_Northeastern_%1_*.key) do start \FVS\FVSbin\FVSne.exe --keywordfile=%%p
 ```
 
-## Results
+# Results
 
-### Load Results
+## Load Results
 
 Load the output from all FVS partitions into a single dataframe
 
@@ -2767,7 +2759,7 @@ remove(
 )
 ```
 
-### Annual vs. Decadal Projections
+## Annual vs. Decadal Projections
 
 ```{r annual_vs_decadal}
 decadal_carbon_tmp <- FVS_Carbon_NONE |>
@@ -2864,7 +2856,7 @@ annual_vs_decadal |>
 summary(annual_vs_decadal[,c("Annual_Carbon_Flux", "Decadal_Carbon_Flux")])
 ```
 
-### Regeneration vs. None
+## Regeneration vs. None
 
 Look at carbon projections with vs. without regeneration
 
@@ -2919,7 +2911,7 @@ regen_vs_noregen |>
 ```
 
 
-### Projected vs. Measured
+## Projected vs. Measured
 
 Filter projections to corresponding observations.
 
@@ -3041,7 +3033,7 @@ ggplot(
   ggtitle("Grow-Only Stands\nChange in FVS Measured BA (m² / ha) vs. Projection Years")
 ```
 
-### Carbon Projection
+## Carbon Projection
 
 ```{r projected_carbon_vs_measured_carbon}
 projected_vs_measured |>
@@ -3100,7 +3092,7 @@ m
 y
 ```
 
-#### Carbon Flux
+### Carbon Flux
 
 Which is great, but for large BA plots, only a small portion will be projected,
 so the error is masked by the pre-existing BA. So, instead, look at measured
@@ -3213,7 +3205,7 @@ ggplot(
 ```
 
 
-#### Residuals
+### Residuals
 
 Let's look at carbon flux residuals.
 This is Mg of carbon per hectare per year.
@@ -3307,7 +3299,7 @@ ggplot(
   xlab("Carbon Flux Residual (Mg/ha/year)")
 ```
 
-#### Residuals vs. Years Projected
+### Residuals vs. Years Projected
 
 ```{r carbon_residual_vs_projection_years}
 ggplot(
@@ -3370,7 +3362,7 @@ ggplot(
   ggtitle("Grow-Only Stands\nCarbon Projection Flux Residual (Mg/ha) vs. Projection Years")
 ```
 
-#### Residuals vs. BA
+### Residuals vs. BA
 
 ```{r carbon_residual_vs_measured_ba}
 ggplot(
@@ -3452,7 +3444,7 @@ ggplot(
   
 ```
 
-#### Residuals vs. QMD
+### Residuals vs. QMD
 
 ```{r carbon_residuals_vs_qmd}
 ggplot(
@@ -3493,7 +3485,7 @@ ggplot(
   ggtitle("Grow-Only Stands\nCarbon Flux Residual (Mg/ha) vs. Measured QMD (cm)")
 ```
 
-### Basal Area Projection
+## Basal Area Projection
 
 ```{r projected_ba_vs_measured_ba}
 ggplot(
@@ -3592,7 +3584,7 @@ remove(plot_location_tmp)
 ```
 
 
-#### Residuals vs. Years Projected
+### Residuals vs. Years Projected
 
 ```{r ba_residual_vs_projection_years}
 ggplot(
@@ -3635,7 +3627,7 @@ ggplot(
   
 ```
 
-#### Residuals vs. QMD
+### Residuals vs. QMD
 
 ```{r ba_residual_vs_qmd}
 ggplot(
@@ -3678,7 +3670,7 @@ ggplot(
   xlab(bquote("Measured Stand QMD " (m)))
 
 ```
-#### Residuals vs. TPA
+### Residuals vs. TPA
 
 ```{r ba_residual_vs_qmd}
 ggplot(
