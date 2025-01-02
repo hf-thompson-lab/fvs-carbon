@@ -14,12 +14,9 @@ editor_options:
 
 ```{r setup, include=FALSE}
 library(tidyverse)
-library(reshape2) # for melt()
+library(reshape2) # melt()
 library(RSQLite)
-library(htmltools)
-library(rmarkdown)
-library(dbplyr)
-library(measurements)
+library(measurements) # conv_unit and conv_multiunit
 library(maps)
 library(pbapply) # Progress bar for long operations
 options(scipen = 9) # Use integer notation for numbers under 9 digits
