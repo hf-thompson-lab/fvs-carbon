@@ -2588,9 +2588,9 @@ for (partition in 1:num_partitions) {
             )
           }
         )
-        write_lines("Stop", filename, append = TRUE)
       }
     )
+    write_lines("Stop", filename, append = TRUE)
   }
 }
 ```
