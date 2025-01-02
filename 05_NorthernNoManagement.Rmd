@@ -581,8 +581,8 @@ grm_ingrown |>
 grm_ingrown |>
   select(DIA_END) |>
   ggplot(aes(DIA_END)) +
-  geom_boxplot() +
-  scale_y_continuous(breaks = NULL) +
+  geom_histogram(binwidth = 1) +
+  scale_y_continuous(transform = "log10") +
   xlab('Diameter at Ingrowth (inches)') +
   geom_vline(xintercept = 3, color = 'red')
 ```
@@ -1588,7 +1588,10 @@ ggplot(
   ylab("Species Group")
 ```
 
-Looks good, but what we actually needed was height, not diameter.
+So the majority of trees that establish are projected to be over 3" diameter
+at all times within the simulation window.
+
+We will need to use a different method of calculating ingrowth.
 
 ### Ingrowth Rate
 
@@ -1864,7 +1867,7 @@ ingrowth_stem_rate |>
 
 Ok, who are these outliers?
 ```{r stem rate outliers}
-View(
+knitr::kable(
   ingrowth_stem_rate |>
   arrange(desc(RATE)) |>
   head(10) |>
@@ -1873,18 +1876,34 @@ View(
 ```
 
 ```{r}
+row <- ingrowth_stem_rate |>
+  arrange(desc(RATE)) |>
+  head(1)
+statecd <- row[["STATECD"]]
+countycd <- row[["COUNTYCD"]]
+plot <- row[["PLOT"]]
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-plot_206 <- tbl(fia, 'COND') |>
-  filter(STATECD == 42, COUNTYCD == 113, PLOT == 206) |>
+biggest_outlier <- tbl(fia, 'COND') |>
+  filter(
+    STATECD == statecd,
+    COUNTYCD == countycd,
+    PLOT == plot
+  ) |>
   collect()
 dbDisconnect(fia)
-View(plot_206)
+knitr::kable(biggest_outlier)
 ```
+
+Looking, for example, at ALSTKCD we find that these plots are fully stocked
+or overstocked, indicating that they have large cohorts of young trees all
+coming of age at the same time.
 
 
 ```{r stem rate summary}
 summary(ingrowth_stem_rate)
 ```
+
+Looks good, but what we actually needed was height, not diameter.
 
 #### Ingrowth Height
 
@@ -2074,7 +2093,8 @@ stopifnot(
 
 ### Ingrowth Model
 
-Combining
+Combining these, we can gather per-plot the nuber of stems of each species
+that establish each year, and the height at establishment.
 
 ```{r ingrowth_by_stem}
 ingrowth_by_stem <- ingrowth_stem_rate |>
@@ -2107,10 +2127,14 @@ summary(ingrowth_by_stem)
 
 # Run FVS
 
-> TODO nik: How does FVS UI deal with stand replication? Should be able
-> to re-jigger this to run everything in one pass.
-> If necessary, output can be separated using the per-stand output
-> specifications, but the UI should give a model for how to do replicas.
+> TODO nik: use Stand replication for random seeds.
+
+We run FVS on the same stands in many different ways. The FVS UI
+has a method of replicating stands so that the same stand can be
+run in different ways in the same run. To do this, it creates a copy
+of the keyword file section, adding the replica number to the stand
+identifier using "_N" format. So, for example, replica 2 of stand
+"230202502686" becomes "230202502686_2"
 
 ## Generate Keyfile
 
