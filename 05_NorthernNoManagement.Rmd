@@ -3188,61 +3188,6 @@ annual_vs_decadal |>
 summary(annual_vs_decadal[,c("Annual_Carbon_Flux", "Decadal_Carbon_Flux")])
 ```
 
-## Regeneration vs. None
-
-Look at carbon projections with vs. without regeneration
-
-```{r regen_vs_none}
-tmp_regen <- FVS_Carbon_NONE |>
-  select(StandID, Year, Total_Stand_Carbon) |>
-  rename(Carbon_With_Regen = Total_Stand_Carbon)
-
-tmp_noregen <- FVS_Carbon_REGEN |>
-  select(StandID, Year, Total_Stand_Carbon) |>
-  rename(Carbon_Without_Regen = Total_Stand_Carbon)
-
-regen_vs_noregen <- tmp_regen |>
-  left_join(tmp_noregen, by = join_by(StandID, Year)) |>
-  group_by(StandID) |>
-  filter(Year == max(Year)) |>
-  ungroup()
-
-regen_vs_noregen |>
-  ggplot(aes(Carbon_Without_Regen, Carbon_With_Regen)) +
-  geom_bin2d(binwidth = 10) +
-  geom_abline(slope = 1, linetype = "dashed", color = "red") +
-  coord_cartesian(xlim = c(0, 800), ylim = c(0, 800)) +
-  theme_bw() +
-  theme(aspect.ratio = 1) +
-  scale_fill_continuous(name = "Number of Plots", transform = "log10") +
-  ggtitle("FVS Projected Carbon with vs. without regeneration") +
-  xlab(bquote("Carbon Without Regeneration" ~ (`Mg C` %*% ha^-1))) +
-  ylab(bquote("Carbon With Regeneration" ~ (`Mg C` %*% ha^-1)))
-
-```
-```{r}
-regen_vs_noregen |>
-  mutate(Ratio = Carbon_Without_Regen / Carbon_With_Regen) |>
-  ggplot(aes(x = Ratio)) +
-  geom_histogram(bins = 50) +
-  geom_vline(xintercept = 1, linetype = "dashed", color = "red") +
-  theme_bw() +
-  ggtitle("Ratio of FVS Projected Carbon without vs. with regeneration") +
-  ylab("Number of Plots") +
-  xlab("Ratio of Projected Carbon Without to With Regeneration")
-```
-
-```{r noregen stats}
-regen_vs_noregen |>
-  mutate(
-    Without_to_With = Carbon_Without_Regen / Carbon_With_Regen,
-    With_to_Without = Carbon_With_Regen / Carbon_Without_Regen
-  ) |>
-  select("Carbon_With_Regen", "Carbon_Without_Regen", "Without_to_With", "With_to_Without") |>
-  summary()
-```
-
-
 ## Projected vs. Measured
 
 Filter projections to corresponding observations.
