@@ -3378,12 +3378,10 @@ vs. projected carbon change.
 ```{r measured_vs_projected_carbon_change}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0) |> arrange(Projection_Years),
-    aes(x = Measured_Carbon_Delta, y = Projected_Carbon_Delta, color = Projection_Years)
+    aes(x = Measured_Carbon_Delta, y = Projected_Carbon_Delta)
   ) +
-  geom_point(
-#    size = 2,
-    alpha = 0.25,
-  ) +
+  geom_bin2d(bins = 20) +
+  scale_fill_continuous(transform = "log10") +
   geom_abline(intercept = 0, slope = 1) +
   geom_smooth(
     method = lm,
@@ -3396,8 +3394,8 @@ ggplot(
   facet_wrap(~`Forest Type Group`) +
   ggtitle("Grow-Only Stands FVS Projected vs. Measured Carbon Flux") +
   ylab(bquote("Projected Carbon Delta" ~(Mg %*% ha^-1))) +
-  xlab(bquote("Measured Carbon Delta" ~(Mg %*% ha^-1))) +
-  coord_cartesian(xlim = c(-100, 100), ylim = c(-100, 100))
+  xlab(bquote("Measured Carbon Delta" ~(Mg %*% ha^-1))) #+
+  #coord_cartesian(xlim = c(-100, 100), ylim = c(-100, 100))
 ```
 
 ```{r measured_vs_projected_carbon_flux}
@@ -3547,8 +3545,8 @@ ggplot(
     size = 3
   ) +
 #  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
-  coord_cartesian(xlim = c(-5, 5)) +
-  scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5)) +
+  coord_cartesian(xlim = c(0, 10)) +
+  #scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5)) +
   ggtitle(paste0(
     "FVS Projected Carbon Flux Residual by Forest Type Group",
     "\n",
