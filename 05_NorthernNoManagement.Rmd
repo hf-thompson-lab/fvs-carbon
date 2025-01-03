@@ -2984,7 +2984,7 @@ FVS_Summary2_East <- NULL
 title <- "NRSGrowOnly"
 for (mgmtid in c("GROW", "SRVY")) {
   for (partition in 1:num_partitions) {
-    filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, regen, ".db")
+    filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".db")
     if (file.exists(filename)) {
       print(paste0("Reading ", filename))
       fvs_out_db <- DBI::dbConnect(RSQLite::SQLite(), filename)
@@ -2993,8 +2993,8 @@ for (mgmtid in c("GROW", "SRVY")) {
         mutate(
           Title = title,
           MgmtId = mgmtid,
-          Timestep = sub("^.*_Y([^_]+)_.*$", "\\1", StandID), # Extract timestep
-          RanNSeed = sub("^.*_R([^_]+)_.*$", "\\1", StandID), # Extract random seed
+          Timestep = sub("^.*_Y([0-9]+).*$", "\\1", StandID), # Extract timestep
+          RanNSeed = sub("^.*_R([0-9]+).*$", "\\1", StandID), # Extract random seed
           Partition = partition,
           StandID = sub("^([^_]+)_.*$", "\\1", StandID) # Extract stand ID
         )
@@ -3025,7 +3025,7 @@ Consolidate outputs; average the multiple runs with different random seeds.
 
 ```{r FVS_Carbon_NONE}
 FVS_Carbon_NONE <- FVS_Carbon |>
-  filter(Timestep == 10) |>
+  filter(MgmtId == "GROW" & Timestep == 10) |>
   group_by(StandID, Year) |>
   summarize(
     Aboveground_Total_Live = mean(Aboveground_Total_Live),
@@ -3035,7 +3035,7 @@ FVS_Carbon_NONE <- FVS_Carbon |>
   ungroup()
 
 FVS_Carbon_ANNL <- FVS_Carbon |>
-  filter(Timestep == 1) |>
+  filter(MgmtId == "GROW" & Timestep == 1) |>
   group_by(StandID, Year) |>
   summarize(
     Aboveground_Total_Live = mean(Aboveground_Total_Live),
@@ -3046,7 +3046,7 @@ FVS_Carbon_ANNL <- FVS_Carbon |>
 
 # There is no projection for the observed run, so no need to average
 FVS_Carbon_SRVY <- FVS_Carbon |>  
-  filter(Timestep == 0)
+  filter(MgmtId == "SRVY")
 ```
 
 Sanity check: did we get the outputs we requested?
