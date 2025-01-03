@@ -36,7 +36,10 @@ read from cache. Set `USE_CACHE` to `FALSE` to re-compute everything, and
 USE_CACHE <- TRUE
 ```
 
-## Species Table
+## Species Crosswalk
+
+Different systems use different ways of encoding species. Here's a single
+crosswalk for them all.
 
 ```{r species_mixin}
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
@@ -52,8 +55,12 @@ fvs_spcd_mixin <- read_csv(
     "data/raw/FVSne_Overview_Table_3.2.1.csv",
     col_types = "iiciccc"
   ) |>
-  select(`FIA Code`, `Species Code`) |>
-  rename(SPCD = `FIA Code`, FVS_SPCD = `Species Code`)
+  select(`FIA Code`, `Species Number`, `Species Code`) |>
+  rename(
+    SPCD = `FIA Code`,
+    FVS_SPNO = `Species Number`,
+    FVS_SPCD = `Species Code`
+  )
 
 species_mixin <- tbl(fia, 'REF_SPECIES') |>
   select(SPCD, GENUS, SPECIES, E_SPGRPCD, JENKINS_SPGRPCD, SCIENTIFIC_NAME, COMMON_NAME) |>
@@ -2661,11 +2668,310 @@ for (partition in 1:num_partitions) {
 ```{r run_fvs}
 # TODO nik: Run FVS directly from R.
 # Batch file to run FVS in parallel:
-# for %%p in (FVS_Northeastern_%1_*.key) do del %%~np.db
-# for %%p in (FVS_Northeastern_%1_*.key) do start \FVS\FVSbin\FVSne.exe --keywordfile=%%p
+# for %%p in (FVS_%1_%2_*.key) do del %%~np.db
+# for %%p in (FVS_%1_%2_*.key) do start \FVS\FVSbin\FVSne.exe --keywordfile=%%p
+# Run it as:
+# runfvs.bat NRSGrowOnly GROW
+# Could be clever and create a ".done" file for each ".key" file when done,
+# and poll for existence of all of them.
 ```
 
 # Results
+
+## Fault Analysis
+
+### Parse Problems
+
+What errors and warnings do we get?
+```{r fvs warnings}
+mgmtid <- "GROW"
+fvs_warnings <- NULL
+for (partition in 1:num_partitions) {
+  filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".out")
+  fvs_warnings <- bind_rows(
+    fvs_warnings,
+    read_lines(filename) |>
+      as.data.frame(nm="text") |>
+      # Filter to just initial STAND ID and WARNING lines
+      filter(
+        grepl("^ +STAND ID=", text) |
+          grepl("WARNING:", text) |
+          grepl("ERROR:", text)
+      ) |>
+      # Parse out the STAND ID and fill it into the following lines
+      mutate(
+        STAND_ID = case_when(
+          grepl("^ +STAND ID=", text) ~ sub("^ +STAND ID= *([^ ]+) .*$", "\\1", text)
+        )
+      ) |>
+      fill(STAND_ID) |>
+      # Remove everything but warnings (which now have STAND_ID)
+      filter(
+        grepl("WARNING:", text) |
+          grepl("ERROR:", text)
+      )
+  )
+}
+```
+
+Find the distinct warnings
+```{r distinct fvs warnings}
+fvs_warnings_distinct <- fvs_warnings |>
+  # Warnings have some leading text, the tag WARNING:,
+  # then descriptive text; if there's a number in the descriptive text,
+  # it's probably pulled from the data, so we chop off the descriptive
+  # text starting at the first number to find the truly distinct warnings
+  mutate(
+    PROBLEM = case_when(
+      grepl("WARNING:", text) ~ sub("^[*. ]*(.*WARNING: [^0-9]+)([0-9].*)?$", "\\1", text),
+      grepl("ERROR:", text) ~ sub("^[*. ]*(.*ERROR: [^0-9]+)([0-9].*)?$", "\\1", text)
+    ),
+    PROBLEM = sub("\\s+$", "", PROBLEM)
+  ) |>
+  distinct(PROBLEM) |>
+  arrange(PROBLEM)
+knitr::kable(fvs_warnings_distinct)
+```
+### Keyword in Wrong Context
+
+The keyword in wrong context could be a keyword file generation error; let's
+track it down.
+```{r keyword context}
+debug_stand_id <- fvs_warnings |>
+  filter(grepl(" WRONG CONTEXT ", text)) |>
+  head(1) |>
+  pull("STAND_ID")
+fvs_warnings |>
+  filter(STAND_ID == debug_stand_id)
+```
+
+RECORDS READ=4884 likely means the number of lines in the keyword file
+(this is a FORTRAM program, where each line is a record).
+
+Which partition is it in?
+```{r keyword context partition}
+as.numeric(sub("^([^_]+)_.*$", "\\1",debug_stand_id)) %% num_partitions
+```
+
+so the 26th partition, which is partition 27.
+
+Here's the keyword file section:
+```
+StdIdent  
+540003101366_Y1_R1 NRSGrowOnly
+StandCN   
+7554111010661
+MgmtId    
+GROW
+InvYear         2000
+TimeInt            0         1
+TimeInt           19         1
+NumCycle          19
+RANNSEED           1
+FMIn      
+CarbRept  
+CarbCut   
+CarbCalc           1         1    0.0425         9        11
+FuelOut   
+FuelRept  
+End       
+Database  
+DSNIn     
+SQLite_FIADB_ENTIRE.db
+StandSQL  
+SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'
+EndSQL    
+TreeSQL   
+SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'
+EndSQL    
+DSNOut    
+FVS_NRSGrowOnly_GROW_27.db
+Summary            2
+Computdb           0         1
+MisRpts            2
+CarbReDB           2
+FuelReDB           2
+FuelsOut           2
+End       
+If                 0
+mod(cycle,1) eq 0
+Then      
+Estab              0
+MechPrep           0         0
+BurnPrep           0         0
+Sprout    
+Natural            0        RM         6       100                  29         0
+Natural            0        BG        42       100                  26         0
+End       
+EndIf     
+Process   
+
+```
+
+Reading the full text of the output file gives more context:
+```
+********   FVS16 ERROR:  KEYWORD ENTERED IS USED IN WRONG CONTEXT AND WAS IGNORED.  RECORDS READ=4884
+           DSNOUT DATA BASE CAN NOT BE REDEFINED. DSN FOR OUTPUT REMAINS: FVS_NRSGrowOnly_GROW_27.db
+```
+
+This appears after reporting the results of TreeSQL. So it looks like
+there's an extra DSNOUT somewhere, but I don't see it.
+
+This happens 6 times, only in partitions 27 and 29. All are for DSNOut, and
+all report that the DSNOut is left as what I want it to be.
+
+So we can ignore these errors.
+
+### Keyword Ignored
+
+Let's look at the KEYWORD IGNORED errors:
+```{r keyword ignored}
+debug_stand_id <- fvs_warnings |>
+  filter(grepl(" KEYWORD IGNORED.", text)) |>
+  head(1) |>
+  pull("STAND_ID")
+fvs_warnings |>
+  filter(STAND_ID == debug_stand_id)
+```
+
+```{r keyword ignored partition}
+as.numeric(sub("^([^_]+)_.*$", "\\1",debug_stand_id)) %% num_partitions
+```
+
+The relevant section of the output is:
+```
+STDIDENT
+           STAND ID= 338300300218_Y1_R1                NRSGrowOnly                                                             
+
+STANDCN    DATA BASE CONTROL NUMBER=22870841010661
+
+MGMTID  
+           MANAGEMENT ID= GROW
+
+INVYEAR    INVENTORY YEAR= 1983
+
+TIMEINT    ALL CYCLES;  PERIOD LENGTH=  1
+
+ CARD NUM = 1957; KEYWORD FIELD = 'TIMEINT '
+      PARAMETERS ARE:    41.0000000     1.0000000     0.0000000     0.0000000     0.0000000     0.0000000     0.0000000
+      COL 11 TO 80 ='        41         1                                                  '
+
+********   FVS04 ERROR:  A REQUIRED PARAMETER IS MISSING OR A PARAMETER IS INCORRECT; KEYWORD IGNORED.
+
+ CARD NUM = 1958; KEYWORD FIELD = 'NUMCYCLE'
+      PARAMETERS ARE:    41.0000000     0.0000000     0.0000000     0.0000000     0.0000000     0.0000000     0.0000000
+      COL 11 TO 80 ='        41                                                            '
+
+********   FVS04 ERROR:  A REQUIRED PARAMETER IS MISSING OR A PARAMETER IS INCORRECT; KEYWORD IGNORED.
+
+RANNSEED   RANDOM SEED IS:           1.0
+
+```
+
+STAND ID 338300300218_Y1_R1 has STAND CN 22870841010661; it is the first
+stand in the file.
+
+SAND CN 22870841010661 is for STAND ID 338300300218_Y1_R1, which is 30 some
+odd stands down.
+
+Aha - NUMCYCLE is 41; from the FVS Keyword Reference:
+
+> The maximum number of cycles in a projection is 40.
+
+Are there any others?
+
+Nope, just this one stand, only for the single-year projection, once for
+each of the random seeds. Ignore.
+
+### One Thousand Trees
+
+The TPA fault may indicate a keyword file generation error; let's track it down.
+```{r}
+debug_stand_id <- fvs_warnings |>
+  filter(grepl(" TPA ", text)) |>
+  head(1) |>
+  pull("STAND_ID")
+fvs_warnings |>
+  filter(STAND_ID == debug_stand_id)
+```
+
+a'ight, what's species 9?
+
+```{r fvs species 9}
+debug_species <- species_mixin |>
+  filter(FVS_SPNO == 9)
+debug_species
+```
+
+There's a record for this plot for eastern white pine with TPA > 1000.
+Is it regen?
+
+```{r fault analysis}
+fvs_spcd <- debug_species[["FVS_SPCD"]]
+regen_table |>
+  filter(STAND_ID == "090400500390") |>
+  filter(species == fvs_spcd)
+```
+
+Doesn't look like it.
+
+Is it in the tree table?
+
+```{r white pine in stand 390}
+debug_stand <- stands_projected |>
+  filter(STAND_ID == "090400500390")
+standcn <- debug_stand[["STAND_CN"]]
+statecd <- debug_stand[["STATECD"]]
+countycd <- debug_stand[["COUNTYCD"]]
+plot <- debug_stand[["PLOT"]]
+invyr <- debug_stand[["FIRSTYEAR"]]
+spcd <- debug_species[["SPCD"]]
+
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+debug_trees <- tbl(fia, "FVS_TreeInit_Plot") |>
+  filter(
+    STAND_CN == standcn &
+      SPECIES == spcd
+  ) |>
+  collect()
+DBI::dbDisconnect(fia)
+debug_trees |>
+  arrange(DIAMETER, desc(TREE_COUNT))
+```
+
+Yup, there it is - TREE_COUNT = 1124.479237 and DIAMETER = 0.1
+
+I think we note that these exist, and ignore them.
+
+```{r}
+fvs_warnings |>
+  filter(grepl(" TPA ", text)) |>
+  nrow()
+```
+
+4167 is a lot. What species are they?
+
+```{r tpa warning species}
+fvs_warnings |>
+  filter(grepl("TREE_ID", text)) |>
+  mutate(
+    FVS_SPNO = as.integer(sub(".*SPECIES=[^0-9]*([0-9]+) .*", "\\1", text)),
+    DIA = as.double(sub(".*DIAMETER=[^0-9]*([0-9.]+) .*", "\\1", text)),
+    TREE_CLASS = case_when(
+      DIA < 1 ~ "SEEDLING",
+      DIA < 3 ~ "SAPLING",
+      .default = "TREE"
+    )
+  ) |>
+  group_by(FVS_SPNO, TREE_CLASS) |>
+  summarize(COUNT = n(), .groups = "keep") |>
+  ungroup() |>
+  arrange(desc(COUNT)) |>
+  left_join(species_mixin, by = join_by(FVS_SPNO))
+```
+
+All seedlings, and all read directly from FIA.
+We can decide to not worry about them.
 
 ## Load Results
 
