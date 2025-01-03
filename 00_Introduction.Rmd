@@ -62,6 +62,7 @@ idx_col <- function(row) {
   tbl <- row["table_name"]
   col <- row["column_name"]
   idx_name <- paste0("IDX_", tbl, "_", col)
+  print(paste0("Creating ", idx_name))
   sql <- paste(
     "CREATE INDEX IF NOT EXISTS", idx_name, "ON", tbl, "(", col, ");",
     sep = ' '
@@ -78,7 +79,7 @@ remove(fia, column_query, columns, idx_col)
 
 ## Plot Identifiers
 
-Many tables have the three columns that uniquely indentify a plot:
+Many tables have the three columns that uniquely identify a plot:
 STATECD, COUNTYCD, PLOT
 Index those because we often want to look up all the records pertaining to
 a plot by location.
@@ -113,6 +114,7 @@ tables <- DBI::dbGetQuery(fia, table_query)
 idx_tbl <- function(row) {
   tbl <- row["table_name"]
   idx_name <- paste0("IDX_", tbl, "_PLOT")
+  print(paste("Creating index", idx_name))
   sql <- paste(
     "CREATE INDEX IF NOT EXISTS", idx_name, "ON", tbl, "(STATECD, COUNTYCD, PLOT);",
     sep = ' '
@@ -121,6 +123,7 @@ idx_tbl <- function(row) {
   plotyr <- row["has_pltyr"]
   if (plotyr == 1) {
     idx_name <- paste0("IDX_", tbl, "_PLOT_INVYR")
+    print(paste("Creating index", idx_name))
     sql <- paste(
       "CREATE INDEX IF NOT EXISTS", idx_name, "ON", tbl, "(STATECD, COUNTYCD, PLOT, INVYR);",
       sep = ' '
