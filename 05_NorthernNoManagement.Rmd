@@ -3188,7 +3188,7 @@ projected_carbon_tmp <- FVS_Carbon_NONE |>
   rename(Projected_Carbon = Total_Stand_Carbon)
 
 FVS_Summary2_East_NONE <- FVS_Summary2_East |>
-  filter(Timestep == 10) |>
+  filter(MgmtId == "GROW" & Timestep == 10) |>
   group_by(StandID, Year) |>
   summarize(
     BA = mean(BA),
@@ -3198,7 +3198,7 @@ FVS_Summary2_East_NONE <- FVS_Summary2_East |>
   ungroup()
 
 FVS_Summary2_East_SRVY <- FVS_Summary2_East |>  
-  filter(Timestep == 0)
+  filter(MgmtId == "SRVY")
 
 projected_ba_tmp <- FVS_Summary2_East_NONE |>
   select(StandID, Year, BA, Tpa) |>
