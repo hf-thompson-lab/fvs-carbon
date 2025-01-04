@@ -3160,15 +3160,16 @@ ggplot(
 ```{r}
 annual_vs_decadal |>
   filter(Decadal_Carbon_Flux > 0) |>
-  mutate(Ratio = Annual_Carbon_Flux / Decadal_Carbon_Flux) |>
+  mutate(Ratio = Decadal_Carbon_Flux / Annual_Carbon_Flux) |>
   ggplot(aes(x = Ratio)) +
   geom_histogram(bins = 50) +
   geom_vline(xintercept = 1, linetype = "dashed", color = "red") +
+  scale_x_continuous(transform = "log10", breaks = c(1, 2, 3, 5, 10, 20, 30, 50)) +
 #  facet_wrap(~`Forest Type Group`) +
   theme_bw() +
-  ggtitle("Ratio of Projected Carbon using 1 vs. 10 year timestep") +
+  ggtitle("Ratio of Projected Carbon using 10 vs. 1 year timestep") +
   ylab("Number of Plots") +
-  xlab("Ratio (1-Year / 10-Year)")
+  xlab("Ratio (10-Year / 1-Year)")
 
 ```
 
