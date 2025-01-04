@@ -1882,25 +1882,6 @@ knitr::kable(
 )
 ```
 
-```{r}
-row <- ingrowth_stem_rate |>
-  arrange(desc(RATE)) |>
-  head(1)
-statecd <- row[["STATECD"]]
-countycd <- row[["COUNTYCD"]]
-plot <- row[["PLOT"]]
-fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-biggest_outlier <- tbl(fia, 'COND') |>
-  filter(
-    STATECD == statecd,
-    COUNTYCD == countycd,
-    PLOT == plot
-  ) |>
-  collect()
-dbDisconnect(fia)
-knitr::kable(biggest_outlier)
-```
-
 Looking, for example, at ALSTKCD we find that these plots are fully stocked
 or overstocked, indicating that they have large cohorts of young trees all
 coming of age at the same time.
