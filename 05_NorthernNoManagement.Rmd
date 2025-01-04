@@ -963,7 +963,7 @@ tree_growth |>
     geom_boxplot() +
     scale_fill_discrete(breaks = c("2.5%", "1%", "0%")) +
     ggtitle("Measured Annual Growth with Outliers Removed by Species") +
-    xlab(bquote("Annual Growth " ~(inches %*% year^{-1}))) +
+    xlab(bquote("Annual Growth " ~(inches %.% year^{-1}))) +
     ylab("Species Group")
 
 ```
@@ -1155,7 +1155,7 @@ tree_growth_rate |>
     coord_cartesian(xlim = c(-1, 1)) +
     theme_bw() +
     ggtitle("Measured Annual Diameter Growth of Ingrown Trees") +
-    xlab(bquote("Annual Diameter Growth " ~(inches %*% year^{-1}))) +
+    xlab(bquote("Annual Diameter Growth " ~(inches %.% year^{-1}))) +
     ylab("Species Group")
 
 ```
@@ -1181,7 +1181,7 @@ tree_growth_rate |>
     coord_cartesian(xlim = c(-0.2, 0.2)) +
     theme_bw() +
     ggtitle("Measured Annual Basal Area Growth of Ingrown Trees") +
-    xlab(bquote("Annual Basal Area Growth " ~(m^2 %*% year^{-1}))) +
+    xlab(bquote("Annual Basal Area Growth " ~(m^2 %.% year^{-1}))) +
     ylab("Species Group")
 
 ```
@@ -1430,7 +1430,7 @@ ggplot(
   #coord_cartesian(xlim = c(-0.2, 0.2)) +
   theme_bw() +
   ggtitle("Projected Annual Growth of Ingrown Trees") +
-  xlab(bquote("Change in Basal Area " ~(m^2 %*% year^{-1}))) +
+  xlab(bquote("Change in Basal Area " ~(m^2 %.% year^{-1}))) +
   ylab("Species Group")
 ```
 
@@ -1866,9 +1866,9 @@ ingrowth_stem_rate |>
   scale_fill_continuous(name = "Number of Plots", transform = "log10", limits = c(1, 1000)) +
   facet_wrap(~GROUP_NAME) +
   theme_bw() +
-  #xlab(bquote("Basal Area" ~(m^2 %*% hectare^-1))) +
+  #xlab(bquote("Basal Area" ~(m^2 %.% hectare^-1))) +
   xlab(bquote("QMD (cm)")) +
-  ylab(bquote("Ingrowth Rate" ~(stems %*% hectare^-1 %*% year^-1))) +
+  ylab(bquote("Ingrowth Rate" ~(stems %.% hectare^-1 %.% year^-1))) +
   ggtitle("Per-Plot Ingrowth Stem Rate")
 ```
 
@@ -3150,10 +3150,11 @@ ggplot(
   scale_fill_continuous(name = "Number of Plots", transform = "log10") +
   geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") +
   #facet_wrap(~`Forest Type Group`) +
+  theme_bw() +
   ggtitle(bquote("Annual Carbon Flux for 1- vs. 10-year Timestep")) +
   coord_cartesian(xlim = c(-1, 8), ylim = c(-1, 8)) +
-  ylab(bquote("1-Year Timestep Annual Carbon Flux" ~ (`Mg C` %*% ha^-1 %*% year^-1))) +
-  xlab(bquote("10-Year Timestep Annual Carbon Flux" ~ (`Mg C` %*% ha^-1 %*% year^-1)))
+  ylab(bquote("1-Year Timestep Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  xlab(bquote("10-Year Timestep Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1)))
 ```
 
 ```{r}
@@ -3292,6 +3293,7 @@ ggplot(
   geom_bin2d(bins = 30) +
   geom_abline(intercept = 0, slope = 0, linetype = "dashed", color = "red") +
   scale_fill_continuous(name = "Number of Plots") +
+  theme_bw() +
   #scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
   #facet_wrap(~`Forest Type Group`) +
   ggtitle("Grow-Only Stands\nChange in FVS Measured BA (m² / ha) vs. Projection Years")
@@ -3339,8 +3341,8 @@ ggplot(
   theme_bw() +
   theme(aspect.ratio = 1) +
   ggtitle("FVS Projected vs. FIA Measured Carbon") +
-  xlab(bquote("Projected Stand Carbon" ~(Mg %*% ha^-1))) +
-  ylab(bquote("Measured Stand Carbon" ~(Mg %*% ha^-1))) +
+  xlab(bquote("Projected Stand Carbon" ~(`Mg C` %.% ha^-1))) +
+  ylab(bquote("Measured Stand Carbon" ~(`Mg C` %.% ha^-1))) +
   coord_cartesian(xlim = c(0, 800), ylim = c(0, 800))
 ```
 
@@ -3379,9 +3381,11 @@ ggplot(
     se = FALSE
   ) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands FVS Projected vs. Measured Carbon Flux") +
-  ylab(bquote("Projected Carbon Delta" ~(Mg %*% ha^-1))) +
-  xlab(bquote("Measured Carbon Delta" ~(Mg %*% ha^-1))) #+
+  theme(aspect.ratio = 1) +
+  theme_bw() +
+  ggtitle("Grow-Only Stands FVS Projected vs. Measured Carbon Change") +
+  ylab(bquote("Projected Carbon Delta" ~(`Mg C` %.% ha^-1))) +
+  xlab(bquote("Measured Carbon Delta" ~(`Mg C` %.% ha^-1))) #+
   #coord_cartesian(xlim = c(-100, 100), ylim = c(-100, 100))
 ```
 
@@ -3405,8 +3409,8 @@ ggplot(
   theme_bw() +
   theme(aspect.ratio = 1) +
   ggtitle("FVS Projected vs. Measured Annual Carbon Flux") +
-  xlab(bquote("Measured Annual Carbon Flux" ~(Mg %*% ha^-1 %*% year^-1))) +
-  ylab(bquote("Projected Annual Carbon Flux" ~(Mg %*% ha^-1 %*% year^-1))) #+
+  xlab(bquote("Measured Annual Carbon Flux" ~(`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab(bquote("Projected Annual Carbon Flux" ~(`Mg C` %.% ha^-1 %.% year^-1))) #+
   #coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
 ```
 
@@ -3460,8 +3464,9 @@ ggplot(
     shape = 4,
     size = 3
   ) +
+  theme_bw() +
   ggtitle(bquote("Projected vs. Measured Annual Carbon Flux")) +
-  xlab(bquote("Carbon Flux" ~(Mg %*% ha^-1 %*% year^-1))) +
+  xlab(bquote("Carbon Flux" ~(`Mg C` %.% ha^-1 %.% year^-1))) +
   ylab("Forest Type Group")
 
 ```
@@ -3495,15 +3500,16 @@ ggplot(
     shape = 4,
     size = 3
   ) +
+  theme_bw() +
   ggtitle(paste0(
     "FVS Projected Carbon Flux Residual by Forest Type Group",
     "\n",
     "for Grow-Only FIA Plots in the Northeast"
   )) +
   xlab(paste0(
-    "Carbon Flux Residual (Mg/ha/year)",
+    "Carbon Flux Residual (Mg C/ha/year)",
     "\n",
-    "(X = Mean Measured Carbon Flux)"
+    "X = Mean Measured Carbon Flux (Mg C/ha/year)"
   )) +
   ylab("Forest Type Group")
 
@@ -3533,6 +3539,7 @@ ggplot(
   ) +
 #  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
   coord_cartesian(xlim = c(0, 10)) +
+  theme_bw() +
   #scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5)) +
   ggtitle(paste0(
     "FVS Projected Carbon Flux Residual by Forest Type Group",
@@ -3540,9 +3547,9 @@ ggplot(
     "for Grow-Only FIA Plots in the Northeast"
   )) +
   xlab(paste0(
-    "Carbon Flux Residual (Mg/ha/year)",
+    "Carbon Flux Residual (Mg C/ha/year)",
     "\n",
-    "(X = Mean Measured Carbon Flux)"
+    "X = Mean Measured Carbon Flux(Mg C/ha/year)"
   )) +
   ylab("Forest Type Group")
 ```
@@ -3555,10 +3562,12 @@ ggplot(
   geom_vline(xintercept = 0, color = 'red') +
   geom_boxplot(varwidth = TRUE) +
 #  scale_y_discrete(guide = guide_axis(n.dodge = 2)) +
-  coord_cartesian(xlim = c(-5, 5)) +
-  scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5)) +
+  coord_cartesian(xlim = c(-10, 10)) +
+#  scale_x_continuous(breaks = c(-10, -2.5, 0, 2.5, 5)) +
+  theme_bw() +
   ggtitle("Grow-Only Stands\nCarbon Flux Residual by Ecoregion") +
-  xlab("Carbon Flux Residual (Mg/ha/year)")
+  xlab(bquote("Carbon Flux Residual" ~(`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab("Ecosubregion")
 ```
 
 ### Residuals vs. Years Projected
@@ -3568,9 +3577,7 @@ ggplot(
     projected_vs_measured|> filter(Projection_Years > 0),
     aes(x = Projection_Years, y = Carbon_Residual)
   ) +
-  geom_point(
-    alpha = 0.25
-  ) +
+  geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
@@ -3579,7 +3586,11 @@ ggplot(
     color = 'brown'
   ) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nCarbon Projection Error (Mg/ha) vs. Projection Years")
+  theme_bw() +
+  scale_fill_continuous(transform = "log10") +
+  ggtitle("Grow-Only Stands\nCarbon Projection Error vs. Projection Years") +
+  xlab("Projection Years") +
+  ylab(bquote("Carbon Residual" ~(`Mg C` %.% ha^-1)))
 ```
 
 
@@ -3588,9 +3599,7 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Projection_Years, y = Carbon_Error)
   ) +
-  geom_point(
-    alpha = 0.25
-  ) +
+  geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
@@ -3599,8 +3608,10 @@ ggplot(
     color = 'brown'
   ) +
   facet_wrap(~`Forest Type Group`) +
-  coord_cartesian(xlim = c(10, 20), ylim = c(0, 1)) +
-  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20)) +
+#  coord_cartesian(xlim = c(10, 20), ylim = c(0, 1)) +
+#  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20)) +
+  scale_fill_continuous(transform = "log10") +
+  theme_bw() +
   ggtitle("Grow-Only Stands\nCarbon Projection Error (fraction) vs. Projection years")
   
 ```
@@ -3610,9 +3621,7 @@ ggplot(
     projected_vs_measured|> filter(Projection_Years > 0),
     aes(x = Projection_Years, y = Carbon_Flux_Residual)
   ) +
-  geom_point(
-    alpha = 0.25
-  ) +
+  geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
@@ -3620,8 +3629,12 @@ ggplot(
     se = FALSE,
     color = 'brown'
   ) +
+  scale_fill_continuous(transform = "log10") +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nCarbon Projection Flux Residual (Mg/ha) vs. Projection Years")
+  theme_bw() +
+  ggtitle("Grow-Only Stands\nCarbon Projection Flux Residual vs. Projection Years") +
+  xlab("Projection Years") +
+  ylab(bquote("Carbon Flux Residual" ~(`Mg C` %.% ha^-1 %.% year^-1)))
 ```
 
 ### Residuals vs. BA
@@ -3631,9 +3644,7 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     mapping = aes(x = Measured_BA, y = Carbon_Residual)
   ) +
-  geom_point(
-    alpha = 0.25
-  ) +
+  geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
@@ -3641,8 +3652,11 @@ ggplot(
     se = FALSE,
     color = 'brown'
   ) +
+  scale_fill_continuous(transform = "log10") +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nCarbon Projection Residuals (Mg/ha) vs. Measured BA (m²/ha)")
+  ggtitle("Grow-Only Stands\nCarbon Projection Residuals vs. Measured BA") +
+  xlab(bquote("Measured BA" ~ (m^2 %.% ha^-1))) +
+  ylab(bquote("Carbon Residual" ~ (`Mg C` %.% ha^-1)))
   
 ```
 
@@ -3654,9 +3668,7 @@ ggplot(
       filter(Carbon_Error < 1),
     aes(x = Measured_BA, y = Carbon_Error)
   ) +
-  geom_point(
-    alpha = 0.25
-  ) +
+  geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
@@ -3664,8 +3676,12 @@ ggplot(
     se = FALSE,
     color = 'brown'
   ) +
+  scale_fill_continuous(transform = "log10") +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nCarbon Projection Error (fraction) vs. Measured BA (m² / ha)")
+  theme_bw() +
+  ggtitle("Grow-Only Stands\nCarbon Projection Error (fraction) vs. Measured BA (m² / ha)") +
+  xlab(bquote("Measured BA" ~ (m^2 %.% ha^-1))) +
+  ylab(bquote("Carbon Projection Error (fraction)"))
 ```
 
 This omits outliers; looking just at the outliers (error >= 2x value):
@@ -3677,13 +3693,13 @@ ggplot(
       filter(Carbon_Error >= 1),
     aes(x = Measured_BA, y = Carbon_Error)
   ) +
-  geom_point(
-    alpha = 0.25
-  ) +
-  coord_cartesian(xlim = c(0, 80), ylim = c(-15, 15)) +
+  geom_point() +
+  coord_cartesian(ylim = c(0, NA)) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nCarbon Projection Error Outliers vs. Measured BA (m² / ha)")
-
+  theme_bw() +
+  ggtitle("Grow-Only Stands\nCarbon Projection Error Outliers vs. Measured BA") +
+  xlab(bquote("Measured BA" ~ (m^2 %.% ha^-1))) +
+  ylab(bquote("Carbon Projection Error (fraction)"))
 ```
 
 ```{r carbon_flux_residual_vs_measured_ba}
@@ -3691,9 +3707,7 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     mapping = aes(x = Measured_BA, y = Carbon_Flux_Residual)
   ) +
-  geom_point(
-    alpha = 0.25
-  ) +
+  geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
@@ -3701,8 +3715,12 @@ ggplot(
     se = FALSE,
     color = 'brown'
   ) +
+  scale_fill_continuous(transform = "log10") +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nCarbon Flux Residual (Mg/ha) vs. Measured BA (m²/ha)")
+  theme_bw() +
+  ggtitle("Grow-Only Stands\nCarbon Flux Residual vs. Measured BA") +
+  xlab(bquote("Measured BA" ~ (m^2 %.% ha^-1))) +
+  ylab(bquote("Carbon Flux Residual" ~(`Mg C` %.% ha^-1 %.% year^-1)))
   
 ```
 
@@ -3713,9 +3731,7 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
     aes(x = QMD_METRIC, y = Carbon_Residual)
   ) +
-  geom_point(
-    alpha = 0.25
-  ) +
+  geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
@@ -3723,8 +3739,13 @@ ggplot(
     se = FALSE,
     color = 'brown'
   ) +
+  scale_fill_continuous(transform = "log10") +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nCarbon Projection Error (Mg/ha) vs. Measured QMD (cm)")
+  theme_bw() +
+  ggtitle("Grow-Only Stands\nCarbon Projection Error (Mg/ha) vs. Measured QMD (cm)") +
+  xlab(bquote("Measured QMD" ~ (cm))) +
+  ylab(bquote("Carbon Residual" ~ (`Mg C` %.% ha^-1)))
+  
 ```
 
 ```{r carbon_flux_residuals_vs_qmd}
@@ -3732,9 +3753,7 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
     aes(x = QMD_METRIC, y = Carbon_Flux_Residual)
   ) +
-  geom_point(
-    alpha = 0.25
-  ) +
+  geom_bin2d(bins = 20) +
   scale_x_log10() +
   geom_smooth(
     method = lm,
@@ -3743,8 +3762,12 @@ ggplot(
     se = FALSE,
     color = 'brown'
   ) +
+  scale_fill_continuous(transform = "log10") +
+  theme_bw() +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nCarbon Flux Residual (Mg/ha) vs. Measured QMD (cm)")
+  ggtitle("Grow-Only Stands\nCarbon Flux Residual vs. Measured QMD") +
+  xlab(bquote("QMD" ~ (cm))) +
+  ylab(bquote("Carbon Flux Residual" ~ (`Mg C` %.% ha^-1 %.% year^-1)))
 ```
 
 ## Basal Area Projection
@@ -3752,12 +3775,9 @@ ggplot(
 ```{r projected_ba_vs_measured_ba}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
-    aes(x = Measured_BA, y = Projected_BA, color = Projection_Years)
+    aes(x = Measured_BA, y = Projected_BA)
   ) +
-  geom_point(
-#    size = 2,
-    alpha = 0.25,
-  ) +
+  geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
@@ -3765,9 +3785,14 @@ ggplot(
     se = FALSE,
     color = 'brown'
   ) +
-  geom_abline(intercept = 0, slope = 1) +
+  theme_bw() +
+#  theme(aspect.ratio = 1) +
+  scale_fill_continuous(transform = "log10") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nProjected vs. Measured Basal Area (m²/ha)")
+  ggtitle("Grow-Only Stands\nProjected vs. Measured Basal Area") +
+  xlab(bquote("Measured Basal Area" ~(m^2 %.% ha^-1))) +
+  ylab(bquote("Projected Basal Area" ~(m^2 %.% ha^-1)))
 ```
 
 ```{r basal_area_trend}
@@ -3786,9 +3811,9 @@ ggplot(
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
   scale_fill_discrete(name = "Forest Type Group") +
-  ggtitle("Measured vs. Projected BA with Regeneration") +
-  ylab(bquote("BA Residual " (m^2 %*% hectare^-1 %*% year^-1))) +
-  xlab(bquote("Measured Stand BA " (m^2 %*% hectare^-1))) +
+  ggtitle("Measured vs. Projected BA") +
+  ylab(bquote("BA Residual " (m^2 %.% hectare^-1 %.% year^-1))) +
+  xlab(bquote("Measured Stand BA " (m^2 %.% hectare^-1))) +
   theme_bw() +
   coord_cartesian(ylim = c(-2, 3))
 
@@ -3853,9 +3878,8 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Projection_Years, y = BA_Residual)
   ) +
-  geom_point(
-    alpha = 0.25
-  ) +
+  geom_bin2d(bins = 20) +
+  scale_fill_continuous(transform = "log10") +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
@@ -3863,9 +3887,12 @@ ggplot(
     se = FALSE,
     color = 'brown'
   ) +
-  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
+#  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nBA Residual (m²/ha) vs. Projection Years")
+  theme_bw() +
+  ggtitle("Grow-Only Stands\nBA Residual vs. Projection Years") +
+  xlab(bquote("Projection Years")) +
+  ylab(bquote("BA Residual" ~(m^2 %.% ha^-1)))
   
 ```
 
@@ -3874,9 +3901,8 @@ ggplot(
     projected_vs_measured |> filter(BA_Error < 1),
     aes(x = Projection_Years, y = BA_Error)
   ) +
-  geom_point(
-    alpha = 0.25
-  ) +
+  geom_bin2d(bins = 20) +
+  scale_fill_continuous(transform = "log10") +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
@@ -3885,7 +3911,10 @@ ggplot(
     color = 'brown'
   ) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nBA Projection Error (fraction) vs. Projection years")
+  theme_bw() +
+  ggtitle("Grow-Only Stands\nBA Projection Error vs. Projection years") +
+  xlab("Projection Years") +
+  ylab("BA Projection Error (fraction)")
   
 ```
 
@@ -3896,9 +3925,8 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
     aes(x = QMD_METRIC, y = BA_Residual)
   ) +
-  geom_point(
-    alpha = 0.25
-  ) +
+  geom_bin2d(bins = 20) +
+  scale_fill_continuous(transform = "log10") +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
@@ -3907,7 +3935,10 @@ ggplot(
     color = 'brown'
   ) +
   facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nBA Projection Residual (m²/ha) vs. Measured QMD (cm)")
+  theme_bw() +
+  ggtitle("Grow-Only Stands\nBA Projection Residual vs. Measured QMD") +
+  xlab(bquote("QMD" ~(cm))) +
+  ylab(bquote("BA Residual" ~(m^2 %.% ha^-1)))
 ```
 
 ```{r qmd_trend}
@@ -3927,9 +3958,9 @@ ggplot(
   geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
   scale_fill_discrete(name = "Forest Type Group") +
   theme_bw() +
-  ggtitle("Measured QMD vs. Projected BA for Grow-Only Stands") +
-  ylab(bquote("BA Residual " (m^2 %*% hectare^-1 %*% year^-1))) +
-  xlab(bquote("Measured Stand QMD " (m)))
+  ggtitle("Measured QMD vs. BA Residual for Grow-Only Stands") +
+  ylab(bquote("BA Residual " ~(m^2 %.% ha^-1 %.% year^-1))) +
+  xlab(bquote("Measured Stand QMD " ~(cm)))
 
 ```
 ### Residuals vs. TPA
@@ -3956,10 +3987,14 @@ ggplot(
     se = FALSE,
     color = 'brown'
   ) +
+  geom_abline(intercept = c(0, 0), slope = 1, linetype = "dashed") +
   coord_cartesian( xlim = c(0, 40000), ylim = c(0, 25000)) +
   theme_bw() +
+  #theme(aspect.ratio = 1) +
   #facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nProjected vs. Measured Tpa (trees / acre)")
+  ggtitle("Grow-Only Stands\nProjected vs. Measured TPA") +
+  xlab(bquote("Measured" ~(trees %.% acre^-1))) +
+  ylab(bquote("Projected" ~(trees %.% acre^-1)))
 ```
 
 ```{r qmd_trend}
@@ -3980,9 +4015,9 @@ ggplot(
   geom_boxplot(outlier.size = 0.1, varwidth = TRUE, position = position_nudge(x = -0.5)) +
   scale_fill_discrete(name = "Forest Type Group") +
   theme_bw() +
-  ggtitle("Measured Tpa vs. Residula in Projected BA for Grow-Only Stands") +
-  ylab(bquote("BA Residual " (m^2 %*% hectare^-1 %*% year^-1))) +
-  xlab(bquote("Measured Stand Tpa " (trees / acre)))
+  ggtitle("Measured TPA vs. BA Residual for Grow-Only Stands") +
+  ylab(bquote("BA Residual" (m^2 %.% ha^-1 %.% year^-1))) +
+  xlab(bquote("Measured Stand TPA" (trees %.% acre^-1)))
 
 ```
 
@@ -4084,7 +4119,8 @@ eastern_hemlock |>
   filter(!is.na(CCL) & !is.na(CR)) |>
   mutate(CCL = factor(CCL, levels = c("Open grown", "Dominant", "Codominant", "Intermediate", "Overtopped"))) |>
   ggplot(aes(x = CCL, y = CR)) +
-  geom_boxplot() +
+  geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
+  theme_bw() +
   ylab("Crown Ratio (%)") +
   xlab("Crown Class") +
   ggtitle("Eastern Hemlock Crown Ratio vs. Crown Class")
@@ -4120,6 +4156,7 @@ plot_eastern_hemlock_counts <- plot_eastern_hemlock |>
   summarize(COUNT = n(), CR = mean(CR), .groups = "keep") |>
   ungroup()
 ```
+
 ```{r}
 
 plot_eastern_hemlock |>
