@@ -3054,7 +3054,7 @@ matched_carbon_tmp <- stands_projected |>
         ),
     by = join_by(STAND_ID, LASTYEAR)
   ) |>
-  mutate(partition = (as.numeric(STAND_ID) %% 8) + 1)
+  mutate(partition = (as.numeric(STAND_ID) %% num_partitions) + 1)
 missing_start <- matched_carbon_tmp |>
   filter(is.na(Starting_Carbon)) |> 
   nrow()
