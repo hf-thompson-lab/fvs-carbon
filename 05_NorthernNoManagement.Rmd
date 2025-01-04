@@ -2445,6 +2445,12 @@ keyfile_regen_section <- function(StandID, Timestep) {
     filter(STAND_ID == as.character(StandID)) |>
     mutate(
       density = floor(density * Timestep),
+      # Cap density at 1000 TPA no matter what
+      # the timestep - this is an FVS limitation.
+      density = case_when(
+        density > 1000 ~ 1000,
+        .default = density
+      ),
       height = floor(height)
     ) |>
     filter(density > 0)
