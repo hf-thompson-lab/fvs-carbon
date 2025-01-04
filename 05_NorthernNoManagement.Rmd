@@ -2286,7 +2286,7 @@ Within a Database section:
 -  FuelsOut: FVS_Fuels table: database (2)
 
 
-#### Translating to FVS
+### Translating to FVS
 
 For each timestep, we will find the trees that establish during that timestep,
 and add a record describing the tree at the time of establishment.
