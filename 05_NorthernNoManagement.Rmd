@@ -2470,6 +2470,14 @@ dbDisconnect(fia)
 remove(fia, fia_fvs_standinit_plot)
 ```
 
+> TODO nik: when density > 1000, try breaking it into multiple records, e.g.
+> instead of
+> Natural            0        RM    1500       100                  29         0
+> try
+> Natural            0        RM    1000       100                  29         0
+> Natural            0        RM     500       100                  29         0
+> CAVEAT:
+> FVS says it has a hard limit of 3000
 
 ```{r regen_table}
 regen_table <- ingrowth_by_stem |>
@@ -2586,7 +2594,7 @@ keywordfile_section <- function(
 The first set of keyword files is to project from the first measurement year to 2025.
 
 ```{r NRSGrowOnly GROW}
-num_partitions <- 30 # The number of simultaneous processes to use
+num_partitions <- 60 # The number of simultaneous processes to use
 title <- "NRSGrowOnly"
 mgmtid <- "GROW"
 for (partition in 1:num_partitions) {
@@ -3853,7 +3861,7 @@ ggplot(
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
   scale_fill_discrete(name = "Forest Type Group") +
-  ggtitle("Measured vs. Projected BA") +
+  ggtitle("BA Residual vs. Measured BA") +
   ylab(bquote("BA Residual " (m^2 %.% ha^-1 %.% yr^-1))) +
   xlab(bquote("Measured Stand BA " (m^2 %.% ha^-1))) +
   theme_bw() +
