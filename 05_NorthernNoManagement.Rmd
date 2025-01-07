@@ -1913,7 +1913,8 @@ height to what it might be at 3" DBH, and average them.
 > - hardwoods 5 inches and <11 inches d.b.h.
 
 - HT_PLOT - per-species height at 3" DBH modeled only from trees on the plot
-- HT_STATE - per-species height at 3" DBH modeled from trees in the state
+- HT_ECOSUBCD - per-species height at 3" DBH modeled from trees in the ecosubregion
+- HT_ECOCD - per-species height at 3" DBH modeled from trees in the ecoregion
 - HT_NE - per-species height at 3" DBH for the entire northeast
 - HT_MIN - same as HT_NE, but populated even if fewer than 3 trees can be found
 
@@ -1936,6 +1937,15 @@ trees_for_ht_estimation <- tree_growth_with_fixed_spcd |>
   mutate(HT = coalesce(HT, PREV_HT), DIA = coalesce(DIA, PREV_DIA)) |>
   filter(!is.na(HT) & !is.na(DIA)) |>
   left_join(ecosubcd_mixin, by = join_by(STATECD, COUNTYCD, PLOT))
+
+tree_growth_ht_plot <- trees_for_ht_estimation |>
+  group_by(STATECD, COUNTYCD, PLOT, SPCD) |>
+  arrange(abs(DIA - 3)) |>
+  filter(row_number() <= 9) |>
+  mutate(HT_PLOT = HT * 3 / DIA) |>
+  filter(n() >= 3) |>
+  summarize(HT_PLOT = mean(HT_PLOT), .groups = "keep") |>
+  ungroup()
 
 tree_growth_ht_ecosubcd <- trees_for_ht_estimation |>
   group_by(ECOSUBCD, SPCD) |>
@@ -1976,28 +1986,42 @@ tree_growth_ht <- tree_growth_with_fixed_spcd |> # unfiltered tree growth
   semi_join(grm_ingrown, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)) |>
   distinct(STATECD, COUNTYCD, PLOT, SPCD) |>
   left_join(ecosubcd_mixin, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  left_join(tree_growth_ht_plot, by = join_by(STATECD, COUNTYCD, PLOT, SPCD)) |>
   left_join(tree_growth_ht_ecosubcd, by = join_by(ECOSUBCD, SPCD)) |>
   left_join(tree_growth_ht_ecocd, by = join_by(ECOCD, SPCD)) |>
   left_join(tree_growth_ht_ne, by = join_by(SPCD)) |>
   left_join(tree_growth_ht_min, by = join_by(SPCD)) |>
-  mutate(HT = coalesce(HT_ECOSUBCD, HT_ECOCD, HT_NE, HT_MIN))
+  mutate(HT = coalesce(HT_PLOT, HT_ECOSUBCD, HT_ECOCD, HT_NE, HT_MIN))
 ```
+
+How specific are our heights?
+
+```{r plot tree_growth_ht origin}
+tree_growth_ht |>
+  mutate(
+    HT_ORIGIN = case_when(
+      !is.na(HT_PLOT) ~ "Plot",
+      !is.na(HT_ECOSUBCD) ~ "EcoSubRegion",
+      !is.na(HT_ECOCD) ~ "EcoRegion",
+      !is.na(HT_NE) ~ "Region",
+      .default = "All"
+    ),
+    HT_ORIGIN = ordered(HT_ORIGIN, levels = c("Plot", "EcoSubRegion", "EcoRegion", "Region", "All"))
+  ) |>
+  ggplot(aes(x = factor(1), fill = HT_ORIGIN)) +
+  geom_bar(width = 1) + 
+  ylab(NULL) +
+  xlab(NULL) +
+  scale_x_discrete(labels = NULL) +
+  scale_fill_brewer(name = "Origin", palette = "Set1") +
+  ggtitle("Origin of Height estimates")
+```
+
 
 What diameters of trees are we selecting?
 
 ```{r ht dia selection limited dia}
-min_tree <- tree_growth_with_fixed_spcd |>
-  filter(2.5 < DIA & DIA < 6) |>
-  group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
-  arrange(abs(DIA - 3)) |>
-  filter(row_number() == 1) |>
-  ungroup() |>
-  # Overcome a data issue: some trees have no HT, but have PREV_HT
-  mutate(HT = coalesce(HT, PREV_HT), DIA = coalesce(DIA, PREV_DIA)) |>
-  filter(!is.na(HT) & !is.na(DIA)) |>
-  left_join(ecosubcd_mixin, by = join_by(STATECD, COUNTYCD, PLOT))
-
-ht_ecosubcd_mixin <- min_tree |>
+ht_ecosubcd_mixin <- trees_for_ht_estimation |>
   group_by(ECOSUBCD, SPCD) |>
   arrange(abs(DIA - 3)) |>
   filter(row_number() <= 9) |>
@@ -2006,7 +2030,16 @@ ht_ecosubcd_mixin <- min_tree |>
   ungroup() |>
   select(STATECD, COUNTYCD, PLOT, SUBP, TREE, HT_ECOSUBCD)
 
-ht_ecocd_mixin <- min_tree |>
+ht_plot_mixin <- trees_for_ht_estimation |>
+  group_by(STATECD, COUNTYCD, PLOT, SPCD) |>
+  arrange(abs(DIA - 3)) |>
+  filter(row_number() <= 9) |>
+  mutate(HT_PLOT = HT * 3 / DIA) |>
+  filter(n() >= 3) |>
+  ungroup() |>
+  select(STATECD, COUNTYCD, PLOT, SUBP, TREE, HT_PLOT)
+
+ht_ecocd_mixin <- trees_for_ht_estimation |>
   group_by(ECOCD, SPCD) |>
   arrange(abs(DIA - 3)) |>
   filter(row_number() <= 9) |>
@@ -2015,7 +2048,7 @@ ht_ecocd_mixin <- min_tree |>
   ungroup() |>
   select(STATECD, COUNTYCD, PLOT, SUBP, TREE, HT_ECOCD)
 
-ht_ne_mixin <- min_tree |>
+ht_ne_mixin <- trees_for_ht_estimation |>
   group_by(SPCD) |>
   arrange(abs(DIA - 3)) |>
   filter(row_number() <= 9) |>
@@ -2024,7 +2057,7 @@ ht_ne_mixin <- min_tree |>
   ungroup() |>
   select(STATECD, COUNTYCD, PLOT, SUBP, TREE, HT_NE)
 
-ht_min_mixin <- min_tree |>
+ht_min_mixin <- trees_for_ht_estimation |>
   group_by(SPCD) |>
   arrange(abs(DIA - 3)) |> # closest to 3" first
   filter(row_number() <= 9) |> 
@@ -2032,13 +2065,14 @@ ht_min_mixin <- min_tree |>
   ungroup() |>
   select(STATECD, COUNTYCD, PLOT, SUBP, TREE, HT_MIN)
 
-tree_growth_ht_whence <- min_tree |>
+tree_growth_ht_whence <- trees_for_ht_estimation |>
   select(STATECD, COUNTYCD, PLOT, SUBP, TREE, SPCD, DIA) |>
+  left_join(ht_plot_mixin, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)) |>
   left_join(ht_ecosubcd_mixin, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)) |>
   left_join(ht_ecocd_mixin, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)) |>
   left_join(ht_ne_mixin, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)) |>
   left_join(ht_min_mixin, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)) |>
-  mutate(HT = coalesce(HT_ECOSUBCD, HT_ECOCD, HT_NE, HT_MIN)) |>
+  mutate(HT = coalesce(HT_PLOT, HT_ECOSUBCD, HT_ECOCD, HT_NE, HT_MIN)) |>
   filter(!is.na(HT)) |>
   left_join(species_mixin, by = join_by(SPCD))
 ```
