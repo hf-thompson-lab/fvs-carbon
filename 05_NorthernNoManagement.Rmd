@@ -963,7 +963,7 @@ tree_growth |>
     geom_boxplot() +
     scale_fill_discrete(breaks = c("2.5%", "1%", "0%")) +
     ggtitle("Measured Annual Growth with Outliers Removed by Species") +
-    xlab(bquote("Annual Growth " ~(in %.% yr^-1))) +
+    xlab(bquote("Annual Growth " ~(inch %.% yr^-1))) +
     ylab("Species Group")
 
 ```
@@ -1155,7 +1155,7 @@ tree_growth_rate |>
     coord_cartesian(xlim = c(-1, 1)) +
     theme_bw() +
     ggtitle("Measured Annual Diameter Growth of Ingrown Trees") +
-    xlab(bquote("Annual Diameter Growth " ~(in %.% yr^-1))) +
+    xlab(bquote("Annual Diameter Growth " ~(inch %.% yr^-1))) +
     ylab("Species Group")
 
 ```
@@ -1591,7 +1591,7 @@ ggplot(
   scale_fill_discrete(breaks = rev(levels(tree_ingrown_three_validation$Series))) +
   theme_bw() +
   ggtitle("Smallest Projected Diameter in Simulation Window") +
-  xlab(bquote("Diameter " ~(in))) +
+  xlab(bquote("Diameter " ~(inch))) +
   ylab("Species Group")
 ```
 
