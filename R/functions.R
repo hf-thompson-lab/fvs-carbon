@@ -96,16 +96,16 @@ no_unnatural_regen_filter <- function(.data) {
   # TRTCD 50 - Other silvicultural treatment - fertilizers, herbicides, etc.
   .data |> 
     group_by(STATECD, COUNTYCD, PLOT) |> 
-    filter(
-      sum(
-        if_else(!is.na(TRTCD1) & TRTCD1 == 30, 1,
-          if_else(!is.na(TRTCD2) & TRTCD2 == 30, 1,
-            if_else(!is.na(TRTCD3) & TRTCD3 == 30, 1, 0)
-          )
-        ),
-        na.rm = TRUE
-      ) == 0
-    ) |>
+#    filter(
+#      sum(
+#        if_else(!is.na(TRTCD1) & TRTCD1 == 30, 1,
+#          if_else(!is.na(TRTCD2) & TRTCD2 == 30, 1,
+#            if_else(!is.na(TRTCD3) & TRTCD3 == 30, 1, 0)
+#          )
+#        ),
+#        na.rm = TRUE
+#      ) == 0
+#    ) |>
     filter(
       sum(
         if_else(!is.na(TRTCD1) & TRTCD1 == 50, 1,
