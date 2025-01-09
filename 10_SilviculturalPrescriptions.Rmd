@@ -64,6 +64,16 @@ if (USE_CACHE & file.exists(rds_file)) {
 } else {
   fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
   
+  harvest_mixin <- tbl(fia, 'TREE') |>
+    filter(STATUSCD == 3) |>
+    distinct(STATECD, COUNTYCD, PLOT, INVYR) |>
+    union(
+      tbl(fia, 'COND') |>
+        filter((TRTCD1 == 10) | (TRTCD2 == 10) | (TRTCD3 == 10)) |>
+        distinct(STATECD, COUNTYCD, PLOT, INVYR)
+    ) |>
+    mutate(HARVEST = 1) 
+  
   fia_cond <- tbl(fia, 'COND') |>
     select(
       STATECD, COUNTYCD, PLOT, PLT_CN, CONDID, INVYR,
@@ -86,13 +96,46 @@ if (USE_CACHE & file.exists(rds_file)) {
     left_join(fia_plotgeom, by = join_by(PLT_CN)) |>
     fvsne_plots_filter() |>
     modern_plots_filter() |>
+    filter(INVYR >= 1999) |>
     long_measurement_filter() |>
     forested_plots_filter() |>
-    undisturbed_plots_filter() |>
-    harvested_plots_filter() |>
-    no_unnatural_regen_filter() |> 
-    measured_pre_post_harvest_filter() |>
     single_condition_plots_filter() |>
+    undisturbed_plots_filter() |>
+    no_unnatural_regen_filter() |> 
+    # harvested_plots_filter() |>
+    left_join(harvest_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    # Special case:
+    # - If a plot is harvested, AND
+    # - the first harvest is also the first inventory, THEN
+    # - we want to not process the first harvest as a harvest, BECAUSE
+    # - we don't know which trees were on the plot prior to that,
+    # - which means we can't figure out natural regen
+    mutate(
+      HARVEST = case_when(
+        INVYR == min(INVYR, na.rm = TRUE) ~ 0,
+        is.na(HARVEST) ~ 0,
+        .default = HARVEST
+      )
+    ) |>
+    ungroup() |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    mutate(NUM_HARVESTS = sum(HARVEST, na.rm = TRUE)) |>
+    filter(NUM_HARVESTS > 0) |>
+    ungroup() |>
+    # measured_pre_post_harvest_filter() |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    mutate(
+      MIN_MEASYEAR = min(MEASYEAR, na.rm = TRUE),
+      MAX_MEASYEAR = max(MEASYEAR, na.rm = TRUE),
+      MIN_HRVYR = min(if_else(HARVEST == 1, MEASYEAR, 9999), na.rm = TRUE),
+      MAX_HRVYR = max(if_else(HARVEST == 1, MEASYEAR, 0), na.rm = TRUE),
+    ) |> 
+    filter(
+      (MIN_MEASYEAR < MIN_HRVYR) &
+      (MAX_MEASYEAR - MAX_HRVYR >= 10)
+    ) |> 
+    ungroup() |>
     distinct(STATECD, COUNTYCD, PLOT) |>
     collect()
   
@@ -126,11 +169,20 @@ if (USE_CACHE & file.exists(rds_file)) {
       .groups = "keep"
     )
   
+  harvest_mixin <- tbl(fia, 'TREE') |>
+    filter(STATUSCD == 3) |>
+    distinct(STATECD, COUNTYCD, PLOT, INVYR) |>
+    union(
+      tbl(fia, 'COND') |>
+        filter((TRTCD1 == 10) | (TRTCD2 == 10) | (TRTCD3 == 10)) |>
+        distinct(STATECD, COUNTYCD, PLOT, INVYR)
+    ) |>
+    mutate(HARVEST = 1) 
+
   cond_mixin <- tbl(fia, 'COND') |>
     semi_join(plot_harvested, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
     select(
-      STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, FORTYPCD,
-      TRTCD1, TRTYR1, TRTCD2, TRTYR2, TRTCD3, TRTYR3
+      STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, FORTYPCD
     ) |>
     group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
     summarize(
@@ -138,6 +190,16 @@ if (USE_CACHE & file.exists(rds_file)) {
       FORTYPCD = max(FORTYPCD, na.rm = TRUE),
       STDAGE = max(STDAGE, na.rm = TRUE),
       .groups = "keep"
+    ) |>
+    ungroup() |>
+    left_join(harvest_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    mutate(
+      HARVEST = case_when(
+        INVYR == min(INVYR, na.rm = TRUE) ~ 0,
+        is.na(HARVEST) ~ 0,
+        .default = HARVEST
+      )
     ) |>
     ungroup()
   
@@ -152,7 +214,8 @@ if (USE_CACHE & file.exists(rds_file)) {
   
   stand_stats <- tbl(fia, 'PLOT') |>
     semi_join(plot_harvested, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
-    select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, SRV_CN, DESIGNCD, ECOSUBCD, LAT, LON) |>
+    filter(INVYR >= 1999) |>
+    select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, DESIGNCD, ECOSUBCD, LAT, LON) |>
     left_join(tree_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
     left_join(cond_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
     left_join(forest_type_mixin, by = join_by(FORTYPCD)) |>
@@ -186,18 +249,36 @@ if (USE_CACHE & file.exists(rds_file)) {
       )
     ) |>
     group_by(STATECD, COUNTYCD, PLOT) |>
+    arrange(INVYR) |>
     mutate(
-      BALIVE_START = if_else(MEASYEAR == min(MEASYEAR, na.rm = TRUE), BALIVE_METRIC, NA),
-      BALIVE_DELTA = BALIVE_METRIC - max(BALIVE_START, na.rm = TRUE),
-      YEARS = MEASYEAR - min(MEASYEAR, na.rm = TRUE),
-      group = sprintf('%02d%03d%05d', STATECD, COUNTYCD, PLOT)
+      INVNUM = row_number(),
+      BALIVE_START = if_else(row_number() == 1, BALIVE_METRIC, NA),
+      MIN_MEASYEAR = min(MEASYEAR, na.rm = TRUE)
     ) |> 
     ungroup() |>
     arrange(STATECD, COUNTYCD, PLOT, INVYR) |>
-    fill(BALIVE_START)
+    fill(BALIVE_START) |>
+    mutate(
+      BALIVE_DELTA = BALIVE_METRIC - BALIVE_START,
+      YEARS = MEASYEAR - MIN_MEASYEAR,
+      group = sprintf('%02d%03d%05d', STATECD, COUNTYCD, PLOT)
+    )
+
+  # Figure out which inventories are pre-harvest
+  pre_harvest_mixin <- stand_stats |>
+    filter(HARVEST == 1) |>
+    mutate(INVNUM = INVNUM - 1) |> # the inventory prior to harvest is pre-harvest
+    rename(PRE_HARVEST = HARVEST) |>
+    select(STATECD, COUNTYCD, PLOT, INVNUM, PRE_HARVEST)
+  
+  stand_stats <- stand_stats |>
+    left_join(pre_harvest_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVNUM)) |>
+    mutate(
+      PRE_HARVEST = if_else(is.na(PRE_HARVEST), 0, PRE_HARVEST)
+    )
   
   dbDisconnect(fia)
-  remove(fia, cond_mixin, forest_type_mixin, tree_mixin, state_mixin)
+  remove(fia, cond_mixin, forest_type_mixin, tree_mixin, state_mixin, pre_harvest_mixin)
   
   write_rds(stand_stats, rds_file)
 }
@@ -271,29 +352,128 @@ Next up: use ATTACH DATABASE 'harvest_prescriptions.db' AS prsc;
 
 Find the trees that were removed during harvest.
 
-FIA.TREE.STATUSCD == 3 - Removed
-
-```{r removed_trees}
-fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-  
-tree_harvested <- tbl(fia, 'TREE') |>
-  semi_join(plot_harvested, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
-  select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, STATUSCD) |>
-  filter(STATUSCD == 3) |>
-  collect()
-
-DBI::dbDisconnect(fia)
-
-remove(fia)
-```
+Note that FIA.TREE.STATUSCD == 3 indicates that a tree has been harvested,
+but not all harvested trees have STATUSCD == 3. Therefore we approximate
+harvested trees by finding all trees that exist in a pre-harvest inventory,
+but do not exist (or are marked as harvested) in the corresponding harvest
+inventory.
 
 TODO:
 
-* Convert harvest years to per-plot harvest numbers
-* join harvest number on to tree
-* data validation: were all trees harvested in a harvest?
-* create a dataframe with tree_cn and prescription
+✔️ Convert harvest years to per-plot harvest numbers
+✔ join harvest number on to tree
+✔ data validation: were all trees harvested in a harvest?
+  ? there are about 20 standing dead trees that are subsequently harvested;
+    given that there are so few, I'm going to not worry about them
+    and treat them the same as live trees that are harvested
+→ create a dataframe with tree_cn and prescription
 * write out the prescription table
+
+## Trees removed in harvest
+
+Fetch trees that were live pre-harvest, that are neither live nor dead
+post-harvest.
+
+```{r trees_removed_in_harvest}
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+
+trees_in_harvested_plots <- tbl(fia, "TREE") |>
+  semi_join(
+    stand_stats |> filter(HARVEST == 1),
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
+    copy = TRUE
+  ) |>
+  filter(STATUSCD == 1 | STATUSCD == 2) |> # live and dead trees are still there
+  select(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, STATUSCD) |>
+  collect() |>
+  left_join(
+    stand_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+  ) |>
+  mutate(
+    INVNUM = INVNUM - 1
+  )
+
+trees_in_pre_harvest_plots <- tbl(fia, "TREE") |>
+  semi_join(
+    stand_stats |> filter(PRE_HARVEST == 1),
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
+    copy = TRUE
+  ) |>
+  filter(STATUSCD == 1 | STATUSCD == 2) |> # only live trees
+  select(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, STATUSCD) |>
+  collect() |>
+  left_join(
+    stand_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+  )
+
+trees_removed_in_harvest <- trees_in_pre_harvest_plots |>
+  anti_join(
+    trees_in_harvested_plots,
+    by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVNUM)
+  )
+
+DBI::dbDisconnect(fia)
+
+remove(fia)#, trees_in_harvested_plots, trees_in_pre_harvest_plots)
+```
+
+Fetch trees that FIA says were harvested.
+
+```{r fia_tree_harvested}
+rds_file <- "data/intermediate/tree_harvested.rds"
+if (USE_CACHE & file.exists(rds_file)) {
+  tree_harvested <- read_rds(rds_file)
+} else {
+  fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+  
+  plot_mixin <- tbl(fia, 'PLOT') |>
+    select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR)
+    
+  tree_harvested <- tbl(fia, 'TREE') |>
+    semi_join(
+      stand_stats |> filter(HARVEST == 1),
+      by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
+      copy = TRUE
+    ) |>
+    select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, STATUSCD) |>
+    filter(STATUSCD == 3) |>
+    left_join(plot_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+    collect()
+  
+  DBI::dbDisconnect(fia)
+  
+  remove(fia, plot_mixin)
+  
+  write_rds(tree_harvested, rds_file)
+}
+```
+
+Did we correctly find all the trees that FIA says were harvested?
+```{r validate_harvested_tree_method}
+trees_harvested_but_not_removed <- tree_harvested |>
+  anti_join(trees_removed_in_harvest, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE))
+```
+
+Do all harvested plots have harvested trees?
+```{r}
+View(plot_harvested |>
+  left_join(
+    trees_removed_in_harvest |>
+      group_by(STATECD, COUNTYCD, PLOT) |>
+      summarize(N = n(), .groups = "keep") |>
+      ungroup(),
+    join_by(STATECD, COUNTYCD, PLOT)
+  ) |> filter(is.na(N) | (N < 1)))
+```
+
+When running FVS, we will need:
+
+* CutList / CutLiDB - list of trees harvested
+* TreeList / TreeLiDB - list of trees; probably we want cycle 0 captured
+* ATrtList / ATrtLiDB - After treatment (post treelist, pre harvest) tree list
+
 
 Example of how to write to a database table:
 ```{r}
