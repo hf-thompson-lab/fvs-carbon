@@ -493,6 +493,13 @@ The Northeastern variant is a partial establishment model, so it does not
 automatically perform natural regeneration. We will therefore use actual
 ingrowth from the FIA data.
 
+> TODO nik: RegRepts - keyword to generate regeneration reports
+> TODO nik: DATASCRN - screen out trees below a diameter class, e.g. 3"
+> TODO nik: TreeList - keyword to generate tree lists
+> TODO nik: CALBSTDB - keyword to generate calibration stats table
+
+
+
 ### Observed Ingrowth
 
 fia.TREE_GRM_COMPONENT will mark a tree as 'INGROWTH' when
