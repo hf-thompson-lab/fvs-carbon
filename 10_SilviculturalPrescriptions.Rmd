@@ -288,11 +288,30 @@ if (USE_CACHE & file.exists(rds_file)) {
 
 Where are they?
 
-```{r map_by_location}
-northeastern_states <- stand_stats |>
-  distinct(STATE_NAME) |>
-  mutate(region = str_to_lower(STATE_NAME))
-map_data('state', northeastern_states$region) |> 
+```{r fvsne_states}
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+
+fvs_variant_mixin <- tbl(fia, 'PLOTGEOM') |>
+  # Narrow and rename columns to facilitate join
+  select(CN, FVS_VARIANT)
+
+# research station has state name and abbreviation
+state_mixin <- tbl(fia, 'REF_RESEARCH_STATION') |>
+  distinct(STATECD, STATE_NAME, STATE_ABBR)
+
+fvsne_states <- tbl(fia, 'PLOT') |>
+  left_join(fvs_variant_mixin, by = join_by(CN)) |>
+  fvsne_plots_filter() |>
+  distinct(STATECD) |>
+  left_join(state_mixin, by = join_by(STATECD)) |>
+  mutate(region = str_to_lower(STATE_NAME)) |>
+  collect()
+
+remove(fia, fvs_variant_mixin, state_mixin)
+```
+
+```{r map_by_ecoregion}
+map_data('state', fvsne_states$region) |> 
   ggplot(aes(long, lat, group = group)) +
   geom_polygon(fill = "white", color = "black") + 
   geom_point(
@@ -304,7 +323,6 @@ map_data('state', northeastern_states$region) |>
   coord_quickmap() +
   theme_bw() +
   scale_color_discrete(name = "Ecoregion")
-remove(northeastern_states)
 ```
 
 > TODO nik: in FVS_TreeInit_Plot, column PRESCRIPTION FLOAT is used for ThinPRSC.
