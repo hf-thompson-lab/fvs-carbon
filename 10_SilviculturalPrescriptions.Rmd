@@ -170,14 +170,19 @@ if (USE_CACHE & file.exists(rds_file)) {
     )
   
   harvest_mixin <- tbl(fia, 'TREE') |>
+    semi_join(plot_harvested, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
     filter(STATUSCD == 3) |>
     distinct(STATECD, COUNTYCD, PLOT, INVYR) |>
-    union(
+    mutate(HARVEST_TREE = TRUE) |>
+    full_join(
       tbl(fia, 'COND') |>
+        semi_join(plot_harvested, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
         filter((TRTCD1 == 10) | (TRTCD2 == 10) | (TRTCD3 == 10)) |>
-        distinct(STATECD, COUNTYCD, PLOT, INVYR)
+        distinct(STATECD, COUNTYCD, PLOT, INVYR) |>
+        mutate(HARVEST_COND = TRUE),
+      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
-    mutate(HARVEST = 1) 
+    mutate(HARVEST = TRUE)
 
   cond_mixin <- tbl(fia, 'COND') |>
     semi_join(plot_harvested, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
@@ -196,10 +201,12 @@ if (USE_CACHE & file.exists(rds_file)) {
     group_by(STATECD, COUNTYCD, PLOT) |>
     mutate(
       HARVEST = case_when(
-        INVYR == min(INVYR, na.rm = TRUE) ~ 0,
-        is.na(HARVEST) ~ 0,
+        INVYR == min(INVYR, na.rm = TRUE) ~ FALSE,
+        is.na(HARVEST) ~ FALSE,
         .default = HARVEST
-      )
+      ),
+      HARVEST_TREE = if_else(!is.na(HARVEST_TREE), HARVEST_TREE, FALSE),
+      HARVEST_COND = if_else(!is.na(HARVEST_COND), HARVEST_COND, FALSE),
     ) |>
     ungroup()
   
@@ -437,6 +444,8 @@ DBI::dbDisconnect(fia)
 remove(fia)#, trees_in_harvested_plots, trees_in_pre_harvest_plots)
 ```
 
+## FIA Harvested Trees
+
 Fetch trees that FIA says were harvested.
 
 ```{r fia_tree_harvested}
@@ -468,24 +477,80 @@ if (USE_CACHE & file.exists(rds_file)) {
 }
 ```
 
-Did we correctly find all the trees that FIA says were harvested?
-```{r validate_harvested_tree_method}
+## Validation
+
+Were all the trees that FIA says were harvested actually removed?
+```{r trees_harvested_but_not_removed}
 trees_harvested_but_not_removed <- tree_harvested |>
   anti_join(trees_removed_in_harvest, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE))
+stopifnot(trees_harvested_but_not_removed |> nrow() == 0)
 ```
 
-Do all harvested plots have harvested trees?
-```{r}
-View(plot_harvested |>
-  left_join(
+It is expected that FIA did not mark all removed trees as harvested.
+```{r trees_removed_but_not_harvested}
+trees_removed_but_not_harvested <- trees_removed_in_harvest |>
+  anti_join(tree_harvested, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE))
+trees_removed_but_not_harvested |> nrow()
+```
+
+All harvested trees should be on harvested plots.
+```{r stopifnot_trees_removed_from_non_harvested_plots}
+stopifnot(
+  trees_removed_in_harvest |>
+    distinct(STATECD, COUNTYCD, PLOT, INVNUM) |>
+    # INVNUM is the last inventory in which the tree was standing,
+    # so it is marked harvested in the next inventory
+    mutate(INVNUM = INVNUM + 1) |>
+    anti_join(
+      stand_stats |> filter(HARVEST == 1),
+      by = join_by(STATECD, COUNTYCD, PLOT, INVNUM)
+    ) |>
+    nrow() == 0
+)
+```
+
+There are some plots that do not have trees removed.
+```{r plot_harvested_without_trees_removed}
+plot_harvested_without_trees_removed <- plot_harvested |>
+  anti_join(
     trees_removed_in_harvest |>
-      group_by(STATECD, COUNTYCD, PLOT) |>
-      summarize(N = n(), .groups = "keep") |>
-      ungroup(),
+      distinct(STATECD, COUNTYCD, PLOT),
     join_by(STATECD, COUNTYCD, PLOT)
-  ) |> filter(is.na(N) | (N < 1)))
+  )
+plot_harvested_without_trees_removed |> nrow()
 ```
 
+## Remove Harvested Plots Without Removed Trees
+
+Remove those plots from consideration.
+```{r ignore plots with no trees removed}
+join_cols <- plot_harvested_without_trees_removed |>
+  names()
+plot_harvested <- plot_harvested |>
+  anti_join(plot_harvested_without_trees_removed, join_cols)
+stand_stats <- stand_stats |>
+  anti_join(plot_harvested_without_trees_removed, join_cols)
+tree_harvested <- tree_harvested |>
+  anti_join(plot_harvested_without_trees_removed, join_cols)
+rm(join_cols)
+```
+
+What's left?
+```{r map_by_ecoregion2}
+map_data('state', fvsne_states$region) |> 
+  ggplot(aes(long, lat, group = group)) +
+  geom_polygon(fill = "white", color = "black") + 
+  geom_point(
+    data = stand_stats |>
+      group_by(STATECD, COUNTYCD, PLOT) |>
+      filter(row_number() == 1),
+    aes(color = ECOCD)
+  ) +
+  coord_quickmap() +
+  theme_bw() +
+  scale_color_discrete(name = "Ecoregion")
+```
+# Run FVS
 When running FVS, we will need:
 
 * CutList / CutLiDB - list of trees harvested
