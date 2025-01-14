@@ -430,7 +430,7 @@ inventory.
     Given that there are only 13 of these, I am removing these plots from
     the analysis.
 ✔ create a dataframe with tree_cn and prescription
-* write out the prescription table
+✔ write out the prescription table
 
 ## Trees removed in harvest
 
@@ -596,13 +596,15 @@ map_data('state', fvsne_states$region) |>
   theme_bw() +
   scale_color_discrete(name = "Ecoregion")
 ```
-# Harvest Prescription Table
+# Harvest Prescription for FVS
 
 When running FVS, we will need:
 
 * CutList / CutLiDB - list of trees harvested
 * TreeList / TreeLiDB - list of trees; probably we want cycle 0 captured
 * ATrtList / ATrtLiDB - After treatment (post treelist, pre harvest) tree list
+
+## Prescription Table
 
 Prescription table:
 
@@ -639,9 +641,10 @@ trtyr_mixin <- stand_stats |>
   filter(HARVEST == TRUE) |>
   mutate(
     TRTYR = if_else(is.na(TRTYR), MEASYEAR - 1, TRTYR),
+    TRTNUM = if_else(is.na(TRTNUM), 1, TRTNUM),
     INVNUM = INVNUM - 1
   ) |>
-  select(CN, STATECD, COUNTYCD, PLOT, INVNUM, TRTYR) |>
+  select(CN, STATECD, COUNTYCD, PLOT, INVNUM, TRTYR, TRTNUM) |>
   rename(STAND_CN = CN)
 
 
@@ -650,13 +653,22 @@ tree_prescription <- tree_removed_in_harvest |>
     trtyr_mixin,
     by = join_by(STATECD, COUNTYCD, PLOT, INVNUM)
   ) |>
-  rename(TREE_CN = CN)
-
+  rename(TREE_CN = CN) |>
+  mutate(PRESCRIPTION = TRTNUM + 1) |> # PRESCRIPTION range is 2-9
+  select(TREE_CN, PRESCRIPTION)
 ```
 
-Example of how to write to a database table:
-```{r example harvest prescriptions, eval=FALSE}
-#harvest_prescriptions <- DBI::dbConnect(RSQLite::SQLite(), 'data/fvs/harvest_prescriptions.db')
-#DBI::dbWriteTable(harvest_prescriptions, 'PRSC', tree_harvested)
-#DBI::dbDisconnect(harvest_prescriptions)
+Write the prescription table to a SQLite database so it can be joined 
+onto the trees at run-time:
+
+```{r write tree_prescription}
+out_db <- DBI::dbConnect(RSQLite::SQLite(), 'data/fvs/tree_prescription.db')
+DBI::dbWriteTable(out_db, 'PRSC', tree_prescription)
+DBI::dbDisconnect(out_db)
+rm(out_db)
+```
+
+We can create a map from year to treatment number as:
+```
+stand_stats |> filter(!is.na(TRTYR)) |> select(STAND_CN, TRTYR, TRTNUM)
 ```
