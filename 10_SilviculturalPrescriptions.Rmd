@@ -139,7 +139,7 @@ if (USE_CACHE & file.exists(rds_file)) {
     distinct(STATECD, COUNTYCD, PLOT) |>
     collect()
   
-  dbDisconnect(fia)
+  DBI::dbDisconnect(fia)
   remove(fia, fia_cond, fia_plot, fia_plotgeom)
   
   write_rds(plot_harvested, rds_file)
@@ -284,8 +284,9 @@ if (USE_CACHE & file.exists(rds_file)) {
       PRE_HARVEST = if_else(is.na(PRE_HARVEST), 0, PRE_HARVEST)
     )
   
-  dbDisconnect(fia)
-  remove(fia, cond_mixin, forest_type_mixin, tree_mixin, state_mixin, pre_harvest_mixin)
+  DBI::dbDisconnect(fia)
+  remove(fia, cond_mixin, forest_type_mixin, tree_mixin, state_mixin,
+         pre_harvest_mixin, harvest_mixin)
   
   write_rds(stand_stats, rds_file)
 }
@@ -313,6 +314,8 @@ fvsne_states <- tbl(fia, 'PLOT') |>
   left_join(state_mixin, by = join_by(STATECD)) |>
   mutate(region = str_to_lower(STATE_NAME)) |>
   collect()
+
+DBI::dbDisconnect(fia)
 
 remove(fia, fvs_variant_mixin, state_mixin)
 ```
@@ -383,14 +386,19 @@ harvested trees by finding all trees that exist in a pre-harvest inventory,
 but do not exist (or are marked as harvested) in the corresponding harvest
 inventory.
 
-TODO:
+## TODO List
 
 ✔️ Convert harvest years to per-plot harvest numbers
 ✔ join harvest number on to tree
 ✔ data validation: were all trees harvested in a harvest?
-  ? there are about 20 standing dead trees that are subsequently harvested;
+  ✔ there are about 20 standing dead trees that are subsequently harvested;
     given that there are so few, I'm going to not worry about them
     and treat them the same as live trees that are harvested
+✔ data validation: were trees removed from harvested plots?
+  ✔ there are 13 plots that FIA marks as "harvested," were there are no
+    trees on the plot pre-harvest that are not on the plot post-harvest.
+    Given that there are only 13 of these, I am removing these plots from
+    the analysis.
 → create a dataframe with tree_cn and prescription
 * write out the prescription table
 
@@ -399,66 +407,73 @@ TODO:
 Fetch trees that were live pre-harvest, that are neither live nor dead
 post-harvest.
 
-```{r trees_removed_in_harvest}
-fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+```{r tree_removed_in_harvest}
+rds_file <- "data/intermediate/tree_removed_in_harvest.rds"
+if (USE_CACHE & file.exists(rds_file)) {
+  tree_removed_in_harvest <- read_rds(rds_file)
+} else {
+  fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+  
+  tree_in_harvested_plots <- tbl(fia, "TREE") |>
+    semi_join(
+      stand_stats |> filter(HARVEST == 1),
+      by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
+      copy = TRUE
+    ) |>
+    filter(STATUSCD == 1 | STATUSCD == 2) |> # live and dead trees are still there
+    select(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, MORTYR, STATUSCD) |>
+    collect() |>
+    left_join(
+      stand_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
+      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    ) |>
+    mutate(
+      INVNUM = INVNUM - 1
+    )
+  
+  tree_in_pre_harvest_plots <- tbl(fia, "TREE") |>
+    semi_join(
+      stand_stats |> filter(PRE_HARVEST == 1),
+      by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
+      copy = TRUE
+    ) |>
+    filter(STATUSCD == 1 | STATUSCD == 2) |> # live or dead trees
+    select(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, MORTYR, STATUSCD) |>
+    collect() |>
+    left_join(
+      stand_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
+      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    )
+  
+  tree_removed_in_harvest <- tree_in_pre_harvest_plots |>
+    anti_join(
+      tree_in_harvested_plots,
+      by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVNUM)
+    )
+  
+  DBI::dbDisconnect(fia)
+  
+  remove(fia, tree_in_harvested_plots, tree_in_pre_harvest_plots)
 
-trees_in_harvested_plots <- tbl(fia, "TREE") |>
-  semi_join(
-    stand_stats |> filter(HARVEST == 1),
-    by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
-    copy = TRUE
-  ) |>
-  filter(STATUSCD == 1 | STATUSCD == 2) |> # live and dead trees are still there
-  select(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, STATUSCD) |>
-  collect() |>
-  left_join(
-    stand_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
-    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
-  ) |>
-  mutate(
-    INVNUM = INVNUM - 1
-  )
-
-trees_in_pre_harvest_plots <- tbl(fia, "TREE") |>
-  semi_join(
-    stand_stats |> filter(PRE_HARVEST == 1),
-    by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
-    copy = TRUE
-  ) |>
-  filter(STATUSCD == 1 | STATUSCD == 2) |> # only live trees
-  select(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, STATUSCD) |>
-  collect() |>
-  left_join(
-    stand_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
-    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
-  )
-
-trees_removed_in_harvest <- trees_in_pre_harvest_plots |>
-  anti_join(
-    trees_in_harvested_plots,
-    by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVNUM)
-  )
-
-DBI::dbDisconnect(fia)
-
-remove(fia)#, trees_in_harvested_plots, trees_in_pre_harvest_plots)
+  write_rds(tree_removed_in_harvest, rds_file)
+}
 ```
 
 ## FIA Harvested Trees
 
 Fetch trees that FIA says were harvested.
 
-```{r fia_tree_harvested}
-rds_file <- "data/intermediate/tree_harvested.rds"
+```{r tree_fia_harvested}
+rds_file <- "data/intermediate/tree_fia_harvested.rds"
 if (USE_CACHE & file.exists(rds_file)) {
-  tree_harvested <- read_rds(rds_file)
+  tree_fia_harvested <- read_rds(rds_file)
 } else {
   fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
   
   plot_mixin <- tbl(fia, 'PLOT') |>
     select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR)
     
-  tree_harvested <- tbl(fia, 'TREE') |>
+  tree_fia_harvested <- tbl(fia, 'TREE') |>
     semi_join(
       stand_stats |> filter(HARVEST == 1),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
@@ -473,30 +488,30 @@ if (USE_CACHE & file.exists(rds_file)) {
   
   remove(fia, plot_mixin)
   
-  write_rds(tree_harvested, rds_file)
+  write_rds(tree_fia_harvested, rds_file)
 }
 ```
 
 ## Validation
 
 Were all the trees that FIA says were harvested actually removed?
-```{r trees_harvested_but_not_removed}
-trees_harvested_but_not_removed <- tree_harvested |>
-  anti_join(trees_removed_in_harvest, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE))
-stopifnot(trees_harvested_but_not_removed |> nrow() == 0)
+```{r tree_harvested_but_not_removed}
+tree_harvested_but_not_removed <- tree_fia_harvested |>
+  anti_join(tree_removed_in_harvest, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE))
+stopifnot(tree_harvested_but_not_removed |> nrow() == 0)
 ```
 
 It is expected that FIA did not mark all removed trees as harvested.
-```{r trees_removed_but_not_harvested}
-trees_removed_but_not_harvested <- trees_removed_in_harvest |>
-  anti_join(tree_harvested, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE))
-trees_removed_but_not_harvested |> nrow()
+```{r tree_removed_but_not_harvested}
+tree_removed_but_not_harvested <- tree_removed_in_harvest |>
+  anti_join(tree_fia_harvested, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE))
+tree_removed_but_not_harvested |> nrow()
 ```
 
 All harvested trees should be on harvested plots.
-```{r stopifnot_trees_removed_from_non_harvested_plots}
+```{r stopifnot_tree_removed_from_non_harvested_plots}
 stopifnot(
-  trees_removed_in_harvest |>
+  tree_removed_in_harvest |>
     distinct(STATECD, COUNTYCD, PLOT, INVNUM) |>
     # INVNUM is the last inventory in which the tree was standing,
     # so it is marked harvested in the next inventory
@@ -510,28 +525,26 @@ stopifnot(
 ```
 
 There are some plots that do not have trees removed.
-```{r plot_harvested_without_trees_removed}
-plot_harvested_without_trees_removed <- plot_harvested |>
+```{r plot_harvested_without_tree_removed}
+plot_harvested_without_tree_removed <- plot_harvested |>
   anti_join(
-    trees_removed_in_harvest |>
+    tree_removed_in_harvest |>
       distinct(STATECD, COUNTYCD, PLOT),
     join_by(STATECD, COUNTYCD, PLOT)
   )
-plot_harvested_without_trees_removed |> nrow()
+plot_harvested_without_tree_removed |> nrow()
 ```
 
 ## Remove Harvested Plots Without Removed Trees
 
 Remove those plots from consideration.
 ```{r ignore plots with no trees removed}
-join_cols <- plot_harvested_without_trees_removed |>
+join_cols <- plot_harvested_without_tree_removed |>
   names()
 plot_harvested <- plot_harvested |>
-  anti_join(plot_harvested_without_trees_removed, join_cols)
+  anti_join(plot_harvested_without_tree_removed, join_cols)
 stand_stats <- stand_stats |>
-  anti_join(plot_harvested_without_trees_removed, join_cols)
-tree_harvested <- tree_harvested |>
-  anti_join(plot_harvested_without_trees_removed, join_cols)
+  anti_join(plot_harvested_without_tree_removed, join_cols)
 rm(join_cols)
 ```
 
