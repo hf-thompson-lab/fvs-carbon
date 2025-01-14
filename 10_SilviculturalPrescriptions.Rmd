@@ -205,7 +205,12 @@ if (USE_CACHE & file.exists(rds_file)) {
         .default = TRTYR1
       )
     ) |>
-    select(STATECD, COUNTYCD, PLOT, INVYR, TRTYR)
+    select(STATECD, COUNTYCD, PLOT, INVYR, TRTYR) |>
+    filter(!is.na(TRTYR)) |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    arrange(TRTYR) |>
+    mutate(TRTNUM = row_number()) |>
+    ungroup()
 
   cond_mixin <- tbl(fia, 'COND') |>
     semi_join(plot_harvested, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
