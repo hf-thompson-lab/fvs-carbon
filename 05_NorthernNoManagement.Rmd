@@ -796,6 +796,8 @@ For the remaining trees we will need to back-project.
 
 ### Back-Projecting Trees
 
+> TODO nik: use lm for all linear models!
+
 #### FIA Estimated Growth Rate
 
 fia.TREE_GRM_COMPONENT.ANN_DIA_GROWTH specifies annual diameter growth rate.
