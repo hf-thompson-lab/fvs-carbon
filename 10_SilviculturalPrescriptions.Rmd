@@ -245,7 +245,7 @@ if (USE_CACHE & file.exists(rds_file)) {
   stand_stats <- tbl(fia, 'PLOT') |>
     semi_join(plot_harvested, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
     filter(INVYR >= 1999) |>
-    select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, DESIGNCD, ECOSUBCD, LAT, LON) |>
+    select(CN, STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, DESIGNCD, ECOSUBCD, LAT, LON) |>
     left_join(tree_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
     left_join(cond_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
     left_join(trtyr_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
@@ -284,11 +284,12 @@ if (USE_CACHE & file.exists(rds_file)) {
     mutate(
       INVNUM = row_number(),
       BALIVE_START = if_else(row_number() == 1, BALIVE_METRIC, NA),
-      MIN_MEASYEAR = min(MEASYEAR, na.rm = TRUE)
+      MIN_MEASYEAR = min(MEASYEAR, na.rm = TRUE),
+      STAND_CN = if_else(row_number() == 1, CN, NA)
     ) |> 
     ungroup() |>
     arrange(STATECD, COUNTYCD, PLOT, INVYR) |>
-    fill(BALIVE_START) |>
+    fill(BALIVE_START, STAND_CN) |>
     mutate(
       BALIVE_DELTA = BALIVE_METRIC - BALIVE_START,
       YEARS = MEASYEAR - MIN_MEASYEAR,
@@ -309,8 +310,8 @@ if (USE_CACHE & file.exists(rds_file)) {
     )
   
   DBI::dbDisconnect(fia)
-  remove(fia, cond_mixin, forest_type_mixin, tree_mixin, state_mixin,
-         pre_harvest_mixin, harvest_mixin)
+  remove(fia, cond_mixin, trtyr_mixin, forest_type_mixin, tree_mixin,
+         state_mixin, pre_harvest_mixin, harvest_mixin)
   
   write_rds(stand_stats, rds_file)
 }
@@ -423,13 +424,12 @@ inventory.
     trees on the plot pre-harvest that are not on the plot post-harvest.
     Given that there are only 13 of these, I am removing these plots from
     the analysis.
-→ create a dataframe with tree_cn and prescription
+✔ create a dataframe with tree_cn and prescription
 * write out the prescription table
 
 ## Trees removed in harvest
 
-Fetch trees that were live pre-harvest, that are neither live nor dead
-post-harvest.
+Fetch trees that were standing pre-harvest, that are not standing post-harvest.
 
 ```{r tree_removed_in_harvest}
 rds_file <- "data/intermediate/tree_removed_in_harvest.rds"
@@ -438,14 +438,32 @@ if (USE_CACHE & file.exists(rds_file)) {
 } else {
   fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
   
+  tree_in_pre_harvest_plots <- tbl(fia, "TREE") |>
+    semi_join(
+      stand_stats |>
+        filter(PRE_HARVEST == 1) |>
+        select(STATECD, COUNTYCD, PLOT, INVYR),
+      by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
+      copy = TRUE
+    ) |>
+    filter(STATUSCD == 1 | STATUSCD == 2) |> # live or dead trees
+    select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, MORTYR, STATUSCD) |>
+    collect() |>
+    left_join(
+      stand_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
+      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    )
+  
   tree_in_harvested_plots <- tbl(fia, "TREE") |>
     semi_join(
-      stand_stats |> filter(HARVEST == 1),
+      stand_stats |>
+        filter(HARVEST == 1) |>
+        select(STATECD, COUNTYCD, PLOT, INVYR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
       copy = TRUE
     ) |>
     filter(STATUSCD == 1 | STATUSCD == 2) |> # live and dead trees are still there
-    select(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, MORTYR, STATUSCD) |>
+    select(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR) |>
     collect() |>
     left_join(
       stand_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
@@ -453,20 +471,6 @@ if (USE_CACHE & file.exists(rds_file)) {
     ) |>
     mutate(
       INVNUM = INVNUM - 1
-    )
-  
-  tree_in_pre_harvest_plots <- tbl(fia, "TREE") |>
-    semi_join(
-      stand_stats |> filter(PRE_HARVEST == 1),
-      by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
-      copy = TRUE
-    ) |>
-    filter(STATUSCD == 1 | STATUSCD == 2) |> # live or dead trees
-    select(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, MORTYR, STATUSCD) |>
-    collect() |>
-    left_join(
-      stand_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
-      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     )
   
   tree_removed_in_harvest <- tree_in_pre_harvest_plots |>
@@ -503,7 +507,7 @@ if (USE_CACHE & file.exists(rds_file)) {
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
       copy = TRUE
     ) |>
-    select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, STATUSCD) |>
+    select(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, STATUSCD) |>
     filter(STATUSCD == 3) |>
     left_join(plot_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
     collect()
@@ -587,17 +591,67 @@ map_data('state', fvsne_states$region) |>
   theme_bw() +
   scale_color_discrete(name = "Ecoregion")
 ```
-# Run FVS
+# Harvest Prescription Table
+
 When running FVS, we will need:
 
 * CutList / CutLiDB - list of trees harvested
 * TreeList / TreeLiDB - list of trees; probably we want cycle 0 captured
 * ATrtList / ATrtLiDB - After treatment (post treelist, pre harvest) tree list
 
+Prescription table:
+
+- Find all years in which trees were removed.
+  - For trees marked as harvested, the estimated year of harvest is in MORTYR
+    - 1 of 5580 records has MORTYR
+    - this is not worth handling for one tree
+  - For trees removed from conditions marked as harvested, the estimated year(s)
+    of harvest are in TRTYR1/2/3
+    - when there are multiple harvest years, we can't tell which trees are
+      harvested in which year
+    - when there are multiple harvest years, pick the latest one
+  - if there are trees left that don't have a harvest year, put their harvest
+    the year before measurement. This will be pessimistic with respect to regen,
+    but fits the overall distribution
+- Create ordinals for removal.
+  - Each plot needs to have < 10 years in which removals occur to keep life easy
+  - sort the years and number them
+- Consolidate harvests
+  - we don't want lots of short cycles, but
+  - Essential FVS figure 3-1 shows that thinning happens once per cycle,
+    no matter how many years are involved
+
+We have access to:
+- Stand_CN - ignored, but used for filtering
+- Stand_ID - ignored
+- PLOT_CN - ignored
+- PLOT_ID
+- TREE_CN - ignored, but can be used for join
+- TREE_ID
+
+```{r tree_prescription}
+trtyr_mixin <- stand_stats |>
+  filter(HARVEST == TRUE) |>
+  mutate(
+    TRTYR = if_else(is.na(TRTYR), MEASYEAR - 1, TRTYR),
+    INVNUM = INVNUM - 1
+  ) |>
+  select(CN, STATECD, COUNTYCD, PLOT, INVNUM, TRTYR) |>
+  rename(STAND_CN = CN)
+
+
+tree_prescription <- tree_removed_in_harvest |>
+  inner_join(
+    trtyr_mixin,
+    by = join_by(STATECD, COUNTYCD, PLOT, INVNUM)
+  ) |>
+  rename(TREE_CN = CN)
+
+```
 
 Example of how to write to a database table:
-```{r}
-harvest_prescriptions <- DBI::dbConnect(RSQLite::SQLite(), 'data/fvs/harvest_prescriptions.db')
-DBI::dbWriteTable(harvest_prescriptions, 'PRSC', tree_harvested)
-DBI::dbDisconnect(harvest_prescriptions)
+```{r example harvest prescriptions, eval=FALSE}
+#harvest_prescriptions <- DBI::dbConnect(RSQLite::SQLite(), 'data/fvs/harvest_prescriptions.db')
+#DBI::dbWriteTable(harvest_prescriptions, 'PRSC', tree_harvested)
+#DBI::dbDisconnect(harvest_prescriptions)
 ```
