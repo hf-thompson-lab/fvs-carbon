@@ -183,6 +183,29 @@ if (USE_CACHE & file.exists(rds_file)) {
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
     mutate(HARVEST = TRUE)
+  
+  trtyr_mixin <- tbl(fia, "COND") |>
+    semi_join(plot_harvested, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
+    select(
+      STATECD, COUNTYCD, PLOT, INVYR,
+      TRTCD1, TRTYR1, TRTCD2, TRTYR2, TRTCD3, TRTYR3
+    ) |>
+    # If harvest is performed in multiple years, we can't know which trees
+    # were harvested in which year. In theory, this would be in MORTYR, but
+    # 1 in 5000 harvested tree records has MORTYR filled in. Therefore, we
+    # retain only the latest harvest year - this will be pessimistic with
+    # respect to regeneration.
+    mutate(
+      TRTYR1 = if_else(TRTCD1 == 10, TRTYR1, NA),
+      TRTYR2 = if_else(TRTCD2 == 10, TRTYR2, NA),
+      TRTYR3 = if_else(TRTCD3 == 10, TRTYR3, NA),
+      TRTYR = case_when(
+        !is.na(TRTYR3) ~ TRTYR3,
+        !is.na(TRTYR2) ~ TRTYR2,
+        .default = TRTYR1
+      )
+    ) |>
+    select(STATECD, COUNTYCD, PLOT, INVYR, TRTYR)
 
   cond_mixin <- tbl(fia, 'COND') |>
     semi_join(plot_harvested, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
@@ -225,6 +248,7 @@ if (USE_CACHE & file.exists(rds_file)) {
     select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, DESIGNCD, ECOSUBCD, LAT, LON) |>
     left_join(tree_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
     left_join(cond_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+    left_join(trtyr_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
     left_join(forest_type_mixin, by = join_by(FORTYPCD)) |>
     rename(`Forest Type` = FORTYPE) |>
     mutate(FORTYPCD = floor(FORTYPCD / 10) * 10) |>
