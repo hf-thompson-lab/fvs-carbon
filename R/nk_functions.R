@@ -1,12 +1,12 @@
-read_nk_table1 <- function(file) {
+nk_read_table1 <- function(file) {
   read_csv(
     file,
     col_types = cols(`FIA plot code` = col_character())
   )
 }
 
-compute_nk_table1_expanded <- function(nk_table1) {
-  nk_table1_expanded <- nk_table1 |>
+nk_extract_cols_from_plot_code <- function(.data) {
+  nk_table1_expanded <- .data |>
     mutate(STATECD = substr(`FIA plot code`, 1, 2)) |>
     mutate(INVYR = substr(`FIA plot code`, 3, 6)) |>
     mutate(UNITCD = substr(`FIA plot code`, 7, 8)) |>
@@ -14,7 +14,7 @@ compute_nk_table1_expanded <- function(nk_table1) {
     mutate(PLOT = substr(`FIA plot code`, 12, 16))
 }
 
-load_nk_matching_cond <- function(fiadb, nk_table1_expanded)
+nk_load_plot_all_invyr <- function(.data, fiadb)
 {
   fia = DBI::dbConnect(RSQLite::SQLite(), fiadb)
   on.exit(dbDisconnect(fia))
@@ -22,30 +22,30 @@ load_nk_matching_cond <- function(fiadb, nk_table1_expanded)
   tbl(fia, 'COND') |>
     rename(FIA_INVYR=INVYR) |>
     right_join(
-      nk_table1_expanded |>
-        select(STATECD, UNITCD, COUNTYCD, PLOT, INVYR) |>
+      .data |>
+        select(STATECD, COUNTYCD, PLOT, INVYR) |>
         rename(NK_INVYR=INVYR),
-      by=join_by(STATECD, UNITCD, COUNTYCD, PLOT),
+      by=join_by(STATECD, COUNTYCD, PLOT),
       copy=TRUE
     ) |>
     mutate(INVYR_MATCHES=ifelse(NK_INVYR==FIA_INVYR, 1, 0)) |>
     collect()
 }
 
-compute_nk_all_cond <- function(nk_table1_expanded, nk_matching_cond) {
-  nk_plots_with_age <- nk_table1_expanded |>
-    select(`FIA plot code`, STATECD, INVYR, UNITCD, COUNTYCD, PLOT,
+nk_match_plots <- function(nk_plots, fia_plots) {
+  nk_plots_with_age <- nk_plots |>
+    select(`FIA plot code`, STATECD, INVYR, COUNTYCD, PLOT,
            `Starting stand age`, `Slope (%)`, `Aspect (degrees)`,
            `Basal area (m2/ha)`) |>
     rename(NK_INVYR=INVYR)
 
-  fia_cond_with_age <- nk_matching_cond |>
-    select(STATECD, FIA_INVYR, CYCLE, SUBCYCLE, CONDID, UNITCD, COUNTYCD, PLOT,
+  fia_plots_with_age <- fia_plots |>
+    select(STATECD, FIA_INVYR, CYCLE, SUBCYCLE, UNITCD, COUNTYCD, PLOT, CONDID,
            STDAGE, FLDAGE, SLOPE, ASPECT, BALIVE) |>
     left_join(
-      nk_plots_with_age, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT)
+      nk_plots_with_age, by=join_by(STATECD, COUNTYCD, PLOT)
     )
-  fia_cond_with_age |>
+  fia_plots_with_age |>
     filter(
       NK_INVYR==FIA_INVYR | (
         NK_INVYR!=FIA_INVYR & `Starting stand age`==STDAGE
@@ -57,11 +57,11 @@ compute_nk_all_cond <- function(nk_table1_expanded, nk_matching_cond) {
 compute_nk_to_fia <- function(nk_all_cond) {
   nk_all_cond |>
     select(`FIA plot code`, NK_INVYR, 
-           STATECD, FIA_INVYR, CYCLE, SUBCYCLE, CONDID, UNITCD, COUNTYCD, PLOT) |>
+           STATECD, FIA_INVYR, CYCLE, SUBCYCLE, UNITCD, CONDID, UNITCD, COUNTYCD, PLOT) |>
     rename(INVYR = FIA_INVYR)
 }
 
-nk_transalte_stand_ids <- function(nk_stands) {
+nk_transalte_to_fia <- function(nk_stands) {
   nk_stands |>
     mutate(
       STATECD  = as.numeric(STATECD),
@@ -81,7 +81,7 @@ nk_transalte_stand_ids <- function(nk_stands) {
     select(`FIA plot code`, FVS_STAND_ID, STAND_ID_PLOT, STAND_ID_COND)
 }
 
-compute_nk_to_fvs <- function(fiadb, fvs_stands) {
+nk_translate_to_fvs <- function(fvs_stands, fiadb) {
   fia = DBI::dbConnect(RSQLite::SQLite(), fiadb)
   on.exit(dbDisconnect(fia))
   

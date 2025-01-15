@@ -15,7 +15,6 @@ editor_options:
 options(tidyverse.quiet = TRUE)
 library(targets)
 library(tidyverse)
-tar_source()
 ```
 
 # Identifying Stands
@@ -65,11 +64,11 @@ longer aligns with the inventory years in the FIA data for 27 of the 32
 plots.
 
 ```{r}
-tar_load(nk_matching_cond)
+tar_load(nk_all_plot)
 # Group by STATECD, UNITCD, COUNTYCD and PLOT to see how NK INVYR does and
 # doesn't line up with FIA INVYR
 knitr::kable(
-  nk_matching_cond |>
+  nk_all_plot |>
     group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
     summarize(
       NUM_INVYR=n(),
@@ -85,8 +84,8 @@ two data sets, we note that NK's "Starting stand age" matches
 in NK.
 
 ```{r}
-tar_load(nk_all_cond)
-knitr::kable(nk_all_cond)
+tar_load(nk_matching_plot)
+knitr::kable(nk_matching_plot)
 ```
 
 Matching on stand age results in a uniquely identified FIA condition for
@@ -106,8 +105,8 @@ the FVS UI Stand ID consists of STATECD(2) + INVYR(2) + COUNTYCD(3) +
 PLOT(5), and if using FVS_STANDINIT_COND, then also + CONDID(1).
 
 ```{r}
-tar_load(nk_translated_stands)
-knitr::kable(nk_translated_stands)
+tar_load(nk_to_fia)
+knitr::kable(nk_to_fia)
 ```
 
 We can then fetch those IDs from the FIA-provided FVS tables to
