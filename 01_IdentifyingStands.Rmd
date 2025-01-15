@@ -9,15 +9,13 @@ editor_options:
     wrap: 72
 ---
 
-```{r setup, include=FALSE}
-# Pre-load libraries that issue warnings on startup so these
-# warnings don't corrupt the text later.
+# Setup
+
+```{r setup, include = FALSE}
+options(tidyverse.quiet = TRUE)
+library(targets)
 library(tidyverse)
-library(reshape2) # for melt()
-library(RSQLite)
-library(htmltools)
-library(rmarkdown)
-library(dbplyr)
+tar_source()
 ```
 
 # Identifying Stands
@@ -28,11 +26,8 @@ In [@nunery2010, Table 1], 32 plots are listed, with the first column,
 subsequently changed, so these codes no longer align with the stand
 identifiers in the FVS tables in the published FIA data.
 
-```{r}
-nk_table1 <- read_csv(
-  "data/raw/NK_Table_1.csv",
-  col_types = cols(`FIA plot code` = col_character())
-)
+```{r nk_table1}
+tar_load(nk_table1)
 knitr::kable(nk_table1, caption = 'Nunery Keeton Table 1')
 ```
 
@@ -58,16 +53,11 @@ STATECD, and omitted CYCLE and SUBCYCLE. Using this information, we can
 parse STATECD, INVYR, UNITCD, COUNTYCD, and PLOT from the
 `FIA plot code` in NK.
 
-```{r}
-nk_table1_expanded <- nk_table1 |>
-  mutate(STATECD = substr(`FIA plot code`, 1, 2)) |>
-  mutate(INVYR = substr(`FIA plot code`, 3, 6)) |>
-  mutate(UNITCD = substr(`FIA plot code`, 7, 8)) |>
-  mutate(COUNTYCD = substr(`FIA plot code`, 9, 11)) |>
-  mutate(PLOT = substr(`FIA plot code`, 12, 16))
-nk_plot_codes <- nk_table1_expanded |>
-  select(`FIA plot code`, STATECD, INVYR, UNITCD, COUNTYCD, PLOT)
-knitr::kable(nk_plot_codes)
+```{r nk_table1_expanded}
+tar_load(nk_table1_expanded)
+knitr::kable(
+  nk_table1_expanded[c("FIA plot code", "STATECD", "INVYR", "UNITCD", "COUNTYCD", "PLOT")]
+)
 ```
 
 In addition, the way INVYR is assigned has changed, so the NK INVYR no
@@ -75,36 +65,18 @@ longer aligns with the inventory years in the FIA data for 27 of the 32
 plots.
 
 ```{r}
-fia = DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-fia_cond = tbl(fia, 'COND')
-# Note: we're joining tables across data providers so we have to copy one to the other.
-# We do a right join so that we can copy the small table (nk_plot_codes) to
-# the SQLite engine, where it can perform the join, while using the small table
-# to select the output rows.
-# We rename INVYR in NK to NK_INVYR, and in FIA to FIA_INVYR, so that we
-# can compare the two.
-matching_cond <- fia_cond |>
-  rename(FIA_INVYR=INVYR) |>
-  right_join(
-    nk_plot_codes |> rename(NK_INVYR=INVYR),
-    by=join_by(STATECD, UNITCD, COUNTYCD, PLOT),
-    copy=TRUE
-  ) |>
-  collect()
-
-DBI::dbDisconnect(fia)
-
+tar_load(nk_matching_cond)
 # Group by STATECD, UNITCD, COUNTYCD and PLOT to see how NK INVYR does and
 # doesn't line up with FIA INVYR
-cond_grp <- matching_cond |>
-  mutate(INVYR_MATCHES=ifelse(NK_INVYR==FIA_INVYR, 1, 0)) |>
-  group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
-  summarize(
-    NUM_INVYR=n(),
-    NUM_INVYR_MATCHES=sum(INVYR_MATCHES),
-    .groups = "keep"
-  )
-knitr::kable(cond_grp)
+knitr::kable(
+  nk_matching_cond |>
+    group_by(STATECD, UNITCD, COUNTYCD, PLOT) |>
+    summarize(
+      NUM_INVYR=n(),
+      NUM_INVYR_MATCHES=sum(INVYR_MATCHES),
+      .groups = "keep"
+    )
+)
 ```
 
 To find corresponding Stand_IDs where INVYR does not align between the
@@ -113,32 +85,8 @@ two data sets, we note that NK's "Starting stand age" matches
 in NK.
 
 ```{r}
-nk_plots_with_age <- nk_table1_expanded |>
-  select(`FIA plot code`, STATECD, INVYR, UNITCD, COUNTYCD, PLOT,
-         `Starting stand age`, `Slope (%)`, `Aspect (degrees)`,
-         `Basal area (m2/ha)`) |>
-  rename(NK_INVYR=INVYR)
-fia_cond_with_age <- matching_cond |>
-  select(STATECD, FIA_INVYR, CYCLE, SUBCYCLE, CONDID, UNITCD, COUNTYCD, PLOT,
-         STDAGE, FLDAGE, SLOPE, ASPECT, BALIVE) |>
-  left_join(
-    nk_plots_with_age, by=join_by(STATECD, UNITCD, COUNTYCD, PLOT)
-  )
-unique_cond <- fia_cond_with_age |>
-  filter(
-    NK_INVYR==FIA_INVYR | (
-      NK_INVYR!=FIA_INVYR & `Starting stand age`==STDAGE
-    ),
-    FIA_INVYR<=2005
-  )
-
-nk_to_fia <- unique_cond |>
-  select(`FIA plot code`, NK_INVYR, 
-         STATECD, FIA_INVYR, CYCLE, SUBCYCLE, CONDID, UNITCD, COUNTYCD, PLOT) |>
-  rename(INVYR = FIA_INVYR)
-write_csv(nk_to_fia, "data/intermediate/nk_to_fia.csv")
-
-knitr::kable(unique_cond)
+tar_load(nk_all_cond)
+knitr::kable(nk_all_cond)
 ```
 
 Matching on stand age results in a uniquely identified FIA condition for
@@ -158,24 +106,8 @@ the FVS UI Stand ID consists of STATECD(2) + INVYR(2) + COUNTYCD(3) +
 PLOT(5), and if using FVS_STANDINIT_COND, then also + CONDID(1).
 
 ```{r}
-translated_stands <- unique_cond |>
-  mutate(
-    STATECD  = as.numeric(STATECD),
-    UNITCD   = as.numeric(UNITCD),
-    COUNTYCD = as.numeric(COUNTYCD),
-    PLOT     = as.numeric(PLOT)
-  ) |>
-  mutate(FVS_STAND_ID=sprintf(paste0(
-    '%02d',  '%02d',           '%03d',   '%05d'),
-    STATECD, FIA_INVYR %% 100, COUNTYCD, PLOT
-  )) |>
-  mutate(STAND_ID_PLOT=sprintf(paste0(
-    '%04d' , '%04d'    , '%02d', '%02d'  , '%02d', '%03d'  , '%05d'),
-    STATECD, FIA_INVYR , CYCLE , SUBCYCLE, UNITCD, COUNTYCD, PLOT
-  )) |>
-  mutate(STAND_ID_COND=paste0(STAND_ID_PLOT, CONDID)) |>
-  select(`FIA plot code`, FVS_STAND_ID, STAND_ID_PLOT, STAND_ID_COND)
-knitr::kable(translated_stands)
+tar_load(nk_translated_stands)
+knitr::kable(nk_translated_stands)
 ```
 
 We can then fetch those IDs from the FIA-provided FVS tables to
@@ -184,45 +116,7 @@ confirming that each updated Stand ID corresponds to a unique stand in
 the provided FVS tables.
 
 ```{r}
-fia = DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-
-fia_fvs_plotinit_plot = tbl(fia, 'FVS_PLOTINIT_PLOT')
-matching_plotinit_plot <- fia_fvs_plotinit_plot |>
-  right_join(translated_stands |> rename(STAND_ID=STAND_ID_PLOT),
-    by=join_by(STAND_ID), copy=TRUE) |>
-  collect()
-matching_plotinit_plot_grp <- matching_plotinit_plot |>
-  group_by(STAND_ID) |> summarize(NUM_PLOTS=n(), .groups = "keep") |>
-  rename(FVS_PLOTINIT_PLOT=STAND_ID)
-
-fia_fvs_standinit_cond = tbl(fia, 'FVS_STANDINIT_COND')
-matching_standinit_cond <- fia_fvs_standinit_cond |>
-  right_join(translated_stands |> rename(STAND_ID=STAND_ID_COND),
-    by=join_by(STAND_ID), copy=TRUE) |>
-  collect()
-matching_standinit_cond_grp <- matching_standinit_cond |>
-  group_by(STAND_ID) |> summarize(NUM_CONDS=n(), .groups = "keep") |>
-  rename(FVS_STANDINIT_COND=STAND_ID)
-
-fia_fvs_standinit_plot = tbl(fia, 'FVS_STANDINIT_PLOT')
-matching_standinit_plot <- fia_fvs_standinit_plot |>
-  right_join(translated_stands |> rename(STAND_ID=STAND_ID_PLOT),
-    by=join_by(STAND_ID), copy=TRUE) |>
-  collect()
-
-DBI::dbDisconnect(fia)
-
-matching_standinit_plot_grp <- matching_standinit_plot |>
-  group_by(STAND_ID) |> summarize(NUM_COND_PLOTS=n(), .groups = "keep") |>
-  rename(FVS_STANDINIT_PLOT=STAND_ID)
-
-nk_to_fvs <- translated_stands |>
-  left_join(matching_plotinit_plot_grp, by=join_by(STAND_ID_PLOT==FVS_PLOTINIT_PLOT)) |>
-  left_join(matching_standinit_cond_grp, by=join_by(STAND_ID_COND==FVS_STANDINIT_COND)) |>
-  left_join(matching_standinit_plot_grp, by=join_by(STAND_ID_PLOT==FVS_STANDINIT_PLOT))
-
-write_csv(nk_to_fvs, "data/intermediate/nk_to_fvs.csv")
-
+tar_load(nk_to_fvs)
 knitr::kable(nk_to_fvs)
 ```
 
