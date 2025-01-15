@@ -1,2 +1,2 @@
 #!/bin/sh
-R -q -f build.R
+R -q -e "targets::tar_make()"
