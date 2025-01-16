@@ -848,10 +848,9 @@ remove(fia, stand_id_mixin)
 stopifnot(fvs_stands_prsc |> filter(is.na(STAND_ID)) |> nrow() == 0)
 ```
 
-
-
 ```{r NRSHarvest PRSC}
 num_partitions <- 60 # The number of simultaneous processes to use
+timestep <- 10
 title <- "NRSHarvest"
 mgmtid <- "PRSC"
 for (partition in 1:num_partitions) {
@@ -859,11 +858,10 @@ for (partition in 1:num_partitions) {
   if (!USE_CACHE | !file.exists(filename)) {
     unlink(filename)
     print(paste0("Writing ", filename))
-    pbapply(
-      expand.grid(timestep = c(1, 10), rannseed = c(1, 3, 5)),
+    apply(
+      expand.grid(rannseed = c(1, 3, 5)),
       1,
       \(runconfig) {
-        timestep <- runconfig["timestep"]
         rannseed <- runconfig["rannseed"]
         apply(
           fvs_stands_prsc |> 
