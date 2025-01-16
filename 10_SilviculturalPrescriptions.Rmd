@@ -663,7 +663,7 @@ onto the trees at run-time:
 
 ```{r write tree_prescription}
 out_db <- DBI::dbConnect(RSQLite::SQLite(), 'data/fvs/tree_prescription.db')
-DBI::dbWriteTable(out_db, 'PRSC', tree_prescription)
+DBI::dbWriteTable(out_db, 'PRSC', tree_prescription, overwrite = TRUE)
 DBI::dbDisconnect(out_db)
 rm(out_db)
 ```
@@ -671,4 +671,63 @@ rm(out_db)
 We can create a map from year to treatment number as:
 ```
 stand_stats |> filter(!is.na(TRTYR)) |> select(STAND_CN, TRTYR, TRTNUM)
+```
+
+## Compose FVS Tree Query
+
+The FVS Keyword File has a SQL query to fetch the trees for a stand. The
+usual query is:
+```{sql example_fvs_tree_sql, eval = FALSE}
+SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'
+```
+
+One of the columns that matches `*` is `PRESCRIPTION` - we want to override
+that one column to come from `PRSC.PRSC`. Unfortunately, SQLite does not
+support tidyselect, or any useful selection metagrammar, so we need to
+list all the columns to be selected, and change just the one we want to change.
+
+To do this, we fetch the table schema from SQLite, and write a JOIN to fetch
+that one column, yielding something like:
+
+```{sql example_fvs_tree_override_sql, eval = FALSE}
+SELECT
+  t.STAND_CN AS STAND_CN,
+  t.STAND_ID AS STAND_ID,
+  ...,
+  p.PRESCRIPTION AS PRESCRIPTION,
+  ...
+FROM FVS_TreeInit_Plot t
+LEFT JOIN PRSC.PRSC p ON t.TREE_CN = p.TREE_CN
+WHERE Stand_CN = '%Stand_CN%'
+```
+
+```{r fvs_tree_prescription_query}
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+# We need to query a pragma (which looks like a table function);
+# dbplyr doesn't support this.
+# So we run this query using raw DBI.
+columns <- DBI::dbListFields(fia, "FVS_TreeInit_Plot")
+dbDisconnect(fia)
+
+result_column <- function(name) {
+  table <- NULL
+  if (name == "PRESCRIPTION") {
+    table <- "p"
+  } else {
+    table <- "t"
+  }
+  paste0(table, ".", name) #, " AS ", name)
+}
+
+fvs_tree_prescription_query <- paste(
+  "ATTACH 'tree_prescription.db' AS PRSC;",
+  "SELECT ",
+  paste(lapply(columns, result_column), collapse = ",\n"),
+  "FROM FVS_TreeInit_Plot t ",
+  "LEFT JOIN PRSC.PRSC p ON t.TREE_CN = p.TREE_CN ",
+  "WHERE Stand_CN = '%Stand_CN%'",
+  sep = "\n"
+)
+
+remove(fia, columns, result_column)
 ```
