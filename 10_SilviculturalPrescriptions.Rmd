@@ -731,3 +731,146 @@ fvs_tree_prescription_query <- paste(
 
 remove(fia, columns, result_column)
 ```
+
+## Keyword File Definition
+
+```{r keywordfile_section}
+keywordfile_section <- function(
+    Title, MgmtId, StandID, StandCN,
+    FirstYear, LastYear, Timestep,
+    Partition, RandSeed = NA
+  ) {
+  if (!is.na(RandSeed)) {
+    StdIdent <- c(
+      fvs_kwd0("StdIdent"),
+      paste0(StandID, "_Y", Timestep, "_R", RandSeed, " ", Title)
+    )
+    # Careful: RannSeed != RandSeed
+    RannSeed <- fvs_kwd1("RANNSEED", RandSeed)
+  } else {
+    StdIdent <- c(
+      fvs_kwd0("StdIdent"),
+      # RannSeed isn't 0, but 0 is an illegal random seed so a fine flag value
+      paste0(StandID, "_Y", Timestep, "_R0", " ", Title))
+    # Careful: RannSeed != RandSeed
+    RannSeed <- c()
+  }
+  TimeConfig <- fvs_TimeConfig(FirstYear, LastYear, Timestep)
+  # if (FirstYear == LastYear) {
+  #  Regen <- c() # Don't do regen for 0-year runs
+  #} else {
+  #  Regen <- keyfile_regen_section(StandID, Timestep)
+  #}
+  c(
+    StdIdent,
+    fvs_kwd0("StandCN"),
+    StandCN,
+    fvs_kwd0("MgmtId"),
+    MgmtId,
+    TimeConfig,
+    RannSeed,
+    fvs_kwd0("FMIn"), # Fire and Fuels Extension
+    fvs_kwd0("CarbRept"),
+    fvs_kwd0("CarbCut"),
+    fvs_kwd5("CarbCalc", 1, 1, 0.0425, 9, 11),
+    fvs_kwd0("FuelOut"),
+    fvs_kwd0("FuelRept"),
+    fvs_kwd0("End"), # FMIn
+    fvs_kwd0("Database"), # Database extension
+    fvs_kwd0("DSNIn"),
+    "SQLite_FIADB_ENTIRE.db",
+    fvs_kwd0("StandSQL"),
+    "SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'",
+    fvs_kwd0("EndSQL"), # StandSQL
+    fvs_kwd0("TreeSQL"),
+    fvs_tree_prescription_query,
+    fvs_kwd0("EndSQL"), # TreeSQL
+    fvs_kwd0("DSNOut"),
+    paste0("FVS_", Title, "_", MgmtId, "_", Partition, ".db"),
+    fvs_kwd1("Summary",  2),
+    fvs_kwd2("Computdb", 0, 1),
+    fvs_kwd1("MisRpts",  2),
+    fvs_kwd1("CarbReDB", 2),
+    fvs_kwd1("FuelReDB", 2),
+    fvs_kwd1("FuelsOut", 2),
+    fvs_kwd0("End"), # Database
+    #Regen,
+    fvs_kwd0("Process")
+  )
+}
+
+```
+
+## Keyword File Generation
+
+```{r fvs_stands_prsc}
+starting_stands <- stand_stats |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  summarize(
+    INVYR = min(INVYR),
+    FIRSTYEAR = min(MEASYEAR),
+    LASTYEAR = max(MEASYEAR),
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+fia_fvs_standinit_plot <- tbl(fia, 'FVS_StandInit_Plot') |>
+  select(STAND_CN, STAND_ID)
+
+fvs_stands_prsc <- tbl(fia, 'PLOT') |>
+  inner_join(starting_stands, by = join_by(STATECD, COUNTYCD, PLOT, INVYR), copy = TRUE) |>
+  select(CN, STATECD, COUNTYCD, PLOT, INVYR, FIRSTYEAR, LASTYEAR) |>
+  rename(STAND_CN = CN) |>
+  left_join(fia_fvs_standinit_plot, by = join_by(STAND_CN)) |>
+  collect()
+
+dbDisconnect(fia)
+remove(fia, starting_stands, fia_fvs_standinit_plot)
+```
+
+
+```{r NRSHarvest PRSC}
+num_partitions <- 60 # The number of simultaneous processes to use
+title <- "NRSHarvest"
+mgmtid <- "PRSC"
+for (partition in 1:num_partitions) {
+  filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".key")
+  if (!USE_CACHE | !file.exists(filename)) {
+    unlink(filename)
+    print(paste0("Writing ", filename))
+    pbapply(
+      expand.grid(timestep = c(1, 10), rannseed = c(1, 3, 5)),
+      1,
+      \(runconfig) {
+        timestep <- runconfig["timestep"]
+        rannseed <- runconfig["rannseed"]
+        apply(
+          fvs_stands_prsc |> 
+            filter((as.numeric(STAND_ID) %% num_partitions) == (partition - 1)) |>
+            arrange(STAND_ID, FIRSTYEAR),
+          1,
+          function(row) {
+            write_lines(
+              keywordfile_section(
+                title,
+                mgmtid,
+                row['STAND_ID'],
+                row['STAND_CN'],
+                row['FIRSTYEAR'],
+                row['LASTYEAR'],
+                timestep,
+                partition,
+                rannseed
+              ),
+              filename,
+              append = TRUE
+            )
+          }
+        )
+      }
+    )
+    write_lines("Stop", filename, append = TRUE)
+  }
+}
+```
