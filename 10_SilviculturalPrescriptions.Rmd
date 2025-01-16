@@ -709,6 +709,49 @@ DBI::dbDisconnect(fia)
 rm(fia, fvs, fvs_standinit_plot, fvs_treeinit_plot)
 ```
 
+## Thin Prescription Table
+
+Create a table describing thinning prescriptions by year
+
+```{r fvs_thinprsc}
+fvs_ThinPRSC <- function(rows) {
+  thinprsc <- function(row) {
+    year <- row["year"]
+    if ("percent" %in% names(row)) {
+      percent <- row["percent"]
+    } else {
+      percent <- 1
+    }
+    prsc <- row["prescription"]
+    fvs_kwd3("ThinPRSC", year, percent, prsc)
+  }
+  apply(rows, 1, thinprsc)
+}
+```
+
+```{r keyfile_thin_section}
+keyfile_thin_section <- function(StandCN) {
+  # StandCN referes to STAND_CN in stand_stats
+  # swizzle that to CN, which is what trtyr_mixin uses
+  stand_cn <- stand_stats |>
+    filter(STAND_CN == StandCN) |>
+    select(CN) |>
+    rename(STAND_CN = CN)
+  pertinent <- trtyr_mixin |>
+    semi_join(stand_cn, by = join_by(STAND_CN)) |>
+    filter(!is.na(TRTNUM)) |>
+    rename(year = TRTYR) |>
+    mutate(prescription = TRTNUM + 1) |>
+    select(year, prescription)
+  if (nrow(pertinent) > 0) {
+    fvs_ThinPRSC(pertinent)
+  } else {
+    ''
+  }
+}
+```
+
+
 ## Keyword File Definition
 
 ```{r keywordfile_section}
@@ -733,11 +776,11 @@ keywordfile_section <- function(
     RannSeed <- c()
   }
   TimeConfig <- fvs_TimeConfig(FirstYear, LastYear, Timestep)
-  # if (FirstYear == LastYear) {
-  #  Regen <- c() # Don't do regen for 0-year runs
-  #} else {
-  #  Regen <- keyfile_regen_section(StandID, Timestep)
-  #}
+  if (FirstYear == LastYear) {
+    Thin <- c() # Don't do thinning for 0-year runs
+  } else {
+    Thin <- keyfile_thin_section(StandCN)
+  }
   c(
     StdIdent,
     fvs_kwd0("StandCN"),
@@ -771,6 +814,7 @@ keywordfile_section <- function(
     fvs_kwd1("FuelReDB", 2),
     fvs_kwd1("FuelsOut", 2),
     fvs_kwd0("End"), # Database
+    Thin,
     #Regen,
     fvs_kwd0("Process")
   )
