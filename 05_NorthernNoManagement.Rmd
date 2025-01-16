@@ -2710,7 +2710,7 @@ for (partition in 1:num_partitions) {
 
 ### Run FVS
 
-```{r run_fvs}
+```{r run_fvs, eval = FALSE}
 # TODO nik: Run FVS directly from R.
 # Batch file to run FVS in parallel:
 # for %%p in (FVS_%1_%2_*.key) do del %%~np.db
