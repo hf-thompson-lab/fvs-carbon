@@ -14,6 +14,7 @@ editor_options:
 library(tidyverse)
 library(reshape2) # melt()
 library(RSQLite)
+library(dbplyr) # window_order()
 library(measurements) # conv_unit and conv_multiunit
 library(maps)
 library(pbapply) # Progress bar for long operations
@@ -208,7 +209,7 @@ if (USE_CACHE & file.exists(rds_file)) {
     select(STATECD, COUNTYCD, PLOT, INVYR, TRTYR) |>
     filter(!is.na(TRTYR)) |>
     group_by(STATECD, COUNTYCD, PLOT) |>
-    arrange(TRTYR) |>
+    window_order(TRTYR) |>
     mutate(TRTNUM = row_number()) |>
     ungroup()
 
@@ -247,7 +248,7 @@ if (USE_CACHE & file.exists(rds_file)) {
   state_mixin <- tbl(fia, 'REF_RESEARCH_STATION') |>
     distinct(STATECD, STATE_NAME, STATE_ABBR)
   
-  stand_stats <- tbl(fia, 'PLOT') |>
+  stand_stats_partial <- tbl(fia, 'PLOT') |>
     semi_join(plot_harvested, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
     filter(INVYR >= 1999) |>
     select(CN, STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, DESIGNCD, ECOSUBCD, LAT, LON) |>
@@ -289,8 +290,9 @@ if (USE_CACHE & file.exists(rds_file)) {
     mutate(
       INVNUM = row_number(),
       BALIVE_START = if_else(row_number() == 1, BALIVE_METRIC, NA),
+      STAND_CN = if_else(row_number() == 1, CN, NA),
       MIN_MEASYEAR = min(MEASYEAR, na.rm = TRUE),
-      STAND_CN = if_else(row_number() == 1, CN, NA)
+      MAX_MEASYEAR = max(MEASYEAR, na.rm = TRUE)
     ) |> 
     ungroup() |>
     arrange(STATECD, COUNTYCD, PLOT, INVYR) |>
@@ -302,13 +304,13 @@ if (USE_CACHE & file.exists(rds_file)) {
     )
 
   # Figure out which inventories are pre-harvest
-  pre_harvest_mixin <- stand_stats |>
+  pre_harvest_mixin <- stand_stats_partial |>
     filter(HARVEST == 1) |>
     mutate(INVNUM = INVNUM - 1) |> # the inventory prior to harvest is pre-harvest
     rename(PRE_HARVEST = HARVEST) |>
     select(STATECD, COUNTYCD, PLOT, INVNUM, PRE_HARVEST)
   
-  stand_stats <- stand_stats |>
+  stand_stats <- stand_stats_partial |>
     left_join(pre_harvest_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVNUM)) |>
     mutate(
       PRE_HARVEST = if_else(is.na(PRE_HARVEST), 0, PRE_HARVEST)
@@ -316,7 +318,7 @@ if (USE_CACHE & file.exists(rds_file)) {
   
   DBI::dbDisconnect(fia)
   remove(fia, cond_mixin, trtyr_mixin, forest_type_mixin, tree_mixin,
-         state_mixin, pre_harvest_mixin, harvest_mixin)
+         state_mixin, pre_harvest_mixin, harvest_mixin, stand_stats_partial)
   
   write_rds(stand_stats, rds_file)
 }
@@ -658,78 +660,53 @@ tree_prescription <- tree_removed_in_harvest |>
   select(TREE_CN, PRESCRIPTION)
 ```
 
-Write the prescription table to a SQLite database so it can be joined 
-onto the trees at run-time:
-
-```{r write tree_prescription}
-out_db <- DBI::dbConnect(RSQLite::SQLite(), 'data/fvs/tree_prescription.db')
-DBI::dbWriteTable(out_db, 'PRSC', tree_prescription, overwrite = TRUE)
-DBI::dbDisconnect(out_db)
-rm(out_db)
-```
-
 We can create a map from year to treatment number as:
 ```
 stand_stats |> filter(!is.na(TRTYR)) |> select(STAND_CN, TRTYR, TRTNUM)
 ```
 
-## Compose FVS Tree Query
+## Compose FVS Database
 
-The FVS Keyword File has a SQL query to fetch the trees for a stand. The
-usual query is:
-```{sql example_fvs_tree_sql, eval = FALSE}
-SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'
+FVS fetches stand and tree data from a SQLite database. Unfortunately,
+the way it queries the database prevents doing "intereting" things,
+such as attaching a second database for prescription overrides. So we need
+to write an entire database with the information FVS needs, which is
+the FVS_StandInit_Plot and FVS_TreeInit_Plot tables.
+
+```{r fvs_starting_stands}
+fvs_starting_stands <- stand_stats |>
+  filter(MEASYEAR == MIN_MEASYEAR)
 ```
 
-One of the columns that matches `*` is `PRESCRIPTION` - we want to override
-that one column to come from `PRSC.PRSC`. Unfortunately, SQLite does not
-support tidyselect, or any useful selection metagrammar, so we need to
-list all the columns to be selected, and change just the one we want to change.
+Write a database for use just by this run.
 
-To do this, we fetch the table schema from SQLite, and write a JOIN to fetch
-that one column, yielding something like:
-
-```{sql example_fvs_tree_override_sql, eval = FALSE}
-SELECT
-  t.STAND_CN AS STAND_CN,
-  t.STAND_ID AS STAND_ID,
-  ...,
-  p.PRESCRIPTION AS PRESCRIPTION,
-  ...
-FROM FVS_TreeInit_Plot t
-LEFT JOIN PRSC.PRSC p ON t.TREE_CN = p.TREE_CN
-WHERE Stand_CN = '%Stand_CN%'
-```
-
-```{r fvs_tree_prescription_query}
+```{r fvs_nrsharvest_prsc.db}
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-# We need to query a pragma (which looks like a table function);
-# dbplyr doesn't support this.
-# So we run this query using raw DBI.
-columns <- DBI::dbListFields(fia, "FVS_TreeInit_Plot")
-dbDisconnect(fia)
+fvs <- DBI::dbConnect(RSQLite::SQLite(), 'data/fvs/FVS_NRSHarvest_PRSC.db')
 
-result_column <- function(name) {
-  table <- NULL
-  if (name == "PRESCRIPTION") {
-    table <- "p"
-  } else {
-    table <- "t"
-  }
-  paste0(table, ".", name) #, " AS ", name)
-}
+fvs_standinit_plot <- tbl(fia, "FVS_StandInit_Plot") |>
+  semi_join(
+    fvs_starting_stands |> select(CN) |> rename(STAND_CN = CN),
+    by = join_by(STAND_CN),
+    copy = TRUE
+  ) |>
+  collect()
+DBI::dbWriteTable(fvs, "FVS_StandInit_Plot", fvs_standinit_plot, overwrite = TRUE)
 
-fvs_tree_prescription_query <- paste(
-  "ATTACH 'tree_prescription.db' AS PRSC;",
-  "SELECT ",
-  paste(lapply(columns, result_column), collapse = ",\n"),
-  "FROM FVS_TreeInit_Plot t ",
-  "LEFT JOIN PRSC.PRSC p ON t.TREE_CN = p.TREE_CN ",
-  "WHERE Stand_CN = '%Stand_CN%'",
-  sep = "\n"
-)
+fvs_treeinit_plot <- tbl(fia, "FVS_TreeInit_Plot") |>
+  semi_join(
+    fvs_starting_stands |> select(CN) |> rename(STAND_CN = CN),
+    by = join_by(STAND_CN),
+    copy = TRUE
+  ) |>
+  collect() |>
+  select(!PRESCRIPTION) |>
+  left_join(tree_prescription, by = join_by(TREE_CN))
+DBI::dbWriteTable(fvs, "FVS_TreeInit_Plot", fvs_treeinit_plot, overwrite = TRUE)
 
-remove(fia, columns, result_column)
+DBI::dbDisconnect(fvs)
+DBI::dbDisconnect(fia)
+rm(fia, fvs, fvs_standinit_plot, fvs_treeinit_plot)
 ```
 
 ## Keyword File Definition
@@ -769,21 +746,21 @@ keywordfile_section <- function(
     MgmtId,
     TimeConfig,
     RannSeed,
-    fvs_kwd0("FMIn"), # Fire and Fuels Extension
+    fvs_kwd0("FMIn"), # Begin
     fvs_kwd0("CarbRept"),
     fvs_kwd0("CarbCut"),
     fvs_kwd5("CarbCalc", 1, 1, 0.0425, 9, 11),
     fvs_kwd0("FuelOut"),
     fvs_kwd0("FuelRept"),
     fvs_kwd0("End"), # FMIn
-    fvs_kwd0("Database"), # Database extension
+    fvs_kwd0("Database"), # Begin
     fvs_kwd0("DSNIn"),
-    "SQLite_FIADB_ENTIRE.db",
-    fvs_kwd0("StandSQL"),
+    paste0("FVS_", Title, "_", MgmtId, ".db"),
+    fvs_kwd0("StandSQL"), # Begin
     "SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'",
     fvs_kwd0("EndSQL"), # StandSQL
-    fvs_kwd0("TreeSQL"),
-    fvs_tree_prescription_query,
+    fvs_kwd0("TreeSQL"), # Begin
+    "SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'",
     fvs_kwd0("EndSQL"), # TreeSQL
     fvs_kwd0("DSNOut"),
     paste0("FVS_", Title, "_", MgmtId, "_", Partition, ".db"),
@@ -804,30 +781,29 @@ keywordfile_section <- function(
 ## Keyword File Generation
 
 ```{r fvs_stands_prsc}
-starting_stands <- stand_stats |>
-  group_by(STATECD, COUNTYCD, PLOT) |>
-  summarize(
-    INVYR = min(INVYR),
-    FIRSTYEAR = min(MEASYEAR),
-    LASTYEAR = max(MEASYEAR),
-    .groups = "keep"
-  ) |>
-  ungroup()
-
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-fia_fvs_standinit_plot <- tbl(fia, 'FVS_StandInit_Plot') |>
-  select(STAND_CN, STAND_ID)
-
-fvs_stands_prsc <- tbl(fia, 'PLOT') |>
-  inner_join(starting_stands, by = join_by(STATECD, COUNTYCD, PLOT, INVYR), copy = TRUE) |>
-  select(CN, STATECD, COUNTYCD, PLOT, INVYR, FIRSTYEAR, LASTYEAR) |>
-  rename(STAND_CN = CN) |>
-  left_join(fia_fvs_standinit_plot, by = join_by(STAND_CN)) |>
+stand_id_mixin <- tbl(fia, 'FVS_StandInit_Plot') |>
+  semi_join(
+    fvs_starting_stands |>
+      select(CN) |>
+      rename(STAND_CN = CN),
+    by = join_by(STAND_CN),
+    copy = TRUE
+  ) |>
+  select(STAND_CN, STAND_ID) |>
+  rename(CN = STAND_CN) |>
   collect()
 
+fvs_stands_prsc <- fvs_starting_stands |>
+  left_join(stand_id_mixin, by = join_by(CN))
+
 dbDisconnect(fia)
-remove(fia, starting_stands, fia_fvs_standinit_plot)
+remove(fia, stand_id_mixin)
+
+# Every stand must have a STAND_ID
+stopifnot(fvs_stands_prsc |> filter(is.na(STAND_ID)) |> nrow() == 0)
 ```
+
 
 
 ```{r NRSHarvest PRSC}
@@ -848,7 +824,7 @@ for (partition in 1:num_partitions) {
         apply(
           fvs_stands_prsc |> 
             filter((as.numeric(STAND_ID) %% num_partitions) == (partition - 1)) |>
-            arrange(STAND_ID, FIRSTYEAR),
+            arrange(STAND_ID, MIN_MEASYEAR),
           1,
           function(row) {
             write_lines(
@@ -857,8 +833,8 @@ for (partition in 1:num_partitions) {
                 mgmtid,
                 row['STAND_ID'],
                 row['STAND_CN'],
-                row['FIRSTYEAR'],
-                row['LASTYEAR'],
+                row['MIN_MEASYEAR'],
+                row['MAX_MEASYEAR'],
                 timestep,
                 partition,
                 rannseed
