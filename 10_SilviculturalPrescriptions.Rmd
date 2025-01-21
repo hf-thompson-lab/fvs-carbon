@@ -876,3 +876,301 @@ for (partition in 1:num_partitions) {
   }
 }
 ```
+# Results
+
+## Fault Analysis
+
+### Parse Faults
+
+What errors and warnings do we get?
+```{r fvs warnings}
+fvs_warnings <- NULL
+for (partition in 1:num_partitions) {
+  filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".out")
+  fvs_warnings <- bind_rows(
+    fvs_warnings,
+    read_lines(filename) |>
+      as.data.frame(nm="text") |>
+      # Filter to just initial STAND ID and WARNING lines
+      filter(
+        grepl("^ +STAND ID=", text) |
+          grepl("^\\*{8} ", text)
+      ) |>
+      # Parse out the STAND ID and fill it into the following lines
+      mutate(
+        STAND_ID = case_when(
+          grepl("^ +STAND ID=", text) ~ sub("^ +STAND ID= *([^ ]+) .*$", "\\1", text)
+        )
+      ) |>
+      fill(STAND_ID) |>
+      # Remove everything but warnings (which now have STAND_ID)
+      filter(
+        grepl("^\\*{8} ", text)
+      )
+  )
+}
+```
+
+Find the distinct faults
+
+```{r distinct fvs warnings}
+fvs_warnings_distinct <- fvs_warnings |>
+  # Most faults have some leading text, the tag ERROR: or WARNING:,
+  # then descriptive text; if there's a number in the descriptive text,
+  # it's probably pulled from the data, so we chop off the descriptive
+  # text starting at the first number to find the truly distinct warnings
+  mutate(
+    PROBLEM = case_when(
+      grepl("WARNING:", text) ~ sub("^[*. ]*(.*WARNING: [^0-9]+)([0-9].*)?$", "\\1", text),
+      grepl("ERROR:", text) ~ sub("^[*. ]*(.*ERROR: [^0-9]+)([0-9].*)?$", "\\1", text),
+      .default = text
+    ),
+    PROBLEM = sub("\\s+$", "", PROBLEM)
+  ) |>
+  distinct(PROBLEM) |>
+  arrange(PROBLEM)
+knitr::kable(fvs_warnings_distinct)
+```
+### Plot Count Mismatch
+
+Plot counts do not match data on the design record could indicate a data prep
+error.
+
+```{r keyword context}
+debug_stand_id <- fvs_warnings |>
+  filter(grepl("FVS09 WARNING: ", text)) |>
+  head(1) |>
+  pull("STAND_ID")
+fvs_warnings |>
+  filter(STAND_ID == debug_stand_id)
+```
+
+From Essential FVS:
+```
+This
+warning message is printed when either the plot count or nonstockable count determined
+from reading the tree data records differs from the values coded on the DESIGN record.
+```
+
+Which partition is it in?
+```{r keyword context partition}
+as.numeric(sub("^([^_]+)_.*$", "\\1", debug_stand_id)) %% num_partitions
+```
+
+so the 16th partition, which is partition 17.
+
+Here's the keyword file section:
+```
+StdIdent  
+420301305916_Y10_R1 NRSHarvest
+StandCN   
+58377688010538
+MgmtId    
+PRSC
+InvYear         2003
+TimeInt            0        10
+TimeInt            1         7
+TimeInt            3         1
+NumCycle           3
+RANNSEED           1
+FMIn      
+CarbRept  
+CarbCut   
+CarbCalc           1         1    0.0425         9        11
+FuelOut   
+FuelRept  
+End       
+Database  
+DSNIn     
+FVS_NRSHarvest_PRSC.db
+StandSQL  
+SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'
+EndSQL    
+TreeSQL   
+SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'
+EndSQL    
+DSNOut    
+FVS_NRSHarvest_PRSC_17.db
+Summary            2
+Computdb           0         1
+MisRpts            2
+CarbReDB           2
+FuelReDB           2
+FuelsOut           2
+End       
+ThinPRSC        2006         1         3
+Process   
+```
+
+from the .out file, when processing TreeSQL:
+> NUMBER ROWS PROCESSED:   18
+
+The number of plots should match the number of distinct SUBP in FIA:
+```{r}
+debug_fia_plot <- fvs_stands_prsc |>
+  filter(STAND_ID == sub("^([^_]+)_.*$", "\\1", debug_stand_id)) |>
+  select(STATECD, COUNTYCD, PLOT, INVYR)
+tree_removed_in_harvest |>
+  semi_join(debug_fia_plot, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+  distinct(SUBP) |>
+  nrow()
+```
+
+This is probably benign - it means there were trees on only 2 out of 4 subplots
+at the start of the run.
+
+How common is this?
+```{r}
+fvs_warnings |>
+  filter(grepl("FVS09 WARNING: ", text)) |>
+  nrow()
+```
+
+This happens on 9 out of 400 plots; ignore.
+
+### One Thousand Trees
+
+The TPA fault may indicate a keyword file generation error; let's track it down.
+```{r}
+debug_stand_id <- fvs_warnings |>
+  filter(grepl(" TPA ", text)) |>
+  head(1) |>
+  pull("STAND_ID")
+fvs_warnings |>
+  filter(STAND_ID == debug_stand_id)
+```
+
+a'ight, what's the species?
+
+```{r fvs species 9}
+debug_species <- fvs_warnings |>
+  filter(grepl("FVS40 WARNING:", text) & grepl("SPECIES=", text)) |>
+  mutate(FVS_SPNO = as.integer(sub("^.*SPECIES=\\s*(\\d+) .*$", "\\1", text))) |>
+  group_by(FVS_SPNO) |>
+  summarize(N = n(), .groups = "keep") |>
+  ungroup() |>
+  arrange(desc(N)) |>
+  left_join(species_mixin, by = join_by(FVS_SPNO))
+debug_species
+```
+
+These are plots where the number of seedlings / saplings on the microplots
+tally to >1000 TPA.
+
+I think we note that these exist, and ignore them.
+
+How often does this occur?
+
+```{r}
+fvs_warnings |>
+  filter(grepl(" TPA ", text)) |>
+  nrow()
+```
+
+27 out of 400 plots.
+
+We can decide to not worry about them.
+
+## Load Results
+
+Load the output from all FVS partitions into a single dataframe
+
+```{r FVS_Carbon}
+FVS_Carbon <- NULL
+FVS_Summary2_East <- NULL
+
+for (partition in 1:num_partitions) {
+  filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".db")
+  if (file.exists(filename)) {
+    print(paste0("Reading ", filename))
+    fvs_out_db <- DBI::dbConnect(RSQLite::SQLite(), filename)
+    fvs_carbon_tbl = tbl(fvs_out_db, 'FVS_Carbon') |>
+      collect() |>
+      mutate(
+        Title = title,
+        MgmtId = mgmtid,
+        Timestep = sub("^.*_Y([0-9]+).*$", "\\1", StandID), # Extract timestep
+        RanNSeed = sub("^.*_R([0-9]+).*$", "\\1", StandID), # Extract random seed
+        Partition = partition,
+        StandID = sub("^([^_]+)_.*$", "\\1", StandID) # Extract stand ID
+      )
+    FVS_Carbon <- bind_rows(FVS_Carbon, fvs_carbon_tbl)
+
+    fvs_summary2_east_tbl = tbl(fvs_out_db, 'FVS_Summary2_East') |>
+      collect() |>
+      mutate(
+        Title = title,
+        MgmtId = mgmtid,
+        Timestep = sub("^.*_Y([^_]+)_.*$", "\\1", StandID), # Extract timestep
+        RanNSeed = sub("^.*_R([^_]+)_.*$", "\\1", StandID), # Extract random seed
+        Partition = partition,
+        StandID = sub("^([^_]+)_.*$", "\\1", StandID) # Extract stand ID
+      )
+      FVS_Summary2_East <- bind_rows(FVS_Summary2_East, fvs_summary2_east_tbl)
+  
+      dbDisconnect(fvs_out_db)
+  } else {
+    print(paste0("Skipping ", filename))
+  }
+}
+
+remove(fvs_out_db, fvs_carbon_tbl, fvs_summary2_east_tbl)
+```
+Consolidate outputs; average the multiple runs with different random seeds.
+
+```{r FVS_Carbon_NONE}
+FVS_Carbon_PRSC <- FVS_Carbon |>
+  group_by(StandID, Year) |>
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    Total_Stand_Carbon = mean(Total_Stand_Carbon),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+
+# There is no projection for the observed run, so no need to average
+#FVS_Carbon_SRVY <- FVS_Carbon |>  
+#  filter(MgmtId == "SRVY")
+```
+
+Sanity check: did we get the outputs we requested?
+
+```{r sanity-check-expected-output}
+matched_carbon_tmp <- fvs_stands_prsc |>
+  left_join(
+    FVS_Carbon_PRSC |>
+      select(StandID, Year, Aboveground_Total_Live) |> 
+      rename(
+        STAND_ID = StandID,
+        MIN_MEASYEAR = Year,
+        Starting_Carbon = Aboveground_Total_Live
+      ),
+    by = join_by(STAND_ID, MIN_MEASYEAR)
+  ) |>
+  left_join(
+    FVS_Carbon_PRSC |>
+      select(StandID, Year, Aboveground_Total_Live) |>
+      rename(
+        STAND_ID = StandID,
+        MAX_MEASYEAR = Year,
+        Ending_Carbon = Aboveground_Total_Live
+        ),
+    by = join_by(STAND_ID, MAX_MEASYEAR)
+  ) |>
+  mutate(partition = (as.numeric(STAND_ID) %% num_partitions) + 1)
+missing_start <- matched_carbon_tmp |>
+  filter(is.na(Starting_Carbon)) |> 
+  nrow()
+print(missing_start)
+missing_end <- matched_carbon_tmp |>
+  filter(is.na(Ending_Carbon)) |> 
+  nrow()
+print(missing_end)
+stopifnot(missing_start == 0)
+stopifnot(missing_end == 0)
+remove(
+  matched_carbon_tmp,
+  missing_start,
+  missing_end
+)
+```
