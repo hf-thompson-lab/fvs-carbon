@@ -418,22 +418,6 @@ harvested trees by finding all trees that exist in a pre-harvest inventory,
 but do not exist (or are marked as harvested) in the corresponding harvest
 inventory.
 
-## TODO List
-
-✔️ Convert harvest years to per-plot harvest numbers
-✔ join harvest number on to tree
-✔ data validation: were all trees harvested in a harvest?
-  ✔ there are about 20 standing dead trees that are subsequently harvested;
-    given that there are so few, I'm going to not worry about them
-    and treat them the same as live trees that are harvested
-✔ data validation: were trees removed from harvested plots?
-  ✔ there are 13 plots that FIA marks as "harvested," were there are no
-    trees on the plot pre-harvest that are not on the plot post-harvest.
-    Given that there are only 13 of these, I am removing these plots from
-    the analysis.
-✔ create a dataframe with tree_cn and prescription
-✔ write out the prescription table
-
 ## Trees removed in harvest
 
 Fetch trees that were standing pre-harvest, that are not standing post-harvest.
