@@ -3423,6 +3423,41 @@ Which is great, but for large BA plots, only a small portion will be projected,
 so the error is masked by the pre-existing BA. So, instead, look at measured
 vs. projected carbon change.
 
+```{r plot_projected_annual_carbon_flux}
+all_years <- tibble(Year = min(FVS_Carbon_NONE$Year):max(FVS_Carbon_NONE$Year))
+num_years <- all_years |> nrow()
+
+FVS_Carbon_NONE |>
+  group_by(StandID) |>
+  arrange(Year) |>
+  mutate(
+    C_Flux = Aboveground_Total_Live - lag(Aboveground_Total_Live),
+    Prev_Year = lag(Year)
+  ) |>
+  ungroup() |>
+  mutate(
+    Annual_C_Flux = C_Flux / (Year - Prev_Year)
+  ) |>
+  group_by(StandID) |>
+  mutate(Min_Year = min(Year), Max_Year = max(Year)) |>
+  ungroup() |>
+  full_join(all_years, by = join_by(Year)) |>
+  arrange(Year) |>
+  fill(Min_Year, Max_Year, .direction = "updown") |>
+  filter(Year >= Min_Year & Year <= Max_Year) |>
+  fill(StandID, Annual_C_Flux, .direction = "up") |>
+  ggplot(
+    aes(x = Year, y = Annual_C_Flux)
+  ) +
+  geom_bin2d(binwidth = c(1, 1)) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  scale_fill_continuous(name = "Number of Plots", transform = "log10") +
+  theme_bw() +
+  ggtitle("FVS Projected Annual Carbon Flux for Grow-Only Plots") +
+  ylab(bquote("Projected Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) #+;
+
+```
+
 ```{r measured_vs_projected_carbon_change}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0) |> arrange(Projection_Years),
