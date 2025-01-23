@@ -2,8 +2,8 @@
 title: "Nunery Keeton Revisited"
 author: "Nikolaus Bates-Haus"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 editor_options:
   markdown:
     wrap: 72
@@ -999,7 +999,7 @@ from the .out file, when processing TreeSQL:
 > NUMBER ROWS PROCESSED:   18
 
 The number of plots should match the number of distinct SUBP in FIA:
-```{r}
+```{r debug_fia_plot}
 debug_fia_plot <- fvs_stands_prsc |>
   filter(STAND_ID == sub("^([^_]+)_.*$", "\\1", debug_stand_id)) |>
   select(STATECD, COUNTYCD, PLOT, INVYR)
@@ -1013,7 +1013,7 @@ This is probably benign - it means there were trees on only 2 out of 4 subplots
 at the start of the run.
 
 How common is this?
-```{r}
+```{r fvs09 warnings}
 fvs_warnings |>
   filter(grepl("FVS09 WARNING: ", text)) |>
   nrow()
@@ -1024,7 +1024,7 @@ This happens on 9 out of 400 plots; ignore.
 ### One Thousand Trees
 
 The TPA fault may indicate a keyword file generation error; let's track it down.
-```{r}
+```{r one thousand trees}
 debug_stand_id <- fvs_warnings |>
   filter(grepl(" TPA ", text)) |>
   head(1) |>
@@ -1054,7 +1054,7 @@ I think we note that these exist, and ignore them.
 
 How often does this occur?
 
-```{r}
+```{r fvs tpa warnings}
 fvs_warnings |>
   filter(grepl(" TPA ", text)) |>
   nrow()
@@ -1126,6 +1126,8 @@ FVS_Carbon_PRSC <- FVS_Carbon |>
 #  filter(MgmtId == "SRVY")
 ```
 
+### Sanity Check
+
 Sanity check: did we get the outputs we requested?
 
 ```{r sanity-check-expected-output}
@@ -1168,7 +1170,9 @@ remove(
 )
 ```
 
-```{r}
+### Projected Carbon
+
+```{r plot aboveground carbon}
 ggplot(
     FVS_Carbon_PRSC,
     aes(x = Year, y = Aboveground_Total_Live)
@@ -1193,22 +1197,9 @@ ggplot(
 
 ```
 
+### Projected Carbon Flux
 
-```{r}
-x <- FVS_Carbon_PRSC |>
-  group_by(StandID) |>
-  arrange(Year) |>
-  mutate(
-    C_Flux = Aboveground_Total_Live - lag(Aboveground_Total_Live),
-    Prev_Year = lag(Year)
-  ) |>
-  ungroup() |>
-  mutate(
-    Annual_C_Flux = C_Flux / (Year - Prev_Year)
-  )
-```
-
-```{r}
+```{r plot carbon flux}
 all_years <- tibble(Year = min(FVS_Carbon_PRSC$Year):max(FVS_Carbon_PRSC$Year))
 num_years <- all_years |> nrow()
 
