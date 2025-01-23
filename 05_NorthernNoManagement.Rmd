@@ -3441,11 +3441,17 @@ FVS_Carbon_NONE |>
   group_by(StandID) |>
   mutate(Min_Year = min(Year), Max_Year = max(Year)) |>
   ungroup() |>
-  full_join(all_years, by = join_by(Year)) |>
-  arrange(Year) |>
+  full_join(
+    expand.grid(
+      StandID = unique(FVS_Carbon_NONE$StandID),
+      Year = all_years$Year
+    ),
+    by = join_by(StandID, Year)
+  ) |>
+  arrange(StandID, Year) |>
   fill(Min_Year, Max_Year, .direction = "updown") |>
-  filter(Year >= Min_Year & Year <= Max_Year) |>
   fill(StandID, Annual_C_Flux, .direction = "up") |>
+  filter(Year >= Min_Year & Year <= Max_Year) |>
   ggplot(
     aes(x = Year, y = Annual_C_Flux)
   ) +
@@ -3455,6 +3461,53 @@ FVS_Carbon_NONE |>
   theme_bw() +
   ggtitle("FVS Projected Annual Carbon Flux for Grow-Only Plots") +
   ylab(bquote("Projected Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) #+;
+
+```
+
+```{r plot_surveyed_annual_carbon_flux}
+all_years <- tibble(Year = min(FVS_Carbon_SRVY$Year):max(FVS_Carbon_SRVY$Year))
+num_years <- all_years |> nrow()
+
+FVS_Carbon_SRVY |>
+  left_join(
+    stands_surveyed |> select(STAND_ID, STATECD, COUNTYCD, PLOT),
+    by = join_by(StandID == STAND_ID)
+  ) |>
+  mutate(StandID = sprintf('%02d%03d%05d', STATECD, COUNTYCD, PLOT)) |>
+  select(StandID, Year, Aboveground_Total_Live) |>
+  group_by(StandID) |>
+  arrange(Year) |>
+  mutate(
+    C_Flux = Aboveground_Total_Live - lag(Aboveground_Total_Live),
+    Prev_Year = lag(Year)
+  ) |>
+  ungroup() |>
+  mutate(
+    Annual_C_Flux = C_Flux / (Year - Prev_Year)
+  ) |>
+  group_by(StandID) |>
+  mutate(Min_Year = min(Year), Max_Year = max(Year)) |>
+  ungroup() |>
+  full_join(
+    expand.grid(
+      StandID = unique(projected_vs_measured$STAND_ID),
+      Year = all_years$Year
+    ),
+    by = join_by(StandID, Year)
+  ) |>
+  arrange(StandID, Year) |>
+  fill(Min_Year, Max_Year, .direction = "updown") |>
+  fill(StandID, Annual_C_Flux, .direction = "up") |>
+  filter(Year >= Min_Year & Year <= Max_Year) |>
+  ggplot(
+    aes(x = Year, y = Annual_C_Flux)
+  ) +
+  geom_bin2d(binwidth = c(1, 1)) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  scale_fill_continuous(name = "Number of Plots", transform = "log10") +
+  theme_bw() +
+  ggtitle("FVS Observed Annual Carbon Flux for Grow-Only Plots") +
+  ylab(bquote("Observed Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) #+;
 
 ```
 
