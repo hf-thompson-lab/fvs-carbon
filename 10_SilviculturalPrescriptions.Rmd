@@ -352,47 +352,6 @@ map_data('state', fvsne_states$region) |>
   scale_color_discrete(name = "Ecoregion")
 ```
 
-> TODO nik: in FVS_TreeInit_Plot, column PRESCRIPTION FLOAT is used for ThinPRSC.
-> Should be able to identify in which year a tree is harvested and put the year
-> in PRESCRIPTION, then run with a ThinPRSC to remove the trees prescribed for
-> each year.
-
-> NB: ThinPRSC valid range is 2-9 - so this can NOT be the year in which to thin.
-> It needs to be a harvest number (+1)
-
-> Will need to find the database and modify it in-place.
-> Good news: TREE_CN is TREE.CN (and, presumably, PLOT_CN is PLOT.CN, etc)
-> Can a tree be indirectly harvested, e.g. TPA_UNADJ is reduced?
-> Since the SQL Query to fetch trees is in the keyword file, we should
-> be able to modify that query to add PRESCRIPTION as needed.
-```{sql}
-with v as (values
-  (3181625010661, 2006),
-  (3181626010661, 2007)
-)
-select
-  TREE_CN,
-  COALESCE(tree.PRESCRIPTION, v.column2) AS PRESCRIPTION
-FROM FVS_TreeInit_Plot tree
-LEFT JOIN v ON tree.TREE_CN = v.column1
-LIMIT 3;
-```
-
-```
-TREE_CN|PRESCRIPTION
-3181625010661|2006
-3181626010661|2007
-3181627010661|
-```
-
-EXCEPT:
-From FVS's DBSUserGuide, sectino 4.3 Stand and Tree Initialization:
-> The maximum length of the SQL statement is set at 5000 characters
-
-...which is not going to be enough.
-
-Next up: use ATTACH DATABASE 'harvest_prescriptions.db' AS prsc;
-
 # Harvested Trees
 
 Find the trees that were removed during harvest.
