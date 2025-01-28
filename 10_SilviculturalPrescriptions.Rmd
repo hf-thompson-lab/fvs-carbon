@@ -703,6 +703,9 @@ keywordfile_section <- function(
     MgmtId,
     TimeConfig,
     RannSeed,
+    fvs_kwd1("CutList", 0),
+    fvs_kwd1("ATrtList", 0),
+    fvs_kwd1("TreeList", 0),
     fvs_kwd0("FMIn"), # Begin
     fvs_kwd0("CarbRept"),
     fvs_kwd0("CarbCut"),
@@ -724,9 +727,12 @@ keywordfile_section <- function(
     fvs_kwd1("Summary",  2),
     fvs_kwd2("Computdb", 0, 1),
     fvs_kwd1("MisRpts",  2),
+    fvs_kwd1("ATrtLiDB", 2),
     fvs_kwd1("CarbReDB", 2),
+    fvs_kwd1("CutLiDB", 2),
     fvs_kwd1("FuelReDB", 2),
     fvs_kwd1("FuelsOut", 2),
+    fvs_kwd1("TreeLiDB", 2),
     fvs_kwd0("End"), # Database
     Thin,
     #Regen,
@@ -1069,50 +1075,57 @@ We can decide to not worry about them.
 Load the output from all FVS partitions into a single dataframe
 
 ```{r FVS_Carbon, cache=TRUE}
-FVS_Carbon <- NULL
-FVS_Summary2_East <- NULL
-
-for (partition in 1:num_partitions) {
+load_result_table_helper <- function(title, mgmtid, partition, table) {
   filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".db")
-  if (file.exists(filename)) {
-    #print(paste0("Reading ", filename))
-    fvs_out_db <- DBI::dbConnect(RSQLite::SQLite(), filename)
-    fvs_carbon_tbl = tbl(fvs_out_db, 'FVS_Carbon') |>
-      collect() |>
-      mutate(
-        Title = title,
-        MgmtId = mgmtid,
-        Timestep = sub("^.*_Y([0-9]+).*$", "\\1", StandID), # Extract timestep
-        RanNSeed = sub("^.*_R([0-9]+).*$", "\\1", StandID), # Extract random seed
-        Partition = partition,
-        StandID = sub("^([^_]+)_.*$", "\\1", StandID) # Extract stand ID
-      )
-    FVS_Carbon <- bind_rows(FVS_Carbon, fvs_carbon_tbl)
+  stopifnot(file.exists(filename))
+  fvs_out_db <- DBI::dbConnect(RSQLite::SQLite(), filename)
+  on.exit(dbDisconnect(fvs_out_db), add = TRUE, after = FALSE)
 
-    fvs_summary2_east_tbl = tbl(fvs_out_db, 'FVS_Summary2_East') |>
-      collect() |>
-      mutate(
-        Title = title,
-        MgmtId = mgmtid,
-        Timestep = sub("^.*_Y([^_]+)_.*$", "\\1", StandID), # Extract timestep
-        RanNSeed = sub("^.*_R([^_]+)_.*$", "\\1", StandID), # Extract random seed
-        Partition = partition,
-        StandID = sub("^([^_]+)_.*$", "\\1", StandID) # Extract stand ID
-      )
-      FVS_Summary2_East <- bind_rows(FVS_Summary2_East, fvs_summary2_east_tbl)
-  
-      dbDisconnect(fvs_out_db)
-  } else {
-    print(paste0("Skipping ", filename))
-  }
+  fvs_carbon_tbl = tbl(fvs_out_db, table) |>
+    collect() |>
+    mutate(
+      Title = title,
+      MgmtId = mgmtid,
+      Timestep = sub("^.*_Y([0-9]+).*$", "\\1", StandID), # Extract timestep
+      RanNSeed = sub("^.*_R([0-9]+).*$", "\\1", StandID), # Extract random seed
+      Partition = partition,
+      StandID = sub("^([^_]+)_.*$", "\\1", StandID) # Extract stand ID
+    )
 }
 
-remove(fvs_out_db, fvs_carbon_tbl, fvs_summary2_east_tbl)
+load_result_table <- function(title, mgmt_id, partition, table) {
+  bind_rows(
+    pbapply(
+      expand.grid(MgmtId = mgmt_id, Partition = partition),
+      1,
+      \(row) {
+        m <- row["MgmtId"]
+        p <- as.integer(row["Partition"])
+        load_result_table_helper(title, m, p, table)
+      }
+    )
+  )
+}
+
+mgmt_ids <- c("PRSC", "SRVY")
+partitions <- 1:num_partitions
+
+print("Loading Carbon results")
+FVS_Carbon <- load_result_table(title, mgmt_ids, partitions, "FVS_Carbon")
+
+print("Loading result Summary")
+FVS_Summary2_East <- load_result_table(title, mgmt_ids, partitions, "FVS_Summary2_East")
+
+print("Loading Treelist")
+FVS_TreeList_East <- load_result_table(title, mgmt_ids, partitions, "FVS_TreeList_East")
+
+rm(load_result_table, load_result_table_helper)
 ```
 Consolidate outputs; average the multiple runs with different random seeds.
 
-```{r FVS_Carbon_NONE}
+```{r FVS_Carbon_PRSC}
 FVS_Carbon_PRSC <- FVS_Carbon |>
+  filter(MgmtId == "PRSC") |>
   group_by(StandID, Year) |>
   summarize(
     Aboveground_Total_Live = mean(Aboveground_Total_Live),
@@ -1122,8 +1135,8 @@ FVS_Carbon_PRSC <- FVS_Carbon |>
   ungroup()
 
 # There is no projection for the observed run, so no need to average
-#FVS_Carbon_SRVY <- FVS_Carbon |>  
-#  filter(MgmtId == "SRVY")
+FVS_Carbon_SRVY <- FVS_Carbon |>  
+  filter(MgmtId == "SRVY")
 ```
 
 ### Sanity Check
