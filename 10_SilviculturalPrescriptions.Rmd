@@ -1072,54 +1072,92 @@ We can decide to not worry about them.
 
 ## Load Results
 
-Load the output from all FVS partitions into a single dataframe
+Load the output from all FVS partitions into a single database.
+Particularly with the tree list, these start to get big, so we want to 
+put them into SQLite where we can quickly read in just those portions
+we're interested in.
+
+```{r consolidate_results}
+mgmt_ids <- c("PRSC", "SRVY")
+partitions <- 1:num_partitions
+
+fvs_output_partition <- function(title, mgmtid, partition) {
+  paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".db")
+}
+
+fvs_output_consolidated <- function(title, mgmtid) {
+  paste0("data/fvs/FVS_", title, "_", mgmtid, "_Results.db")
+}
+
+fvs_consolidate_output <- function(title, mgmtid, partitions) {
+  dest <- dbConnect(RSQLite::SQLite(), fvs_output_consolidated(title, mgmtid))
+  on.exit(dbDisconnect(dest), add = TRUE, after = FALSE)
+
+  pblapply(partitions, \(partition) {
+    part <- dbConnect(RSQLite::SQLite(), fvs_output_partition(title, mgmtid, partition))
+    on.exit(dbDisconnect(part), add = TRUE, after = FALSE)
+    
+    tables <- dbListTables(part)
+    lapply(tables, \(table) {
+      dbWriteTable(dest, table, tbl(part, table) |> collect(), append = TRUE)
+    })
+  })
+}
+
+invisible(
+  lapply(mgmt_ids, \(mgmtid) {
+    filename <- fvs_output_consolidated(title, mgmtid)
+    print(paste0("Writing ", filename))
+    if (file.exists(filename)) {
+      unlink(filename)
+    }
+    # Notable SQLite restrictions:
+    # - One statement per dbExecute - so, no semicolon-separated statements
+    # - Maximum of 10 connections at a time
+    # - Not all tables exist in all outputs; e.g. FVS_Error only exists
+    #   if an error was observed
+    # Rather than try to be clever and have SQLite copy the tables,
+    # it's easier (and about as fast) to pull them into R one partition
+    # at a time, and write the data out to the consolidated database
+    fvs_consolidate_output(title, mgmtid, partitions)
+  })
+)
+rm(fvs_output_partition, fvs_output_consolidated, fvs_consolidate_output)
+```
+
 
 ```{r FVS_Carbon, cache=TRUE}
-load_result_table_helper <- function(title, mgmtid, partition, table) {
-  filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".db")
+load_result_table <- function(title, mgmtid, table) {
+  filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_Results.db")
   stopifnot(file.exists(filename))
   fvs_out_db <- DBI::dbConnect(RSQLite::SQLite(), filename)
   on.exit(dbDisconnect(fvs_out_db), add = TRUE, after = FALSE)
 
-  fvs_carbon_tbl = tbl(fvs_out_db, table) |>
+  tbl(fvs_out_db, table) |>
     collect() |>
     mutate(
       Title = title,
       MgmtId = mgmtid,
       Timestep = sub("^.*_Y([0-9]+).*$", "\\1", StandID), # Extract timestep
       RanNSeed = sub("^.*_R([0-9]+).*$", "\\1", StandID), # Extract random seed
-      Partition = partition,
-      StandID = sub("^([^_]+)_.*$", "\\1", StandID) # Extract stand ID
+      StandID = sub("^([^_]+)_.*$", "\\1", StandID), # Extract stand ID
+      Partition = (as.numeric(StandID) %% num_partitions) + 1
     )
 }
-
-load_result_table <- function(title, mgmt_id, partition, table) {
-  bind_rows(
-    pbapply(
-      expand.grid(MgmtId = mgmt_id, Partition = partition),
-      1,
-      \(row) {
-        m <- row["MgmtId"]
-        p <- as.integer(row["Partition"])
-        load_result_table_helper(title, m, p, table)
-      }
-    )
-  )
-}
-
-mgmt_ids <- c("PRSC", "SRVY")
-partitions <- 1:num_partitions
 
 print("Loading Carbon results")
-FVS_Carbon <- load_result_table(title, mgmt_ids, partitions, "FVS_Carbon")
+FVS_Carbon <- bind_rows(
+  load_result_table(title, "PRSC", "FVS_Carbon"),
+  load_result_table(title, "SRVY", "FVS_Carbon")
+)
 
 print("Loading result Summary")
-FVS_Summary2_East <- load_result_table(title, mgmt_ids, partitions, "FVS_Summary2_East")
+FVS_Summary2_East <- bind_rows(
+  load_result_table(title, "PRSC", "FVS_Summary2_East"),
+  load_result_table(title, "SRVY", "FVS_Summary2_East")
+)
 
-print("Loading Treelist")
-FVS_TreeList_East <- load_result_table(title, mgmt_ids, partitions, "FVS_TreeList_East")
-
-rm(load_result_table, load_result_table_helper)
+rm(load_result_table)
 ```
 Consolidate outputs; average the multiple runs with different random seeds.
 
