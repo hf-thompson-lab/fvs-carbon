@@ -1221,14 +1221,11 @@ FVS_Carbon_PRSC |>
   arrange(Year) |>
   mutate(
     C_Flux = Aboveground_Total_Live - lag(Aboveground_Total_Live),
-    Prev_Year = lag(Year)
+    Prev_Year = lag(Year),
+    Annual_C_Flux = C_Flux / (Year - Prev_Year),
+    Min_Year = min(Year),
+    Max_Year = max(Year)
   ) |>
-  ungroup() |>
-  mutate(
-    Annual_C_Flux = C_Flux / (Year - Prev_Year)
-  ) |>
-  group_by(StandID) |>
-  mutate(Min_Year = min(Year), Max_Year = max(Year)) |>
   ungroup() |>
   full_join(
     expand.grid(
@@ -1238,8 +1235,8 @@ FVS_Carbon_PRSC |>
     by = join_by(StandID, Year)
   ) |>
   arrange(StandID, Year) |>
-  fill(Min_Year, Max_Year, .direction = "updown") |>
   fill(StandID, Annual_C_Flux, .direction = "up") |>
+  fill(Min_Year, Max_Year, .direction = "updown") |>
   filter(Year >= Min_Year & Year <= Max_Year) |>
   ggplot(
     aes(x = Year, y = Annual_C_Flux)
