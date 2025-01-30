@@ -10,12 +10,9 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-library(tidyverse)
+library(targets)
 library(reshape2) # for melt()
-library(RSQLite)
-library(htmltools)
-library(rmarkdown)
-library(dbplyr)
+library(ggplot2)
 ```
 
 # Reconstructing NK Figure 2
@@ -32,87 +29,10 @@ Note that all values are approximate. For example, all values should
 align in 2005, but they do not; we ignore this, since small differences
 are within the error bounds for parsing the chart.
 
-```{r}
-NK_Fig2_NoManagement <- read_csv(
-    "data/raw/NK_Fig2_NoManagement.csv",
-    col_names = c("Year","NoManagement"),
-    # Read columns as double, since that is how they were written
-    col_types = "dd"
-  ) |>
-  # Round columns to nearest integer, since that is what was intended
-  mutate(Year=round(Year), NoManagement=round(NoManagement))
-NK_Fig2_ClearcutHigh <- read_csv(
-    "data/raw/NK_Fig2_ClearcutHigh.csv",
-    col_names = c("Year","ClearcutHigh"),
-    col_types = "dd"
-  ) |>
-  mutate(Year=round(Year), ClearcutHigh=round(ClearcutHigh))
-NK_Fig2_ClearcutLow <- read_csv(
-    "data/raw/NK_Fig2_ClearcutLow.csv",
-    col_names = c("Year","ClearcutLow"),
-    col_types = "dd"
-  ) |>
-  mutate(Year=round(Year), ClearcutLow=round(ClearcutLow))
-NK_Fig2_ShelterwoodHigh <- read_csv(
-    "data/raw/NK_Fig2_ShelterwoodHigh.csv",
-    col_names = c("Year","ShelterwoodHigh"),
-    col_types = "dd"
-  ) |>
-  mutate(Year=round(Year), ShelterwoodHigh=round(ShelterwoodHigh))
-NK_Fig2_ShelterwoodLow <- read_csv(
-    "data/raw/NK_Fig2_ShelterwoodLow.csv",
-    col_names = c("Year","ShelterwoodLow"),
-    col_types = "dd"
-  ) |>
-  mutate(Year=round(Year), ShelterwoodLow=round(ShelterwoodLow))
-NK_Fig2_ITS_LowHigh <- read_csv(
-    "data/raw/NK_Fig2_ITS_LowHigh.csv",
-    col_names = c("Year","ITS_LowHigh"),
-    col_types = "dd"
-  ) |>
-  mutate(Year=round(Year), ITS_LowHigh=round(ITS_LowHigh))
-NK_Fig2_ITS_LowLow <- read_csv(
-    "data/raw/NK_Fig2_ITS_LowLow.csv",
-    col_names = c("Year","ITS_LowLow"),
-    col_types = "dd"
-  ) |>
-  mutate(Year=round(Year), ITS_LowLow=round(ITS_LowLow))
-NK_Fig2_ITS_HighHigh <- read_csv(
-    "data/raw/NK_Fig2_ITS_HighHigh.csv",
-    col_names = c("Year","ITS_HighHigh"),
-    col_types = "dd"
-  ) |>
-  mutate(Year=round(Year), ITS_HighHigh=round(ITS_HighHigh))
-NK_Fig2_ITS_HighLow <- read_csv(
-    "data/raw/NK_Fig2_ITS_HighLow.csv",
-    col_names = c("Year","ITS_HighLow"),
-    col_types = "dd"
-  ) |>
-  mutate(Year=round(Year), ITS_HighLow=round(ITS_HighLow))
-
-# Assemble a single table from 2005 - 2165
-fig2 <- NK_Fig2_NoManagement |>
-  full_join(NK_Fig2_ClearcutHigh, by=join_by(Year)) |>
-  full_join(NK_Fig2_ClearcutLow, by=join_by(Year)) |>
-  full_join(NK_Fig2_ShelterwoodHigh, by=join_by(Year)) |>
-  full_join(NK_Fig2_ShelterwoodLow, by=join_by(Year)) |>
-  full_join(NK_Fig2_ITS_LowHigh, by=join_by(Year)) |>
-  full_join(NK_Fig2_ITS_LowLow, by=join_by(Year)) |>
-  full_join(NK_Fig2_ITS_HighHigh, by=join_by(Year)) |>
-  full_join(NK_Fig2_ITS_HighLow, by=join_by(Year)) |>
-  filter(Year>=2005) |>
-  # The last year in Fig2 is 2164; nudge it to 2165
-  # to align with contemporary FVS runs.
-  mutate(Year=if_else(Year==2164,2165,Year)) |>
-  arrange(Year)
-
-write_csv(
-  fig2,
-  "data/intermediate/nk_fig2_reconstructed.csv"
-)
-
+```{r nk_fig2}
+tar_load(nk_fig2)
 ggplot(
-    data = melt(fig2, id.vars = "Year"),
+    data = melt(nk_fig2, id.vars = "Year"),
     mapping = aes(x = Year, y = value, color = variable)
   ) +
   ggtitle("NK Fig2 Reconstruction") +
