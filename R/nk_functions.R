@@ -46,8 +46,8 @@ nk_extract_cols_from_plot_code <- function(.data) {
 
 nk_load_plot_all_invyr <- function(.data, fiadb)
 {
-  fia = DBI::dbConnect(RSQLite::SQLite(), fiadb)
-  on.exit(dbDisconnect(fia))
+  fia = DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = SQLITE_RO)
+  on.exit(dbDisconnect(fia), add = TRUE, after = FALSE)
   
   tbl(fia, 'COND') |>
     rename(FIA_INVYR=INVYR) |>
@@ -112,8 +112,8 @@ nk_transalte_to_fia <- function(nk_stands) {
 }
 
 nk_translate_to_fvs <- function(fvs_stands, fiadb) {
-  fia = DBI::dbConnect(RSQLite::SQLite(), fiadb)
-  on.exit(dbDisconnect(fia))
+  fia = DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = SQLITE_RO)
+  on.exit(dbDisconnect(fia), add = TRUE, after = FALSE)
   
   matching_plotinit_plot_grp <- tbl(fia, 'FVS_PLOTINIT_PLOT') |>
     right_join(
