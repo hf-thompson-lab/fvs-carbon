@@ -63,7 +63,7 @@ In addition, the way INVYR is assigned has changed, so the NK INVYR no
 longer aligns with the inventory years in the FIA data for 27 of the 32
 plots.
 
-```{r}
+```{r nk_all_plot}
 tar_load(nk_all_plot)
 # Group by STATECD, UNITCD, COUNTYCD and PLOT to see how NK INVYR does and
 # doesn't line up with FIA INVYR
@@ -83,7 +83,7 @@ two data sets, we note that NK's "Starting stand age" matches
 `FIA.COND.STDAGE`, uniquely identifying all but one of the stands used
 in NK.
 
-```{r}
+```{r nk_matching_plot }
 tar_load(nk_matching_plot)
 knitr::kable(nk_matching_plot)
 ```
@@ -104,7 +104,7 @@ Note that the Stand IDs visible in the FVS UI are different from these;
 the FVS UI Stand ID consists of STATECD(2) + INVYR(2) + COUNTYCD(3) +
 PLOT(5), and if using FVS_STANDINIT_COND, then also + CONDID(1).
 
-```{r}
+```{r nk_to_fia}
 tar_load(nk_to_fia)
 knitr::kable(nk_to_fia)
 ```
@@ -114,7 +114,7 @@ determine the number of matching rows from each corresponding table,
 confirming that each updated Stand ID corresponds to a unique stand in
 the provided FVS tables.
 
-```{r}
+```{r nk_to_fvs}
 tar_load(nk_to_fvs)
 knitr::kable(nk_to_fvs)
 ```
