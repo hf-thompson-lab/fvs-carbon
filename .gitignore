@@ -64,3 +64,6 @@ data/intermediate
 
 # targets local object store
 _targets/
+
+# rendered documents
+rendered/
