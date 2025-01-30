@@ -30,12 +30,12 @@ align in 2005, but they do not; we ignore this, since small differences
 are within the error bounds for parsing the chart.
 
 ```{r nk_fig2}
-tar_load(nk_fig2)
+tar_load(nk_fig_2)
 ggplot(
-    data = melt(nk_fig2, id.vars = "Year"),
+    data = melt(nk_fig_2, id.vars = "Year"),
     mapping = aes(x = Year, y = value, color = variable)
   ) +
-  ggtitle("NK Fig2 Reconstruction") +
+  ggtitle("NK Fig. 2 Reconstruction") +
   ylab("Carbon (Tonnes / Hectare)") +
   theme(legend.title = element_blank()) +
   geom_line() +

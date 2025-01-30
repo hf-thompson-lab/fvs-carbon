@@ -26,8 +26,8 @@ subsequently changed, so these codes no longer align with the stand
 identifiers in the FVS tables in the published FIA data.
 
 ```{r nk_table1}
-tar_load(nk_table1)
-knitr::kable(nk_table1, caption = 'Nunery Keeton Table 1')
+tar_load(nk_table_1)
+knitr::kable(nk_table_1, caption = 'Nunery Keeton Table 1')
 ```
 
 To re-align NK's plot codes with the FIA published FVS stand

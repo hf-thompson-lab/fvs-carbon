@@ -10,6 +10,7 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
+library(targets)
 library(tidyverse)
 library(reshape2) # for melt()
 library(RSQLite)
@@ -18,6 +19,7 @@ library(measurements)
 
 ```{r source-functions}
 source('R/functions.R')
+source('R/fia_functions.R')
 ```
 
 # Reproducing the NoManagement Scenario
@@ -29,37 +31,11 @@ FVS Software with `Release date: 20240401` was used.
 FIA data version:
 
 ```{r}
-fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-fia_ref_fiadb_version <- tbl(fia, 'REF_FIADB_VERSION')
-version <- fia_ref_fiadb_version |>
-  filter(INSTALL_TYPE == 'RELEASE') |>
-  arrange(desc(CREATED_DATE)) |>
-  head(1) |>
-  collect()
-DBI::dbDisconnect(fia)
-remove(fia, fia_ref_fiadb_version)
-knitr::kable(version)
+tar_load(fiadb)
+fia_version(fiadb)
 ```
 
 ### Stands
-
-```{r nk_to_fia}
-nk_to_fia <- read_csv(
-  "data/intermediate/nk_to_fia.csv", 
-  col_types = cols(
-    `FIA plot code` = col_character(), 
-    NK_INVYR = col_character(),
-    STATECD = col_integer(), 
-    INVYR = col_integer(),
-    CYCLE = col_character(), 
-    SUBCYCLE = col_character(),
-    CONDID = col_character(), 
-    UNITCD = col_character(),
-    COUNTYCD = col_integer(), 
-    PLOT = col_integer()
-  )
-)
-```
 
 #### Via the UI
 
@@ -76,24 +52,8 @@ be added to the run.
 
 #### Automatic
 
-What FVS calls "StandCN" is what FIA calls "PLOT.CN". Augment nk_to_fia
-to include this information.
-
-```{r stand_cn}
-fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-
-stand_cns <- tbl(fia, 'PLOT') |>
-  left_join(nk_to_fia, by = join_by(STATECD, COUNTYCD, PLOT, INVYR), copy = TRUE) |>
-  select(CN, STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR) |>
-  rename(STAND_CN = CN) |>
-  collect()
-
-nk_to_fia <- nk_to_fia |>
-  left_join(stand_cns, by = join_by(STATECD, COUNTYCD, PLOT, INVYR))
-
-DBI::dbDisconnect(fia)
-rm(fia, stand_cns)
-```
+What FVS calls "StandCN" is what FIA calls "PLOT.CN". The keywordfile
+looks up stands by StandCN. nk_to_fia includes STAND_CN for the NK plots.
 
 ### Time
 
@@ -122,50 +82,14 @@ This background regeneration rate is in NK Table 4.
 Note that if *any* establishment is specified, whether Natural or Plant,
 FVS defaults to doing site prep. It generates a mix of mechanical and burn site
 prep based on site characteristics. For grow-only plots, it's important to turn
-this off by explicitly
+this off by explicitly specifying MerchPrep 0 or BurnPrep 0 (or both).
 
-```{r}
-table4 <- read_csv(
-  "data/raw/NK_Table_4.csv",
-  col_types = cols(
-    `Management scenario` = col_character(),
-    .default = col_number(),
-  )
-)
-
-# Table4 uses scientific names; translate to get FVS Species Code
-fvs_species_codes <- read_csv(
-    "data/raw/FVSne_Overview_Table_3.2.1.csv",
-    col_types = "iiciccc"
-  ) |>
-  select("Scientific Name", "Species Code", "Common Name")
-
-# table4 has one column per species. We wish to add observations per species
-# with different types, so pivot the table to have one row per species.
-table4_rot <- table4 |>
-  pivot_longer(cols = !`Management scenario`) |>
-  pivot_wider(names_from = `Management scenario`) |>
-  rename(`Scientific Name` = name) |>
-  left_join(fvs_species_codes, by = join_by(`Scientific Name`)) |>
-  # Values in NK are seedlings per hectare; FVS needs seedlings per acre.
-  # To convert rates, do the reverse conversion, i.e. to convert from
-  # per-hectare to per-acre, we convert using the inverse of the ratio
-  # of hectare-to-acre, which is the same as the ratio from acre-to-hectare.
-  mutate(Clearcut = round(conv_unit(Clearcut, 'acre', 'hectare'))) |>
-  mutate(Shelterwood = round(conv_unit(Shelterwood, 'acre', 'hectare'))) |>
-  mutate(`ITS_Low Retention` = round(conv_unit(`ITS_Low Retention`, 'acre', 'hectare'))) |>
-  mutate(`ITS_High Retention` = round(conv_unit(`ITS_High Retention`, 'acre', 'hectare'))) |>
-  mutate(Background = round(conv_unit(Background, 'acre', 'hectare')))
-
-
-write_csv(table4_rot, 'data/intermediate/nk_regen.csv')
-
-knitr::kable(
-  table4_rot |>
-    filter(!is.na(Background)) |>
-    select(`Scientific Name`, Background, `Species Code`, `Common Name`) |>
-    arrange(desc(Background))
-)
+```{r nk_regen}
+tar_load(nk_regen)
+nk_regen |>
+  filter(!is.na(Background)) |>
+  select(SCIENTIFIC_NAME, Background, FVS_SPCD, COMMON_NAME) |>
+  arrange(desc(Background))
 ```
 
 #### Via the UI
@@ -206,8 +130,8 @@ Select `Save in run` to apply to `Grp: All_FIA_Plots`.
 #### Automatic
 
 ```{r background_regen}
-background_regen <- table4_rot |>
-  rename(species = `Species Code`, density = Background) |>
+background_regen <- nk_regen |>
+  rename(species = FVS_SPCD, density = Background) |>
   filter(!is.na(density)) |>
   fvs_Estab()
 ```

@@ -19,6 +19,7 @@ library(RSQLite)
 library(measurements) # conv_unit and conv_multiunit
 library(maps)
 library(pbapply) # Progress bar for long operations
+library(targets)
 options(scipen = 9) # Use integer notation for numbers under 9 digits
 ```
 
@@ -41,66 +42,8 @@ USE_CACHE <- TRUE
 Different systems use different ways of encoding species. Here's a single
 crosswalk for them all.
 
-```{r species_mixin}
-rds_file <- "data/intermediate/species_mixin.rds"
-if (USE_CACHE & file.exists(rds_file)) {
-  species_mixin <- read_rds(rds_file)
-} else {
-  fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-  
-  jenkins_spgrpcd_mixin <- read_csv(
-      "data/raw/FIADB_11.5.17_JENKINS_SPGRPCD.csv", 
-      col_types = cols(JENKINS_SPGRPCD = col_integer())
-    ) |>
-    select(JENKINS_SPGRPCD, NAME) |>
-    rename(JENKINS_SPGRP_NAME = NAME)
-  
-  fvs_spcd_mixin <- read_csv(
-      "data/raw/FVSne_Overview_Table_3.2.1.csv",
-      col_types = "iiciccc"
-    ) |>
-    select(`FIA Code`, `Species Number`, `Species Code`) |>
-    rename(
-      SPCD = `FIA Code`,
-      FVS_SPNO = `Species Number`,
-      FVS_SPCD = `Species Code`
-    )
-  
-  species_mixin <- tbl(fia, 'REF_SPECIES') |>
-    select(SPCD, GENUS, SPECIES, E_SPGRPCD, JENKINS_SPGRPCD, SCIENTIFIC_NAME, COMMON_NAME) |>
-    left_join(
-      tbl(fia, 'REF_SPECIES_GROUP') |> distinct(SPGRPCD, NAME),
-      by = join_by(E_SPGRPCD == SPGRPCD)
-    ) |>
-    rename(SPGRPCD = E_SPGRPCD, SPGRP_NAME = NAME) |>
-    collect() |>
-    left_join(jenkins_spgrpcd_mixin, by = join_by(JENKINS_SPGRPCD)) |>
-    left_join(fvs_spcd_mixin, by = join_by(SPCD)) |>
-    # From FIADB User Guides
-    # Volume Database Description (version 9.2)
-    # Appendix E: Tree Species Group Codes
-    # Softwoods: 1 - 24
-    # Hardwoods: 25 - 48
-    # Tropical and subtropical: 51 - 54
-    # Urban: 55, 56
-    # SPGRP_NAME often has hardwood or softwood in the name;
-    # less frequently, JENKINS_SPGRP_NAME does.
-    mutate(HARD_SOFT = case_when(
-      SPGRPCD %in% 1:24 ~ "SOFTWOOD",
-      SPGRPCD %in% 25:48 ~ "HARDWOOD",
-      grepl("hardwood", SPGRP_NAME) ~ "HARDWOOD",
-      grepl("softwood", SPGRP_NAME) ~ "SOFTWOOD",
-      grepl("hardwood", JENKINS_SPGRP_NAME) ~ "HARDWOOD",
-      grepl("softwood", JENKINS_SPGRP_NAME) ~ "SOFTWOOD",
-      .default = NA
-    ))
-  
-  dbDisconnect(fia)
-  
-  rm(fia, jenkins_spgrpcd_mixin, fvs_spcd_mixin)
-
-  write_rds(species_mixin, rds_file)
-}
+```{r species_crosswalk}
+tar_load(species_crosswalk)
 ```
 
 # Grow-Only Plots in the Northeast

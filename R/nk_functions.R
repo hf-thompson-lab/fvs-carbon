@@ -1,12 +1,12 @@
-nk_read_table1 <- function(file) {
+nk_read_table_1 <- function(filename) {
   read_csv(
-    file,
+    filename,
     col_types = cols(`FIA plot code` = col_character())
   )
 }
 
-nk_read_fig2 <- function(dir) {
-  nk_read_fig2_helper <- function(dir, column) {
+nk_read_fig_2 <- function(dir) {
+  nk_read_fig_2_helper <- function(dir, column) {
     filename <- file.path(dir, paste0("NK_Fig2_", column, ".csv"))
     read_csv(
       filename,
@@ -27,7 +27,7 @@ nk_read_fig2 <- function(dir) {
     "ShelterwoodHigh", "ShelterwoodLow",
     "ITS_LowHigh", "ITS_LowLow", "ITS_HighHigh", "ITS_HighLow"
   )
-  bind_rows(lapply(columns, \(column) nk_read_fig2_helper(dir, column) )) |>
+  bind_rows(lapply(columns, \(column) nk_read_fig_2_helper(dir, column) )) |>
     pivot_wider(id_cols = "Year") |>
     # The last year in Fig2 is 2164; nudge it to 2165
     # to align with contemporary FVS runs.
@@ -36,7 +36,7 @@ nk_read_fig2 <- function(dir) {
 }
 
 nk_extract_cols_from_plot_code <- function(.data) {
-  nk_table1_expanded <- .data |>
+  .data |>
     mutate(STATECD = substr(`FIA plot code`, 1, 2)) |>
     mutate(INVYR = substr(`FIA plot code`, 3, 6)) |>
     mutate(UNITCD = substr(`FIA plot code`, 7, 8)) |>
@@ -84,15 +84,8 @@ nk_match_plots <- function(nk_plots, fia_plots) {
     )
 }
 
-compute_nk_to_fia <- function(nk_all_cond) {
-  nk_all_cond |>
-    select(`FIA plot code`, NK_INVYR, 
-           STATECD, FIA_INVYR, CYCLE, SUBCYCLE, UNITCD, CONDID, UNITCD, COUNTYCD, PLOT) |>
-    rename(INVYR = FIA_INVYR)
-}
-
-nk_transalte_to_fia <- function(nk_stands) {
-  nk_stands |>
+nk_transalte_to_fia <- function(fiadb, nk_stands) {
+  left <- nk_stands |>
     mutate(
       STATECD  = as.numeric(STATECD),
       UNITCD   = as.numeric(UNITCD),
@@ -107,8 +100,30 @@ nk_transalte_to_fia <- function(nk_stands) {
       '%04d' , '%04d'    , '%02d', '%02d'  , '%02d', '%03d'  , '%05d'),
       STATECD, FIA_INVYR , CYCLE , SUBCYCLE, UNITCD, COUNTYCD, PLOT
     )) |>
-    mutate(STAND_ID_COND=paste0(STAND_ID_PLOT, CONDID)) |>
-    select(`FIA plot code`, FVS_STAND_ID, STAND_ID_PLOT, STAND_ID_COND)
+    mutate(STAND_ID_COND=paste0(STAND_ID_PLOT, CONDID))
+
+  con = DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = SQLITE_RO)
+  on.exit(dbDisconnect(con), add = TRUE, after = FALSE)
+  
+  plot_mixin <- tbl(con, 'PLOT') |>
+    semi_join(
+      left |>
+        distinct(STATECD, COUNTYCD, PLOT, FIA_INVYR) |>
+        rename(INVYR = FIA_INVYR),
+      by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
+      copy = TRUE
+    ) |>
+    select(CN, STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR) |>
+    rename(STAND_CN = CN, FIA_INVYR = INVYR) |>
+    collect()
+  
+  left |>
+    left_join(plot_mixin, by = join_by(STATECD, COUNTYCD, PLOT, FIA_INVYR)) |>
+    select(
+      `FIA plot code`,
+      STAND_CN, STATECD, COUNTYCD, PLOT, FIA_INVYR, MEASYEAR,
+      FVS_STAND_ID, STAND_ID_PLOT, STAND_ID_COND
+    )
 }
 
 nk_translate_to_fvs <- function(fvs_stands, fiadb) {
@@ -154,4 +169,33 @@ nk_translate_to_fvs <- function(fvs_stands, fiadb) {
     left_join(matching_plotinit_plot_grp, by=join_by(STAND_ID_PLOT==FVS_PLOTINIT_PLOT)) |>
     left_join(matching_standinit_cond_grp, by=join_by(STAND_ID_COND==FVS_STANDINIT_COND)) |>
     left_join(matching_standinit_plot_grp, by=join_by(STAND_ID_PLOT==FVS_STANDINIT_PLOT))
+}
+
+nk_read_table_4 <- function(filename) {
+  read_csv(
+    filename,
+    col_types = cols(
+      `Management scenario` = col_character(),
+      .default = col_number(),
+    )
+  )
+}
+
+nk_generate_regen <- function(nk_table_4, species_crosswalk) {
+  # Values in NK are seedlings per hectare; FVS needs seedlings per acre.
+  # Convert using hectares_per_acre
+  hectares_per_acre <- conv_unit(1, "acre", "hectare")
+
+  # table4 has one column per species. We wish to add observations per species
+  # with different types, so pivot the table to have one row per species.
+  nk_table_4 |>
+    pivot_longer(cols = !`Management scenario`) |>
+    pivot_wider(names_from = `Management scenario`) |>
+    rename(SCIENTIFIC_NAME = name) |>
+    left_join(species_crosswalk, by = join_by(SCIENTIFIC_NAME)) |>
+    mutate(Clearcut = round(Clearcut * hectares_per_acre)) |>
+    mutate(Shelterwood = round(Shelterwood * hectares_per_acre)) |>
+    mutate(`ITS_Low Retention` = round(`ITS_Low Retention` * hectares_per_acre)) |>
+    mutate(`ITS_High Retention` = round(`ITS_High Retention` * hectares_per_acre)) |>
+    mutate(Background = round(Background * hectares_per_acre))
 }

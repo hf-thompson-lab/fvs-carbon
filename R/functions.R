@@ -287,132 +287,48 @@ hectare_at <- function(lat, lon) {
   hectare_polygon
 }
 
-fvs_kwd0 <- function(kwd) {
-  sprintf('%-10s', kwd)
-}
-
-fvs_kwd1 <- function(kwd, arg1) {
-  arg1 <- as.character(arg1)
-  sprintf('%-10s%10s', kwd, arg1)
-}
-
-fvs_kwd2 <- function(kwd, arg1, arg2) {
-  arg1 <- as.character(arg1)
-  arg2 <- as.character(arg2)
-  sprintf('%-10s%10s%10s', kwd, arg1, arg2)
-}
-
-fvs_kwd3 <- function(kwd, arg1, arg2, arg3) {
-  arg1 <- as.character(arg1)
-  arg2 <- as.character(arg2)
-  arg3 <- as.character(arg3)
-  sprintf('%-10s%10s%10s%10s', kwd, arg1, arg2, arg3)
-}
-
-fvs_kwd4 <- function(kwd, arg1, arg2, arg3, arg4) {
-  arg1 <- as.character(arg1)
-  arg2 <- as.character(arg2)
-  arg3 <- as.character(arg3)
-  arg4 <- as.character(arg4)
-  sprintf('%-10s%10s%10s%10s%10s', kwd, arg1, arg2, arg3, arg4)
-}
-
-fvs_kwd5 <- function(kwd, arg1, arg2, arg3, arg4, arg5) {
-  arg1 <- as.character(arg1)
-  arg2 <- as.character(arg2)
-  arg3 <- as.character(arg3)
-  arg4 <- as.character(arg4)
-  arg5 <- as.character(arg5)
-  sprintf('%-10s%10s%10s%10s%10s%10s', kwd, arg1, arg2, arg3, arg4, arg5)
-}
-
-fvs_kwd6 <- function(kwd, arg1, arg2, arg3, arg4, arg5, arg6) {
-  arg1 <- as.character(arg1)
-  arg2 <- as.character(arg2)
-  arg3 <- as.character(arg3)
-  arg4 <- as.character(arg4)
-  arg5 <- as.character(arg5)
-  arg6 <- as.character(arg6)
-  sprintf('%-10s%10s%10s%10s%10s%10s%10s', kwd, arg1, arg2, arg3, arg4, arg5, arg6)
-}
-
-fvs_kwd7 <- function(kwd, arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
-  arg1 <- as.character(arg1)
-  arg2 <- as.character(arg2)
-  arg3 <- as.character(arg3)
-  arg4 <- as.character(arg4)
-  arg5 <- as.character(arg5)
-  arg6 <- as.character(arg6)
-  arg7 <- as.character(arg7)
-  sprintf('%-10s%10s%10s%10s%10s%10s%10s%10s', kwd, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
-}
-
-fvs_TimeConfig <- function(FirstYear, LastYear, Timestep) {
-  FirstYear <- as.integer(FirstYear)
-  LastYear <- as.integer(LastYear)
-  Timestep <- as.integer(Timestep)
-  TimeConfig <- NULL
-  if (FirstYear == LastYear) {
-    # Produce a single one-year cycle
-    TimeConfig <- c(
-      fvs_kwd1("InvYear", FirstYear),
-      fvs_kwd2("TimeInt", 0, 1),
-      fvs_kwd1("NumCycle", 1)
-    )      
-  } else {
-    # LastYear must be the first year of the last cycle, so
-    # add an extra cycle at the end
-    NumCycles <- as.integer((LastYear - FirstYear) / Timestep) + 1
-    ShortCycle <- (LastYear - FirstYear) %% Timestep
-    if (ShortCycle > 0) {
-      # Produce a single short cycle followed by 10-year cycles
-      NumCycles <- NumCycles + 1
-      TimeConfig <- c(
-        fvs_kwd1("InvYear", FirstYear),
-        fvs_kwd2("TimeInt", 0, Timestep),
-        fvs_kwd2("TimeInt", 1, ShortCycle),
-        fvs_kwd2("TimeInt", NumCycles, 1),
-        fvs_kwd1("NumCycle", NumCycles)
-      )
-    } else {
-      # No need for an initial short cycle
-      TimeConfig <- c(
-        fvs_kwd1("InvYear", FirstYear),
-        fvs_kwd2("TimeInt", 0, Timestep),
-        fvs_kwd2("TimeInt", NumCycles, 1),
-        fvs_kwd1("NumCycle", NumCycles)
-      )
-    }
-  }
-  return(TimeConfig)
-}
-
-fvs_Estab <- function(rows) {
-  natural_regen <- function(row) {
-    year <- 0
-    species <- row["species"]
-    density <- row["density"] # TPA
-    survival <- 100 # percent
-    age <- ''
-    if ("height" %in% names(row)) {
-      height <- row["height"]
-    } else {
-      height <- ''
-    }
-    shade <- 0
-    fvs_kwd7("Natural", year, species, density, survival, age, height, shade)
-  }
-  Estab <- c(
-    fvs_kwd1("If", 0),
-    fvs_kwd0("mod(cycle,1) eq 0"),
-    fvs_kwd0("Then"),
-    fvs_kwd1("Estab", 0),
-    fvs_kwd2("MechPrep", 0, 0),
-    fvs_kwd2("BurnPrep", 0, 0),
-    fvs_kwd0("Sprout"),
-    apply(rows, 1, natural_regen),
-    fvs_kwd0("End"),
-    fvs_kwd0("EndIf")
-  )
-  return(Estab)
+generate_species_crosswalk <- function(fiadb, fvsne_table_3_2_1, fiadb_table_11_5_17) {
+  con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = SQLITE_RO)
+  on.exit(dbDisconnect(con), add = TRUE, after = FALSE)
+  
+  jenkins_spgrpcd_mixin <- fiadb_table_11_5_17 |>
+    select(JENKINS_SPGRPCD, NAME) |>
+    rename(JENKINS_SPGRP_NAME = NAME)
+  
+  fvs_spcd_mixin <- fvsne_table_3_2_1 |>
+    select(`FIA Code`, `Species Number`, `Species Code`) |>
+    rename(
+      SPCD = `FIA Code`,
+      FVS_SPNO = `Species Number`,
+      FVS_SPCD = `Species Code`
+    )
+  
+  tbl(con, 'REF_SPECIES') |>
+    select(SPCD, GENUS, SPECIES, E_SPGRPCD, JENKINS_SPGRPCD, SCIENTIFIC_NAME, COMMON_NAME) |>
+    left_join(
+      tbl(con, 'REF_SPECIES_GROUP') |> distinct(SPGRPCD, NAME),
+      by = join_by(E_SPGRPCD == SPGRPCD)
+    ) |>
+    rename(SPGRPCD = E_SPGRPCD, SPGRP_NAME = NAME) |>
+    collect() |>
+    left_join(jenkins_spgrpcd_mixin, by = join_by(JENKINS_SPGRPCD)) |>
+    left_join(fvs_spcd_mixin, by = join_by(SPCD)) |>
+    # From FIADB User Guides
+    # Volume Database Description (version 9.2)
+    # Appendix E: Tree Species Group Codes
+    # Softwoods: 1 - 24
+    # Hardwoods: 25 - 48
+    # Tropical and subtropical: 51 - 54
+    # Urban: 55, 56
+    # SPGRP_NAME often has hardwood or softwood in the name;
+    # less frequently, JENKINS_SPGRP_NAME does.
+    mutate(HARD_SOFT = case_when(
+      SPGRPCD %in% 1:24 ~ "SOFTWOOD",
+      SPGRPCD %in% 25:48 ~ "HARDWOOD",
+      grepl("hardwood", SPGRP_NAME) ~ "HARDWOOD",
+      grepl("softwood", SPGRP_NAME) ~ "SOFTWOOD",
+      grepl("hardwood", JENKINS_SPGRP_NAME) ~ "HARDWOOD",
+      grepl("softwood", JENKINS_SPGRP_NAME) ~ "SOFTWOOD",
+      .default = NA
+    ))
 }
