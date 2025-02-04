@@ -440,8 +440,12 @@ ingrowth from the FIA data.
 > TODO nik: DATASCRN - screen out trees below a diameter class, e.g. 3"
 > TODO nik: TreeList - keyword to generate tree lists
 > TODO nik: CALBSTDB - keyword to generate calibration stats table
-
-
+> TODO nik: FVS Keyword Reference says of STDINFO:
+>           > field 2: Stand habitat type code or plant community code
+>           >          (ecological unit code in SN.)
+>           > field 7: Potential Vegetation (field 2) Reference code.
+>           >          For list of reference codes see FSVEG documentation.
+>           Maybe we can get regen hints from FSVEG.
 
 ### Observed Ingrowth
 
