@@ -186,8 +186,8 @@ nk_generate_regen <- function(nk_table_4, species_crosswalk) {
   # Convert using hectares_per_acre
   hectares_per_acre <- conv_unit(1, "acre", "hectare")
 
-  # table4 has one column per species. We wish to add observations per species
-  # with different types, so pivot the table to have one row per species.
+  # table4 has species in columns and management scenarios in rows.
+  # We wish to pivot to have species in rows and management scenarios in columns.
   nk_table_4 |>
     pivot_longer(cols = !`Management scenario`) |>
     pivot_wider(names_from = `Management scenario`) |>
@@ -198,4 +198,34 @@ nk_generate_regen <- function(nk_table_4, species_crosswalk) {
     mutate(`ITS_Low Retention` = round(`ITS_Low Retention` * hectares_per_acre)) |>
     mutate(`ITS_High Retention` = round(`ITS_High Retention` * hectares_per_acre)) |>
     mutate(Background = round(Background * hectares_per_acre))
+}
+
+nk_extract_regen <- function(nk_regen, mgmt_id) {
+  nk_regen |>
+    select(FVS_SPCD, {{mgmt_id}}) |>
+    rename(species = FVS_SPCD, density = {{mgmt_id}}) |>
+    filter(!is.na(density)) |>
+    mutate(stand_cn = NA, year = NA)
+}
+
+nk_project_grow_only <- function(data_dir, fiadb, nk_to_fia, nk_regen) {
+  title <- "NKByPlot"
+  mgmt_id <- "NONE"
+  
+  tar_load(fiadb)
+  fvs_input_db <- fvs_fia_input(nk_to_fia, fiadb, data_dir, title, mgmt_id)
+  nk_background_regen <- nk_extract_regen(nk_regen, "Background")
+  
+  filename <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id, ".key"))
+  
+  nk_grow_only_stands <- nk_to_fia |>
+    rename(
+      stand_id = `FIA plot code`,
+      stand_cn = STAND_CN,
+      first_year = MEASYEAR
+    ) |>
+    mutate(last_year = 2165) |>
+    select(stand_id, stand_cn, first_year, last_year)
+  
+  fvs_write_keyword_file(filename, title, mgmt_id, nk_grow_only_stands, nk_background_regen)
 }

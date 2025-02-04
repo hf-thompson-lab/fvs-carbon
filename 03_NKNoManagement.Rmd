@@ -9,6 +9,8 @@ editor_options:
     wrap: 72
 ---
 
+# Setup
+
 ```{r setup, include=FALSE}
 library(targets)
 library(tidyverse)
@@ -20,11 +22,11 @@ library(measurements)
 ```{r source-functions}
 source('R/functions.R')
 source('R/fia_functions.R')
+source('R/fvs_functions.R')
+source('R/nk_functions.R')
 ```
 
-# Reproducing the NoManagement Scenario
-
-## Configuring FVS
+# Configuring FVS
 
 FVS Software with `Release date: 20240401` was used.
 
@@ -35,9 +37,9 @@ tar_load(fiadb)
 fia_version(fiadb)
 ```
 
-### Stands
+## Stands
 
-#### Via the UI
+### Via the UI
 
 Stands can be found in the FVS UI using FVS_STAND_ID from the table
 above.
@@ -50,12 +52,12 @@ above.
 Clicking `Find` will then filter to the single matching stand, which can
 be added to the run.
 
-#### Automatic
+### Automatic
 
 What FVS calls "StandCN" is what FIA calls "PLOT.CN". The keywordfile
 looks up stands by StandCN. nk_to_fia includes STAND_CN for the NK plots.
 
-### Time
+## Time
 
 FVS will not run prior to the inventory year; it's unclear what NK did
 to get their chart to go back prior to 2005. We will instead use 2005 as
@@ -68,7 +70,7 @@ start of a new cycle, so we set the common ending year to 2166.
 All events in NK take place on 10 year intervals, therefore we select 10
 years as the reporting interval.
 
-### Regeneration
+## Regeneration
 
 NK regeneration rates are in NK Table 4, in seedlings per hectare.
 
@@ -92,7 +94,7 @@ nk_regen |>
   arrange(desc(Background))
 ```
 
-#### Via the UI
+### Via the UI
 
 In FVS, go to Simulate -\> Components -\> Management From Categories,
 select "Planting & Natural Regeneration" From Components, select
@@ -127,16 +129,7 @@ Switch to freeform and add all the rows, fix the titles.
 
 Select `Save in run` to apply to `Grp: All_FIA_Plots`.
 
-#### Automatic
-
-```{r background_regen}
-background_regen <- nk_regen |>
-  rename(species = FVS_SPCD, density = Background) |>
-  filter(!is.na(density)) |>
-  fvs_Estab()
-```
-
-### Carbon
+## Carbon
 
 To set the carbon calculations to be metric (Metric tons of carbon per
 hectare), go to Simulate -\> Components -\> Keywords, and select:
@@ -151,78 +144,13 @@ hectare), go to Simulate -\> Components -\> Keywords, and select:
 
 Select `Save in run` to apply to `Grp: All_FIA_Plots`.
 
-## Keywordfile Generation
 
-```{r keywordfile_section}
-keywordfile_section <- function(Title, MgmtId, StandID, StandCN, FirstYear, LastYear) {
-  TimeConfig <- fvs_TimeConfig(FirstYear, LastYear, 10)
-  c(
-    fvs_kwd0("StdIdent"),
-    paste0(StandID, " ", Title),
-    fvs_kwd0("StandCN"),
-    StandCN,
-    fvs_kwd0("MgmtId"),
-    MgmtId,
-    TimeConfig,
-    fvs_kwd0("FMIn"), # Fire and Fuels Extension
-    fvs_kwd0("CarbRept"),
-    fvs_kwd0("CarbCut"),
-    fvs_kwd5("CarbCalc", 1, 1, 0.0425, 9, 11),
-    fvs_kwd0("FuelOut"),
-    fvs_kwd0("FuelRept"),
-    fvs_kwd0("End"), # FMIn
-    fvs_kwd0("Database"), # Database extension
-    fvs_kwd0("DSNIn"),
-    "SQLite_FIADB_ENTIRE.db",
-    fvs_kwd0("StandSQL"),
-    "SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'",
-    fvs_kwd0("EndSQL"), # StandSQL
-    fvs_kwd0("TreeSQL"),
-    "SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'",
-    fvs_kwd0("EndSQL"), # TreeSQL
-    fvs_kwd0("DSNOut"),
-    paste0("FVS_", Title, "_", MgmtId, ".db"),
-    fvs_kwd1("Summary",  2),
-    fvs_kwd2("Computdb", 0, 1),
-    fvs_kwd1("MisRpts",  2),
-    fvs_kwd1("CarbReDB", 2),
-    fvs_kwd1("FuelReDB", 2),
-    fvs_kwd1("FuelsOut", 2),
-    fvs_kwd0("End"), # Database
-    background_regen,
-    fvs_kwd0("Process"),
-    recursive = TRUE
-  )
-}
-
-```
+# Keywordfile Generation
 
 ```{r FVS_NKByPlot_NONE.key, include=FALSE}
-Title <- "NKByPlot"
-MgmtId <- "NONE"
-filename <- paste0("data/fvs/FVS_", Title, "_", MgmtId, ".key")
-unlink(filename)
-apply(
-  nk_to_fia,
-  1,
-  function(row) {
-    write_lines(
-      keywordfile_section(
-        Title,
-        MgmtId,
-        row['FIA plot code'],
-        row['STAND_CN'],
-        row['MEASYEAR'],
-        2165
-      ),
-      filename,
-      append = TRUE
-    )
-  }
-)
-write_lines("Stop", filename, append = TRUE)
+# TODO nik: put each FVS run in a separate subdir under data/fvs/
+nk_project_grow_only("data/fvs/", fiadb, nk_to_fia, nk_regen)
 ```
-
 
 ## Run FVS
 
