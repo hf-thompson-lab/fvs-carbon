@@ -36,12 +36,12 @@ list(
   tar_target(nk_matching_plot, nk_match_plots(nk_table_1_expanded, nk_all_plot)),
   tar_target(nk_to_fia, nk_transalte_to_fia(fiadb, nk_matching_plot)),
   tar_target(nk_to_fvs, nk_translate_to_fvs(nk_to_fia, fiadb)),
-  tar_render(nk_identifying_stands, "01_IdentifyingStands.Rmd", output_dir = "rendered/"),
+  #tar_render(nk_identifying_stands, "01_IdentifyingStands.Rmd", output_dir = "rendered/"),
 
   # 02_NKProjectedCarbon.Rmd
   tar_target(nk_fig_2_dir, "data/raw/nk_fig2/", format = "file"),
   tar_target(nk_fig_2, nk_read_fig_2(nk_fig_2_dir)),
-  tar_render(nk_projected_carbon, "02_NKProjectedCarbon.Rmd", output_dir = "rendered/"),
+  #tar_render(nk_projected_carbon, "02_NKProjectedCarbon.Rmd", output_dir = "rendered/"),
   
   # 03_NKNoManagement.Rmd
   tar_target(nk_table_4_csv, "data/raw/NK_Table_4.csv", format = "file"),

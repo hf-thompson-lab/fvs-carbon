@@ -237,8 +237,8 @@ nk_project_grow_only <- function(data_dir, fiadb, nk_to_fia, nk_regen) {
   
   fvs_write_keyword_file(
     fvs_keyword_filename,
-    fvs_input_db,
-    fvs_output_db,
+    basename(fvs_input_db), # FVS will run in the same directory
+    basename(fvs_output_db), # FVS will run in the same directory
     title,
     mgmt_id,
     nk_grow_only_stands,
