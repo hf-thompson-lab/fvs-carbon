@@ -131,13 +131,6 @@ fvs_Estab <- function(rows) {
   }
 }
 
-fvsne_read_table_3_2_1 <- function(filename) {
-  read_csv(
-    filename,
-    col_types = "iiciccc"
-  )
-}
-
 # Given a dataframe with column STAND_CN, create a SQLite database
 # of input stands and trees for FVS.
 fvs_fia_input <- function(stands, fiadb, filename) {

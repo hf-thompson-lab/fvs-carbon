@@ -53,9 +53,9 @@ parse STATECD, INVYR, UNITCD, COUNTYCD, and PLOT from the
 `FIA plot code` in NK.
 
 ```{r nk_table1_expanded}
-tar_load(nk_table1_expanded)
+tar_load(nk_table_1_expanded)
 knitr::kable(
-  nk_table1_expanded[c("FIA plot code", "STATECD", "INVYR", "UNITCD", "COUNTYCD", "PLOT")]
+  nk_table_1_expanded[c("FIA plot code", "STATECD", "INVYR", "UNITCD", "COUNTYCD", "PLOT")]
 )
 ```
 

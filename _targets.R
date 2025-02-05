@@ -15,44 +15,57 @@ list(
   # TODO nik: do we want tar_download() to manage this database?
   #           potentially interesting WIP: sqltargets https://github.com/daranzolin/sqltargets
   tar_target(fiadb, "data/raw/SQLite_FIADB_ENTIRE.db", format = "file"),
-  # TODO nik: all the file / read pairs can be replaced with tarchetypes::tar_file_read
-  # see https://docs.ropensci.org/tarchetypes/reference/tar_file_read.html
-  tar_target(nk_table_1_csv, "data/raw/NK_Table_1.csv", format = "file"),
+  tar_file_read(
+    nk_table_1,
+    "data/raw/NK_Table_1.csv",
+    read_csv(!!.x, col_types = cols(`FIA plot code` = col_character()))
+  ),
 
   # Species Crosswalk
-  tar_target(fvsne_table_3_2_1_csv, "data/raw/FVSne_Overview_Table_3.2.1.csv", format = "file"),
-  tar_target(fvsne_table_3_2_1, fvsne_read_table_3_2_1(fvsne_table_3_2_1_csv)),
-  tar_target(fia_table_11_5_17_csv, "data/raw/FIADB_11.5.17_JENKINS_SPGRPCD.csv", format = "file"),
-  tar_target(fia_table_11_5_17, fia_read_table_11_5_17(fia_table_11_5_17_csv)),
+  tar_file_read(
+    fvsne_table_3_2_1,
+    "data/raw/FVSne_Overview_Table_3.2.1.csv",
+    read_csv(!!.x, col_types = "iiciccc")
+  ),
+  tar_file_read(
+    fia_table_11_5_17,
+    "data/raw/FIADB_11.5.17_JENKINS_SPGRPCD.csv",
+    read_csv(!!.x, col_types = cols(JENKINS_SPGRPCD = col_integer()))
+  ),
   tar_target(
     species_crosswalk,
     generate_species_crosswalk(fiadb, fvsne_table_3_2_1, fia_table_11_5_17)
   ),
 
   # 01_IdentifyingStands.Rmd
-  tar_target(nk_table_1, nk_read_table_1(nk_table_1_csv)),
   tar_target(nk_table_1_expanded, nk_extract_cols_from_plot_code(nk_table_1)),
   tar_target(nk_all_plot, nk_load_plot_all_invyr(nk_table_1_expanded, fiadb)),
   tar_target(nk_matching_plot, nk_match_plots(nk_table_1_expanded, nk_all_plot)),
   tar_target(nk_to_fia, nk_transalte_to_fia(fiadb, nk_matching_plot)),
   tar_target(nk_to_fvs, nk_translate_to_fvs(nk_to_fia, fiadb)),
-  #tar_render(nk_identifying_stands, "01_IdentifyingStands.Rmd", output_dir = "rendered/"),
+  tar_render(nk_identifying_stands, "01_IdentifyingStands.Rmd", output_dir = "rendered/"),
 
   # 02_NKProjectedCarbon.Rmd
-  tar_target(nk_fig_2_dir, "data/raw/nk_fig2/", format = "file"),
-  tar_target(nk_fig_2, nk_read_fig_2(nk_fig_2_dir)),
-  #tar_render(nk_projected_carbon, "02_NKProjectedCarbon.Rmd", output_dir = "rendered/"),
+  tar_file_read(
+    nk_fig_2,
+    "data/raw/nk_fig2/",
+    nk_read_fig_2(!!.x)
+  ),
+  tar_render(nk_projected_carbon, "02_NKProjectedCarbon.Rmd", output_dir = "rendered/"),
   
   # 03_NKNoManagement.Rmd
-  tar_target(nk_table_4_csv, "data/raw/NK_Table_4.csv", format = "file"),
-  tar_target(nk_table_4, nk_read_table_4(nk_table_4_csv)),
+  tar_file_read(
+    nk_table_4,
+    "data/raw/NK_Table_4.csv",
+    read_csv(!!.x, col_types = cols(`Management scenario` = col_character(), .default = col_number()))
+  ),
   tar_target(nk_regen, nk_generate_regen(nk_table_4, species_crosswalk)),
   ## Run FVS - note that format = "file" because it produces files outside targets' control
   tar_target(nk_grow_plot, nk_project_grow(fiadb, "plot", nk_to_fia, nk_regen), format = "file"),
   tar_target(nk_grow_plot_carbon, fvs_read_output(nk_grow_plot[3], "FVS_Carbon")),
   tar_target(nk_grow_plot_summary, fvs_read_output(nk_grow_plot[3], "FVS_Summary2_East")),
   # By Subplot
-  # TODO: figure out why re-running this doesn't work
+  # TODO: figure out why re-running by subplot and condition doesn't work
   tar_file_read(
     nk_grow_subplot_carbon,
     "data/fvs/FVS_NKBySubplot_NONE_Carbon.csv",
@@ -65,6 +78,7 @@ list(
     "data/fvs/FVS_NKByCondition_NONE_Carbon.csv",
     read_csv(!!.x, col_types = cols(StandID = col_character()))
   )
+  #tar_render(nk_no_management, "03_NKNoManagement.Rmd", output_dir = "rendered/")
 
   # Two things:
   # x. Run FVS at all.

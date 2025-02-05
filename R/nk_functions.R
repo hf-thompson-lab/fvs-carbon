@@ -1,10 +1,3 @@
-nk_read_table_1 <- function(filename) {
-  read_csv(
-    filename,
-    col_types = cols(`FIA plot code` = col_character())
-  )
-}
-
 nk_read_fig_2 <- function(dir) {
   nk_read_fig_2_helper <- function(dir, column) {
     filename <- file.path(dir, paste0("NK_Fig2_", column, ".csv"))
@@ -169,16 +162,6 @@ nk_translate_to_fvs <- function(fvs_stands, fiadb) {
     left_join(matching_plotinit_plot_grp, by=join_by(STAND_ID_PLOT==FVS_PLOTINIT_PLOT)) |>
     left_join(matching_standinit_cond_grp, by=join_by(STAND_ID_COND==FVS_STANDINIT_COND)) |>
     left_join(matching_standinit_plot_grp, by=join_by(STAND_ID_PLOT==FVS_STANDINIT_PLOT))
-}
-
-nk_read_table_4 <- function(filename) {
-  read_csv(
-    filename,
-    col_types = cols(
-      `Management scenario` = col_character(),
-      .default = col_number(),
-    )
-  )
 }
 
 nk_generate_regen <- function(nk_table_4, species_crosswalk) {

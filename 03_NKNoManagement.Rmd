@@ -15,16 +15,7 @@ editor_options:
 library(targets)
 library(tidyverse)
 library(reshape2) # for melt()
-library(RSQLite)
-library(measurements)
-library(processx)
-```
-
-```{r source-functions}
-source('R/functions.R')
-source('R/fia_functions.R')
-source('R/fvs_functions.R')
-source('R/nk_functions.R')
+source("R/fia_functions.R")
 ```
 
 # Configuring FVS
@@ -153,22 +144,10 @@ lists, and Inventory statistics may also be interesting.
 ```{r run fvs}
 tar_load(nk_grow_only)
 ```
-Status codes:
-- 0: no issues
-- 10: warning
-- 20: error
 
-```
-REM Delete destination databases. FVS will otherwise append to them, leaving previous rows.
-for %%p in (FVS_%1_%2*.key) do del %%~np.db
+# Carbon Projection
 
-REM Start FVSne in the background on each partition
-for %%p in (FVS_%1_%2*.key) do start \FVS\FVSbin\FVSne.exe --keywordfile=%%p
-```
-
-## Carbon Projection
-
-### By Plot
+## By Plot
 
 Read FVS output for carbon storage by plot. FVS column names are a bit
 idiosyncratic, so clean those up.
@@ -178,9 +157,9 @@ and down dead. We plot this, as well as just aboveground live and stand total
 carbon for comparison.
 
 ```{r FVS_Carbon}
-tar_load(nk_fvs_carbon)
+tar_load(nk_grow_plot_carbon)
 
-NoManagement_Carbon_ByPlot <- nk_fvs_carbon |>
+NoManagement_Carbon_ByPlot <- nk_grow_plot_carbon |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
@@ -226,7 +205,7 @@ ggplot(
     mapping = aes(x = Year, y = value, color = variable, linetype = variable)
   ) +
   ggtitle("FVS Carbon Projection for NK Plots with no management") +
-  ylab(bquote("Carbon " ~(Mg %*% ha^{-1}))) +
+  ylab(bquote("Carbon " ~(Mg %.% ha^{-1}))) +
 #  theme(legend.title = element_blank()) +
   theme_bw() +
   theme(legend.title = element_blank(), legend.position = "bottom") +
@@ -269,7 +248,7 @@ for their chart, but the best fit is from Aboveground Live, with RMSE \~= 12.
 Plots_RMSE |> select(Aboveground_Live)
 ```
 
-### By Subplot
+## By Subplot
 
 To confirm that NK used the FVS_StandInit_Plot table, we examine the
 RMSE between projections from other tables and the NK Fig 2 values.
@@ -305,7 +284,7 @@ ggplot(
     mapping = aes(x = Year, y = value, color = variable, linetype = variable)
   ) +
   ggtitle("FVS Carbon Projection by FIA Subplot") +
-  ylab(bquote("Carbon " ~(Mg %*% ha^{-1}))) +
+  ylab(bquote("Carbon " ~(Mg %.% ha^{-1}))) +
   theme_bw() +
   theme(legend.title = element_blank(), legend.position = "bottom") +
   scale_linetype_manual(values = c("solid", "solid", "solid", "dashed")) +
@@ -340,7 +319,7 @@ ggplot(
 Note that all RMSE for the subplot projections are significantly worse
 than for the plot projections.
 
-### By Condition
+## By Condition
 
 We repeat the exercise using the FVS_StandInit_Cond table, which creates
 FVS stands for corresponding FIA conditions.
@@ -377,7 +356,7 @@ ggplot(
     mapping = aes(x = Year, y = value, color = variable, linetype = variable)
   ) +
   ggtitle("FVS Carbon Projection by FIA Condition") +
-  ylab(bquote("Carbon " ~(Mg %*% ha^{-1}))) +
+  ylab(bquote("Carbon " ~(Mg %.% ha^{-1}))) +
   theme_bw() +
   theme(legend.title = element_blank(), legend.position = "bottom") +
   scale_linetype_manual(values = c("solid", "solid", "solid", "dashed")) +
