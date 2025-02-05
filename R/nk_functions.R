@@ -208,8 +208,9 @@ nk_extract_regen <- function(nk_regen, mgmt_id) {
     mutate(STAND_CN = NA, YEAR = NA)
 }
 
-nk_project_grow_only <- function(
+nk_project_grow <- function(
     fiadb,
+    stand_type,
     nk_to_fia,
     nk_regen
 ) {
@@ -239,6 +240,7 @@ nk_project_grow_only <- function(
     fvs_variant,
     project_dir,
     fiadb,
+    stand_type,
     title,
     mgmt_id,
     nk_grow_only_stands,

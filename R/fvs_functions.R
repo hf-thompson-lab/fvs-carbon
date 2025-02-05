@@ -148,8 +148,18 @@ fvs_fia_input <- function(stands, fiadb, filename) {
   on.exit(dbDisconnect(out), add = TRUE, after = FALSE)
   
   stand_cns <- stands |> distinct(STAND_CN)
-  tables <- c("FVS_StandInit_Plot", "FVS_TreeInit_Plot")
-
+  # StandInit_Plot / TreeInit_Plot - Used when a stand is a plot.
+  # StandInit_Cond / TreeInit_Cond - Used when a stand is a condition.
+  # PlotInit_Plot / TreeInit_Plot - Used when a stand is a subplot.
+  # 
+  # These tables are described in the FIA Data Quick Start guide.
+  tables <- c(
+    "FVS_PlotInit_Plot",
+    "FVS_StandInit_Cond",
+    "FVS_StandInit_Plot",
+    "FVS_TreeInit_Cond",
+    "FVS_TreeInit_Plot"
+  )
   # In theory, we could ATTACH the output database and do this copy
   # internal to SQLite, but that is a bit tricky to manage so we
   # pull it into R and write it back out.
@@ -173,12 +183,25 @@ fvs_keywordfile_section <- function(
     mgmt_id,
     input_db,
     output_db,
+    stand_type,
     stand_id,
     stand_cn,
     first_year,
     last_year,
     regen
 ) {
+  if (stand_type == "plot") {
+    stand_table <- "FVS_StandInit_Plot"
+    tree_table <- "FVS_TreeInit_Plot"
+  } else if (stand_type == "cond") {
+    stand_table <- "FVS_StandInit_Cond"
+    tree_table <- "FVS_TreeInit_Cond"
+  } else if (stand_type == "subplot") {
+    stand_table <- "FVS_PlotInit_Plot"
+    tree_table <- "FVS_TreeInit_Plot"
+  } else {
+    stop(paste0("Unknown stand type: ", stand_type))
+  }
   c(
     fvs_kwd0("StdIdent"),
     paste0(stand_id, " ", title),
@@ -198,10 +221,10 @@ fvs_keywordfile_section <- function(
     fvs_kwd0("DSNIn"),
     input_db,
     fvs_kwd0("StandSQL"),
-    "SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'",
+    paste0("SELECT * FROM ", stand_table," WHERE Stand_CN = '%Stand_CN%'"),
     fvs_kwd0("EndSQL"), # StandSQL
     fvs_kwd0("TreeSQL"),
-    "SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'",
+    paste0("SELECT * FROM ", tree_table," WHERE Stand_CN = '%Stand_CN%'"),
     fvs_kwd0("EndSQL"), # TreeSQL
     fvs_kwd0("DSNOut"),
     output_db,
@@ -222,6 +245,7 @@ fvs_write_keyword_file <- function(
   keyword_filename,
   input_db,
   output_db,
+  stand_type,
   title,
   mgmt_id,
   stands,
@@ -235,6 +259,7 @@ fvs_write_keyword_file <- function(
         mgmt_id,
         input_db,
         output_db,
+        stand_type,
         row["STAND_ID"],
         row["STAND_CN"],
         row["FIRST_YEAR"],
@@ -256,6 +281,7 @@ fvs_run <- function(
     fvs_variant,
     project_dir,
     fiadb,
+    stand_type,
     title,
     mgmt_id,
     stands,
@@ -290,6 +316,7 @@ fvs_run <- function(
     fvs_keyword_filename,
     basename(fvs_input_db), # FVS will run in the same directory
     basename(fvs_output_db), # FVS will run in the same directory
+    stand_type,
     title,
     mgmt_id,
     stands,
