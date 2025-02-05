@@ -178,25 +178,16 @@ and down dead. We plot this, as well as just aboveground live and stand total
 carbon for comparison.
 
 ```{r FVS_Carbon}
-fvs_out_db <- DBI::dbConnect(
-  RSQLite::SQLite(),
-  paste0('data/fvs/FVS_', Title, '_', MgmtId, '.db')
-)
+tar_load(nk_fvs_carbon)
 
-FVS_Carbon <- tbl(fvs_out_db, 'FVS_Carbon') |> collect()
-FVS_Summary2_East <- tbl(fvs_out_db, 'FVS_Summary2_East') |> collect()
-
-dbDisconnect(fvs_out_db)
-remove(fvs_out_db)
-
-NoManagement_Carbon_ByPlot <- FVS_Carbon |>
+NoManagement_Carbon_ByPlot <- nk_fvs_carbon |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
   mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
   select(StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
-knitr::kable(NoManagement_Carbon_ByPlot)
+knitr::kable(NoManagement_Carbon_ByPlot |> head(10))
 ```
 
 Plot these against NK Fig 2 "NoManagement" scenario. NK Fig 2 has three
@@ -215,21 +206,7 @@ storage in the NoManagement scenario; it might be the right thing to do
 to omit 2164 / 2165 as well.
 
 ```{r}
-fig2 <- read_csv(
-  "data/intermediate/nk_fig2_reconstructed.csv",
-  col_types = cols(
-    Year = col_integer(),
-    NoManagement = col_double(),
-    ClearcutHigh = col_double(),
-    ClearcutLow = col_double(),
-    ShelterwoodHigh = col_double(),
-    ShelterwoodLow = col_double(),
-    ITS_LowHigh = col_double(),
-    ITS_LowLow = col_double(),
-    ITS_HighHigh = col_double(),
-    ITS_HighLow = col_double()
-  )
-)
+tar_load(nk_fig_2)
 
 NoManagement_Carbon_ByPlot_ByYear <- NoManagement_Carbon_ByPlot |>
   group_by(Year) |>
@@ -239,9 +216,9 @@ NoManagement_Carbon_ByPlot_ByYear <- NoManagement_Carbon_ByPlot |>
     Aboveground_Live=mean(Aboveground_Live),
     .groups = "keep"
   ) |>
-  filter(Year >= 2005) |>
   # Join in the NoManagement scenario from fig2 for comparison
-  full_join(fig2 |> select(Year,NoManagement), by=join_by(Year)) |>
+  full_join(nk_fig_2 |> select(Year,NoManagement), by=join_by(Year)) |>
+  filter(Year >= 2005) |>
   rename(NK_Fig2_NoManagement = NoManagement)
 
 ggplot(

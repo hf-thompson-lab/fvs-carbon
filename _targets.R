@@ -48,7 +48,9 @@ list(
   tar_target(nk_table_4, nk_read_table_4(nk_table_4_csv)),
   tar_target(nk_regen, nk_generate_regen(nk_table_4, species_crosswalk)),
   ## Run FVS - note that format = "file" because it produces files outside targets' control
-  tar_target(nk_grow_only, nk_project_grow_only(fiadb, nk_to_fia, nk_regen), format = "file")
+  tar_target(nk_grow_only, nk_project_grow_only(fiadb, nk_to_fia, nk_regen), format = "file"),
+  tar_target(nk_fvs_carbon, fvs_read_output(nk_grow_only[3], "FVS_Carbon")),
+  tar_target(nk_fvs_summary, fvs_read_output(nk_grow_only[3], "FVS_Summary2_East"))
   
   # Two things:
   # x. Run FVS at all.

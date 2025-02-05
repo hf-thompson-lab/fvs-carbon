@@ -311,3 +311,10 @@ fvs_run <- function(
   # 3 - a file containing the data output
   c(fvs_error_filename, fvs_output_filename, fvs_output_db)
 }
+
+fvs_read_output <- function(fvs_output_db, table) {
+  out <- DBI::dbConnect(RSQLite::SQLite(), fvs_output_db, flags = SQLITE_RO)
+  on.exit(dbDisconnect(out), add = TRUE, after = FALSE)
+
+  tbl(out, table) |> collect()
+}
