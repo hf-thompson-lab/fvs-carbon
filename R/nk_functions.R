@@ -203,16 +203,16 @@ nk_generate_regen <- function(nk_table_4, species_crosswalk) {
 nk_extract_regen <- function(nk_regen, mgmt_id) {
   nk_regen |>
     select(FVS_SPCD, {{mgmt_id}}) |>
-    rename(species = FVS_SPCD, density = {{mgmt_id}}) |>
-    filter(!is.na(density)) |>
-    mutate(stand_cn = NA, year = NA)
+    rename(SPECIES = FVS_SPCD, DENSITY = {{mgmt_id}}) |>
+    filter(!is.na(DENSITY)) |>
+    mutate(STAND_CN = NA, YEAR = NA)
 }
 
 nk_project_grow_only <- function(
     fiadb,
     nk_to_fia,
     nk_regen
-  ) {
+) {
   fvsbin_dir <- "/fvs/fvsbin"
   fvs_variant <- "fvsne"
   data_dir <- "data/fvs"
@@ -224,63 +224,24 @@ nk_project_grow_only <- function(
     dir.create(project_dir)
   }
 
-  fvs_input_db <- fvs_fia_input(nk_to_fia, fiadb, file.path(project_dir, "FVS_Input.db"))
-  fvs_output_db <- file.path(project_dir, "FVS_Output.db")
-  if (file.exists(fvs_output_db)) {
-    unlink(fvs_output_db)
-  }
-  
   nk_background_regen <- nk_extract_regen(nk_regen, "Background")
 
   nk_grow_only_stands <- nk_to_fia |>
     rename(
-      stand_id = `FIA plot code`,
-      stand_cn = STAND_CN,
-      first_year = MEASYEAR
+      STAND_ID = `FIA plot code`,
+      FIRST_YEAR = MEASYEAR
     ) |>
-    mutate(last_year = 2165) |>
-    select(stand_id, stand_cn, first_year, last_year)
-  fvs_keyword_filename <- file.path(project_dir, paste0("FVS_", title, "_", mgmt_id, ".key"))
-  if (file.exists(fvs_keyword_filename)) {
-    unlink(fvs_keyword_filename)
-  }
+    mutate(LAST_YEAR = 2165) |>
+    select(STAND_ID, STAND_CN, FIRST_YEAR, LAST_YEAR)
 
-  # FVS will generate its output in a file with the same name as the keyword
-  # file, but with the extension ".out"
-  fvs_output_filename <- sub("\\.key$", ".out", fvs_keyword_filename)
-  if (file.exists(fvs_output_filename)) {
-    unlink(fvs_output_filename)
-  }
-  
-  # Invented Here:
-  # Write the exit status to a separate file so it can be read later
-  fvs_error_filename <- sub("\\.key$", ".err", fvs_keyword_filename)
-  if (file.exists(fvs_error_filename)) {
-    unlink(fvs_error_filename)
-  }
-  
-  fvs_write_keyword_file(
-    fvs_keyword_filename,
-    basename(fvs_input_db), # FVS will run in the same directory
-    basename(fvs_output_db), # FVS will run in the same directory
+  fvs_run(
+    fvsbin_dir,
+    fvs_variant,
+    project_dir,
+    fiadb,
     title,
     mgmt_id,
     nk_grow_only_stands,
     nk_background_regen
   )
-  
-  # Return the name of the keyword file and output database
-  fvs <- processx::process$new(
-    file.path(fvsbin_dir, fvs_variant),
-    paste0("--keywordfile=", basename(fvs_keyword_filename)),
-    wd = dirname(fvs_keyword_filename)
-  )
-  fvs$wait()
-  write_lines(fvs$get_exit_status(), fvs_error_filename)
-  
-  # Give back three pieces of information:
-  # 1 - a file containing the exit status
-  # 2 - a file containing the textual output
-  # 3 - a file containing the data output
-  c(fvs_error_filename, fvs_output_filename, fvs_output_db)
 }
