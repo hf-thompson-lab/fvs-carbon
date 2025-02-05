@@ -145,31 +145,18 @@ hectare), go to Simulate -\> Components -\> Keywords, and select:
 
 Select `Save in run` to apply to `Grp: All_FIA_Plots`.
 
-
-# Keywordfile Generation
-
-```{r FVS_NKByPlot_NONE.key, include=FALSE}
-tar_load(nk_to_fia)
-files <- nk_project_grow_only("data/fvs", fiadb, nk_to_fia, nk_regen)
-keywordfile <- files[1]
-outputdb <- files[2]
-```
-
-## Run FVS
+# Run FVS
 
 The main output will be Carbon and fuels. Stand visualization, Tree
 lists, and Inventory statistics may also be interesting.
 
 ```{r run fvs}
-fvs <- processx::process$new(
-  "/fvs/fvsbin/fvsne.exe",
-  paste0("--keywordfile=", basename(keywordfile)),
-  wd = dirname(keywordfile)
-)
-fvs$wait()
-print(fvs$get_exit_status())
+tar_load(nk_grow_only)
 ```
-
+Status codes:
+- 0: no issues
+- 10: warning
+- 20: error
 
 ```
 REM Delete destination databases. FVS will otherwise append to them, leaving previous rows.

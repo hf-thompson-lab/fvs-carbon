@@ -208,7 +208,14 @@ nk_extract_regen <- function(nk_regen, mgmt_id) {
     mutate(stand_cn = NA, year = NA)
 }
 
-nk_project_grow_only <- function(data_dir, fiadb, nk_to_fia, nk_regen) {
+nk_project_grow_only <- function(
+    fiadb,
+    nk_to_fia,
+    nk_regen
+  ) {
+  fvsbin_dir <- "/fvs/fvsbin"
+  fvs_variant <- "fvsne"
+  data_dir <- "data/fvs"
   title <- "NKByPlot"
   mgmt_id <- "NONE"
   
@@ -234,6 +241,23 @@ nk_project_grow_only <- function(data_dir, fiadb, nk_to_fia, nk_regen) {
     mutate(last_year = 2165) |>
     select(stand_id, stand_cn, first_year, last_year)
   fvs_keyword_filename <- file.path(project_dir, paste0("FVS_", title, "_", mgmt_id, ".key"))
+  if (file.exists(fvs_keyword_filename)) {
+    unlink(fvs_keyword_filename)
+  }
+
+  # FVS will generate its output in a file with the same name as the keyword
+  # file, but with the extension ".out"
+  fvs_output_filename <- sub("\\.key$", ".out", fvs_keyword_filename)
+  if (file.exists(fvs_output_filename)) {
+    unlink(fvs_output_filename)
+  }
+  
+  # Invented Here:
+  # Write the exit status to a separate file so it can be read later
+  fvs_error_filename <- sub("\\.key$", ".err", fvs_keyword_filename)
+  if (file.exists(fvs_error_filename)) {
+    unlink(fvs_error_filename)
+  }
   
   fvs_write_keyword_file(
     fvs_keyword_filename,
@@ -246,5 +270,17 @@ nk_project_grow_only <- function(data_dir, fiadb, nk_to_fia, nk_regen) {
   )
   
   # Return the name of the keyword file and output database
-  c(fvs_keyword_filename, fvs_output_db)
+  fvs <- processx::process$new(
+    file.path(fvsbin_dir, fvs_variant),
+    paste0("--keywordfile=", basename(fvs_keyword_filename)),
+    wd = dirname(fvs_keyword_filename)
+  )
+  fvs$wait()
+  write_lines(fvs$get_exit_status(), fvs_error_filename)
+  
+  # Give back three pieces of information:
+  # 1 - a file containing the exit status
+  # 2 - a file containing the textual output
+  # 3 - a file containing the data output
+  c(fvs_error_filename, fvs_output_filename, fvs_output_db)
 }

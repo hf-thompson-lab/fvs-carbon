@@ -46,20 +46,23 @@ list(
   # 03_NKNoManagement.Rmd
   tar_target(nk_table_4_csv, "data/raw/NK_Table_4.csv", format = "file"),
   tar_target(nk_table_4, nk_read_table_4(nk_table_4_csv)),
-  tar_target(nk_regen, nk_generate_regen(nk_table_4, species_crosswalk))
+  tar_target(nk_regen, nk_generate_regen(nk_table_4, species_crosswalk)),
+  ## Run FVS - note that format = "file" because it produces files outside targets' control
+  tar_target(nk_grow_only, nk_project_grow_only(fiadb, nk_to_fia, nk_regen), format = "file")
+  
   # Two things:
-  # 1. Run FVS at all.
-  # 1.a. factor out fvs_keywords(...)
+  # x. Run FVS at all.
+  # x.a. factor out fvs_keywords(...)
   #      it wants stands, title, mgmtid, regen, etc.
   #      probably many of these are tables, e.g. regen is <standid, year, species, density>
   #      time can be <standid, cycle, cycle length>, where we also need <standid, startyear>
-  # 1.b. factor out fvs input data gathering
-  # 1.c. Actually run FVS. At least on windows, run it directly; elsewhere, maybe
+  # x.b. factor out fvs input data gathering
+  # x.c. Actually run FVS. At least on windows, run it directly; elsewhere, maybe
   #      prompt the user till done, or poll for output data.
-  # 1.c.1. targets wants tar_rep() to return a slice of a data frame; probably this is
+  # x.c.1. targets wants tar_rep() to return a slice of a data frame; probably this is
   #        FVS_Summary2_East
-  # 1.c.2. processx::process$new() is probably the method to use to run FVSne
-  # 1.c.3. unclear how to have a targets function that produces multiple output -
+  # x.c.2. processx::process$new() is probably the method to use to run FVSne
+  # x.c.3. unclear how to have a targets function that produces multiple output -
   #        maybe a "file" target that is a folder that contains the output?
   # 1.d. factor out fvs error parsing
   # 1.e. factor out fvs result gathering
