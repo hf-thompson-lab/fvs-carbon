@@ -50,8 +50,22 @@ list(
   ## Run FVS - note that format = "file" because it produces files outside targets' control
   tar_target(nk_grow_plot, nk_project_grow(fiadb, "plot", nk_to_fia, nk_regen), format = "file"),
   tar_target(nk_grow_plot_carbon, fvs_read_output(nk_grow_plot[3], "FVS_Carbon")),
-  tar_target(nk_grow_plot_summary, fvs_read_output(nk_grow_plot[3], "FVS_Summary2_East"))
-  
+  tar_target(nk_grow_plot_summary, fvs_read_output(nk_grow_plot[3], "FVS_Summary2_East")),
+  # By Subplot
+  # TODO: figure out why re-running this doesn't work
+  tar_file_read(
+    nk_grow_subplot_carbon,
+    "data/fvs/FVS_NKBySubplot_NONE_Carbon.csv",
+    read_csv(!!.x, col_types = cols(StandID = col_character()))
+  ),
+  # By Condition
+  # TODO: figure out why re-running this doesn't work
+  tar_file_read(
+    nk_grow_cond_carbon,
+    "data/fvs/FVS_NKByCondition_NONE_Carbon.csv",
+    read_csv(!!.x, col_types = cols(StandID = col_character()))
+  )
+
   # Two things:
   # x. Run FVS at all.
   # x.a. factor out fvs_keywords(...)
