@@ -140,12 +140,11 @@ fvsne_read_table_3_2_1 <- function(filename) {
 
 # Given a dataframe with column STAND_CN, create a SQLite database
 # of input stands and trees for FVS.
-fvs_fia_input <- function(stands, fiadb, out_dir, title, mgmt_id) {
+fvs_fia_input <- function(stands, fiadb, filename) {
   fia <- dbConnect(RSQLite::SQLite(), fiadb, flags = SQLITE_RO)
   on.exit(dbDisconnect(fia), add = TRUE, after = FALSE)
   
-  out_file <- file.path(out_dir, paste0("FVS_", title, "_", mgmt_id, ".db"))
-  out <- DBI::dbConnect(RSQLite::SQLite(), out_file, flags = SQLITE_RWC)
+  out <- DBI::dbConnect(RSQLite::SQLite(), filename, flags = SQLITE_RWC)
   on.exit(dbDisconnect(out), add = TRUE, after = FALSE)
   
   stand_cns <- stands |> distinct(STAND_CN)
@@ -165,13 +164,15 @@ fvs_fia_input <- function(stands, fiadb, out_dir, title, mgmt_id) {
     )
   })
 
-  # Return the name of the file created
-  out_file
+  # Return the name of the file created / modified
+  filename
 }
 
 fvs_keywordfile_section <- function(
     title,
     mgmt_id,
+    input_db,
+    output_db,
     stand_id,
     stand_cn,
     first_year,
@@ -195,7 +196,7 @@ fvs_keywordfile_section <- function(
     fvs_kwd0("End"), # FMIn
     fvs_kwd0("Database"), # Database extension
     fvs_kwd0("DSNIn"),
-    paste0("FVS_", title, "_", mgmt_id, ".db"),
+    input_db,
     fvs_kwd0("StandSQL"),
     "SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'",
     fvs_kwd0("EndSQL"), # StandSQL
@@ -203,7 +204,7 @@ fvs_keywordfile_section <- function(
     "SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'",
     fvs_kwd0("EndSQL"), # TreeSQL
     fvs_kwd0("DSNOut"),
-    paste0("FVS_", title, "_", mgmt_id, "_Results.db"),
+    output_db,
     fvs_kwd1("Summary",  2),
     fvs_kwd2("Computdb", 0, 1),
     fvs_kwd1("MisRpts",  2),
@@ -217,25 +218,35 @@ fvs_keywordfile_section <- function(
 }
 
 
-fvs_write_keyword_file <- function(filename, title, mgmt_id, stands, regen = NULL) {
-  unlink(filename)
+fvs_write_keyword_file <- function(
+  keyword_filename,
+  input_db,
+  output_db,
+  title,
+  mgmt_id,
+  stands,
+  regen = NULL
+) {
+  unlink(keyword_filename)
   apply(stands, 1, \(row) {
     write_lines(
       fvs_keywordfile_section(
         title,
         mgmt_id,
+        input_db,
+        output_db,
         row["stand_id"],
         row["stand_cn"],
         row["first_year"],
         row["last_year"],
         regen
       ),
-      filename,
+      keyword_filename,
       append = TRUE
     )
   })
-  write_lines("Stop", filename, append = TRUE)
+  write_lines("Stop", keyword_filename, append = TRUE)
 
   # The result is the name of the file written
-  filename
+  keyword_filename
 }

@@ -17,6 +17,7 @@ library(tidyverse)
 library(reshape2) # for melt()
 library(RSQLite)
 library(measurements)
+library(processx)
 ```
 
 ```{r source-functions}
@@ -148,14 +149,27 @@ Select `Save in run` to apply to `Grp: All_FIA_Plots`.
 # Keywordfile Generation
 
 ```{r FVS_NKByPlot_NONE.key, include=FALSE}
-# TODO nik: put each FVS run in a separate subdir under data/fvs/
-nk_project_grow_only("data/fvs/", fiadb, nk_to_fia, nk_regen)
+tar_load(nk_to_fia)
+files <- nk_project_grow_only("data/fvs", fiadb, nk_to_fia, nk_regen)
+keywordfile <- files[1]
+outputdb <- files[2]
 ```
 
 ## Run FVS
 
 The main output will be Carbon and fuels. Stand visualization, Tree
 lists, and Inventory statistics may also be interesting.
+
+```{r run fvs}
+fvs <- processx::process$new(
+  "/fvs/fvsbin/fvsne.exe",
+  paste0("--keywordfile=", basename(keywordfile)),
+  wd = dirname(keywordfile)
+)
+fvs$wait()
+print(fvs$get_exit_status())
+```
+
 
 ```
 REM Delete destination databases. FVS will otherwise append to them, leaving previous rows.

@@ -212,12 +212,19 @@ nk_project_grow_only <- function(data_dir, fiadb, nk_to_fia, nk_regen) {
   title <- "NKByPlot"
   mgmt_id <- "NONE"
   
-  tar_load(fiadb)
-  fvs_input_db <- fvs_fia_input(nk_to_fia, fiadb, data_dir, title, mgmt_id)
+  project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+  if (!dir.exists(project_dir)) {
+    dir.create(project_dir)
+  }
+
+  fvs_input_db <- fvs_fia_input(nk_to_fia, fiadb, file.path(project_dir, "FVS_Input.db"))
+  fvs_output_db <- file.path(project_dir, "FVS_Output.db")
+  if (file.exists(fvs_output_db)) {
+    unlink(fvs_output_db)
+  }
+  
   nk_background_regen <- nk_extract_regen(nk_regen, "Background")
-  
-  filename <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id, ".key"))
-  
+
   nk_grow_only_stands <- nk_to_fia |>
     rename(
       stand_id = `FIA plot code`,
@@ -226,6 +233,18 @@ nk_project_grow_only <- function(data_dir, fiadb, nk_to_fia, nk_regen) {
     ) |>
     mutate(last_year = 2165) |>
     select(stand_id, stand_cn, first_year, last_year)
+  fvs_keyword_filename <- file.path(project_dir, paste0("FVS_", title, "_", mgmt_id, ".key"))
   
-  fvs_write_keyword_file(filename, title, mgmt_id, nk_grow_only_stands, nk_background_regen)
+  fvs_write_keyword_file(
+    fvs_keyword_filename,
+    fvs_input_db,
+    fvs_output_db,
+    title,
+    mgmt_id,
+    nk_grow_only_stands,
+    nk_background_regen
+  )
+  
+  # Return the name of the keyword file and output database
+  c(fvs_keyword_filename, fvs_output_db)
 }
