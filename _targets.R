@@ -15,6 +15,7 @@ tar_option_set(
 list(
   # TODO nik: do we want tar_download() to manage this database?
   #           potentially interesting WIP: sqltargets https://github.com/daranzolin/sqltargets
+  # TODO nik: add indexing here, e.g. fiadb built from fiadb_unindexed, or fiadb.zip
   tar_target(fiadb, "data/raw/SQLite_FIADB_ENTIRE.db", format = "file"),
   tar_file_read(
     nk_table_1,
