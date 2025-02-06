@@ -47,7 +47,7 @@ be added to the run.
 ### Automatic
 
 What FVS calls "StandCN" is what FIA calls "PLOT.CN". The keywordfile
-looks up stands by StandCN. nk_to_fia includes STAND_CN for the NK plots.
+looks up stands by StandCN. nk_plot_crosswalk includes STAND_CN for the NK plots.
 
 ## Time
 

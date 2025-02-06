@@ -104,19 +104,15 @@ Note that the Stand IDs visible in the FVS UI are different from these;
 the FVS UI Stand ID consists of STATECD(2) + INVYR(2) + COUNTYCD(3) +
 PLOT(5), and if using FVS_STANDINIT_COND, then also + CONDID(1).
 
-```{r nk_to_fia}
-tar_load(nk_to_fia)
-knitr::kable(nk_to_fia)
-```
-
-We can then fetch those IDs from the FIA-provided FVS tables to
+We can fetch those IDs from the FIA-provided FVS tables to
 determine the number of matching rows from each corresponding table,
 confirming that each updated Stand ID corresponds to a unique stand in
 the provided FVS tables.
 
-```{r nk_to_fvs}
-tar_load(nk_to_fvs)
-knitr::kable(nk_to_fvs)
+
+```{r nk_to_fia}
+tar_load(nk_plot_crosswalk)
+knitr::kable(nk_plot_crosswalk)
 ```
 
 Note that FIA provides three different means of creating an FVS Stand

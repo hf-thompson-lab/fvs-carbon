@@ -43,8 +43,8 @@ list(
   tar_target(nk_table_1_expanded, nk_extract_cols_from_plot_code(nk_table_1)),
   tar_target(nk_all_plot, nk_load_plot_all_invyr(nk_table_1_expanded, fiadb)),
   tar_target(nk_matching_plot, nk_match_plots(nk_table_1_expanded, nk_all_plot)),
-  tar_target(nk_to_fia, nk_transalte_to_fia(fiadb, nk_matching_plot)),
-  tar_target(nk_to_fvs, nk_translate_to_fvs(nk_to_fia, fiadb)),
+  # TODO: do we really need both? They're almost identical. Consolidate into nk_plot_crosswalk
+  tar_target(nk_plot_crosswalk, nk_build_crosswalk(fiadb, nk_matching_plot)),
   tar_render(nk_identifying_stands, "01_IdentifyingStands.Rmd", output_dir = "rendered/"),
 
   # 02_NKProjectedCarbon.Rmd
@@ -63,7 +63,7 @@ list(
   ),
   tar_target(nk_regen, nk_generate_regen(nk_table_4, species_crosswalk)),
   ## Run FVS - note that format = "file" because it produces files outside targets' control
-  tar_target(nk_grow_plot, nk_project_grow(fiadb, "plot", nk_to_fia, nk_regen), format = "file"),
+  tar_target(nk_grow_plot, nk_project_grow(fiadb, "plot", nk_plot_crosswalk, nk_regen), format = "file"),
   tar_target(nk_grow_plot_carbon, fvs_read_output(nk_grow_plot[3], "FVS_Carbon")),
   tar_target(nk_grow_plot_summary, fvs_read_output(nk_grow_plot[3], "FVS_Summary2_East")),
   # By Subplot
