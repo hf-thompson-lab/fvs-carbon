@@ -187,9 +187,13 @@ fvs_keywordfile_section <- function(
     stand_table <- "FVS_StandInit_Plot"
     tree_table <- "FVS_TreeInit_Plot"
   } else if (stand_type == "cond") {
+    stop("Only stand_type=\"plot\" is currenlty supported")
+    # TODO nik: cond stand_id and stand_cn have cond appended
     stand_table <- "FVS_StandInit_Cond"
     tree_table <- "FVS_TreeInit_Cond"
   } else if (stand_type == "subplot") {
+    stop("Only stand_type=\"plot\" is currenlty supported")
+    # TODO nik: subplot stand_id and stand_cn have subp appended
     stand_table <- "FVS_PlotInit_Plot"
     tree_table <- "FVS_TreeInit_Plot"
   } else {

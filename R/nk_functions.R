@@ -200,7 +200,7 @@ nk_project_grow <- function(
   fvsbin_dir <- "/fvs/fvsbin"
   fvs_variant <- "fvsne"
   data_dir <- "data/fvs"
-  title <- "NKByPlot"
+  title <- paste0("NKBy", stringr::str_to_title(stand_type))
   mgmt_id <- "NONE"
   
   project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))

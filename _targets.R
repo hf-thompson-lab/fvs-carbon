@@ -11,6 +11,7 @@ tar_option_set(
     "pbapply"
   )
 )
+
 list(
   # TODO nik: do we want tar_download() to manage this database?
   #           potentially interesting WIP: sqltargets https://github.com/daranzolin/sqltargets
@@ -65,20 +66,20 @@ list(
   tar_target(nk_grow_plot_carbon, fvs_read_output(nk_grow_plot[3], "FVS_Carbon")),
   tar_target(nk_grow_plot_summary, fvs_read_output(nk_grow_plot[3], "FVS_Summary2_East")),
   # By Subplot
-  # TODO: figure out why re-running by subplot and condition doesn't work
+  # TODO: subplot doesn't work b/c stand_cn needs fixed
   tar_file_read(
     nk_grow_subplot_carbon,
     "data/fvs/FVS_NKBySubplot_NONE_Carbon.csv",
     read_csv(!!.x, col_types = cols(StandID = col_character()))
   ),
   # By Condition
-  # TODO: figure out why re-running this doesn't work
+  # TODO: cond doesn't work b/c stand_cn needs fixed
   tar_file_read(
     nk_grow_cond_carbon,
     "data/fvs/FVS_NKByCondition_NONE_Carbon.csv",
     read_csv(!!.x, col_types = cols(StandID = col_character()))
-  )
-  #tar_render(nk_no_management, "03_NKNoManagement.Rmd", output_dir = "rendered/")
+  ),
+  tar_render(nk_no_management, "03_NKNoManagement.Rmd", output_dir = "rendered/")
 
   # Two things:
   # x. Run FVS at all.

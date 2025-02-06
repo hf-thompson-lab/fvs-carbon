@@ -142,7 +142,7 @@ The main output will be Carbon and fuels. Stand visualization, Tree
 lists, and Inventory statistics may also be interesting.
 
 ```{r run fvs}
-tar_load(nk_grow_only)
+tar_load(nk_grow_plot)
 ```
 
 # Carbon Projection
