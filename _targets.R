@@ -80,8 +80,11 @@ list(
     "data/fvs/FVS_NKByCondition_NONE_Carbon.csv",
     read_csv(!!.x, col_types = cols(StandID = col_character()))
   ),
-  tar_render(nk_no_management, "03_NKNoManagement.Rmd", output_dir = "rendered/")
+  tar_render(nk_no_management, "03_NKNoManagement.Rmd", output_dir = "rendered/"),
 
+  # 04_CarbonCalc.Rmd
+  tar_target(nk_plots_grown, nk_generate_plots_grown(fiadb, nk_plot_crosswalk))
+  
   # Two things:
   # x. Run FVS at all.
   # x.a. factor out fvs_keywords(...)

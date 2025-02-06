@@ -9,13 +9,19 @@ editor_options:
     wrap: 72
 ---
 
+# Setup
+
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(reshape2) # for melt()
 library(RSQLite)
 library(measurements)
-
-source('R/functions.R')
+library(targets)
+```
+```{r source functions}
+source("R/fia_functions.R")
+source("R/nk_functions.R")
+source("R/filters.R")
 ```
 
 # Carbon Calculation
@@ -45,70 +51,12 @@ lists observations from those measurements. We can use the above
 established connection between FVS identifiers and FIA identifiers to
 find subsequent measurement for the plots and conditions included in NK.
 
-Create a single crosswalk between NK, FIA and FVS identifiers.
-
-```{r stand_id_crosswalk}
-nk_to_fia <- read_csv(
-    "data/intermediate/nk_to_fia.csv",
-    col_types = cols(
-      `FIA plot code` = col_character(),
-      .default = col_integer()
-    )
-  ) |>
-  select(`FIA plot code`, STATECD, COUNTYCD, PLOT, CONDID)
-
-nk_to_fvs <- read_csv(
-    "data/intermediate/nk_to_fvs.csv",
-    col_types = cols(
-      `FIA plot code` = col_character(),
-      FVS_STAND_ID = col_character(),
-      STAND_ID_PLOT = col_character(),
-      STAND_ID_COND = col_character(),
-      .default = col_integer()
-    )
-  ) |>
-  select(`FIA plot code`, FVS_STAND_ID)
-
-stand_id_crosswalk <- nk_to_fia |>
-  full_join(nk_to_fvs, by=join_by(`FIA plot code`)) |>
-  # STAND_ID is state, county, plot - like FVS_STAND_ID with no year
-  mutate(STAND_ID = sprintf(paste0(
-    '%02d',  '%03d',   '%05d'),
-    STATECD, COUNTYCD, PLOT
-  ))
-
-remove(nk_to_fia)
-remove(nk_to_fvs)
-```
-
-Given the NK plot IDs, we can find the matching FIA plots.
-
 ```{r matching_plot}
-fia = DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-fia_plot = tbl(fia, 'PLOT')
+tar_load(fiadb)
+tar_load(nk_plot_crosswalk)
 
-matching_plot <- fia_plot |>
-  filter(INVYR >= 1999) |>
-  semi_join(
-    stand_id_crosswalk,
-    by=join_by(STATECD, COUNTYCD, PLOT),
-    copy=TRUE
-  ) |>
-  collect()
-
-plt_cns <- matching_plot |>
-  group_by(STATECD, COUNTYCD, PLOT) |>
-  filter(INVYR == min(INVYR)) |>
-  ungroup() |>
-  select(CN, STATECD, COUNTYCD, PLOT) |>
-  rename(PLT_CN = CN)
-
-stand_id_crosswalk <- stand_id_crosswalk |>
-  left_join(plt_cns, by = join_by(STATECD, COUNTYCD, PLOT))
-
-DBI::dbDisconnect(fia)
-
-remove(fia, fia_plot, plt_cns)
+nk_matching_plot <- fia_plots(fiadb, nk_plot_crosswalk) |>
+  filter(INVYR >= 1999)
 ```
 
 ### Remeasurement Timeline
@@ -130,11 +78,11 @@ This will put plots surveyed earlier towards the bottom of the chart,
 creating an "upward and to the right" visual that is generally easy to read.
 
 ```{r stand_inventories}
-year1 <- matching_plot |>
+year1 <- nk_matching_plot |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   summarize(YEAR1 = min(MEASYEAR), .groups = "keep") |>
   ungroup() |>
-  right_join(matching_plot, by=join_by(STATECD, COUNTYCD, PLOT))
+  right_join(nk_matching_plot, by=join_by(STATECD, COUNTYCD, PLOT))
 
 year2 <- year1 |>
   filter(MEASYEAR > YEAR1) |>
@@ -175,7 +123,7 @@ stand_num <- year4 |>
 remove(year1, year2, year3, year4)
 
 # Paste stand numbers back on to plots
-stand_inventories <- matching_plot |>
+stand_inventories <- nk_matching_plot |>
   left_join(stand_num, by=join_by(STATECD, COUNTYCD, PLOT)) |>
   group_by(STAND_NUM, MEASYEAR) |>
   rename(Year = MEASYEAR)
@@ -201,32 +149,19 @@ age. Because there are only a few plots with multiple conditions, we simplify
 this analysis by omitting multi-condition plots.
 
 ```{r matching_cond}
-fia = DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-fia_cond = tbl(fia, 'COND')
-fia_ref_forest_type = tbl(fia, 'REF_FOREST_TYPE') |>
-  select(VALUE, MEANING)
-
-matching_cond <- fia_cond |>
+nk_matching_cond <- fia_conds(fiadb, nk_plot_crosswalk) |>
   filter(INVYR >= 1999) |>
-  semi_join(
-    stand_id_crosswalk,
-    # Omitting CONDID in the join will not filter out any conditions
-    by=join_by(STATECD, COUNTYCD, PLOT),
-    copy=TRUE
-  ) |>
-  # Dereference forest type codes
-  left_join(fia_ref_forest_type, by = join_by(FORTYPCD == VALUE)) |>
-  rename(FORTYPE = MEANING) |>
   # Paste MEASYEAR on to COND, because everything in FVS works off MEASYEAR
-  collect() |>
   left_join(
-    matching_plot |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
+    nk_matching_plot |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
     by=join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
 
-DBI::dbDisconnect(fia)
-
-remove(fia, fia_cond, fia_ref_forest_type)
+# We should have retrieved conditions for all plots
+stopifnot(
+  (nk_matching_plot |> distinct(STATECD, COUNTYCD, PLOT) |> nrow()) ==
+    (nk_matching_cond |> distinct(STATECD, COUNTYCD, PLOT) |> nrow())
+)
 ```
 
 Which plots have multiple conditions?
@@ -237,7 +172,7 @@ Which plots have multiple conditions?
 # distinct conditions across all inventory years.
 # This will not flag cases when a plot with a single condition changes
 # condition type, e.g. when a plot is harvested.
-matching_cond_multi <- matching_cond |>
+matching_cond_multi <- nk_matching_cond |>
   mutate(MULTI_FLAG = CONDID > 1) |>
   select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, MULTI_FLAG)
 
@@ -255,7 +190,7 @@ all conditions are forested for the duration of the study period.
 Which plots have non-forested conditions?
 
 ```{r nonforest_flag}
-matching_cond_nonforest <- matching_cond |>
+matching_cond_nonforest <- nk_matching_cond |>
   mutate(NONFOREST_FLAG = COND_STATUS_CD > 1) |>
   select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, COND_STATUS_CD, NONFOREST_FLAG)
 
@@ -298,7 +233,7 @@ We want to remove plots that are skipped for any reason.
 
 ```{r skipped_flag}
 # Were any stands not sampled during an inventory?
-matching_cond_skipped <- matching_cond |>
+matching_cond_skipped <- nk_matching_cond |>
   select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, COND_STATUS_CD, COND_NONSAMPLE_REASN_CD) |>
   mutate(SKIPPED_FLAG = COND_STATUS_CD > 1)
 
@@ -359,7 +294,7 @@ Code Descriptions are given in [@Burrill2024]:
 
 ```{r disturbed_flag}
 # Who had disturbance?
-matching_cond_disturbed <- matching_cond |>
+matching_cond_disturbed <- nk_matching_cond |>
   select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, DSTRBCD1, DSTRBCD2, DSTRBCD3) |>
   mutate(DISTURBED_FLAG = DSTRBCD1 > 0 | DSTRBCD2 > 0 | DSTRBCD3 > 0) |>
   mutate(DISTURBED_FLAG = if_else(is.na(DISTURBED_FLAG), FALSE, DISTURBED_FLAG))
@@ -383,7 +318,7 @@ Code Descriptions are given in [@Burrill2024]:
 
 ```{r treated_flag}
 # Who had treatment?
-matching_cond_treated <- matching_cond |>
+matching_cond_treated <- nk_matching_cond |>
   select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, TRTCD1, TRTCD2, TRTCD3) |>
   mutate(TREATED_FLAG = TRTCD1 > 0 | TRTCD2 > 0 | TRTCD3 > 0) |>
   mutate(TREATED_FLAG = if_else(is.na(TREATED_FLAG), FALSE, TREATED_FLAG))
@@ -402,7 +337,7 @@ accommodate, we introduce horizontal offset for conditions so that the status of
 individual conditions within a plot is visible in the chart.
 
 ```{r stand_inventory_status}
-matching_cond_status <- matching_cond |>
+matching_cond_status <- nk_matching_cond |>
   
   # Merge all the matching_cond_<status> tables
   left_join(
@@ -491,15 +426,15 @@ rhs <- matching_cond_status |>
   ungroup() |>
   filter(GROWN_FLAG)
 
-stand_grow_only <- matching_plot |>
+stand_grow_only <- nk_matching_plot |>
   semi_join(rhs, by = join_by(STATECD, COUNTYCD, PLOT)) |>
   left_join(stand_num, by = join_by(STATECD, COUNTYCD, PLOT)) |>
-  left_join(stand_id_crosswalk, by = join_by(STATECD, COUNTYCD, PLOT)) |>
-  # Add STDAGE and FORTYPE, because they'll be useful later
+  left_join(nk_plot_crosswalk, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  # Add STDAGE, FORTYPE, and MEASYEAR because they'll be useful later
   left_join(
-    matching_cond |> 
-      select(STATECD, COUNTYCD, PLOT, FORTYPE, STDAGE, MEASYEAR),
-    by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR)
+    nk_matching_cond |> 
+      select(STATECD, COUNTYCD, PLOT, INVYR, FORTYPE, STDAGE, MEASYEAR),
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
 
 # rhs is just for the RHS of the semi_join
@@ -512,6 +447,19 @@ ggplot(
   ggtitle("Grow-only Stand Inventory Timeline") +
   geom_point() +
   coord_cartesian(xlim = c(1999, 2022), ylim = c(0, 31))
+```
+
+We should be able to get the same plots using database filters
+
+```{r nk_plots_grown}
+tar_load(nk_plots_grown)
+stopifnot(
+  nk_plots_grown |> anti_join(stand_grow_only, by = join_by(STATECD, COUNTYCD, PLOT)) |> nrow() == 0
+)
+stopifnot(
+  stand_grow_only |> anti_join(nk_plots_grown, by = join_by(STATECD, COUNTYCD, PLOT)) |> nrow() == 0
+)
+
 ```
 
 ## Carbon Accounting
@@ -542,7 +490,8 @@ We need two outputs from FVS to compare:
 1. Projected growth for all grow-only stands between their first and last MEASYEAR.
 2. Carbon calculation for each stand for each year in which it was measured.
 
-The first is accomplished with a single run of FVS for each grow-only plot.
+The first is accomplished with a single run of FVS for each grow-only plot,
+ending in the year of last measurement.
 
 The second is accomplished by creating a 0-year FVS run for each plot in each
 year in which it was measured.
@@ -570,75 +519,11 @@ knitr::kable(stand_first_last)
 
 We also need the background regeneration
 ```{r background_regen}
-nk_regen <- read_csv(
-  "data/intermediate/nk_regen.csv", 
-  col_types = cols(
-    Clearcut = col_integer(), 
-    Shelterwood = col_integer(),
-    `ITS_Low Retention` = col_integer(), 
-    `ITS_High Retention` = col_integer(), 
-    Background = col_integer()
-  )
-)
-background_regen <- nk_regen |>
-  rename(species = `Species Code`, seedlings = Background) |>
-  filter(!is.na(seedlings)) |>
-  fvs_Estab()
+tar_load(nk_regen)
+nk_extract_regen(nk_regen, "Background")
 ```
 
 Next, we want to run FVS for each of those plots, in each of those years.
-```{r keywordfile_section}
-keywordfile_section <- function(Title, MgmtId, StandID, StandCN, FirstYear, LastYear, CCMethod) {
-  TimeConfig <- fvs_TimeConfig(FirstYear, LastYear)
-  c(
-    fvs_kwd0("StdIdent"),
-    paste0(StandID, " ", Title),
-    fvs_kwd0("StandCN"),
-    StandCN,
-    fvs_kwd0("MgmtId"),
-    MgmtId,
-    TimeConfig,
-    fvs_kwd0("FMIn"), # Fire and Fuels Extension
-    fvs_kwd0("CarbRept"),
-    fvs_kwd0("CarbCut"),
-    # CarbCalc first param is method:
-    # 0 - FFE
-    # 1 - Jenkins
-    fvs_kwd5("CarbCalc", CCMethod, 1, 0.0425, 9, 11),
-    fvs_kwd0("FuelOut"),
-    fvs_kwd0("FuelRept"),
-    fvs_kwd0("End"), # FMIn
-    fvs_kwd0("Database"), # Database extension
-    fvs_kwd0("DSNIn"),
-    "SQLite_FIADB_ENTIRE.db",
-    fvs_kwd0("StandSQL"),
-    "SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'",
-    fvs_kwd0("EndSQL"), # StandSQL
-    fvs_kwd0("TreeSQL"),
-    "SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'",
-    fvs_kwd0("EndSQL"), # TreeSQL
-    fvs_kwd0("DSNOut"),
-    paste0("FVS_", Title, "_", MgmtId, ".db"),
-    fvs_kwd1("Summary",  2),
-    fvs_kwd2("Computdb", 0, 1),
-    fvs_kwd1("MisRpts",  2),
-    fvs_kwd1("CarbReDB", 2),
-    fvs_kwd1("FuelReDB", 2),
-    fvs_kwd1("FuelsOut", 2),
-    fvs_kwd0("End"), # Database
-    background_regen,
-    fvs_kwd0("Process"),
-    recursive = TRUE
-  )
-}
-
-```
-
-Allocate places to gather results:
-```{r FVS Outputs}
-FVS_Carbon <- NULL
-FVS_Summary2_East <- NULL
-```
 
 #### FFE Projected
 

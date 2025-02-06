@@ -77,7 +77,7 @@ nk_match_plots <- function(nk_plots, fia_plots) {
     )
 }
 
-nk_transalte_to_fia <- function(fiadb, nk_stands) {
+nk_build_crosswalk <- function(fiadb, nk_stands) {
   left <- nk_stands |>
     mutate(
       STATECD  = as.numeric(STATECD),
@@ -110,20 +110,15 @@ nk_transalte_to_fia <- function(fiadb, nk_stands) {
     rename(STAND_CN = CN, FIA_INVYR = INVYR) |>
     collect()
   
-  left |>
+  fvs_stands <- left |>
     left_join(plot_mixin, by = join_by(STATECD, COUNTYCD, PLOT, FIA_INVYR)) |>
     select(
       `FIA plot code`,
       STAND_CN, STATECD, COUNTYCD, PLOT, FIA_INVYR, MEASYEAR,
       FVS_STAND_ID, STAND_ID_PLOT, STAND_ID_COND
     )
-}
 
-nk_translate_to_fvs <- function(fvs_stands, fiadb) {
-  fia = DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = SQLITE_RO)
-  on.exit(dbDisconnect(fia), add = TRUE, after = FALSE)
-  
-  matching_plotinit_plot_grp <- tbl(fia, 'FVS_PLOTINIT_PLOT') |>
+  matching_plotinit_plot_grp <- tbl(con, 'FVS_PLOTINIT_PLOT') |>
     right_join(
       fvs_stands |> rename(STAND_ID=STAND_ID_PLOT) |> select(STAND_ID),
       by=join_by(STAND_ID),
@@ -134,7 +129,7 @@ nk_translate_to_fvs <- function(fvs_stands, fiadb) {
     rename(FVS_PLOTINIT_PLOT=STAND_ID) |>
     collect()
   
-  matching_standinit_cond_grp <- tbl(fia, 'FVS_STANDINIT_COND') |>
+  matching_standinit_cond_grp <- tbl(con, 'FVS_STANDINIT_COND') |>
     right_join(
       fvs_stands |>
         rename(STAND_ID=STAND_ID_COND),
@@ -146,7 +141,7 @@ nk_translate_to_fvs <- function(fvs_stands, fiadb) {
     rename(FVS_STANDINIT_COND=STAND_ID) |>
     collect()
   
-  matching_standinit_plot_grp <- tbl(fia, 'FVS_STANDINIT_PLOT') |>
+  matching_standinit_plot_grp <- tbl(con, 'FVS_STANDINIT_PLOT') |>
     right_join(
       fvs_stands |>
         rename(STAND_ID=STAND_ID_PLOT),
@@ -229,4 +224,13 @@ nk_project_grow <- function(
     nk_grow_only_stands,
     nk_background_regen
   )
+}
+
+nk_generate_plots_grown <- function(fiadb, nk_matching_plot) {
+  fia_plots_filtered(fiadb, nk_matching_plot, \(.data, con) {
+    .data |>
+      filter_plots_forested(con) |> # Forested implies not skipped
+      filter_plots_undisturbed(con) |>
+      filter_plots_untreated(con)
+  })
 }
