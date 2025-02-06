@@ -17,6 +17,12 @@ else. In the event that it doesn't, required packages are listed at the top of
 You will need `pandoc` installed and a working `latex` distribution;
 if you are able to knit Rmd to PDF, you should be all set.
 
+You will need a copy of the full SQLite FIADB; download this from the
+FIA Data Mart and unzip into `data/raw`. This should result in the file
+`data/raw/SQLite_FIADB_ENTIRE.db`. Note that there is code in `00_Introduction.Rmd`
+to add indexes to the FIADB; while not required, these can reduce the time
+for a single run of FVS from hours to minutes.
+
 You will need a working FVS installation, with the FVSne.exe program installed.
 Currently this is hard-coded to look in `C:\FVS\FVSbin\` for `FVSne.exe`.
 
