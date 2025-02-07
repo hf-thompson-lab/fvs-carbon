@@ -45,7 +45,7 @@ list(
   tar_target(nk_matching_plot, nk_match_plots(nk_table_1_expanded, nk_all_plot)),
   # TODO: do we really need both? They're almost identical. Consolidate into nk_plot_crosswalk
   tar_target(nk_plot_crosswalk, nk_build_crosswalk(fiadb, nk_matching_plot)),
-  tar_render(nk_identifying_stands, "01_IdentifyingStands.Rmd", output_dir = "rendered/"),
+  tar_render(nk_identifying_stands, "01_NKIdentifyingStands.Rmd", output_dir = "rendered/"),
 
   # 02_NKProjectedCarbon.Rmd
   tar_file_read(
