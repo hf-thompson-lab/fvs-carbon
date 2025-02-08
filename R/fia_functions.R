@@ -1,4 +1,4 @@
-fiadb_version <- function(fiadb) {
+fia_version <- function(fiadb) {
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
   tbl(con, "REF_FIADB_VERSION") |>
@@ -8,7 +8,7 @@ fiadb_version <- function(fiadb) {
     collect()
 }
 
-fiadb_create_index_maybe <- function(con, tbl, col) {
+fia_create_index_maybe <- function(con, tbl, col) {
   idx_name <- paste0("IDX_", tbl, "_", col)
   sql <- paste0(
     "CREATE INDEX IF NOT EXISTS ", idx_name, " ON ", tbl, " (", col, ")"
@@ -16,7 +16,7 @@ fiadb_create_index_maybe <- function(con, tbl, col) {
   DBI::dbExecute(con, sql) > 0 # return TRUE if index created
 }
 
-fiadb_create_plot_indexs_maybe <- function(con, tbl, has_invyr) {
+fia_create_plot_indexs_maybe <- function(con, tbl, has_invyr) {
   idx_name <- paste0("IDX_", tbl, "_PLOT")
   sql <- paste0(
     "CREATE INDEX IF NOT EXISTS ", idx_name, " ON ", tbl, " (STATECD, COUNTYCD, PLOT)"
@@ -31,13 +31,13 @@ fiadb_create_plot_indexs_maybe <- function(con, tbl, has_invyr) {
   }
 }
 
-fiadb_cn_columns <- function(con, tbl) {
+fia_cn_columns <- function(con, tbl) {
   # list the Control Number (CN) primary and foreign keys in a table
   cols <- DBI::dbListFields(con, tbl)
   cols[grepl("^CN$", cols) | grepl("_CN$", cols)]
 }
 
-fiadb_table_has_plot_cols <- function(con, tbl) {
+fia_table_has_plot_cols <- function(con, tbl) {
   cols <- DBI::dbListFields(con, tbl)
   # result[1] - true if table has plot columns
   # result[2] - true if table has invyr
@@ -49,7 +49,7 @@ fiadb_table_has_plot_cols <- function(con, tbl) {
   )
 }
 
-fiadb_create_indexes <- function() {
+fia_create_indexes <- function() {
   # TODO: depend on the zip file or something for targets
   fiadb <- "data/raw/SQLite_FIADB_ENTIRE.db"
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO) # not SQLITE_RC
@@ -57,12 +57,12 @@ fiadb_create_indexes <- function() {
   
   tbls <- DBI::dbListTables(con)
   lapply(tbls, \(tbl) {
-    lapply(fiadb_cn_columns(con, tbl), \(col) {
-      fiadb_create_index_maybe(con, tbl, col)
+    lapply(fia_cn_columns(con, tbl), \(col) {
+      fia_create_index_maybe(con, tbl, col)
     })
-    plot_cols <- fiadb_table_has_plot_cols(con, tbl)
+    plot_cols <- fia_table_has_plot_cols(con, tbl)
     if (plot_cols[1]) {
-      fiadb_create_plot_indexs_maybe(con, tbl, plot_cols[2])
+      fia_create_plot_indexs_maybe(con, tbl, plot_cols[2])
     }
   })
   fiadb

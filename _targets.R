@@ -15,7 +15,7 @@ tar_option_set(
 list(
   # TODO nik: do we want tar_download() to manage this database?
   #           potentially interesting WIP: sqltargets https://github.com/daranzolin/sqltargets
-  tar_target(fiadb, fiadb_create_indexes(), format = "file"),
+  tar_target(fiadb, fia_create_indexes(), format = "file"),
   tar_file_read(
     nk_table_1,
     "data/raw/NK_Table_1.csv",
