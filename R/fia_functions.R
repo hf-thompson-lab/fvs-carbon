@@ -16,7 +16,7 @@ fia_create_index_maybe <- function(con, tbl, col) {
   DBI::dbExecute(con, sql) > 0 # return TRUE if index created
 }
 
-fia_create_plot_indexs_maybe <- function(con, tbl, has_invyr) {
+fia_create_plot_indexes_maybe <- function(con, tbl, has_invyr) {
   idx_name <- paste0("IDX_", tbl, "_PLOT")
   sql <- paste0(
     "CREATE INDEX IF NOT EXISTS ", idx_name, " ON ", tbl, " (STATECD, COUNTYCD, PLOT)"
@@ -72,7 +72,7 @@ fia_fiadb_indexed <- function() {
     })
     plot_cols <- fia_table_has_plot_cols(con, tbl)
     if (plot_cols[1]) {
-      fia_create_plot_indexs_maybe(con, tbl, plot_cols[2])
+      fia_create_plot_indexes_maybe(con, tbl, plot_cols[2])
     }
   })
   fiadb
