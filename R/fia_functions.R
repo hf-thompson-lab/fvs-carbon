@@ -49,8 +49,18 @@ fia_table_has_plot_cols <- function(con, tbl) {
   )
 }
 
-fia_create_indexes <- function() {
-  # TODO: depend on the zip file or something for targets
+fia_fiadb_indexed <- function() {
+  # TODO: depend on the zip file
+  # As it stands, this function is side-effect only, which means
+  # targets has no way to track whether it's been run. We work around this
+  # by not telling targets about the un-indexed database, and making indexing
+  # the only way for targets to know about it.
+  # Ideally, we'd have a three step pipeline here:
+  # 1. The URL to fetch the database; targets can tell when the remote has
+  #    been updated, and download only when necessary.
+  # 2. Prepare the database: unzip the download, create indexes, and anything
+  #    else we need to do to make the download practical to use.
+  # 3. Notify targets that the database is in the appropriate files.
   fiadb <- "data/raw/SQLite_FIADB_ENTIRE.db"
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO) # not SQLITE_RC
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
