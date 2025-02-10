@@ -1,26 +1,6 @@
-library(targets)
-library(tarchetypes)
-tar_source()
-tar_option_set(
-  packages = c(
-    "tidyverse",
-    "RSQLite",
-    "measurements",
-    "reshape2",
-    "maps",
-    "pbapply"
-  )
-)
 
 list(
-  # TODO nik: do we want tar_download() to manage this database?
-  #           potentially interesting WIP: sqltargets https://github.com/daranzolin/sqltargets
-  tar_target(fiadb, fia_create_indexes(), format = "file"),
-  tar_file_read(
-    nk_table_1,
-    "data/raw/NK_Table_1.csv",
-    read_csv(!!.x, col_types = cols(`FIA plot code` = col_character()))
-  ),
+,
 
   # Species Crosswalk
   tar_file_read(
@@ -39,9 +19,6 @@ list(
   ),
 
   # 01_IdentifyingStands.Rmd
-  tar_target(nk_table_1_expanded, nk_extract_cols_from_plot_code(nk_table_1)),
-  tar_target(nk_all_plot, nk_load_plot_all_invyr(nk_table_1_expanded, fiadb)),
-  tar_target(nk_matching_plot, nk_match_plots(nk_table_1_expanded, nk_all_plot)),
   # TODO: do we really need both? They're almost identical. Consolidate into nk_plot_crosswalk
   tar_target(nk_plot_crosswalk, nk_build_crosswalk(fiadb, nk_matching_plot)),
   tar_render(nk_identifying_stands, "01_NKIdentifyingStands.Rmd", output_dir = "rendered/"),

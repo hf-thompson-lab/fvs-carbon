@@ -1,20 +1,20 @@
 ---
-title: "Nunery Keeton Revisited"
+title: "FVS Carbon Modeling Analysis"
 author: "Nikolaus Bates-Haus"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 editor_options:
   markdown:
     wrap: 72
 ---
 
-```{r setup, include=FALSE}
-library(tidyverse)
-library(RSQLite)
-library(dbplyr)
-```
+# Setup
 
+```{r setup, include = FALSE}
+library(targets)
+library(tarchetypes)
+```
 
 # Introduction
 
@@ -25,11 +25,58 @@ carbon storage; we seek to compare FVS with other models to understand
 their different predictions for carbon storage under different
 management regimens.
 
+# Targets
+
+This project uses [`targets`](https://docs.ropensci.org/targets) and
+[Targets Markdown](https://books.ropensci.org/targets/markdown.html). You can
+interact with the notebooks in the normal way for any R code; in addition, when
+you knit the notebooks, file `_targets.R` and the folder `_targets_r/` will be
+updated such that running `tar_make()` will do a minimal rebuild of the project.
+
+## Targets Cleanup
+
+Two commands are useful to clean up stale objects cached by targets:
+
+- `tar_prune()` - removes from `_targets/` cached objects that are no longer defined in the project
+- `tar_unscript()` - removes build scripts from `_targets_r/` so they can be rebuilt
+
+`tar_prune()` it makes sense to run on every build; `tar_unscript()` is run
+once, here, to ensure that knitting will produce a clean build.
+
+```{r tar_unscript, include = FALSE}
+tar_unscript()
+```
+
+## Targets Globals
+
+This is the global configuration for Targets.
+
+```{targets tar_globals, targ_globals = TRUE}
+options(tidyverse.quiet = TRUE)
+tar_option_set(
+  packages = c(
+    "tidyverse",
+    "RSQLite",
+    "measurements",
+    "reshape2",
+    "maps",
+    "pbapply"
+  )
+)
+tar_source()
+```
+
 # Database Preparation
 
 This project depends heavily on the SQLite version of the FIA data, distributed
 as SQLite_FIADB_ENTIRE.db. Place a copy of this file in data/raw/
 The database ships with most indexes missing, which makes most queries very slow.
+
+
+```{targets fiadb}
+# Cannot use tar_simple = TRUE for targets with format = "file"
+tar_target(fiadb, fia_fiadb_indexed(), format = "file")
+```
 
 ## Primary and Foreign Keys
 

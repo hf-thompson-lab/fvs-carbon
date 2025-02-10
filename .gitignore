@@ -64,6 +64,9 @@ data/intermediate
 
 # targets local object store
 _targets/
+# targets Markdown auto-generated files
+_targets.R
+_targets_r/
 
 # rendered documents
 rendered/
