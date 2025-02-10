@@ -1,5 +1,5 @@
 ---
-title: "Nunery Keeton Revisited"
+title: "FVS Carbon Modeling Analysis"
 author: "Nikolaus Bates-Haus"
 output:
   pdf_document: default
@@ -12,16 +12,22 @@ editor_options:
 # Setup
 
 ```{r setup, include=FALSE}
+library(targets)
+library(tarchetypes)
 library(tidyverse)
 library(reshape2) # for melt()
 library(RSQLite)
 library(measurements)
-library(targets)
+tar_source()
 ```
-```{r source functions}
-source("R/fia_functions.R")
-source("R/nk_functions.R")
-source("R/filters.R")
+
+## Load targets results from other documents
+
+```{r load tar objects}
+tar_load(fiadb)
+tar_load(species_crosswalk)
+tar_load(nk_plot_crosswalk)
+tar_load(nk_fig_2)
 ```
 
 # Carbon Calculation
@@ -51,10 +57,7 @@ lists observations from those measurements. We can use the above
 established connection between FVS identifiers and FIA identifiers to
 find subsequent measurement for the plots and conditions included in NK.
 
-```{r matching_plot}
-tar_load(fiadb)
-tar_load(nk_plot_crosswalk)
-
+```{r matching_plot, eval = FALSE}
 nk_matching_plot <- fia_plots(fiadb, nk_plot_crosswalk) |>
   filter(INVYR >= 1999)
 ```
@@ -77,7 +80,7 @@ To create these ordinals, we sort plots by:
 This will put plots surveyed earlier towards the bottom of the chart,
 creating an "upward and to the right" visual that is generally easy to read.
 
-```{r stand_inventories}
+```{r stand_inventories, eval = FALSE}
 year1 <- nk_matching_plot |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   summarize(YEAR1 = min(MEASYEAR), .groups = "keep") |>
@@ -148,7 +151,7 @@ conditions by characteristics such as azimuth, forest type and stand
 age. Because there are only a few plots with multiple conditions, we simplify
 this analysis by omitting multi-condition plots.
 
-```{r matching_cond}
+```{r matching_cond, eval = FALSE}
 nk_matching_cond <- fia_conds(fiadb, nk_plot_crosswalk) |>
   filter(INVYR >= 1999) |>
   # Paste MEASYEAR on to COND, because everything in FVS works off MEASYEAR
@@ -166,7 +169,7 @@ stopifnot(
 
 Which plots have multiple conditions?
 
-```{r multi_flag}
+```{r multi_flag, eval = FALSE}
 # We are interested in plots that have more than one condition in any
 # inventory year. Therefore we group by plot, and count the number of
 # distinct conditions across all inventory years.
@@ -189,7 +192,7 @@ all conditions are forested for the duration of the study period.
 
 Which plots have non-forested conditions?
 
-```{r nonforest_flag}
+```{r nonforest_flag, eval = FALSE}
 matching_cond_nonforest <- nk_matching_cond |>
   mutate(NONFOREST_FLAG = COND_STATUS_CD > 1) |>
   select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, COND_STATUS_CD, NONFOREST_FLAG)
@@ -231,7 +234,7 @@ Nonsample Reason Code Descriptions are given in [@Burrill2024]:
 
 We want to remove plots that are skipped for any reason.
 
-```{r skipped_flag}
+```{r skipped_flag, eval = FALSE}
 # Were any stands not sampled during an inventory?
 matching_cond_skipped <- nk_matching_cond |>
   select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, COND_STATUS_CD, COND_NONSAMPLE_REASN_CD) |>
@@ -242,7 +245,7 @@ knitr::kable(matching_cond_skipped |> filter(SKIPPED_FLAG))
 
 Notably, all Nonforest is skipped:
 
-```{r nonforest_is_skipped}
+```{r nonforest_is_skipped, eval = FALSE}
 matching_cond_nonforest |>
   full_join(matching_cond_skipped, by = join_by(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR)) |>
   select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, NONFOREST_FLAG, SKIPPED_FLAG) |>
@@ -292,7 +295,7 @@ Code Descriptions are given in [@Burrill2024]:
 -   94 Other geologic event.
 -   95 Earth movement / avalanches.
 
-```{r disturbed_flag}
+```{r disturbed_flag, eval = FALSE}
 # Who had disturbance?
 matching_cond_disturbed <- nk_matching_cond |>
   select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, DSTRBCD1, DSTRBCD2, DSTRBCD3) |>
@@ -316,7 +319,7 @@ Code Descriptions are given in [@Burrill2024]:
 -   40 Natural regeneration
 -   50 Other silvicultural treatment
 
-```{r treated_flag}
+```{r treated_flag, eval = FALSE}
 # Who had treatment?
 matching_cond_treated <- nk_matching_cond |>
   select(STATECD, COUNTYCD, PLOT, CONDID, MEASYEAR, TRTCD1, TRTCD2, TRTCD3) |>
@@ -336,7 +339,7 @@ Note that the various status are per condition, and we are charting per plot. To
 accommodate, we introduce horizontal offset for conditions so that the status of
 individual conditions within a plot is visible in the chart.
 
-```{r stand_inventory_status}
+```{r stand_inventory_status, eval = FALSE}
 matching_cond_status <- nk_matching_cond |>
   
   # Merge all the matching_cond_<status> tables
@@ -415,7 +418,7 @@ We need all conditions in the plot to be grow-only for all inventory years, sinc
 FIA and FVS may diverge in their understanding of condition composition
 of plots over time.
 
-```{r stand_grow_only}
+```{r stand_grow_only, eval = FALSE}
 rhs <- matching_cond_status |>
   mutate(GROWN_FLAG = !SKIPPED_FLAG & !DISTURBED_FLAG & !TREATED_FLAG) |>
   group_by(STATECD, COUNTYCD, PLOT) |>
@@ -451,8 +454,16 @@ ggplot(
 
 We should be able to get the same plots using database filters
 
-```{r nk_plots_grown}
-tar_load(nk_plots_grown)
+```{targets nk_plots_grown, tar_simple = TRUE}
+fia_plots_filtered(fiadb, nk_plot_crosswalk, \(.data, con) {
+  .data |>
+    filter_plots_forested(con) |> # Forested implies not skipped
+    filter_plots_undisturbed(con) |>
+    filter_plots_untreated(con)
+})
+```
+
+```{r nk_plots_grown, eval = FALSE}
 stopifnot(
   nk_plots_grown |> anti_join(stand_grow_only, by = join_by(STATECD, COUNTYCD, PLOT)) |> nrow() == 0
 )

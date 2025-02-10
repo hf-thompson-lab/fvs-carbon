@@ -21,7 +21,7 @@ library(reshape2) # for melt()
 tar_source()
 ```
 
-# Load targets results from other documents
+## Load targets results from other documents
 
 ```{r load tar objects}
 tar_load(fiadb)
