@@ -1,9 +1,9 @@
 ---
-title: "Nunery Keeton Revisited"
+title: "FVS Carbon Modeling Analysis"
 author: "Nikolaus Bates-Haus"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 editor_options:
   markdown:
     wrap: 72
@@ -11,11 +11,23 @@ editor_options:
 
 # Setup
 
-```{r setup, include=FALSE}
+```{r setup, include = FALSE}
 library(targets)
+library(tarchetypes)
 library(tidyverse)
+library(measurements)
+library(RSQLite)
 library(reshape2) # for melt()
-source("R/fia_functions.R")
+tar_source()
+```
+
+# Load targets results from other documents
+
+```{r load tar objects}
+tar_load(fiadb)
+tar_load(species_crosswalk)
+tar_load(nk_plot_crosswalk)
+tar_load(nk_fig_2)
 ```
 
 # Configuring FVS
@@ -24,8 +36,7 @@ FVS Software with `Release date: 20240401` was used.
 
 FIA data version:
 
-```{r}
-tar_load(fiadb)
+```{r fiadb verson, eval = FALSE}
 fia_version(fiadb)
 ```
 
@@ -73,13 +84,43 @@ stands, independent of forest management activities."
 
 This background regeneration rate is in NK Table 4.
 
+```{targets nk_table_4}
+tarchetypes::tar_file_read(
+  nk_table_4,
+  "data/raw/NK_Table_4.csv",
+  read_csv(!!.x, col_types = cols(`Management scenario` = col_character(), .default = col_number()))
+)
+```
+
+```{r nk_table_4_preview, eval = FALSE}
+knitr::kable(nk_table_4)
+```
+
 Note that if *any* establishment is specified, whether Natural or Plant,
 FVS defaults to doing site prep. It generates a mix of mechanical and burn site
 prep based on site characteristics. For grow-only plots, it's important to turn
 this off by explicitly specifying MerchPrep 0 or BurnPrep 0 (or both).
 
-```{r nk_regen}
-tar_load(nk_regen)
+```{targets nk_regen, tar_simple = TRUE}
+# Values in NK are seedlings per hectare; FVS needs seedlings per acre.
+# Convert using hectares_per_acre
+hectares_per_acre <- conv_unit(1, "acre", "hectare")
+
+# nk_table_4 has species in columns and management scenarios in rows.
+# We wish to pivot to have species in rows and management scenarios in columns.
+nk_table_4 |>
+  pivot_longer(cols = !`Management scenario`) |>
+  pivot_wider(names_from = `Management scenario`) |>
+  rename(SCIENTIFIC_NAME = name) |>
+  left_join(species_crosswalk, by = join_by(SCIENTIFIC_NAME)) |>
+  mutate(Clearcut = round(Clearcut * hectares_per_acre)) |>
+  mutate(Shelterwood = round(Shelterwood * hectares_per_acre)) |>
+  mutate(`ITS_Low Retention` = round(`ITS_Low Retention` * hectares_per_acre)) |>
+  mutate(`ITS_High Retention` = round(`ITS_High Retention` * hectares_per_acre)) |>
+  mutate(Background = round(Background * hectares_per_acre))
+```
+
+```{r nk_regen_preview, eval = FALSE}
 nk_regen |>
   filter(!is.na(Background)) |>
   select(SCIENTIFIC_NAME, Background, FVS_SPCD, COMMON_NAME) |>
@@ -138,11 +179,58 @@ Select `Save in run` to apply to `Grp: All_FIA_Plots`.
 
 # Run FVS
 
+Run FVS to see if we can reproduce the "NoManagement" line. The title
+is "NKByPlot" since we are running by plot, not condition or subplot.
+The management ID is "NONE", since that's what FVS documentation uses
+as the example management ID for grow-only scenarios.
+
 The main output will be Carbon and fuels. Stand visualization, Tree
 lists, and Inventory statistics may also be interesting.
 
-```{r run fvs}
-tar_load(nk_grow_plot)
+```{targets nk_byplot_none}
+# format = "file" because it produces files outside targets' control
+tar_target(
+  nk_byplot_none,
+  {
+    stand_type <- "plot"
+    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
+    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    data_dir <- "data/fvs"
+    title <- paste0("NKBy", stringr::str_to_title(stand_type))
+    mgmt_id <- "NONE"
+  
+    # We communicate with FVS through files. FVSOnline shows a model in which
+    # a "project" (the inputs and outputs of a single FVS run) live in a
+    # single directory; we follow that model.
+    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+    if (!dir.exists(project_dir)) {
+      dir.create(project_dir)
+    }
+
+    nk_background_regen <- nk_extract_regen(nk_regen, "Background")
+
+    nk_grow_only_stands <- nk_plot_crosswalk |>
+      rename(
+        STAND_ID = `FIA plot code`,
+        FIRST_YEAR = MEASYEAR
+      ) |>
+      mutate(LAST_YEAR = 2165) |>
+      select(STAND_ID, STAND_CN, FIRST_YEAR, LAST_YEAR)
+
+    fvs_run(
+      fvsbin_dir,
+      fvs_variant,
+      project_dir,
+      fiadb,
+      stand_type,
+      title,
+      mgmt_id,
+      nk_grow_only_stands,
+      nk_background_regen
+    )
+  },
+  format = "file"
+)
 ```
 
 # Carbon Projection
@@ -156,10 +244,18 @@ NK states that Fig 2 sums carbon from aboveground live, standing dead,
 and down dead. We plot this, as well as just aboveground live and stand total
 carbon for comparison.
 
-```{r FVS_Carbon}
-tar_load(nk_grow_plot_carbon)
+```{targets nk_byplot_grow_carbon}
+tar_target(nk_byplot_grow_carbon, fvs_read_output(nk_byplot_none[3], "FVS_Carbon"))
+```
 
-NoManagement_Carbon_ByPlot <- nk_grow_plot_carbon |>
+We're not using the summary yet, but define the target for it.
+
+```{targets nk_byplot_grow_summary}
+tar_target(nk_byplot_grow_summary, fvs_read_output(nk_byplot_none[3], "FVS_Summary2_East"))
+```
+
+```{r NoManagement_Carbon_ByPlot, eval=FALSE}
+NoManagement_Carbon_ByPlot <- nk_byplot_grow_carbon |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
@@ -184,9 +280,7 @@ Note that NK Fig2 year 2164 shows an anomalous reduction in carbon
 storage in the NoManagement scenario; it might be the right thing to do
 to omit 2164 / 2165 as well.
 
-```{r}
-tar_load(nk_fig_2)
-
+```{r compare nk_byplot_grow_carbon, eval = FALSE}
 NoManagement_Carbon_ByPlot_ByYear <- NoManagement_Carbon_ByPlot |>
   group_by(Year) |>
   summarize(
@@ -205,7 +299,7 @@ ggplot(
     mapping = aes(x = Year, y = value, color = variable, linetype = variable)
   ) +
   ggtitle("FVS Carbon Projection for NK Plots with no management") +
-  ylab(bquote("Carbon " ~(Mg %.% ha^{-1}))) +
+  ylab(bquote("Carbon " ~(`Mg C` %.% ha^{-1}))) +
 #  theme(legend.title = element_blank()) +
   theme_bw() +
   theme(legend.title = element_blank(), legend.position = "bottom") +
@@ -220,7 +314,7 @@ From the chart it seems evident that aboveground live carbon is the best match
 for the NoManagement scenario in NK Fig 2. We confirm this by computing
 RMS error for the residuals between our FVS runs and the NK Fig 2 data:
 
-```{r}
+```{r byplot_rmse, eval = FALSE}
 Plots_RMSE <- data.frame(
   Total_Carbon = sqrt(mean(
     (NoManagement_Carbon_ByPlot_ByYear$Total_Carbon - NoManagement_Carbon_ByPlot_ByYear$NK_Fig2_NoManagement)^2
@@ -244,7 +338,7 @@ ggplot(
 Note that NK describe using Aboveground Carbon, including both live and dead,
 for their chart, but the best fit is from Aboveground Live, with RMSE \~= 12.
 
-```{r}
+```{r byplot_rmse_summary, eval = FALSE}
 Plots_RMSE |> select(Aboveground_Live)
 ```
 
@@ -258,9 +352,17 @@ select all subplots using the translated stand IDs. We apply the same
 configuration to all stands as we did for FVS_StandInit_Plot. We load
 and clean the results in the same manner.
 
-```{r}
-tar_load(nk_grow_subplot_carbon)
-NoManagement_Carbon_BySubplot_ByYear <- nk_grow_subplot_carbon |>
+```{targets nk_bysubplot_none_carbon}
+# TODO: fvs_run by subplot doesn't work b/c stand_cn needs fixed
+tarchetypes::tar_file_read(
+  nk_bysubplot_none_carbon,
+  "data/fvs/FVS_NKBySubplot_NONE_Carbon.csv",
+  read_csv(!!.x, col_types = cols(StandID = col_character()))
+)
+```
+
+```{r compare nk_bysubplot_grow_carbon, eval = FALSE}
+NoManagement_Carbon_BySubplot_ByYear <- nk_bysubplot_none_carbon |>
   rename(Total_Carbon = Total_Stand_Carbon) |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
@@ -296,7 +398,7 @@ ggplot(
 
 Examine RMSE for the residuals:
 
-```{r}
+```{r subplot_rmse, eval=FALSE}
 Subplots_RMSE <- data.frame(
   Total_Carbon = sqrt(mean(
     (NoManagement_Carbon_BySubplot_ByYear$Total_Carbon - NoManagement_Carbon_BySubplot_ByYear$NK_Fig2_NoManagement)^2
@@ -319,6 +421,11 @@ ggplot(
 Note that all RMSE for the subplot projections are significantly worse
 than for the plot projections.
 
+```{r bysubplot_rmse_summary, eval = FALSE}
+Subplots_RMSE |> select(Aboveground_Live)
+```
+
+
 ## By Condition
 
 We repeat the exercise using the FVS_StandInit_Cond table, which creates
@@ -329,10 +436,17 @@ We select all conditions using the translated stand IDs. Note that plot
 configuration to all stands as we did for FVS_StandInit_Plot. We load
 and clean the results in the same manner.
 
-```{r}
-tar_load(nk_grow_subplot_carbon)
+```{targets nk_bycond_none_carbon}
+# TODO: fvs_run by condition doesn't work b/c stand_cn needs fixed
+tar_file_read(
+  nk_bycond_none_carbon,
+  "data/fvs/FVS_NKByCondition_NONE_Carbon.csv",
+  read_csv(!!.x, col_types = cols(StandID = col_character()))
+)
+```
 
-NoManagement_Carbon_ByCondition_ByYear <- nk_grow_subplot_carbon |>
+```{r compare nk_bycond_none_carbon, eval = FALSE}
+NoManagement_Carbon_ByCondition_ByYear <- nk_bycond_none_carbon |>
   rename(Total_Carbon = Total_Stand_Carbon) |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
@@ -368,7 +482,7 @@ ggplot(
 
 Examine RMSE for the residuals:
 
-```{r}
+```{r bycondition_rmse, eval = FALSE}
 Conditions_RMSE <- data.frame(
   Total_Carbon = sqrt(mean(
     (NoManagement_Carbon_ByCondition_ByYear$Total_Carbon - NoManagement_Carbon_ByCondition_ByYear$NK_Fig2_NoManagement)^2
@@ -388,6 +502,6 @@ ggplot(
   geom_col()
 ```
 
-```{r}
+```{r bycondition_rmse_summary, eval = FALSE}
 Conditions_RMSE |> select(Aboveground_Live)
 ```
