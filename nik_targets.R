@@ -1,22 +1,5 @@
 
 list(
-,
-
-  # Species Crosswalk
-  tar_file_read(
-    fvsne_table_3_2_1,
-    "data/raw/FVSne_Overview_Table_3.2.1.csv",
-    read_csv(!!.x, col_types = "iiciccc")
-  ),
-  tar_file_read(
-    fia_table_11_5_17,
-    "data/raw/FIADB_11.5.17_JENKINS_SPGRPCD.csv",
-    read_csv(!!.x, col_types = cols(JENKINS_SPGRPCD = col_integer()))
-  ),
-  tar_target(
-    species_crosswalk,
-    generate_species_crosswalk(fiadb, fvsne_table_3_2_1, fia_table_11_5_17)
-  ),
 
   # 01_IdentifyingStands.Rmd
   # TODO: do we really need both? They're almost identical. Consolidate into nk_plot_crosswalk

@@ -98,3 +98,118 @@ a plot by location.
 
 If a table also has INVYR, this uniquely identifies a plot at a point of time.
 Index those too.
+
+# Species Crosswalk
+
+Different systems use different species identifiers; create a single crosswalk
+that connects them all.
+
+## FVSne Species Identifiers
+
+The FVSne Overview document describes the species codes used in the Northeast
+variant of FVS in table 3.2.1.
+
+```{targets fvsne_table_3_2_1}
+# tar_file_read is a tarchetypes metatarget, so can't use tar_simple
+tar_file_read(
+  fvsne_table_3_2_1,
+  "data/raw/FVSne_Overview_Table_3.2.1.csv",
+  read_csv(!!.x, col_types = "iiciccc")
+)
+```
+
+```
+knitr::kable(fvsne_table_3_2_1 |> head(5))
+```
+
+## Jenkins Species Group Names
+
+FIADB has a table of species identifiers, but that table omits Jenkins
+species group names. The FIADB Database Description has a list of Jenkins
+Species Group names in table 11.5.17.
+
+```{targets fia_table_11_5_17}
+# tar_file_read is a tarchetypes metatarget, so can't use tar_simple
+tar_file_read(
+  fia_table_11_5_17,
+  "data/raw/FIADB_11.5.17_JENKINS_SPGRPCD.csv",
+  read_csv(!!.x, col_types = cols(JENKINS_SPGRPCD = col_integer()))
+)
+```
+
+```
+# Can't seem to get this to work in non-interactive :-(
+knitr::kable(fia_table_11_5_17 |> head(5))
+```
+
+## FIADB Species Identifiers
+
+FIADB spreads species information across tables REF_SPECIES and REF_SPECIES_GROUP.
+We can merge those with FVSne and FIADB Jenkins Group information to form
+a single species crosswalk.
+
+```{targets fia_ref_species, tar_simple = TRUE}
+con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = SQLITE_RO)
+on.exit(dbDisconnect(con), add = TRUE, after = FALSE)
+
+tbl(con, 'REF_SPECIES') |>
+  select(SPCD, GENUS, SPECIES, E_SPGRPCD, JENKINS_SPGRPCD, SCIENTIFIC_NAME, COMMON_NAME) |>
+  left_join(
+    tbl(con, 'REF_SPECIES_GROUP') |> distinct(SPGRPCD, NAME),
+    by = join_by(E_SPGRPCD == SPGRPCD)
+  ) |>
+  rename(SPGRPCD = E_SPGRPCD, SPGRP_NAME = NAME) |>
+  collect()
+```
+
+```
+# Can't seem to get this to work in non-interactive :-(
+knitr::kable(fia_ref_species |> head(5))
+```
+
+## Hardwood and Softwood Identification
+
+In addition, the FIADB User Guides Volume Database Description (version 9.2),
+Appendix E: Tree Species Group Codes gives the following description of hard
+vs. softwoods (numbers refer to SPCD values):
+
+ - Softwoods: 1 - 24
+ - Hardwoods: 25 - 48
+ - Tropical and subtropical: 51 - 54
+ - Urban: 55, 56
+ 
+To decode Tropical, Subtropical, and Urban tree soft vs. hardwood, we observe
+that SPGRP_NAME often has hardwood or softwood in the name, and, less
+frequently, JENKINS_SPGRP_NAME does.
+
+```{targets species_crosswalk, tar_simple = TRUE}
+jenkins_spgrpcd_mixin <- fia_table_11_5_17 |>
+  select(JENKINS_SPGRPCD, NAME) |>
+  rename(JENKINS_SPGRP_NAME = NAME)
+
+fvs_spcd_mixin <- fvsne_table_3_2_1 |>
+  select(`FIA Code`, `Species Number`, `Species Code`) |>
+  rename(
+    SPCD = `FIA Code`,
+    FVS_SPNO = `Species Number`,
+    FVS_SPCD = `Species Code`
+  )
+
+fia_ref_species |>
+  left_join(jenkins_spgrpcd_mixin, by = join_by(JENKINS_SPGRPCD)) |>
+  left_join(fvs_spcd_mixin, by = join_by(SPCD)) |>
+  mutate(HARD_SOFT = case_when(
+    SPGRPCD %in% 1:24 ~ "SOFTWOOD",
+    SPGRPCD %in% 25:48 ~ "HARDWOOD",
+    grepl("hardwood", SPGRP_NAME) ~ "HARDWOOD",
+    grepl("softwood", SPGRP_NAME) ~ "SOFTWOOD",
+    grepl("hardwood", JENKINS_SPGRP_NAME) ~ "HARDWOOD",
+    grepl("softwood", JENKINS_SPGRP_NAME) ~ "SOFTWOOD",
+    .default = NA
+  ))
+```
+
+```
+# Can't seem to get this to work in non-interactive :-(
+knitr::kable(species_crosswalk |> filter(!is.na(FVS_SPNO)) |> head(5))
+```
