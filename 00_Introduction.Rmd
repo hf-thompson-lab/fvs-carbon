@@ -51,7 +51,7 @@ tar_unscript()
 
 This is the global configuration for Targets.
 
-```{targets tar_globals, targ_globals = TRUE}
+```{targets globals, tar_globals = TRUE}
 options(tidyverse.quiet = TRUE)
 tar_option_set(
   packages = c(
@@ -118,7 +118,7 @@ tar_file_read(
 )
 ```
 
-```
+```{r fvsne_table_3_2_1_preview, eval = FALSE}
 knitr::kable(fvsne_table_3_2_1 |> head(5))
 ```
 
@@ -137,8 +137,7 @@ tar_file_read(
 )
 ```
 
-```
-# Can't seem to get this to work in non-interactive :-(
+```{r fia_table_11_5_17_preview, eval = FALSE}
 knitr::kable(fia_table_11_5_17 |> head(5))
 ```
 
@@ -162,8 +161,7 @@ tbl(con, 'REF_SPECIES') |>
   collect()
 ```
 
-```
-# Can't seem to get this to work in non-interactive :-(
+```{r fia_ref_species_preview, eval = FALSE}
 knitr::kable(fia_ref_species |> head(5))
 ```
 
@@ -209,7 +207,6 @@ fia_ref_species |>
   ))
 ```
 
-```
-# Can't seem to get this to work in non-interactive :-(
+```{r species_crosswalk_preview, eval = FALSE}
 knitr::kable(species_crosswalk |> filter(!is.na(FVS_SPNO)) |> head(5))
 ```
