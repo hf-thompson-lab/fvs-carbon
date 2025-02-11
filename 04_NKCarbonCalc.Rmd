@@ -489,6 +489,20 @@ stopifnot(
 
 ```
 
+We also want all surveys of the grown plots.
+```{targets nk_plots_surveyed, tar_simple = TRUE}
+fia_plots(fiadb, nk_plots_grown) |>
+  filter(INVYR >= 1999) |>
+  left_join(nk_plot_crosswalk |> select(!MEASYEAR), by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  mutate(
+    STAND_CN = CN,
+    STAND_ID = FVS_STAND_ID,
+    FIRST_YEAR = MEASYEAR,
+    LAST_YEAR = MEASYEAR
+  ) |>
+  select(STATECD, COUNTYCD, PLOT, FIRST_YEAR, LAST_YEAR, STAND_ID, STAND_CN)
+```
+
 ## Carbon Accounting
 
 [@fvsstaff2021] Module 2, section Audit 1, describes how to perform a
@@ -537,7 +551,7 @@ tar_target(
     fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
     fvs_variant <- "fvsne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
-    title <- "FFE"
+    title <- "NKFFE"
     mgmt_id <- "NONE"
 
     # We communicate with FVS through files. FVSOnline shows a model in which
@@ -568,237 +582,220 @@ tar_target(
 
 Read back the results.
 
-```{targets nk_ffe_none_carbon}
-tar_target(nk_ffe_none_carbon, fvs_read_output(nk_ffe_none[3], "FVS_Carbon"))
+```{targets nk_ffe_none_carbon, tar_simple = TRUE}
+fvs_read_output(nk_ffe_none[3], "FVS_Carbon")
 ```
 
 We're not using the summary yet, but define the target for it.
 
-```{targets nk_ffe_none_summary}
-tar_target(nk_ffe_none_summary, fvs_read_output(nk_ffe_none[3], "FVS_Summary2_East"))
+```{targets nk_ffe_none_summary, tar_simple = TRUE}
+fvs_read_output(nk_ffe_none[3], "FVS_Summary2_East")
 ```
 
-```{r fvs_stand_projected_ffe}
-
+```{r fvs_stand_projected_ffe, eval=FALSE}
 fvs_stand_projected_ffe <- nk_ffe_none_carbon |>
-  filter(Method == 'Projected' & Algorithm == 'FFE') |>
-  rename(Aboveground_Live = Aboveground_Total_Live) |>
-  rename(Down_Dead = Forest_Down_Dead_Wood) |>
-  mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
-  mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
-  select(Method, Algorithm, StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
+  rename(
+    Aboveground_Live = Aboveground_Total_Live,
+    Down_Dead = Forest_Down_Dead_Wood
+  ) |>
+  mutate(
+    Aboveground_Dead = Standing_Dead + Down_Dead,
+    Aboveground_Carbon = Aboveground_Live + Aboveground_Dead
+  ) |>
+  select(StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
-
+knitr::kable(fvs_stand_projected_ffe)
 ```
 
-#### FFE Measured
+#### FFE Surveyed
 
 Generate the keywordfile for NK Plots measured carbon using FFE algorithm.
 
-```{r FVS_NKFFEMeas_NONE.key, include=FALSE}
-Title <- "NKFFEMeas"
-MgmtId <- "NONE"
-filename <- paste0("data/fvs/FVS_", Title, "_", MgmtId, ".key")
-unlink(filename)
-apply(
-  stand_grow_only |> arrange(FVS_STAND_ID, MEASYEAR),
-  1,
-  function(row) {
-    write_lines(
-      keywordfile_section(
-        Title,
-        MgmtId,
-        row['FVS_STAND_ID'],
-        row['CN'],
-        row['MEASYEAR'],
-        row['MEASYEAR'],
-        0 # FFE CarbCalc method
-      ),
-      filename,
-      append = TRUE
+```{targets nk_ffe_srvy}
+# format = "file" because it produces files outside targets' control
+tar_target(
+  nk_ffe_srvy,
+  {
+    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
+    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    data_dir <- "data/fvs"
+    title <- "NKFFE"
+    mgmt_id <- "SRVY"
+
+    # We communicate with FVS through files. FVSOnline shows a model in which
+    # a "project" (the inputs and outputs of a single FVS run) live in a
+    # single directory; we follow that model.
+    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+    if (!dir.exists(project_dir)) {
+      dir.create(project_dir)
+    }
+
+    nk_background_regen <- nk_extract_regen(nk_regen, "Background")
+
+    fvs_run(
+      fvsbin_dir,
+      fvs_variant,
+      project_dir,
+      fiadb,
+      title,
+      mgmt_id,
+      nk_plots_surveyed,
+      regen = nk_background_regen,
+      carb_calc = "FFE"
     )
-  }
+  },
+  format = "file"
 )
-write_lines("Stop", filename, append = TRUE)
 ```
 
-```{r fvs_stand_measured_ffe}
-# NB: This depends on Title and MgmtId being set correctly!
-fvs_out_db <- DBI::dbConnect(
-  RSQLite::SQLite(),
-  paste0('data/fvs/FVS_', Title, '_', MgmtId, '.db')
-)
+Read back the results.
 
-FVS_Carbon <- bind_rows(
-  FVS_Carbon,
-  tbl(fvs_out_db, 'FVS_Carbon') |>
-    collect() |>
-    # FVS sometimes inserts duplicate rows? In any case, remove dupes.
-    group_by(StandID, Year) |> filter(row_number() == 1) |> ungroup() |>
-    mutate(Method = 'Measured', Algorithm = 'FFE')
-)
-FVS_Summary2_East <- bind_rows(
-  FVS_Summary2_East,
-  tbl(fvs_out_db, 'FVS_Summary2_East') |>
-    collect() |>
-    # FVS sometimes inserts duplicate rows? In any case, remove dupes.
-    group_by(StandID, Year) |> filter(row_number() == 1) |> ungroup() |>
-    mutate(Method = 'Measured', Algorithm = 'FFE')
-)
+```{targets nk_ffe_srvy_carbon, tar_simple = TRUE}
+fvs_read_output(nk_ffe_srvy[3], "FVS_Carbon")
+```
 
-dbDisconnect(fvs_out_db)
-remove(fvs_out_db)
+We're not using the summary yet, but define the target for it.
 
-fvs_stand_measured_ffe <- FVS_Carbon |>
-  filter(Method == 'Measured' & Algorithm == 'FFE') |>
+```{targets nk_ffe_srvy_summary, tar_simple = TRUE}
+fvs_read_output(nk_ffe_srvy[3], "FVS_Summary2_East")
+```
+
+
+```{r fvs_stand_measured_ffe, eval=FALSE}
+fvs_stand_measured_ffe <- nk_ffe_srvy_carbon |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
   mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
-  select(Method, Algorithm, StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
+  select(StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
+knitr::kable(fvs_stand_measured_ffe)
 ```
 
 #### Jenkins Projected
 
 Generate the keywordfile for NK Plots projected carbon using Jenkins algorithm.
+```{targets nk_jenkins_none}
+# format = "file" because it produces files outside targets' control
+tar_target(
+  nk_jenkins_none,
+  {
+    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
+    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    data_dir <- "data/fvs"
+    title <- "NKJenkins"
+    mgmt_id <- "NONE"
 
-```{r FVS_NKJenkinsProj_NONE.key, include=FALSE}
-Title <- "NKJenkinsProj"
-MgmtId <- "NONE"
-filename <- paste0("data/fvs/FVS_", Title, "_", MgmtId, ".key")
-unlink(filename)
-apply(
-  stand_first_last |> arrange(FVS_STAND_ID),
-  1,
-  function(row) {
-    write_lines(
-      keywordfile_section(
-        Title,
-        MgmtId,
-        row['FVS_STAND_ID'],
-        row['STAND_CN'],
-        row['FIRSTYEAR'],
-        row['LASTYEAR'],
-        1 # Jenkins CarbCalc method
-      ),
-      filename,
-      append = TRUE
+    # We communicate with FVS through files. FVSOnline shows a model in which
+    # a "project" (the inputs and outputs of a single FVS run) live in a
+    # single directory; we follow that model.
+    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+    if (!dir.exists(project_dir)) {
+      dir.create(project_dir)
+    }
+
+    nk_background_regen <- nk_extract_regen(nk_regen, "Background")
+
+    fvs_run(
+      fvsbin_dir,
+      fvs_variant,
+      project_dir,
+      fiadb,
+      title,
+      mgmt_id,
+      nk_plots_grown,
+      regen = nk_background_regen,
+      carb_calc = "Jenkins"
     )
-  }
+  },
+  format = "file"
 )
-write_lines("Stop", filename, append = TRUE)
 ```
 
-Read back the results
+Read back the results.
+
+```{targets nk_jenkins_none_carbon, tar_simple = TRUE}
+fvs_read_output(nk_jenkins_none[3], "FVS_Carbon")
+```
+
+We're not using the summary yet, but define the target for it.
+
+```{targets nk_jenkins_none_summary, tar_simple = TRUE}
+fvs_read_output(nk_jenkins_none[3], "FVS_Summary2_East")
+```
 
 ```{r fvs_stand_projected_jenkins}
-# NB: This depends on Title and MgmtId being set correctly!
-fvs_out_db <- DBI::dbConnect(
-  RSQLite::SQLite(),
-  paste0('data/fvs/FVS_', Title, '_', MgmtId, '.db')
-)
-
-FVS_Carbon <- bind_rows(
-  FVS_Carbon,
-  tbl(fvs_out_db, 'FVS_Carbon') |>
-    collect() |>
-    # FVS sometimes inserts duplicate rows? In any case, remove dupes.
-    group_by(StandID, Year) |> filter(row_number() == 1) |> ungroup() |>
-    mutate(Method = 'Projected', Algorithm = 'Jenkins')
-)
-FVS_Summary2_East <- bind_rows(
-  FVS_Summary2_East,
-  tbl(fvs_out_db, 'FVS_Summary2_East') |>
-    collect() |>
-    # FVS sometimes inserts duplicate rows? In any case, remove dupes.
-    group_by(StandID, Year) |> filter(row_number() == 1) |> ungroup() |>
-    mutate(Method = 'Projected', Algorithm = 'Jenkins')
-)
-
-dbDisconnect(fvs_out_db)
-remove(fvs_out_db)
-
-fvs_stand_projected_jenkins <- FVS_Carbon |>
-  filter(Method == 'Projected' & Algorithm == 'Jenkins') |>
+fvs_stand_projected_jenkins <- nk_jenkins_none_carbon |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
   mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
-  select(Method, Algorithm, StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
+  select(StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
-
+knitr::kable(fvs_stand_projected_jenkins)
 ```
 
-#### Jenkins Measured
+#### Jenkins Surveyed
 
 Generate the keywordfile for NK Plots measured carbon using FFE algorithm.
 
-```{r FVS_NKJenkinsMeas_NONE.key, include=FALSE}
-Title <- "NKJenkinsMeas"
-MgmtId <- "NONE"
-filename <- paste0("data/fvs/FVS_", Title, "_", MgmtId, ".key")
-unlink(filename)
-apply(
-  stand_grow_only |> arrange(FVS_STAND_ID, MEASYEAR),
-  1,
-  function(row) {
-    write_lines(
-      keywordfile_section(
-        Title,
-        MgmtId,
-        row['FVS_STAND_ID'],
-        row['CN'],
-        row['MEASYEAR'],
-        row['MEASYEAR'],
-        1 # Jenkins CarbCalc method
-      ),
-      filename,
-      append = TRUE
+```{targets nk_jenkins_srvy}
+# format = "file" because it produces files outside targets' control
+tar_target(
+  nk_jenkins_srvy,
+  {
+    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
+    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    data_dir <- "data/fvs"
+    title <- "NKJenkins"
+    mgmt_id <- "SRVY"
+
+    # We communicate with FVS through files. FVSOnline shows a model in which
+    # a "project" (the inputs and outputs of a single FVS run) live in a
+    # single directory; we follow that model.
+    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+    if (!dir.exists(project_dir)) {
+      dir.create(project_dir)
+    }
+
+    nk_background_regen <- nk_extract_regen(nk_regen, "Background")
+
+    fvs_run(
+      fvsbin_dir,
+      fvs_variant,
+      project_dir,
+      fiadb,
+      title,
+      mgmt_id,
+      nk_plots_surveyed,
+      regen = nk_background_regen,
+      carb_calc = "Jenkins"
     )
-  }
+  },
+  format = "file"
 )
-write_lines("Stop", filename, append = TRUE)
 ```
 
-Read back the results
+Read back the results.
 
+```{targets nk_jenkins_srvy_carbon, tar_simple = TRUE}
+fvs_read_output(nk_jenkins_srvy[3], "FVS_Carbon")
+```
+
+We're not using the summary yet, but define the target for it.
+
+```{targets nk_jenkins_srvy_summary, tar_simple = TRUE}
+fvs_read_output(nk_jenkins_srvy[3], "FVS_Summary2_East")
+```
 ```{r fvs_stand_measured_jenkins}
-# NB: This depends on Title and MgmtId being set correctly!
-fvs_out_db <- DBI::dbConnect(
-  RSQLite::SQLite(),
-  paste0('data/fvs/FVS_', Title, '_', MgmtId, '.db')
-)
-
-FVS_Carbon <- bind_rows(
-  FVS_Carbon,
-  tbl(fvs_out_db, 'FVS_Carbon') |>
-    collect() |>
-    # FVS sometimes inserts duplicate rows? In any case, remove dupes.
-    group_by(StandID, Year) |> filter(row_number() == 1) |> ungroup() |>
-    mutate(Method = 'Measured', Algorithm = 'Jenkins')
-)
-FVS_Summary2_East <- bind_rows(
-  FVS_Summary2_East,
-  tbl(fvs_out_db, 'FVS_Summary2_East') |>
-    collect() |>
-    # FVS sometimes inserts duplicate rows? In any case, remove dupes.
-    group_by(StandID, Year) |> filter(row_number() == 1) |> ungroup() |>
-    mutate(Method = 'Measured', Algorithm = 'Jenkins')
-)
-
-dbDisconnect(fvs_out_db)
-remove(fvs_out_db)
-
-fvs_stand_measured_jenkins <- FVS_Carbon |>
-  filter(Method == 'Measured' & Algorithm == 'Jenkins') |>
+fvs_stand_measured_jenkins <- nk_jenkins_srvy_carbon |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
   mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
-  select(Method, Algorithm, StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
+  select(StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
-
+knitr::kable(fvs_stand_measured_jenkins)
 ```
 
 ### FFE-FFE
