@@ -1040,28 +1040,15 @@ Method:
 Fetch all the trees for the grow-only plots:
 
 ```{r matching_tree, eval = FALSE}
-fia = DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-fia_tree = tbl(fia, 'TREE')
-
 # Create a dataframe containing the TREE rows for the last inventory of
 # all conditions for all subplots for all plots used in NK.
-matching_tree <- fia_tree |>
-  semi_join(
-    stand_grow_only,
-    # Fetch all conditions, all subplots
-    by = join_by(STATECD, COUNTYCD, PLOT),
-    copy = TRUE
-  ) |>
+matching_tree <- fia_trees(fiadb, stand_grow_only) |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   filter(INVYR == max(INVYR, na.rm = TRUE)) |>
   ungroup() |>
   # Only live trees
   filter(STATUSCD == 1) |>
   collect()
-
-DBI::dbDisconnect(fia)
-
-remove(fia, fia_tree)
 ```
 
 For each tree, convert its carbon to carbon per acre, then to carbon per hectare.
@@ -1079,12 +1066,12 @@ stand_measured_spatial <- matching_tree |>
   ungroup() |>
   # Join to get STAND_IDs
   left_join(
-    stand_id_crosswalk,
+    nk_plot_crosswalk,
     by = join_by(STATECD, COUNTYCD, PLOT)
   ) |>
-  # Join to get MEASYEAR, FORTYPE, and STDAGE
+  # Join to get FORTYPE and STDAGE
   left_join(
-    matching_plot |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
+    nk_matching_cond |> select(STATECD, COUNTYCD, PLOT, INVYR, FORTYPE, STDAGE),
     by=join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
 
@@ -1099,7 +1086,7 @@ compare_ffe_spatial <- fvs_stand_measured_ffe |>
   rename(`Forest Type` = FORTYPE) |>
   rename(`Stand Age` = STDAGE) |>
   select(StandID, Year, FFE, `Forest Type`, `Stand Age`) |>
-  left_join(stand_id_crosswalk, by = join_by(StandID == FVS_STAND_ID)) |>
+  left_join(nk_plot_crosswalk, by = join_by(StandID == FVS_STAND_ID)) |>
   left_join(stand_measured_spatial, by = join_by(STATECD, COUNTYCD, PLOT)) |>
   mutate(FIA = CARBON_METRIC) |>
   select(StandID, Year, FFE, FIA, `Stand Age`, `Forest Type`)
@@ -1113,9 +1100,11 @@ ggplot(
   ) +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
   ggtitle("FFE vs. FIA Spatial Carbon Calculation") +
-  xlab(bquote("FFE Carbon " ~(Mg %*% ha^{-1}))) +
-  ylab(bquote("FIA Carbon " ~(Mg %*% ha^{-1}))) 
+  xlab(bquote("FFE Carbon " ~(`Mg C` %.% ha^{-1}))) +
+  ylab(bquote("FIA Carbon " ~(`Mg C` %.% ha^{-1}))) 
 ```
 
 Same, but colored by stand age
@@ -1130,9 +1119,11 @@ ggplot(
   ) +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
   ggtitle("FFE vs. FIA Spatial Carbon Calculation") +
-  xlab(bquote("FFE Carbon " ~(Mg %*% ha^{-1}))) +
-  ylab(bquote("FIA Carbon " ~(Mg %*% ha^{-1}))) 
+  xlab(bquote("FFE Carbon " ~(`Mg C` %.% ha^{-1}))) +
+  ylab(bquote("FIA Carbon " ~(`Mg C` %.% ha^{-1}))) 
 ```
 
 ### FIA TPA
@@ -1161,12 +1152,12 @@ stand_measured_tpa <- matching_tree |>
   ungroup() |>
   # Join to get STAND_IDs
   left_join(
-    stand_id_crosswalk,
+    nk_plot_crosswalk,
     by = join_by(STATECD, COUNTYCD, PLOT)
   ) |>
   # Join to get MEASYEAR, FORTYPE, and STDAGE
   left_join(
-    matching_plot |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
+    nk_matching_plot |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
     by=join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
 
@@ -1182,7 +1173,7 @@ compare_ffe_tpa <- fvs_stand_measured_ffe |>
   rename(`Forest Type` = FORTYPE) |>
   rename(`Stand Age` = STDAGE) |>
   select(StandID, Year, FFE, `Stand Age`, `Forest Type`) |>
-  left_join(stand_id_crosswalk, by = join_by(StandID == FVS_STAND_ID)) |>
+  left_join(nk_plot_crosswalk, by = join_by(StandID == FVS_STAND_ID)) |>
   full_join(stand_measured_tpa, by = join_by(STATECD, COUNTYCD, PLOT)) |>
   mutate(FIA = CARBON_METRIC) |>
   select(StandID, Year, FFE, FIA, `Stand Age`, `Forest Type`)
@@ -1196,9 +1187,11 @@ ggplot(
   ) +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
   ggtitle("FFE vs. FIA TPA Carbon Calculation") +
-  xlab(bquote("FFE Carbon " ~(Mg %*% ha^{-1}))) +
-  ylab(bquote("FIA Carbon " ~(Mg %*% ha^{-1}))) 
+  xlab(bquote("FFE Carbon " ~(`Mg C` %.% ha^{-1}))) +
+  ylab(bquote("FIA Carbon " ~(`Mg C` %.% ha^{-1}))) 
 ```
 
 Same, but color by stand age
@@ -1213,9 +1206,11 @@ ggplot(
   ) +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
   ggtitle("FFE vs. FIA TPA Carbon Calculation") +
-  xlab(bquote("FFE Carbon " ~(Mg %*% ha^{-1}))) +
-  ylab(bquote("FIA Carbon " ~(Mg %*% ha^{-1}))) 
+  xlab(bquote("FFE Carbon " ~(`Mg C` %.% ha^{-1}))) +
+  ylab(bquote("FIA Carbon " ~(`Mg C` %.% ha^{-1}))) 
 ```
 
 These look very similar to the spatial approach; plot them against each other
@@ -1223,12 +1218,12 @@ to directly compare spatial vs. tpa
 
 ```{r compare_tpa_spatial, eval = FALSE}
 compare_tpa_spatial <- stand_measured_spatial |>
-  select(STATECD, COUNTYCD, PLOT, CARBON_METRIC) |>
+  select(STATECD, COUNTYCD, PLOT, MEASYEAR, CARBON_METRIC) |>
   rename(Spatial = CARBON_METRIC) |>
   left_join(stand_measured_tpa, by = join_by(STATECD, COUNTYCD, PLOT)) |>
   select(STATECD, COUNTYCD, PLOT, MEASYEAR, Spatial, CARBON_METRIC) |>
   rename(TPA = CARBON_METRIC) |>
-  left_join(stand_descr, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  left_join(stand_descr |> select(!MEASYEAR), by = join_by(STATECD, COUNTYCD, PLOT)) |>
   select(PLT_CN, MEASYEAR, Spatial, TPA, STDAGE, FORTYPE) |>
   rename(StandID = PLT_CN) |>
   rename(Year = MEASYEAR) |>
@@ -1244,9 +1239,11 @@ ggplot(
   ) +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
   ggtitle("Spatial vs. TPA Carbon Calculation") +
-  xlab(bquote("Spatial Carbon " ~(Mg %*% ha^{-1}))) +
-  ylab(bquote("TPA Carbon " ~(Mg %*% ha^{-1}))) 
+  xlab(bquote("Spatial Carbon " ~(`Mg C` %.% ha^{-1}))) +
+  ylab(bquote("TPA Carbon " ~(`Mg C` %.% ha^{-1}))) 
 ```
 
 Same, but color by stand age
@@ -1261,9 +1258,11 @@ ggplot(
   ) +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
   ggtitle("Spatial vs. TPA Carbon Calculation") +
-  xlab(bquote("Spatial Carbon " ~(Mg %*% ha^{-1}))) +
-  ylab(bquote("TPA Carbon " ~(Mg %*% ha^{-1}))) 
+  xlab(bquote("Spatial Carbon " ~(`Mg C` %.% ha^{-1}))) +
+  ylab(bquote("TPA Carbon " ~(`Mg C` %.% ha^{-1}))) 
 ```
 
 ## Basal Area
@@ -1282,7 +1281,7 @@ FIA provides basal area in COND.BALIVE, which is, per the FIADB User Guide:
 > inch d.b.h./d.r.c. sampled in the condition. Populated for forest conditions.
 
 ```{r stand_measured_ba_fia, eval = FALSE}
-stand_measured_ba_fia <- matching_cond |>
+stand_measured_ba_fia <- nk_matching_cond |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   filter(MEASYEAR == max(MEASYEAR)) |>
   # Sum BA across conditions, proportional to each conditions portion of the
@@ -1293,8 +1292,8 @@ stand_measured_ba_fia <- matching_cond |>
   select(STATECD, COUNTYCD, PLOT, BALIVE) |>
   # BALIVE is square feet per acre; convert to square meters per hectare
   mutate(BA_FIA = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare")) |>
-  left_join(stand_id_crosswalk, by = join_by(STATECD, COUNTYCD, PLOT)) |>
-  select(PLT_CN, BA_FIA)
+  left_join(nk_plot_crosswalk, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  select(STAND_CN, BA_FIA)
 
 knitr::kable(stand_measured_ba_fia)
 ```
@@ -1307,8 +1306,7 @@ section 4.3.1.4.1:
 which we presume to be square feet per acre for standing live trees only.
 
 ```{r stand_measured_ba_fvs, eval = FALSE}
-stand_measured_ba_fvs <- FVS_Summary2_East |>
-  filter(Method == 'Measured' & Algorithm == 'FFE') |>
+stand_measured_ba_fvs <- nk_ffe_srvy_summary |>
   group_by(StandID) |>
   filter(Year == max(Year)) |>
   ungroup() |>
@@ -1318,15 +1316,15 @@ stand_measured_ba_fvs <- FVS_Summary2_East |>
   rename(`Forest Type` = FORTYPE) |>
   rename(`Stand Age` = STDAGE) |>
   select(StandID, Year, BA_FVS, `Stand Age`, `Forest Type`) |>
-  left_join(stand_id_crosswalk, by = join_by(StandID == FVS_STAND_ID)) |>
-  select(PLT_CN, BA_FVS, Year, `Forest Type`, `Stand Age`)
+  left_join(nk_plot_crosswalk, by = join_by(StandID == FVS_STAND_ID)) |>
+  select(STAND_CN, BA_FVS, Year, `Forest Type`, `Stand Age`)
 
 knitr::kable(stand_measured_ba_fvs)
 ```
 
 ```{r compare_ba_fia_fvs, eval = FALSE}
 compare_ba_fia_fvs <- stand_measured_ba_fia |>
-  left_join(stand_measured_ba_fvs, by = join_by(PLT_CN))
+  left_join(stand_measured_ba_fvs, by = join_by(STAND_CN))
 
 ggplot(
     data = compare_ba_fia_fvs
@@ -1338,9 +1336,11 @@ ggplot(
   ggtitle("Measured Basal Area\nFIA BALIVE vs. FVS BA (m2 / ha)") +
   coord_cartesian(xlim = c(0, 60), ylim = c(0, 60)) +
   geom_abline(intercept = 0, slope = 1) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
   ggtitle("FIA vs. FVS Measured BA") +
-  xlab(bquote("FIA BA " ~(m^2 %*% ha^{-1}))) +
-  ylab(bquote("FVS BA " ~(M^2 %*% ha^{-1}))) 
+  xlab(bquote("FIA BA " ~(m^2 %.% ha^{-1}))) +
+  ylab(bquote("FVS BA " ~(m^2 %.% ha^{-1}))) 
 ```
 
 This shows that FVS and FIA approach to measuring basal area often aligns, but
@@ -1353,20 +1353,20 @@ This will give us insight just into the growth model of FVS independent of
 carbon calculation.
 
 ```{r compare_ba_meas_proj, eval = FALSE}
-tmp <- FVS_Summary2_East |>
-  filter(Algorithm == 'FFE') |>
-  group_by(StandID, Method) |>
+measured <- nk_ffe_srvy_summary |>
+  group_by(StandID) |>
   filter(Year == max(Year)) |>
   ungroup() |>
   mutate(BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
-  select(Method, StandID, Year, BA, BA)
-
-measured <- tmp |>
-  filter(Method == 'Measured') |>
+  select(StandID, Year, BA) |>
   rename(Measured = BA)
 
-projected <- tmp |>
-  filter(Method == 'Projected') |>
+projected <- nk_ffe_none_summary |>
+  group_by(StandID) |>
+  filter(Year == max(Year)) |>
+  ungroup() |>
+  mutate(BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
+  select(StandID, Year, BA) |>
   rename(Projected = BA)
 
 compare_ba_meas_proj <- measured |>
@@ -1389,8 +1389,10 @@ ggplot(
   ) +
   coord_cartesian(xlim = c(0, 60), ylim = c(0, 60)) +
   geom_abline(intercept = 0, slope = 1) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
   ggtitle("FVS Measured vs. Projected BA") +
-  xlab(bquote("Measured BA " ~(m^2 %*% ha^{-1}))) +
-  ylab(bquote("Projected BA " ~(m^2 %*% ha^{-1}))) 
+  xlab(bquote("Measured BA " ~(m^2 %.% ha^{-1}))) +
+  ylab(bquote("Projected BA " ~(m^2 %.% ha^{-1}))) 
 ```
 

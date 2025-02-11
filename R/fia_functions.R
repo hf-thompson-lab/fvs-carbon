@@ -121,3 +121,16 @@ fia_conds <- function(fiadb, plots) {
     left_join(fia_ref_forest_type, by = join_by(FORTYPCD)) |>
     collect()
 }
+
+fia_trees <- function(fiadb, plots) {
+  con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
+  on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
+  tbl(con, "TREE") |>
+    semi_join(
+      plots |> distinct(STATECD, COUNTYCD, PLOT),
+      by = join_by(STATECD, COUNTYCD, PLOT),
+      copy = TRUE
+    ) |>
+    collect()
+}
+
