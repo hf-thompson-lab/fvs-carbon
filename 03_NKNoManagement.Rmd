@@ -192,7 +192,6 @@ lists, and Inventory statistics may also be interesting.
 tar_target(
   nk_byplot_none,
   {
-    stand_type <- "plot"
     fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
     fvs_variant <- "fvsne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
@@ -222,7 +221,6 @@ tar_target(
       fvs_variant,
       project_dir,
       fiadb,
-      stand_type,
       title,
       mgmt_id,
       nk_grow_only_stands,

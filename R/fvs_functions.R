@@ -176,29 +176,28 @@ fvs_keywordfile_section <- function(
     mgmt_id,
     input_db,
     output_db,
-    stand_type,
     stand_id,
     stand_cn,
     first_year,
     last_year,
-    regen
+    regen,
+    carb_calc
 ) {
-  if (stand_type == "plot") {
-    stand_table <- "FVS_StandInit_Plot"
-    tree_table <- "FVS_TreeInit_Plot"
-  } else if (stand_type == "cond") {
-    stop("Only stand_type=\"plot\" is currenlty supported")
-    # TODO nik: cond stand_id and stand_cn have cond appended
-    stand_table <- "FVS_StandInit_Cond"
-    tree_table <- "FVS_TreeInit_Cond"
-  } else if (stand_type == "subplot") {
-    stop("Only stand_type=\"plot\" is currenlty supported")
-    # TODO nik: subplot stand_id and stand_cn have subp appended
-    stand_table <- "FVS_PlotInit_Plot"
-    tree_table <- "FVS_TreeInit_Plot"
-  } else {
-    stop(paste0("Unknown stand type: ", stand_type))
-  }
+  stand_table <- "FVS_StandInit_Plot"
+  tree_table <- "FVS_TreeInit_Plot"
+  # for cond, we would use:
+  #   stand_table <- "FVS_StandInit_Cond"
+  #   tree_table <- "FVS_TreeInit_Cond"
+  # but need to match StandPlot_CN instead of STAND_CN
+  # for subplot we would use:
+  #   stand_table <- "FVS_PlotInit_Plot"
+  #   tree_table <- "FVS_TreeInit_Plot"
+  # but need to match StandPlot_CN instead of STAND_CN
+  
+  if (carb_calc == "FFE") { cc_code = 0 }
+  else if (carb_calc == "Jenkins") { cc_code = 1 }
+  else { stop(paste0("Unknown carbon calculation method: ", carb_calc)) }
+  
   c(
     fvs_kwd0("StdIdent"),
     paste0(stand_id, " ", title),
@@ -210,7 +209,7 @@ fvs_keywordfile_section <- function(
     fvs_kwd0("FMIn"), # Fire and Fuels Extension
     fvs_kwd0("CarbRept"),
     fvs_kwd0("CarbCut"),
-    fvs_kwd5("CarbCalc", 1, 1, 0.0425, 9, 11),
+    fvs_kwd2("CarbCalc", cc_code, 1),
     fvs_kwd0("FuelOut"),
     fvs_kwd0("FuelRept"),
     fvs_kwd0("End"), # FMIn
@@ -246,22 +245,23 @@ fvs_write_keyword_file <- function(
   title,
   mgmt_id,
   stands,
-  regen = NULL
+  regen = NULL,
+  carb_calc = "Jenkins" # or "FFE"
 ) {
   unlink(keyword_filename)
   apply(stands, 1, \(row) {
     write_lines(
       fvs_keywordfile_section(
-        title,
-        mgmt_id,
-        input_db,
-        output_db,
-        stand_type,
-        row["STAND_ID"],
-        row["STAND_CN"],
-        row["FIRST_YEAR"],
-        row["LAST_YEAR"],
-        regen
+        title = title,
+        mgmt_id = mgmt_id,
+        input_db = input_db,
+        output_db = output_db,
+        stand_id = row["STAND_ID"],
+        stand_cn = row["STAND_CN"],
+        first_year = row["FIRST_YEAR"],
+        last_year = row["LAST_YEAR"],
+        regen = regen,
+        carb_calc = carb_calc
       ),
       keyword_filename,
       append = TRUE
@@ -278,11 +278,11 @@ fvs_run <- function(
     fvs_variant,
     project_dir,
     fiadb,
-    stand_type,
     title,
     mgmt_id,
     stands,
-    regen
+    regen,
+    carb_calc
 ) {
   fvs_keyword_filename <- file.path(project_dir, paste0("FVS_", title, "_", mgmt_id, ".key"))
   if (file.exists(fvs_keyword_filename)) {
@@ -310,14 +310,14 @@ fvs_run <- function(
   }
   
   fvs_write_keyword_file(
-    fvs_keyword_filename,
-    basename(fvs_input_db), # FVS will run in the same directory
-    basename(fvs_output_db), # FVS will run in the same directory
-    stand_type,
-    title,
-    mgmt_id,
-    stands,
-    regen
+    keyword_filename = fvs_keyword_filename,
+    input_db = basename(fvs_input_db), # FVS will run in the same directory
+    output_db = basename(fvs_output_db), # FVS will run in the same directory
+    title = title,
+    mgmt_id = mgmt_id,
+    stands = stands,
+    regen = regen,
+    carb_calc = carb_calc
   )
   
   # Return the name of the keyword file and output database

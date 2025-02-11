@@ -27,7 +27,7 @@ tar_source()
 tar_load(fiadb)
 tar_load(species_crosswalk)
 tar_load(nk_plot_crosswalk)
-tar_load(nk_fig_2)
+tar_load(nk_regen)
 ```
 
 # Carbon Calculation
@@ -460,10 +460,26 @@ fia_plots_filtered(fiadb, nk_plot_crosswalk, \(.data, con) {
     filter_plots_forested(con) |> # Forested implies not skipped
     filter_plots_undisturbed(con) |>
     filter_plots_untreated(con)
-})
+}) |>
+  # Bring in other plot IDs
+  left_join(nk_plot_crosswalk |> select(!MEASYEAR), by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  # Find the first and last measurement year for each stand
+  summarize(
+    FIRST_YEAR = min(MEASYEAR, na.rm = TRUE),
+    LAST_YEAR = max(MEASYEAR, na.rm = TRUE),
+    STAND_CN = max(STAND_CN, na.rm = TRUE),
+    STAND_ID = max(FVS_STAND_ID, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup()
 ```
 
-```{r nk_plots_grown, eval = FALSE}
+```{r preview nk_plots_grown, eval=FALSE}
+knitr::kable(nk_plots_grown)
+```
+
+```{r test nk_plots_grown, eval = FALSE}
 stopifnot(
   nk_plots_grown |> anti_join(stand_grow_only, by = join_by(STATECD, COUNTYCD, PLOT)) |> nrow() == 0
 )
@@ -507,96 +523,64 @@ ending in the year of last measurement.
 The second is accomplished by creating a 0-year FVS run for each plot in each
 year in which it was measured.
 
-First, determine the first and last years in which at least one plot was measured:
-```{r stand_first_last}
-stand_first_last <- stand_grow_only |>
-  group_by(STATECD, COUNTYCD, PLOT) |>
-  mutate(
-    FIRSTYEAR_FLAG = MEASYEAR == min(MEASYEAR, na.rm = TRUE),
-    STAND_CN = if_else(FIRSTYEAR_FLAG, CN, NA),
-    FVS_STAND_ID = if_else(FIRSTYEAR_FLAG, FVS_STAND_ID, NA)
-  ) |>
-  summarize(
-    FIRSTYEAR = min(MEASYEAR, na.rm = TRUE),
-    LASTYEAR = max(MEASYEAR, na.rm = TRUE),
-    STAND_CN = max(STAND_CN, na.rm = TRUE),
-    FVS_STAND_ID = max(FVS_STAND_ID, na.rm = TRUE),
-    .groups = "keep"
-  ) |>
-  ungroup()
-
-knitr::kable(stand_first_last)
-```
-
-We also need the background regeneration
-```{r background_regen}
-tar_load(nk_regen)
-nk_extract_regen(nk_regen, "Background")
-```
-
 Next, we want to run FVS for each of those plots, in each of those years.
 
 #### FFE Projected
 
 Generate the keywordfile for NK Plots projected carbon using FFE algorithm.
 
-```{r FVS_NKFFEProj_NONE.key, include=FALSE}
-Title <- "NKFFEProj"
-MgmtId <- "NONE"
-filename <- paste0("data/fvs/FVS_", Title, "_", MgmtId, ".key")
-unlink(filename)
-apply(
-  stand_first_last |> arrange(FVS_STAND_ID),
-  1,
-  function(row) {
-    write_lines(
-      keywordfile_section(
-        Title,
-        MgmtId,
-        row['FVS_STAND_ID'],
-        row['STAND_CN'],
-        row['FIRSTYEAR'],
-        row['LASTYEAR'],
-        0 # FFE CarbCalc method
-      ),
-      filename,
-      append = TRUE
+```{targets nk_ffe_none}
+# format = "file" because it produces files outside targets' control
+tar_target(
+  nk_ffe_none,
+  {
+    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
+    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    data_dir <- "data/fvs"
+    title <- "FFE"
+    mgmt_id <- "NONE"
+
+    # We communicate with FVS through files. FVSOnline shows a model in which
+    # a "project" (the inputs and outputs of a single FVS run) live in a
+    # single directory; we follow that model.
+    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+    if (!dir.exists(project_dir)) {
+      dir.create(project_dir)
+    }
+
+    nk_background_regen <- nk_extract_regen(nk_regen, "Background")
+
+    fvs_run(
+      fvsbin_dir,
+      fvs_variant,
+      project_dir,
+      fiadb,
+      title,
+      mgmt_id,
+      nk_plots_grown,
+      regen = nk_background_regen,
+      carb_calc = "FFE"
     )
-  }
+  },
+  format = "file"
 )
-write_lines("Stop", filename, append = TRUE)
 ```
 
 Read back the results.
 
+```{targets nk_ffe_none_carbon}
+tar_target(nk_ffe_none_carbon, fvs_read_output(nk_ffe_none[3], "FVS_Carbon"))
+```
+
+We're not using the summary yet, but define the target for it.
+
+```{targets nk_ffe_none_summary}
+tar_target(nk_ffe_none_summary, fvs_read_output(nk_ffe_none[3], "FVS_Summary2_East"))
+```
+
 ```{r fvs_stand_projected_ffe}
-# NB: This depends on Title and MgmtId being set correctly!
-fvs_out_db <- DBI::dbConnect(
-  RSQLite::SQLite(),
-  paste0('data/fvs/FVS_', Title, '_', MgmtId, '.db')
-)
 
-FVS_Carbon <- bind_rows(
-  FVS_Carbon,
-  tbl(fvs_out_db, 'FVS_Carbon') |>
-    collect() |>
-    # FVS sometimes inserts duplicate rows? In any case, remove dupes.
-    group_by(StandID, Year) |> filter(row_number() == 1) |> ungroup() |>
-    mutate(Method = 'Projected', Algorithm = 'FFE')
-)
-FVS_Summary2_East <- bind_rows(
-  FVS_Summary2_East,
-  tbl(fvs_out_db, 'FVS_Summary2_East') |>
-    collect() |>
-    # FVS sometimes inserts duplicate rows? In any case, remove dupes.
-    group_by(StandID, Year) |> filter(row_number() == 1) |> ungroup() |>
-    mutate(Method = 'Projected', Algorithm = 'FFE')
-)
-
-dbDisconnect(fvs_out_db)
-remove(fvs_out_db)
-
-fvs_stand_projected_ffe <- FVS_Carbon |>
+fvs_stand_projected_ffe <- nk_ffe_none_carbon |>
   filter(Method == 'Projected' & Algorithm == 'FFE') |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
