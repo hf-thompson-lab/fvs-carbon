@@ -2,8 +2,8 @@
 title: "FVS Carbon Modeling Analysis"
 author: "Nikolaus Bates-Haus"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 editor_options:
   markdown:
     wrap: 72
@@ -727,7 +727,7 @@ We're not using the summary yet, but define the target for it.
 fvs_read_output(nk_jenkins_none[3], "FVS_Summary2_East")
 ```
 
-```{r fvs_stand_projected_jenkins}
+```{r fvs_stand_projected_jenkins, eval = FALSE}
 fvs_stand_projected_jenkins <- nk_jenkins_none_carbon |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
@@ -791,7 +791,7 @@ We're not using the summary yet, but define the target for it.
 ```{targets nk_jenkins_srvy_summary, tar_simple = TRUE}
 fvs_read_output(nk_jenkins_srvy[3], "FVS_Summary2_East")
 ```
-```{r fvs_stand_measured_jenkins}
+```{r fvs_stand_measured_jenkins, eval = FALSE}
 fvs_stand_measured_jenkins <- nk_jenkins_srvy_carbon |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
@@ -811,7 +811,7 @@ FFE Carbon for measured vs. projected stands.
 
 This gives us a plot of measured carbon over time.
 
-```{r FFE Measured}
+```{r FFE Measured, eval = FALSE}
 ggplot(
     data = fvs_stand_measured_ffe,
     mapping = aes(x = Year, y = Aboveground_Live, color = StandID)
@@ -825,7 +825,7 @@ ggplot(
 We then run FVS on all grow-only stands from the start year with a one-year timestep to
 get projected FFE carbon.
 
-```{r FFE Projected}
+```{r FFE Projected, eval = FALSE}
 ggplot(
     data = fvs_stand_projected_ffe,
     mapping = aes(x = Year, y = Aboveground_Live, color = StandID)
@@ -838,7 +838,7 @@ ggplot(
 
 We can then plot the measured vs. projected carbon.
 
-```{r ffe_projected_vs_measured}
+```{r ffe_projected_vs_measured, eval = FALSE}
 compare_ffe <- fvs_stand_measured_ffe |>
   union_all(fvs_stand_projected_ffe)
 
@@ -855,7 +855,7 @@ ggplot(
 
 Scatterplot comparing just the last year
 
-```{r ffe_scatterplot}
+```{r ffe_scatterplot, eval = FALSE}
 left <- fvs_stand_measured_ffe |>
   select(StandID, Year, Aboveground_Live) |>
   group_by(StandID) |>
@@ -895,7 +895,7 @@ adding the Jenkins keyword for the fire and fuels extension.
 
 For measured carbon, we re-run all the plots during the years they are measured.
 
-```{r jenkins_projected_vs_measured}
+```{r jenkins_projected_vs_measured, eval = FALSE}
 compare_jenkins <- fvs_stand_measured_jenkins |>
   union_all(fvs_stand_projected_jenkins)
 
@@ -912,7 +912,7 @@ ggplot(
 
 Scatterplot comparing just the last year
 
-```{r jenkins_scatterplot}
+```{r jenkins_scatterplot, eval = FALSE}
 left <- fvs_stand_measured_jenkins |>
   select(StandID, Year, Aboveground_Live) |>
   group_by(StandID) |>
@@ -945,7 +945,7 @@ ggplot(data = compare_jenkins) +
 We can get a good assessment of how FFE and Jenkins calculations compare
 just by comparing measured FFE and Jenkins computed carbon.
 
-```{r compare_ffe_jenkins}
+```{r compare_ffe_jenkins, eval = FALSE}
 stand_descr <- matching_cond |>
   select(PLT_CN, STDAGE, FORTYPE) |>
   full_join(stand_id_crosswalk, by = join_by(PLT_CN))
@@ -981,7 +981,7 @@ From this, it appears the Jenkins over-projects compared to FFE.
 
 Same plot, but colored by stand age:
 
-```{r compare_ffe_jenkins_stdage}
+```{r compare_ffe_jenkins_stdage, eval = FALSE}
 ggplot(
     data = compare_ffe_jenkins
   ) +
@@ -1025,7 +1025,7 @@ Method:
 
 Fetch all the trees for the grow-only plots:
 
-```{r matching_tree}
+```{r matching_tree, eval = FALSE}
 fia = DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 fia_tree = tbl(fia, 'TREE')
 
@@ -1055,7 +1055,7 @@ To convert CARBON_AG, which is pounds, to carbon per acre, we observe that a
 plot is 1/6 acre; replicating the plot 6 times gets us a full acre, so we
 multiply the carbon in each tree by 6 to get lbs/acre of carbon.
 
-```{r stand_measured_spatial]}
+```{r stand_measured_spatial, eval = FALSE}
 stand_measured_spatial <- matching_tree |>
   select(STATECD, COUNTYCD, PLOT, SUBP, CONDID, TREE, INVYR, CARBON_AG) |>
   mutate(CARBON_PER_ACRE = 6 * CARBON_AG) |>
@@ -1077,7 +1077,7 @@ stand_measured_spatial <- matching_tree |>
 knitr::kable(stand_measured_spatial)
 ```
 
-```{r compare_ffe_spatial}
+```{r compare_ffe_spatial, eval = FALSE}
 compare_ffe_spatial <- fvs_stand_measured_ffe |>
   group_by(StandID) |> filter(Year == max(Year)) |> ungroup() |>
   left_join(stand_descr, by = join_by(StandID == FVS_STAND_ID)) |>
@@ -1106,7 +1106,7 @@ ggplot(
 
 Same, but colored by stand age
 
-```{r compare_ffe_spatial_stdage}
+```{r compare_ffe_spatial_stdage, eval = FALSE}
 ggplot(
     data = compare_ffe_spatial
   ) +
@@ -1137,7 +1137,7 @@ Method:
 - Sum for all trees in the plot
 
 
-```{r stand_measured_tpa}
+```{r stand_measured_tpa, eval = FALSE}
 stand_measured_tpa <- matching_tree |>
   select(STATECD, COUNTYCD, PLOT, SUBP, CONDID, TREE, INVYR, CARBON_AG, TPA_UNADJ) |>
   mutate(CARBON_PER_ACRE = CARBON_AG * TPA_UNADJ) |>
@@ -1160,7 +1160,7 @@ knitr::kable(stand_measured_tpa)
 ```
 
 
-```{r compare_ffe_tpa}
+```{r compare_ffe_tpa, eval = FALSE}
 compare_ffe_tpa <- fvs_stand_measured_ffe |>
   group_by(StandID) |> filter(Year == max(Year)) |> ungroup() |>
   left_join(stand_descr, by = join_by(StandID == FVS_STAND_ID)) |>
@@ -1189,7 +1189,7 @@ ggplot(
 
 Same, but color by stand age
 
-```{r compare_ffe_tpa_stdage}
+```{r compare_ffe_tpa_stdage, eval = FALSE}
 ggplot(
     data = compare_ffe_tpa
   ) +
@@ -1207,7 +1207,7 @@ ggplot(
 These look very similar to the spatial approach; plot them against each other
 to directly compare spatial vs. tpa
 
-```{r compare_tpa_spatial}
+```{r compare_tpa_spatial, eval = FALSE}
 compare_tpa_spatial <- stand_measured_spatial |>
   select(STATECD, COUNTYCD, PLOT, CARBON_METRIC) |>
   rename(Spatial = CARBON_METRIC) |>
@@ -1237,7 +1237,7 @@ ggplot(
 
 Same, but color by stand age
 
-```{r plot_tpa_vs_spatial}
+```{r plot_tpa_vs_spatial, eval = FALSE}
 ggplot(
     data = compare_tpa_spatial
   ) +
@@ -1267,7 +1267,7 @@ FIA provides basal area in COND.BALIVE, which is, per the FIADB User Guide:
 > Basal area in square feet per acre of all live trees ω1.0
 > inch d.b.h./d.r.c. sampled in the condition. Populated for forest conditions.
 
-```{r stand_measured_ba_fia}
+```{r stand_measured_ba_fia, eval = FALSE}
 stand_measured_ba_fia <- matching_cond |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   filter(MEASYEAR == max(MEASYEAR)) |>
@@ -1292,7 +1292,7 @@ section 4.3.1.4.1:
 
 which we presume to be square feet per acre for standing live trees only.
 
-```{r stand_measured_ba_fvs}
+```{r stand_measured_ba_fvs, eval = FALSE}
 stand_measured_ba_fvs <- FVS_Summary2_East |>
   filter(Method == 'Measured' & Algorithm == 'FFE') |>
   group_by(StandID) |>
@@ -1310,7 +1310,7 @@ stand_measured_ba_fvs <- FVS_Summary2_East |>
 knitr::kable(stand_measured_ba_fvs)
 ```
 
-```{r compare_ba_fia_fvs}
+```{r compare_ba_fia_fvs, eval = FALSE}
 compare_ba_fia_fvs <- stand_measured_ba_fia |>
   left_join(stand_measured_ba_fvs, by = join_by(PLT_CN))
 
@@ -1338,7 +1338,7 @@ FVS also projects basal area, and we can compare FVS projected with FVS measured
 This will give us insight just into the growth model of FVS independent of
 carbon calculation.
 
-```{r compare_ba_meas_proj}
+```{r compare_ba_meas_proj, eval = FALSE}
 tmp <- FVS_Summary2_East |>
   filter(Algorithm == 'FFE') |>
   group_by(StandID, Method) |>
@@ -1365,7 +1365,7 @@ compare_ba_meas_proj <- measured |>
 knitr::kable(compare_ba_meas_proj)
 ```
 
-```{r plot_measured_vs_projected_ba}
+```{r plot_measured_vs_projected_ba, eval = FALSE}
 ggplot(
     data = compare_ba_meas_proj
   ) +
