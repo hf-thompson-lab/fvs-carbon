@@ -599,10 +599,12 @@ fvs_stand_projected_ffe <- nk_ffe_none_carbon |>
     Down_Dead = Forest_Down_Dead_Wood
   ) |>
   mutate(
+    Method = "Projected",
+    Algorithm = "FFE",
     Aboveground_Dead = Standing_Dead + Down_Dead,
     Aboveground_Carbon = Aboveground_Live + Aboveground_Dead
   ) |>
-  select(StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
+  select(Method, Algorithm, StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
 knitr::kable(fvs_stand_projected_ffe)
 ```
@@ -665,9 +667,10 @@ fvs_read_output(nk_ffe_srvy[3], "FVS_Summary2_East")
 fvs_stand_measured_ffe <- nk_ffe_srvy_carbon |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
+  mutate(Method = "Surveyed", Algorithm = "FFE") |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
   mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
-  select(StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
+  select(Method, Algorithm, StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
 knitr::kable(fvs_stand_measured_ffe)
 ```
@@ -728,9 +731,10 @@ fvs_read_output(nk_jenkins_none[3], "FVS_Summary2_East")
 fvs_stand_projected_jenkins <- nk_jenkins_none_carbon |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
+  mutate(Method = "Projected", Algorithm = "Jenkins") |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
   mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
-  select(StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
+  select(Method, Algorithm, StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
 knitr::kable(fvs_stand_projected_jenkins)
 ```
@@ -791,9 +795,10 @@ fvs_read_output(nk_jenkins_srvy[3], "FVS_Summary2_East")
 fvs_stand_measured_jenkins <- nk_jenkins_srvy_carbon |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
   rename(Down_Dead = Forest_Down_Dead_Wood) |>
+  mutate(Method = "Surveyed", Algorithm = "Jenkins") |>
   mutate(Aboveground_Dead = Standing_Dead + Down_Dead) |>
   mutate(Aboveground_Carbon = Aboveground_Live + Aboveground_Dead) |>
-  select(StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
+  select(Method, Algorithm, StandID, Year, Total_Stand_Carbon, Aboveground_Carbon,
          Aboveground_Live, Aboveground_Dead, Standing_Dead, Down_Dead)
 knitr::kable(fvs_stand_measured_jenkins)
 ```
