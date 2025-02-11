@@ -245,8 +245,8 @@ fvs_write_keyword_file <- function(
   title,
   mgmt_id,
   stands,
-  regen = NULL,
-  carb_calc = "Jenkins" # or "FFE"
+  regen,
+  carb_calc
 ) {
   unlink(keyword_filename)
   apply(stands, 1, \(row) {
@@ -281,8 +281,8 @@ fvs_run <- function(
     title,
     mgmt_id,
     stands,
-    regen,
-    carb_calc
+    regen = NULL,
+    carb_calc = "Jenkins"
 ) {
   fvs_keyword_filename <- file.path(project_dir, paste0("FVS_", title, "_", mgmt_id, ".key"))
   if (file.exists(fvs_keyword_filename)) {

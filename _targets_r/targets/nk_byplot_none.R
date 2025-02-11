@@ -2,11 +2,10 @@
 tar_target(
   nk_byplot_none,
   {
-    stand_type <- "plot"
     fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
     fvs_variant <- "fvsne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
-    title <- paste0("NKBy", stringr::str_to_title(stand_type))
+    title <- "NKByPlot"
     mgmt_id <- "NONE"
   
     # We communicate with FVS through files. FVSOnline shows a model in which
@@ -26,17 +25,16 @@ tar_target(
       ) |>
       mutate(LAST_YEAR = 2165) |>
       select(STAND_ID, STAND_CN, FIRST_YEAR, LAST_YEAR)
-
+    
     fvs_run(
-      fvsbin_dir,
-      fvs_variant,
-      project_dir,
-      fiadb,
-      stand_type,
-      title,
-      mgmt_id,
-      nk_grow_only_stands,
-      nk_background_regen
+      fvsbin_dir = fvsbin_dir,
+      fvs_variant = fvs_variant,
+      project_dir = project_dir,
+      fiadb = fiadb,
+      title = title,
+      mgmt_id = mgmt_id,
+      stands = nk_grow_only_stands,
+      regen = nk_background_regen
     )
   },
   format = "file"
