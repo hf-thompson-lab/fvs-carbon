@@ -8,6 +8,7 @@ tar_option_set(
     "reshape2",
     "maps",
     "pbapply"
-  )
+  ),
+  controller = crew::crew_controller_local(workers = 4)
 )
 tar_source()
