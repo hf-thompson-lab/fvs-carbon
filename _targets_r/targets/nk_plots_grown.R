@@ -6,6 +6,7 @@ tar_target(nk_plots_grown, {
       filter_plots_untreated(con)
   }) |>
     # Bring in other plot IDs
+    filter(INVYR >= 1999) |>
     left_join(nk_plot_crosswalk |> select(!MEASYEAR), by = join_by(STATECD, COUNTYCD, PLOT)) |>
     group_by(STATECD, COUNTYCD, PLOT) |>
     # Find the first and last measurement year for each stand
