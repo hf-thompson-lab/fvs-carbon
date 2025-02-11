@@ -462,6 +462,7 @@ fia_plots_filtered(fiadb, nk_plot_crosswalk, \(.data, con) {
     filter_plots_untreated(con)
 }) |>
   # Bring in other plot IDs
+  filter(INVYR >= 1999) |>
   left_join(nk_plot_crosswalk |> select(!MEASYEAR), by = join_by(STATECD, COUNTYCD, PLOT)) |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   # Find the first and last measurement year for each stand
@@ -791,6 +792,7 @@ We're not using the summary yet, but define the target for it.
 ```{targets nk_jenkins_srvy_summary, tar_simple = TRUE}
 fvs_read_output(nk_jenkins_srvy[3], "FVS_Summary2_East")
 ```
+
 ```{r fvs_stand_measured_jenkins, eval = FALSE}
 fvs_stand_measured_jenkins <- nk_jenkins_srvy_carbon |>
   rename(Aboveground_Live = Aboveground_Total_Live) |>
@@ -817,7 +819,8 @@ ggplot(
     mapping = aes(x = Year, y = Aboveground_Live, color = StandID)
   ) +
   geom_line() +
-  ylab(bquote("Carbon " ~(Mg %*% ha^{-1}))) +
+  theme_bw() +
+  ylab(bquote("Carbon " ~(`Mg C` %.% ha^{-1}))) +
   coord_cartesian(xlim = c(2000, 2025), ylim = c(0, 200)) +
   ggtitle("NK Grow-Only Stands Measured Carbon (FFE)")
 ```
@@ -831,8 +834,9 @@ ggplot(
     mapping = aes(x = Year, y = Aboveground_Live, color = StandID)
   ) +
   geom_line() +
+  theme_bw() +
   coord_cartesian(xlim = c(2000, 2025), ylim = c(0, 200)) +
-  ylab(bquote("Carbon " ~(Mg %*% ha^{-1}))) +
+  ylab(bquote("Carbon " ~(`Mg C` %.% ha^{-1}))) +
   ggtitle("NK Grow-Only Stands Projected Carbon (FFE)")
 ```
 
@@ -848,7 +852,8 @@ ggplot(
   geom_line(
     mapping = aes(x = Year, y = Aboveground_Live, color = StandID, linetype = Method)
   ) +
-  ylab(bquote("Carbon " ~(Mg %*% ha^{-1}))) +
+  ylab(bquote("Carbon " ~(`Mg C` %.% ha^{-1}))) +
+  theme_bw() +
   coord_cartesian(xlim = c(2000, 2025), ylim = c(0, 200)) +
   ggtitle("NK Grow-Only Stands Measured vs. Projected Carbon (FFE)")
 ```
@@ -877,8 +882,10 @@ ggplot(data = compare_ffe) +
     size = 2,
     mapping = aes(x = Measured, y = Projected)
   ) +
-  xlab(bquote("Measured Carbon " ~(Mg %*% ha^{-1}))) +
-  ylab(bquote("Projected Carbon " ~(Mg %*% ha^{-1}))) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  xlab(bquote("Measured Carbon " ~(`Mg C` %.% ha^{-1}))) +
+  ylab(bquote("Projected Carbon " ~(`Mg C` %.% ha^{-1}))) +
   ggtitle("NK Grow-Only Stands Measured vs. Projected Carbon (FFE)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1, color = 'red')
@@ -905,7 +912,8 @@ ggplot(
   geom_line(
     mapping = aes(x = Year, y = Aboveground_Live, color = StandID, linetype = Method)
   ) +
-  ylab(bquote("Carbon " ~(Mg %*% ha^{-1}))) +
+  theme_bw() +
+  ylab(bquote("Carbon " ~(`Mg C` %.% ha^{-1}))) +
   coord_cartesian(xlim = c(2000, 2025), ylim = c(0, 200)) +
   ggtitle("NK Grow-Only Stands Measured vs. Projected Carbon (Jenkins)")
 ```
@@ -934,8 +942,10 @@ ggplot(data = compare_jenkins) +
     size = 2,
     mapping = aes(x = Measured, y = Projected)
   ) +
-  xlab(bquote("Measured Carbon " ~(Mg %*% ha^{-1}))) +
-  ylab(bquote("Projected Carbon " ~(Mg %*% ha^{-1}))) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  xlab(bquote("Measured Carbon " ~(`Mg C` %.% ha^{-1}))) +
+  ylab(bquote("Projected Carbon " ~(`Mg C` %.% ha^{-1}))) +
   ggtitle("NK Grow-Only Stands Measured vs. Projected Carbon (Jenkins)") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1, color = 'red')
@@ -946,9 +956,9 @@ We can get a good assessment of how FFE and Jenkins calculations compare
 just by comparing measured FFE and Jenkins computed carbon.
 
 ```{r compare_ffe_jenkins, eval = FALSE}
-stand_descr <- matching_cond |>
+stand_descr <- nk_matching_cond |>
   select(PLT_CN, STDAGE, FORTYPE) |>
-  full_join(stand_id_crosswalk, by = join_by(PLT_CN))
+  full_join(nk_plot_crosswalk, by = join_by(PLT_CN == STAND_CN))
 
 compare_ffe_jenkins <- fvs_stand_measured_ffe |>
   left_join(stand_descr, by = join_by(StandID == FVS_STAND_ID)) |>
@@ -973,8 +983,10 @@ ggplot(
   ggtitle("FFE vs. Jenkins Carbon Calculation") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1) +
-  xlab(bquote("FFE Carbon " ~(Mg %*% ha^{-1}))) +
-  ylab(bquote("Jenkins Carbon " ~(Mg %*% ha^{-1}))) 
+  theme(aspect.ratio = 1) +
+  theme_bw() +
+  xlab(bquote("FFE Carbon " ~(`Mg C` %.% ha^{-1}))) +
+  ylab(bquote("Jenkins Carbon " ~(`Mg C` %.% ha^{-1}))) 
 ```
 
 From this, it appears the Jenkins over-projects compared to FFE.
@@ -991,9 +1003,11 @@ ggplot(
   ) +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1) +
+  theme(aspect.ratio = 1) +
+  theme_bw() +
   ggtitle("FFE vs. Jenkins Carbon Calculation") +
-  xlab(bquote("FFE Carbon " ~(Mg %*% ha^{-1}))) +
-  ylab(bquote("Jenkins Carbon " ~(Mg %*% ha^{-1}))) 
+  xlab(bquote("FFE Carbon " ~(`Mg C` %.% ha^{-1}))) +
+  ylab(bquote("Jenkins Carbon " ~(`Mg C` %.% ha^{-1}))) 
 
 ```
 
