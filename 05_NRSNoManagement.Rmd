@@ -129,7 +129,7 @@ knitr::kable(state_plot_counts)
 
 Show the plots on a map.
 
-```{r map nrs_plots_grown}
+```{r map nrs_plots_grown, eval = FALSE}
 fvsne_states_map <- fvsne_states |>
   distinct(STATE_NAME) |>
   rename(region = STATE_NAME) |>
@@ -358,40 +358,19 @@ can be marked 'INGROWTH', in different inventories. It may also have other
 records with other components, e.g. trees on the microplot will have a
 'SURVIVOR' record in each inventory prior to ingrowth.
 
-```{r grm_ingrown}
-# We want ingrowth for all the plots in plot_grow_only
-fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+```{targets nrs_grm_ingrowth, tar_simple = TRUE}
+fia_trees_filtered(fiadb, nrs_plots_grown, \(.data, con) {
+  .data |>
+    filter_trees_ingrowth(con) |>
+    # Trees can be marked as ingrown multiple times;
+    # Pick only the first ingrowth record for each tree
+    group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
+    filter(INVYR == min(INVYR, na.rm = TRUE)) |>
+    ungroup()
+})
+```
 
-# Get PLT_CN for all plots in plot_grow_only, for all valid INVYR
-plt_cns_mixin <- tbl(fia, 'PLOT') |>
-  semi_join(plot_grow_only, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
-  select(CN, MEASYEAR) |>
-  distinct() |> # should be redundant, but doesn't appear to be
-  rename(PLT_CN = CN)
-
-tree_mixin <- tbl(fia, 'TREE') |>
-  select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD) |>
-  rename(TRE_CN = CN)
-
-# Get all the Tree Growth, Removal, and Mortality entries for those plots that
-# are marked as INGROWTH, either on a microplot or subplot.
-grm_ingrown <- tbl(fia, 'TREE_GRM_COMPONENT') |>
-  inner_join(plt_cns_mixin, by = join_by(PLT_CN)) |>
-  ingrowth_filter() |>
-  select(
-    TRE_CN, PREV_TRE_CN, PLT_CN, MEASYEAR,
-    DIA_BEGIN, DIA_MIDPT, DIA_END, ANN_DIA_GROWTH, ANN_HT_GROWTH,
-    MICR_COMPONENT_AL_FOREST, MICR_TPAGROW_UNADJ_AL_FOREST,
-    SUBP_COMPONENT_AL_FOREST, SUBP_TPAGROW_UNADJ_AL_FOREST
-  ) |>
-  # Pick only the first ingrowth record
-  left_join(tree_mixin, by = join_by(TRE_CN)) |>
-  group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
-  filter(INVYR == min(INVYR, na.rm = TRUE)) |>
-  ungroup() |>
-  collect()
-dbDisconnect(fia)
-rm(fia, plt_cns_mixin)
+```{r preview nrs_grm_ingrowth, eval = FALSE}
 print(paste0("Ingrown trees: ", grm_ingrown |> nrow()))
 print(paste0(
   "  ",
@@ -421,8 +400,8 @@ Appendix C on details for keywords, for HTADJ, says:
 > bounded between the minimum establishment height
 > listed in table 1 and the height of a tree 3 inches d.b.h.
 
-```{r grm_ingrown_histogram}
-grm_ingrown |>
+```{r nrs_grm_ingrowth_histogram, eval = FALSE}
+nrs_grm_ingrowth |>
   mutate(
     `> 3" DBH` = if_else(DIA_END > 3, MEASYEAR, NA),
     `≤ 3" DBH` = if_else(DIA_END <= 3, MEASYEAR, NA)
@@ -443,8 +422,8 @@ grm_ingrown |>
 
 ```
 
-```{r grm_ingrown_boxplot}
-grm_ingrown |>
+```{r nrs_grm_ingrowth_boxplot, eval = FALSE}
+nrs_grm_ingrowth |>
   select(DIA_END) |>
   ggplot(aes(DIA_END)) +
   geom_histogram(binwidth = 1) +
@@ -481,7 +460,7 @@ tree_ingrown - all tree records for ingrown trees, including pre- and
 
 NB: This takes about 5 minutes on a laptop.
 
-```{r tree_ingrown}
+```{r tree_ingrown, eval = FALSE}
 rds_file <- 'data/intermediate/tree_ingrown.rds'
 if (USE_CACHE & file.exists(rds_file)) {
   tree_ingrown <- read_rds(rds_file)
@@ -565,7 +544,7 @@ if (USE_CACHE & file.exists(rds_file)) {
 
 Walk the tree history to see what diameter we can get to.
 
-```{r tree_ingrown_last}
+```{r tree_ingrown_last, eval = FALSE}
 # CN - the latest CN for this tree
 # DIA - the latest DIA for this tree
 # PREV_TRE_CN - the next earlier CN in this tree history, if any
@@ -628,12 +607,12 @@ rm(trees_rhs, tree_cns_todo, tmp_trees, iterations)
 ```
 
 How many trees ingrow with DBH>3?
-```{r dbh_gt_3}
+```{r dbh_gt_3, eval = FALSE}
 tree_ingrown_last |> filter(DIA > 3) |> nrow()
 ```
 
 How many of those are traceable back to when they had DBH <= 3?
-```{r dbh_le_3}
+```{r dbh_le_3, eval = FALSE}
 tree_ingrown_last |> filter(DIA > 3 & FRST_DIA <= 3) |> nrow() 
 ```
 
@@ -651,7 +630,7 @@ growth rate for trees where we have a previous observation by projecting
 diameter growth backwards to the first MEASYEAR and seeing how close we
 get to the first observed diameter.
 
-```{r tree_growth_fia}
+```{r tree_growth_fia, eval = FALSE}
 tree_growth_fia <- tree_ingrown_last |>
   filter(FRST_DIA < DIA) |>
   # Add on FIA growth rate
@@ -705,7 +684,7 @@ Note that tree_growth is all trees, not just ingrown trees.
 This also fetches trees with only a single observation; these are useful
 for calculating ingrowth.
 
-```{r tree_growth}
+```{r tree_growth, eval = FALSE}
 rds_file <- 'data/intermediate/tree_growth.rds'
 if (USE_CACHE & file.exists(rds_file)) {
   tree_growth <- read_rds(rds_file)
@@ -789,7 +768,7 @@ Measurement is imperfect, leading to some outliers in the growth table. We
 can look at different outlier removal strategies and the resulting distribution
 of observations:
 
-```{r plot_tree_growth}
+```{r plot_tree_growth, eval = FALSE}
 tree_growth |>
   select(CN, SPGRPCD, JENKINS_SPGRP_NAME, ANN_DIA_DELTA) |>
   filter(!is.na(ANN_DIA_DELTA)) |>
@@ -848,7 +827,7 @@ For growth rate, we prioritize:
 
 tree_growth_rate - all computable growth rates for all plot/species/inventory
 
-```{r tree_growth_rate}
+```{r tree_growth_rate, eval = FALSE}
 tree_growth_with_outliers <- tree_growth |>
   filter(!is.na(ANN_DIA_DELTA)) |>
   group_by(SPCD) |>
@@ -996,7 +975,7 @@ tree_growth_rate <- tree_growth_with_outliers |>
   )
 ```
 
-```{r tree_growth_rate_boxplot}
+```{r tree_growth_rate_boxplot, eval = FALSE}
 tree_growth_rate |>
   group_by(JENKINS_SPGRP_NAME) |>
   mutate(
@@ -1021,7 +1000,7 @@ tree_growth_rate |>
 
 ```
 
-```{r tree_growth_rate_boxplot_metric}
+```{r tree_growth_rate_boxplot_metric, eval = FALSE}
 tree_growth_rate |>
   group_by(JENKINS_SPGRP_NAME) |>
   mutate(
@@ -1051,7 +1030,7 @@ tree_growth_rate |>
 
 Can we use that to back-project ingrown trees?
 
-```{r manual_back_projection}
+```{r manual_back_projection, eval = FALSE}
 location_mixin <- tree_ingrown |>
   select(CN, STATECD, COUNTYCD, PLOT, SPCD)
 
@@ -1101,7 +1080,7 @@ tree_ingrown has one tree record for each year an ingrown tree was inventoried.
 We can fill in a DIA_EST using the growth interval, and iterate until
 they're all filled in.
 
-```{r init_stepwise_manual_back_projection}
+```{r init_stepwise_manual_back_projection, eval = FALSE}
 manual_back_projection <- tree_ingrown |>
   # Start with actually ingrown trees
   semi_join(grm_ingrown, by = join_by(CN == TRE_CN)) |>
@@ -1135,7 +1114,7 @@ manual_back_projection <- tree_ingrown |>
 manual_back_projection |> nrow()
 ```
 
-```{r stepwise_manual_back_projection}
+```{r stepwise_manual_back_projection, eval = FALSE}
 prev_tre_cns <- manual_back_projection |>
   select(PREV_TRE_CN) |>
   filter(!is.na(PREV_TRE_CN))
@@ -1230,7 +1209,7 @@ manual_back_projection |>
 
 Apply Back-Projection
 
-```{r projected_vs_measured_annual_growth}
+```{r projected_vs_measured_annual_growth, eval = FALSE}
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 
 projected_annual_growth <- tree_ingrown_last |>
@@ -1302,7 +1281,7 @@ This looks usable.
 Using estimated diameter, what portion of ingrown trees
 can we project back to 3" DBH before the first MEASYEAR?
 
-```{r init_tree_ingrown_three}
+```{r init_tree_ingrown_three, eval = FALSE}
 tree_ingrown_three <- tree_ingrown |>
   # Start with actually ingrown trees
   semi_join(grm_ingrown, by = join_by(CN == TRE_CN)) |>
@@ -1328,7 +1307,7 @@ tree_ingrown_three <- tree_ingrown |>
   )
 ```
 
-```{r tree_ingrown_three}
+```{r tree_ingrown_three, eval = FALSE}
 # Graft on the growth for the previous inventory
 # project back that growth
 # calculate the estimated diameter
@@ -1415,7 +1394,7 @@ tree_ingrown_three |>
 
 How'd we do?
 
-```{r plot_tree_ingrown_three}
+```{r plot_tree_ingrown_three, eval = FALSE}
 tree_ingrown_three_validation <- tree_ingrown_three |>
   select(CN, MEASYEAR, SPCD, # STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR, SPCD,
          FRST_MEASYEAR, FRST_DIA_EST, FRST_DIA_EST_ONE, FRST_DIA_EST_TWO) |>
@@ -1526,7 +1505,7 @@ We find the most common thing that is both inventoried on the plot AND
 supported by FVSne, and move things that are not supported into the most
 common.
 
-```{r tree_growth_with_fixed_spcd}
+```{r tree_growth_with_fixed_spcd, eval = FALSE}
 # mcs == Most Common Species
 mcs_plot <- tree_growth |>
   filter(!is.na(FVS_SPCD)) |>
@@ -1591,7 +1570,7 @@ tree_growth_with_fixed_spcd <- tree_growth |>
 
 How'd we do?
 
-```{r check fix to spcd}
+```{r check fix to spcd, eval = FALSE}
 rbind(
   tree_growth |>
     filter(is.na(FVS_SPCD)) |>
@@ -1611,7 +1590,7 @@ rbind(
 ```
 
 These are the cases where we're unable to find a species code for FVSne:
-```{r fvsne_unhandled_trees}
+```{r fvsne_unhandled_trees, eval = FALSE}
 plot_count_mixin <- tree_growth_with_fixed_spcd |>
   filter(is.na(FVS_SPCD)) |>
   distinct(STATECD, COUNTYCD, PLOT, SPCD) |>
@@ -1652,7 +1631,7 @@ fvsne_unhandled_trees <- tree_growth_with_fixed_spcd |>
   select(SCIENTIFIC_NAME, BA, BA_FRAC, TOTAL_STAND_BA)
 ```
 
-```{r plot fvsne_unhandled_trees}
+```{r plot fvsne_unhandled_trees, eval = FALSE}
 fvsne_unhandled_trees |>
   group_by(SCIENTIFIC_NAME) |>
   mutate(Species = paste0(SCIENTIFIC_NAME, ", n=", n())) |>
@@ -1671,7 +1650,7 @@ fvsne_unhandled_trees |>
 
 Let's find out how many stems of each (corrected) species ingrow per year.
 
-```{r ingrowth_stem_rate}
+```{r ingrowth_stem_rate, eval = FALSE}
 time_mixin <- stand_stats |>
   distinct(STATECD, COUNTYCD, PLOT, MEASYEAR) |>
   group_by(STATECD, COUNTYCD, PLOT) |>
@@ -1712,7 +1691,7 @@ ingrowth_stem_rate <- tree_growth_with_fixed_spcd |>
   )
 ```
 
-```{r plot-ingrowth_stem_rate}
+```{r plot-ingrowth_stem_rate, eval = FALSE}
 stand_stats_mixin <- stand_stats |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   arrange(MEASYEAR) |>
@@ -1734,7 +1713,7 @@ ingrowth_stem_rate |>
 ```
 
 Ok, who are these outliers?
-```{r stem rate outliers}
+```{r stem rate outliers, eval = FALSE}
 knitr::kable(
   ingrowth_stem_rate |>
   arrange(desc(RATE)) |>
@@ -1748,7 +1727,7 @@ or overstocked, indicating that they have large cohorts of young trees all
 coming of age at the same time.
 
 
-```{r stem rate summary}
+```{r stem rate summary, eval = FALSE}
 summary(ingrowth_stem_rate)
 ```
 
@@ -1772,7 +1751,7 @@ height to what it might be at 3" DBH, and average them.
 - HT_NE - per-species height at 3" DBH for the entire northeast
 - HT_MIN - same as HT_NE, but populated even if fewer than 3 trees can be found
 
-```{r tree_growth_ht}
+```{r tree_growth_ht, eval = FALSE}
 ecosubcd_mixin <- stand_stats |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   arrange(MEASYEAR) |>
@@ -1850,7 +1829,7 @@ tree_growth_ht <- tree_growth_with_fixed_spcd |> # unfiltered tree growth
 
 How specific are our heights?
 
-```{r plot tree_growth_ht origin}
+```{r plot tree_growth_ht origin, eval = FALSE}
 tree_growth_ht |>
   mutate(
     HT_ORIGIN = case_when(
@@ -1874,7 +1853,7 @@ tree_growth_ht |>
 
 What diameters of trees are we selecting?
 
-```{r ht dia selection limited dia}
+```{r ht dia selection limited dia, eval = FALSE}
 ht_ecosubcd_mixin <- trees_for_ht_estimation |>
   group_by(ECOSUBCD, SPCD) |>
   arrange(abs(DIA - 3)) |>
@@ -1931,7 +1910,7 @@ tree_growth_ht_whence <- trees_for_ht_estimation |>
   left_join(species_mixin, by = join_by(SPCD))
 ```
 
-```{r plot ht dia distribution}
+```{r plot ht dia distribution, eval = FALSE}
 tree_growth_ht_whence |>
   ggplot(aes(y = DIA, fill = JENKINS_SPGRP_NAME)) +
   geom_boxplot(outlier.size = 0.1) +
@@ -1944,7 +1923,7 @@ tree_growth_ht_whence |>
   ggtitle("Diameter of trees selected for estimation")
 ```
 
-```{r plot estab ht vs dia}
+```{r plot estab ht vs dia, eval = FALSE}
 bins = (max(tree_growth_ht_whence$DIA) - min(tree_growth_ht_whence$DIA)) * 10
 tree_growth_ht_whence |>
   ggplot(aes(x = DIA, y = HT)) +
@@ -1962,7 +1941,7 @@ tree_growth_ht_whence |>
 ```
 
 Are we missing height for any ingrowth?
-```{r validate height projection}
+```{r validate height projection, eval = FALSE}
 stopifnot(
   ingrowth_stem_rate |>
     distinct(STATECD, COUNTYCD, PLOT, SPCD) |> 
@@ -1979,7 +1958,7 @@ stopifnot(
 Combining these, we can gather per-plot the nuber of stems of each species
 that establish each year, and the height at establishment.
 
-```{r ingrowth_by_stem}
+```{r ingrowth_by_stem, eval = FALSE}
 ingrowth_by_stem <- ingrowth_stem_rate |>
   left_join(tree_growth_ht, by = join_by(STATECD, COUNTYCD, PLOT, SPCD))
 
@@ -2004,7 +1983,7 @@ ingrowth_by_stem |>
   ggtitle("Estimated Tree Height at 3\" DBH")
 ```
 
-```{r summary ingrowth_by_stem}
+```{r summary ingrowth_by_stem, eval = FALSE}
 summary(ingrowth_by_stem)
 ```
 
@@ -2297,7 +2276,7 @@ We gather two series of stands:
 Find the stands we want to project; these are the grow-only stands starting
 in their first measurement year.
 
-```{r stands_projected}
+```{r stands_projected, eval = FALSE}
 timeframe <- stand_stats |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   summarize(
@@ -2333,7 +2312,7 @@ remove(fia, fia_fvs_standinit_plot)
 > CAVEAT:
 > FVS says it has a hard limit of 3000
 
-```{r regen_table}
+```{r regen_table, eval = FALSE}
 regen_table <- ingrowth_by_stem |>
   filter(!is.na(FVS_SPCD)) |>
   left_join(stands_projected, by = join_by(STATECD, COUNTYCD, PLOT)) |>
@@ -2378,7 +2357,7 @@ It cooks a StdIdent that can be parsed later:
 - _R followed by the random seed
 
 
-```{r keywordfile_section}
+```{r keywordfile_section, eval = FALSE}
 keywordfile_section <- function(
     Title, MgmtId, StandID, StandCN,
     FirstYear, LastYear, Timestep,
@@ -2447,7 +2426,7 @@ keywordfile_section <- function(
 
 The first set of keyword files is to project from the first measurement year to 2025.
 
-```{r NRSGrowOnly GROW}
+```{r NRSGrowOnly GROW, eval = FALSE}
 num_partitions <- 60 # The number of simultaneous processes to use
 title <- "NRSGrowOnly"
 mgmtid <- "GROW"
@@ -2495,7 +2474,7 @@ for (partition in 1:num_partitions) {
 The second run is a zero-year projection to have FVS calculate the carbon
 in surveyed stands in each year they are surveyed.
 
-```{r stands_surveyed}
+```{r stands_surveyed, eval = FALSE}
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 fia_fvs_standinit_plot <- tbl(fia, 'FVS_StandInit_Plot') |>
   select(STAND_CN, STAND_ID)
@@ -2515,7 +2494,7 @@ remove(fia, fia_fvs_standinit_plot)
 The second run is to do a 0-year projection for each measurement year. These
 are given management ID "SRVY".
 
-```{r NRSGrowOnly SRVY}
+```{r NRSGrowOnly SRVY, eval = FALSE}
 # We're running 0-year timesteps, but FVS requires us to run at least one
 # year, so we run 0-year timesteps for 1 year.
 timestep <- 1
@@ -2573,7 +2552,7 @@ for (partition in 1:num_partitions) {
 ### Parse Problems
 
 What errors and warnings do we get?
-```{r fvs warnings}
+```{r fvs warnings, eval = FALSE}
 mgmtid <- "GROW"
 fvs_warnings <- NULL
 for (partition in 1:num_partitions) {
@@ -2605,7 +2584,7 @@ for (partition in 1:num_partitions) {
 ```
 
 Find the distinct warnings
-```{r distinct fvs warnings}
+```{r distinct fvs warnings, eval = FALSE}
 fvs_warnings_distinct <- fvs_warnings |>
   # Warnings have some leading text, the tag WARNING:,
   # then descriptive text; if there's a number in the descriptive text,
@@ -2626,7 +2605,7 @@ knitr::kable(fvs_warnings_distinct)
 
 The keyword in wrong context could be a keyword file generation error; let's
 track it down.
-```{r keyword context}
+```{r keyword context, eval = FALSE}
 debug_stand_id <- fvs_warnings |>
   filter(grepl(" WRONG CONTEXT ", text)) |>
   head(1) |>
@@ -2639,7 +2618,7 @@ RECORDS READ=4884 likely means the number of lines in the keyword file
 (this is a FORTRAM program, where each line is a record).
 
 Which partition is it in?
-```{r keyword context partition}
+```{r keyword context partition, eval = FALSE}
 as.numeric(sub("^([^_]+)_.*$", "\\1",debug_stand_id)) %% num_partitions
 ```
 
@@ -2715,7 +2694,7 @@ So we can ignore these errors.
 ### Keyword Ignored
 
 Let's look at the KEYWORD IGNORED errors:
-```{r keyword ignored}
+```{r keyword ignored, eval = FALSE}
 debug_stand_id <- fvs_warnings |>
   filter(grepl(" KEYWORD IGNORED.", text)) |>
   head(1) |>
@@ -2724,7 +2703,7 @@ fvs_warnings |>
   filter(STAND_ID == debug_stand_id)
 ```
 
-```{r keyword ignored partition}
+```{r keyword ignored partition, eval = FALSE}
 as.numeric(sub("^([^_]+)_.*$", "\\1",debug_stand_id)) %% num_partitions
 ```
 
@@ -2776,7 +2755,7 @@ each of the random seeds. Ignore.
 ### One Thousand Trees
 
 The TPA fault may indicate a keyword file generation error; let's track it down.
-```{r}
+```{r, eval = FALSE}
 debug_stand_id <- fvs_warnings |>
   filter(grepl(" TPA ", text)) |>
   head(1) |>
@@ -2787,7 +2766,7 @@ fvs_warnings |>
 
 a'ight, what's species 9?
 
-```{r fvs species 9}
+```{r fvs species 9, eval = FALSE}
 debug_species <- species_mixin |>
   filter(FVS_SPNO == 9)
 debug_species
@@ -2796,7 +2775,7 @@ debug_species
 There's a record for this plot for eastern white pine with TPA > 1000.
 Is it regen?
 
-```{r fault analysis}
+```{r fault analysis, eval = FALSE}
 fvs_spcd <- debug_species[["FVS_SPCD"]]
 regen_table |>
   filter(STAND_ID == "090400500390") |>
@@ -2807,7 +2786,7 @@ Doesn't look like it.
 
 Is it in the tree table?
 
-```{r white pine in stand 390}
+```{r white pine in stand 390, eval = FALSE}
 debug_stand <- stands_projected |>
   filter(STAND_ID == "090400500390")
 standcn <- debug_stand[["STAND_CN"]]
@@ -2833,7 +2812,7 @@ Yup, there it is - TREE_COUNT = 1124.479237 and DIAMETER = 0.1
 
 I think we note that these exist, and ignore them.
 
-```{r}
+```{r, eval = FALSE}
 fvs_warnings |>
   filter(grepl(" TPA ", text)) |>
   nrow()
@@ -2841,7 +2820,7 @@ fvs_warnings |>
 
 4167 is a lot. What species are they?
 
-```{r tpa warning species}
+```{r tpa warning species, eval = FALSE}
 fvs_warnings |>
   filter(grepl("TREE_ID", text)) |>
   mutate(
@@ -2867,7 +2846,7 @@ We can decide to not worry about them.
 
 Load the output from all FVS partitions into a single dataframe
 
-```{r FVS_Carbon}
+```{r FVS_Carbon, eval = FALSE}
 FVS_Carbon <- NULL
 FVS_Summary2_East <- NULL
 
@@ -2913,7 +2892,7 @@ remove(fvs_out_db, fvs_carbon_tbl, fvs_summary2_east_tbl)
 ```
 Consolidate outputs; average the multiple runs with different random seeds.
 
-```{r FVS_Carbon_NONE}
+```{r FVS_Carbon_NONE, eval = FALSE}
 FVS_Carbon_NONE <- FVS_Carbon |>
   filter(MgmtId == "GROW" & Timestep == 10) |>
   group_by(StandID, Year) |>
@@ -2941,7 +2920,7 @@ FVS_Carbon_SRVY <- FVS_Carbon |>
 
 Sanity check: did we get the outputs we requested?
 
-```{r sanity-check-expected-output}
+```{r sanity-check-expected-output, eval = FALSE}
 matched_carbon_tmp <- stands_projected |>
   left_join(
     FVS_Carbon_NONE |>
@@ -2983,7 +2962,7 @@ remove(
 
 ## Annual vs. Decadal Projections
 
-```{r annual_vs_decadal}
+```{r annual_vs_decadal, eval = FALSE}
 decadal_carbon_tmp <- FVS_Carbon_NONE |>
   rename(Decadal_Carbon = Aboveground_Total_Live) |>
   mutate(STAND_ID = paste0(
@@ -3043,7 +3022,7 @@ remove(
 )
 ```
 
-```{r plot_decadal_vs_annual}
+```{r plot_decadal_vs_annual, eval = FALSE}
 ggplot(
     annual_vs_decadal |>
       filter(Projection_Years > 0),
@@ -3060,7 +3039,7 @@ ggplot(
   xlab(bquote("10-Year Timestep Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1)))
 ```
 
-```{r}
+```{r, eval = FALSE}
 annual_vs_decadal |>
   filter(Decadal_Carbon_Flux > 0) |>
   mutate(Ratio = Decadal_Carbon_Flux / Annual_Carbon_Flux) |>
@@ -3076,7 +3055,7 @@ annual_vs_decadal |>
 
 ```
 
-```{r carbon_flux_stats}
+```{r carbon_flux_stats, eval = FALSE}
 summary(annual_vs_decadal[,c("Annual_Carbon_Flux", "Decadal_Carbon_Flux")])
 ```
 
@@ -3087,7 +3066,7 @@ Filter projections to corresponding observations.
 projected_vs_measured has the projection and measurement for the quantities
 of interest in the first and last year, and nothing in between.
 
-```{r projected_vs_measured}
+```{r projected_vs_measured, eval = FALSE}
 projected_carbon_tmp <- FVS_Carbon_NONE |>
   select(StandID, Year, Total_Stand_Carbon) |>
   rename(Projected_Carbon = Total_Stand_Carbon)
@@ -3189,7 +3168,7 @@ remove(
 Run a quick check to make sure the plots grew during the projection period,
 rather than shrank.
 
-```{r sanity-check-plots-grew}
+```{r sanity-check-plots-grew, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Projection_Years, y = Measured_BA_Delta)
@@ -3205,7 +3184,7 @@ ggplot(
 
 ## Carbon Projection
 
-```{r projected_carbon_vs_measured_carbon}
+```{r projected_carbon_vs_measured_carbon, eval = FALSE}
 projected_vs_measured |>
   filter(Projection_Years > 0) |>
   mutate(Ratio = Projected_Carbon / Measured_Carbon) |>
@@ -3218,14 +3197,14 @@ projected_vs_measured |>
   xlab("Ratio (FVS Projected / FIA Measured)")
 ```
 
-```{r summary projected_vs_measured}
+```{r summary projected_vs_measured, eval = FALSE}
 projected_vs_measured |>
   filter(Projection_Years > 0) |>
   mutate(Ratio = Measured_Carbon / Projected_Carbon) |>
   summary()
 ```
 
-```{r projected_carbon_vs_measured_carbon_with_trendline}
+```{r projected_carbon_vs_measured_carbon_with_trendline, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Measured_Carbon, y = Projected_Carbon)
@@ -3250,7 +3229,7 @@ ggplot(
   coord_cartesian(xlim = c(0, 800), ylim = c(0, 800))
 ```
 
-```{r}
+```{r, eval = FALSE}
 only_ends <- projected_vs_measured |> filter(Projection_Years > 0)
 p <- sum(only_ends$Projected_Carbon) / nrow(only_ends)
 m <- sum(only_ends$Measured_Carbon) / nrow(only_ends)
@@ -3268,7 +3247,7 @@ Which is great, but for large BA plots, only a small portion will be projected,
 so the error is masked by the pre-existing BA. So, instead, look at measured
 vs. projected carbon change.
 
-```{r plot_projected_annual_carbon_flux}
+```{r plot_projected_annual_carbon_flux, eval = FALSE}
 all_years <- tibble(Year = min(FVS_Carbon_NONE$Year):max(FVS_Carbon_NONE$Year))
 num_years <- all_years |> nrow()
 
@@ -3309,7 +3288,7 @@ FVS_Carbon_NONE |>
 
 ```
 
-```{r plot_surveyed_annual_carbon_flux}
+```{r plot_surveyed_annual_carbon_flux, eval = FALSE}
 all_years <- tibble(Year = min(FVS_Carbon_SRVY$Year):max(FVS_Carbon_SRVY$Year))
 num_years <- all_years |> nrow()
 
@@ -3356,7 +3335,7 @@ FVS_Carbon_SRVY |>
 
 ```
 
-```{r measured_vs_projected_carbon_change}
+```{r measured_vs_projected_carbon_change, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0) |> arrange(Projection_Years),
     aes(x = Measured_Carbon_Delta, y = Projected_Carbon_Delta)
@@ -3381,7 +3360,7 @@ ggplot(
   #coord_cartesian(xlim = c(-100, 100), ylim = c(-100, 100))
 ```
 
-```{r measured_vs_projected_carbon_flux}
+```{r measured_vs_projected_carbon_flux, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux)
@@ -3406,7 +3385,7 @@ ggplot(
   #coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
 ```
 
-```{r carbon flux ratio}
+```{r carbon flux ratio, eval = FALSE}
 projected_vs_measured |>
   filter(Projection_Years > 0) |>
   mutate(Ratio = Projected_Carbon_Flux / Measured_Carbon_Flux) |>
@@ -3421,14 +3400,17 @@ projected_vs_measured |>
   xlab("Ratio (Projected / Measured)")
 
 ```
-```{r summary projected vs measured carbon flux}
+
+
+
+```{r summary projected vs measured carbon flux, eval = FALSE}
 projected_vs_measured |>
   filter(Projection_Years > 0) |>
   mutate(Ratio = Projected_Carbon_Flux / Measured_Carbon_Flux) |>
   summary()
 ```
 
-```{r projected-vs-measured-carbon-flux}
+```{r projected-vs-measured-carbon-flux, eval = FALSE}
 projected_vs_measured_with_n <- projected_vs_measured |>
   filter(Projection_Years > 0) |>
   group_by(FOREST_TYPE_GROUP) |>
@@ -3469,7 +3451,7 @@ ggplot(
 Let's look at carbon flux residuals.
 This is Mg of carbon per hectare per year.
 
-```{r carbon-flux-by-forest-type}
+```{r carbon-flux-by-forest-type, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(Carbon_Flux_Residual, fct_reorder(FOREST_TYPE_GROUP, Measured_Carbon, .fun = sum))
@@ -3507,7 +3489,7 @@ ggplot(
 
 ```
 
-```{r carbon-flux-by-forest-type-detail}
+```{r carbon-flux-by-forest-type-detail, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(Carbon_Flux_Residual, fct_reorder(FOREST_TYPE_GROUP, Measured_Carbon, .fun = sum))
@@ -3546,7 +3528,7 @@ ggplot(
   ylab("Forest Type Group")
 ```
 
-```{r carbon-flux-by-ecoregion}
+```{r carbon-flux-by-ecoregion, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(Carbon_Flux_Residual, fct_reorder(ECOCD, Measured_Carbon, .fun = sum))
@@ -3564,7 +3546,7 @@ ggplot(
 
 ### Residuals vs. Years Projected
 
-```{r carbon_residual_vs_projection_years}
+```{r carbon_residual_vs_projection_years, eval = FALSE}
 ggplot(
     projected_vs_measured|> filter(Projection_Years > 0),
     aes(x = Projection_Years, y = Carbon_Residual)
@@ -3586,7 +3568,7 @@ ggplot(
 ```
 
 
-```{r carbon_error_vs_projection_years}
+```{r carbon_error_vs_projection_yearsm, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Projection_Years, y = Carbon_Error)
@@ -3608,7 +3590,7 @@ ggplot(
   
 ```
 
-```{r carbon_flux_residual_vs_projection_years}
+```{r carbon_flux_residual_vs_projection_years, eval = FALSE}
 ggplot(
     projected_vs_measured|> filter(Projection_Years > 0),
     aes(x = Projection_Years, y = Carbon_Flux_Residual)
@@ -3631,7 +3613,7 @@ ggplot(
 
 ### Residuals vs. BA
 
-```{r carbon_residual_vs_measured_ba}
+```{r carbon_residual_vs_measured_ba, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     mapping = aes(x = Measured_BA, y = Carbon_Residual)
@@ -3653,7 +3635,7 @@ ggplot(
 ```
 
 
-```{r carbon_error_vs_measured_ba}
+```{r carbon_error_vs_measured_ba, eval = FALSE}
 ggplot(
     projected_vs_measured |>
       filter(Projection_Years > 0) |>
@@ -3678,7 +3660,7 @@ ggplot(
 
 This omits outliers; looking just at the outliers (error >= 2x value):
 
-```{r carbon_error_vs_measured_ba_outliers}
+```{r carbon_error_vs_measured_ba_outliers, eval = FALSE}
 ggplot(
     projected_vs_measured |>
       filter(Projection_Years > 0) |>
@@ -3694,7 +3676,7 @@ ggplot(
   ylab(bquote("Carbon Projection Error (fraction)"))
 ```
 
-```{r carbon_flux_residual_vs_measured_ba}
+```{r carbon_flux_residual_vs_measured_ba, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     mapping = aes(x = Measured_BA, y = Carbon_Flux_Residual)
@@ -3718,7 +3700,7 @@ ggplot(
 
 ### Residuals vs. QMD
 
-```{r carbon_residuals_vs_qmd}
+```{r carbon_residuals_vs_qmd, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
     aes(x = QMD_METRIC, y = Carbon_Residual)
@@ -3740,7 +3722,7 @@ ggplot(
   
 ```
 
-```{r carbon_flux_residuals_vs_qmd}
+```{r carbon_flux_residuals_vs_qmd, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
     aes(x = QMD_METRIC, y = Carbon_Flux_Residual)
@@ -3764,7 +3746,7 @@ ggplot(
 
 ## Basal Area Projection
 
-```{r projected_ba_vs_measured_ba}
+```{r projected_ba_vs_measured_ba, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Measured_BA, y = Projected_BA)
@@ -3787,7 +3769,7 @@ ggplot(
   ylab(bquote("Projected Basal Area" ~(m^2 %.% ha^-1)))
 ```
 
-```{r basal_area_trend}
+```{r basal_area_trend, eval = FALSE}
 ggplot(
     projected_vs_measured |>
       filter(Projection_Years > 0) |>
@@ -3813,7 +3795,7 @@ ggplot(
 
 Can we plot plot location with size proportional to BA?
 
-```{r plot_location_by_ecotype_with_carbon}
+```{r plot_location_by_ecotype_with_carbon, eval = FALSE}
 plot_location_tmp <- plot_location |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   filter(INVYR == min(INVYR, na.rm = TRUE)) |>
@@ -3865,7 +3847,7 @@ remove(plot_location_tmp)
 
 ### Residuals vs. Years Projected
 
-```{r ba_residual_vs_projection_years}
+```{r ba_residual_vs_projection_years, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Projection_Years, y = BA_Residual)
@@ -3888,7 +3870,7 @@ ggplot(
   
 ```
 
-```{r ba_error_vs_projection_years}
+```{r ba_error_vs_projection_years, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(BA_Error < 1),
     aes(x = Projection_Years, y = BA_Error)
@@ -3912,7 +3894,7 @@ ggplot(
 
 ### Residuals vs. QMD
 
-```{r ba_residual_vs_qmd}
+```{r ba_residual_vs_qmd, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
     aes(x = QMD_METRIC, y = BA_Residual)
@@ -3933,7 +3915,7 @@ ggplot(
   ylab(bquote("BA Residual" ~(m^2 %.% ha^-1)))
 ```
 
-```{r qmd_trend}
+```{r qmd_trend2, eval = FALSE}
 ggplot(
     projected_vs_measured |>
       filter(Projection_Years > 0) |>
@@ -3957,7 +3939,7 @@ ggplot(
 ```
 ### Residuals vs. TPA
 
-```{r ba_residual_vs_qmd}
+```{r ba_residual_vs_qmd2, eval = FALSE}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Measured_Tpa, y = Projected_Tpa)
@@ -3989,7 +3971,7 @@ ggplot(
   ylab(bquote("Projected" ~(trees %.% acre^-1)))
 ```
 
-```{r qmd_trend}
+```{r qmd_trend, eval = FALSE}
 options(scipen = 9)
 ggplot(
     projected_vs_measured |>
@@ -4019,7 +4001,7 @@ ggplot(
 ## Eastern Hemlock
 
 
-```{r eastern_hemlock}
+```{r eastern_hemlock, eval = FALSE}
 rds_file <- 'data/intermediate/eastern_hemlock.rds'
 if (USE_CACHE & file.exists(rds_file)) {
   eastern_hemlock <- read_rds(rds_file)
@@ -4106,7 +4088,7 @@ if (USE_CACHE & file.exists(rds_file)) {
 Looks like we have a meaningful number of trees with CCLCD and CR, so let's
 compare those.
 
-```{r plot_ccl_vs_cr}
+```{r plot_ccl_vs_cr, eval = FALSE}
 eastern_hemlock |>
   filter(!is.na(CCL) & !is.na(CR)) |>
   mutate(CCL = factor(CCL, levels = c("Open grown", "Dominant", "Codominant", "Intermediate", "Overtopped"))) |>
@@ -4130,7 +4112,7 @@ eastern_hemlock |>
 > something for missing classes?
 
 
-```{r plot_cr_vs_ht_by_ccl}
+```{r plot_cr_vs_ht_by_ccl, eval = FALSE}
 plot_eastern_hemlock <- eastern_hemlock |>
   filter(!is.na(CCL) & !is.na(CANOPY_HT) & !is.na(CR)) |>
   # filter(CANOPY_HT > 30 & CANOPY_HT < 100) |>
@@ -4149,7 +4131,7 @@ plot_eastern_hemlock_counts <- plot_eastern_hemlock |>
   ungroup()
 ```
 
-```{r}
+```{r, eval = FALSE}
 
 plot_eastern_hemlock |>
   ggplot(aes(CR, HT_GROUP, fill = CCL)) +
@@ -4169,7 +4151,7 @@ plot_eastern_hemlock |>
   
 ```
 
-```{r}
+```{r, eval = FALSE}
 plot_eastern_hemlock <- eastern_hemlock |>
   filter(!is.na(CCL) & !is.na(CANOPY_HT) & !is.na(CDENCD)) |>
   # filter(CANOPY_HT > 30 & CANOPY_HT < 100) |>

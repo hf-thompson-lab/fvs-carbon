@@ -157,3 +157,29 @@ fia_trees <- function(fiadb, plots) {
     collect()
 }
 
+fia_trees_filtered <- function(fiadb, plots, filter) {
+  con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
+  on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
+  
+  if (is.null(plots)) {
+    fia_trees <- tbl(con, "TREE")
+  } else if ("INVYR" %in% names(plots)) {
+    fia_trees <- tbl(con, "TREE") |>
+      semi_join(
+        plots |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
+        by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
+        copy = TRUE
+      )
+  } else {
+    fia_trees <- tbl(con, "TREE") |>
+      semi_join(
+        plots |> distinct(STATECD, COUNTYCD, PLOT),
+        by = join_by(STATECD, COUNTYCD, PLOT),
+        copy = TRUE
+      )
+  }
+  fia_trees |>
+    filter(con) |>
+    collect()
+}
+
