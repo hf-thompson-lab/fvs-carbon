@@ -66,4 +66,5 @@ data/intermediate
 _targets/
 
 # rendered documents
+*.html
 rendered/

@@ -373,6 +373,30 @@ filter_plots_ingrowth <- function(.data, con) {
     semi_join(plots_ingrowth, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
+filter_plots_ba_frac <- function(.data, con, spcds, frac) {
+  plots_ba_frac <- tbl(con, "TREE") |>
+    semi_join(.data |> distinct(STATECD, COUNTYCD, PLOT), by = join_by(STATECD, COUNTYCD, PLOT)) |>
+    filter(STATUSCD == 1) |> # only live trees
+    # Only consider the most recent survey of the plot
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    filter(INVYR == max(INVYR, na.rm = TRUE)) |>
+    mutate(BA_TOTAL = sum(6 * pi * DIA^2, na.rm = TRUE)) |>
+    ungroup() |>
+    semi_join(spcds |> distinct(SPCD), by = join_by(SPCD), copy = TRUE) |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    summarize(
+      BA_FVS = sum(6 * pi * DIA^2, na.rm = TRUE),
+      BA_TOTAL = max(BA_TOTAL, na.rm = TRUE),
+      .groups = "keep"
+    ) |>
+    ungroup() |>
+    mutate(BA_FVS_FRAC = BA_FVS / BA_TOTAL) |>
+    filter(BA_FVS_FRAC >= frac)
+  
+  .data |>
+    semi_join(plots_ba_frac, by = join_by(STATECD, COUNTYCD, PLOT))
+}
+
 filter_decode_forest_type_group <- function(.data) {
   # Consolidate a few rare forest type groups into a single 'Other' group:
   # Exotic hardwoods group
@@ -380,13 +404,11 @@ filter_decode_forest_type_group <- function(.data) {
   # Other eastern softwoods group
   # Other hardwoods group
   .data |>
-    mutate(`Forest Type Group` = 
-     if_else(startsWith(`Forest Type Group`, 'Other'), 'Other',
-       if_else(startsWith(`Forest Type Group`, 'Exotic'), 'Other',
-         `Forest Type Group`
-       )
-     )
-    )
+    mutate(FOREST_TYPE_GROUP = case_when(
+      startsWith(FOREST_TYPE_GROUP, "Other") ~ "Other",
+      startsWith(FOREST_TYPE_GROUP, "Exotic") ~ "Other",
+      .default = str_replace(FOREST_TYPE_GROUP, ' group', '')
+    ))
 }
 
 filter_decode_large_end_diameter_class <- function(.data) {

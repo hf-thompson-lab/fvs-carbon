@@ -340,6 +340,11 @@ for their chart, but the best fit is from Aboveground Live, with RMSE \~= 12.
 Plots_RMSE |> select(Aboveground_Live)
 ```
 
+```{r byplot rmse percent, eval = FALSE}
+Plots_RMSE |> select(Aboveground_Live) /
+mean(NoManagement_Carbon_ByPlot_ByYear$Aboveground_Live)
+```
+
 ## By Subplot
 
 To confirm that NK used the FVS_StandInit_Plot table, we examine the

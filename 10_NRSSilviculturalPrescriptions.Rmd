@@ -244,18 +244,18 @@ stand_stats_partial <- tbl(fia, 'PLOT') |>
   left_join(cond_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
   left_join(trtyr_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
   left_join(forest_type_mixin, by = join_by(FORTYPCD)) |>
-  rename(`Forest Type` = FORTYPE) |>
+  rename(FOREST_TYPE = FORTYPE) |>
   mutate(FORTYPCD = floor(FORTYPCD / 10) * 10) |>
   left_join(forest_type_mixin, by = join_by(FORTYPCD)) |>
-  rename(`Forest Type Group` = FORTYPE) |>
+  rename(FOREST_TYPE_GROUP = FORTYPE) |>
   left_join(state_mixin, by = join_by(STATECD)) |>
   collect() |>
   rename(
     long = LON,
     lat = LAT
   ) |>
+  filter_decode_forest_type_group() |>
   mutate(
-    `Forest Type Group` = str_replace(`Forest Type Group`, ' group', ''),
     BALIVE_METRIC = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare"),
     QMD = sqrt(BALIVE / (BA_TREES * (pi / 576))),
     QMD_METRIC = sqrt(BALIVE_METRIC / (BA_TREES * (pi / 40000))),
@@ -1239,7 +1239,7 @@ ggplot(
   #  se = FALSE
   #) +
   scale_fill_continuous(name = "Number of Plots", transform = "log10") +
-  #facet_wrap(~`Forest Type Group`) +
+  #facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   #theme(aspect.ratio = 1) +
   ggtitle("FVS Projected Aboveground Carbon") +

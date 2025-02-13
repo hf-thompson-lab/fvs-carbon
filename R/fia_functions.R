@@ -81,24 +81,47 @@ fia_fiadb_indexed <- function() {
 fia_plots <- function(fiadb, plots) {
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
-  tbl(con, "PLOT") |>
-    semi_join(
-      plots |> distinct(STATECD, COUNTYCD, PLOT),
-      by = join_by(STATECD, COUNTYCD, PLOT),
-      copy = TRUE
-    ) |>
-    collect()
+  if ("INVYR" %in% names(plots)) {
+    tbl(con, "PLOT") |>
+      semi_join(
+        plots |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
+        by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
+        copy = TRUE
+      ) |>
+      collect()
+  } else {
+    tbl(con, "PLOT") |>
+      semi_join(
+        plots |> distinct(STATECD, COUNTYCD, PLOT),
+        by = join_by(STATECD, COUNTYCD, PLOT),
+        copy = TRUE
+      ) |>
+      collect()
+  }
 }
 
-fia_plots_filtered <- function(fiadb, plots, filter) {
+fia_plots_filtered <- function(fiadb, plots = NULL, filter) {
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
-  tbl(con, "PLOT") |>
-    semi_join(
-      plots |> distinct(STATECD, COUNTYCD, PLOT),
-      by = join_by(STATECD, COUNTYCD, PLOT),
-      copy = TRUE
-    ) |>
+
+  if (is.null(plots)) {
+    fia_plots <- tbl(con, "PLOT")
+  } else if ("INVYR" %in% names(plots)) {
+    fia_plots <- tbl(con, "PLOT") |>
+      semi_join(
+        plots |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
+        by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
+        copy = TRUE
+      )
+  } else {
+    fia_plots <- tbl(con, "PLOT") |>
+      semi_join(
+        plots |> distinct(STATECD, COUNTYCD, PLOT),
+        by = join_by(STATECD, COUNTYCD, PLOT),
+        copy = TRUE
+      )
+  }
+  fia_plots |>
     filter(con) |>
     collect()
 }

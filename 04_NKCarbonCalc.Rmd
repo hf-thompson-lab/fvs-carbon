@@ -963,13 +963,13 @@ stand_descr <- nk_matching_cond |>
 compare_ffe_jenkins <- fvs_stand_measured_ffe |>
   left_join(stand_descr, by = join_by(StandID == FVS_STAND_ID)) |>
   rename(FFE = Aboveground_Live) |>
-  rename(`Forest Type` = FORTYPE) |>
+  rename(FOREST_TYPE = FORTYPE) |>
   rename(`Stand Age` = STDAGE) |>
-  select(StandID, Year, FFE, `Stand Age`, `Forest Type`) |>
+  select(StandID, Year, FFE, `Stand Age`, FOREST_TYPE) |>
   full_join(fvs_stand_measured_jenkins, by = join_by(StandID, Year)) |>
   rename(Jenkins = Aboveground_Live) |>
   #left_join(stand_first_last, by = join_by(StandID == FVS_STAND_ID)) |>
-  select(StandID, Year, FFE, Jenkins, `Stand Age`, `Forest Type`) |>
+  select(StandID, Year, FFE, Jenkins, `Stand Age`, FOREST_TYPE) |>
   group_by(StandID) |>
   filter(Year == max(Year))
 
@@ -978,7 +978,7 @@ ggplot(
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = FFE, y = Jenkins, color = Year, shape = `Forest Type`)
+    mapping = aes(x = FFE, y = Jenkins, color = Year, shape = FOREST_TYPE)
   ) +
   ggtitle("FFE vs. Jenkins Carbon Calculation") +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
@@ -999,7 +999,7 @@ ggplot(
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = FFE, y = Jenkins, color = `Stand Age`, shape = `Forest Type`)
+    mapping = aes(x = FFE, y = Jenkins, color = `Stand Age`, shape = FOREST_TYPE)
   ) +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1) +
@@ -1083,20 +1083,20 @@ compare_ffe_spatial <- fvs_stand_measured_ffe |>
   group_by(StandID) |> filter(Year == max(Year)) |> ungroup() |>
   left_join(stand_descr, by = join_by(StandID == FVS_STAND_ID)) |>
   rename(FFE = Aboveground_Live) |>
-  rename(`Forest Type` = FORTYPE) |>
+  rename(FOREST_TYPE = FORTYPE) |>
   rename(`Stand Age` = STDAGE) |>
-  select(StandID, Year, FFE, `Forest Type`, `Stand Age`) |>
+  select(StandID, Year, FFE, FOREST_TYPE, `Stand Age`) |>
   left_join(nk_plot_crosswalk, by = join_by(StandID == FVS_STAND_ID)) |>
   left_join(stand_measured_spatial, by = join_by(STATECD, COUNTYCD, PLOT)) |>
   mutate(FIA = CARBON_METRIC) |>
-  select(StandID, Year, FFE, FIA, `Stand Age`, `Forest Type`)
+  select(StandID, Year, FFE, FIA, `Stand Age`, FOREST_TYPE)
 
 ggplot(
     data = compare_ffe_spatial
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = FFE, y = FIA, color = Year, shape = `Forest Type`)
+    mapping = aes(x = FFE, y = FIA, color = Year, shape = FOREST_TYPE)
   ) +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1) +
@@ -1115,7 +1115,7 @@ ggplot(
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = FFE, y = FIA, color = `Stand Age`, shape = `Forest Type`)
+    mapping = aes(x = FFE, y = FIA, color = `Stand Age`, shape = FOREST_TYPE)
   ) +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1) +
@@ -1170,20 +1170,20 @@ compare_ffe_tpa <- fvs_stand_measured_ffe |>
   group_by(StandID) |> filter(Year == max(Year)) |> ungroup() |>
   left_join(stand_descr, by = join_by(StandID == FVS_STAND_ID)) |>
   mutate(FFE = Aboveground_Live) |>
-  rename(`Forest Type` = FORTYPE) |>
+  rename(FOREST_TYPE = FORTYPE) |>
   rename(`Stand Age` = STDAGE) |>
-  select(StandID, Year, FFE, `Stand Age`, `Forest Type`) |>
+  select(StandID, Year, FFE, `Stand Age`, FOREST_TYPE) |>
   left_join(nk_plot_crosswalk, by = join_by(StandID == FVS_STAND_ID)) |>
   full_join(stand_measured_tpa, by = join_by(STATECD, COUNTYCD, PLOT)) |>
   mutate(FIA = CARBON_METRIC) |>
-  select(StandID, Year, FFE, FIA, `Stand Age`, `Forest Type`)
+  select(StandID, Year, FFE, FIA, `Stand Age`, FOREST_TYPE)
 
 ggplot(
     data = compare_ffe_tpa
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = FFE, y = FIA, color = Year, shape = `Forest Type`)
+    mapping = aes(x = FFE, y = FIA, color = Year, shape = FOREST_TYPE)
   ) +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1) +
@@ -1202,7 +1202,7 @@ ggplot(
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = FFE, y = FIA, color = `Stand Age`, shape = `Forest Type`)
+    mapping = aes(x = FFE, y = FIA, color = `Stand Age`, shape = FOREST_TYPE)
   ) +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1) +
@@ -1227,7 +1227,7 @@ compare_tpa_spatial <- stand_measured_spatial |>
   select(PLT_CN, MEASYEAR, Spatial, TPA, STDAGE, FORTYPE) |>
   rename(StandID = PLT_CN) |>
   rename(Year = MEASYEAR) |>
-  rename(`Forest Type` = FORTYPE) |>
+  rename(FOREST_TYPE = FORTYPE) |>
   rename(`Stand Age` = STDAGE)
 
 ggplot(
@@ -1235,7 +1235,7 @@ ggplot(
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = Spatial, y = TPA, color = Year, shape = `Forest Type`)
+    mapping = aes(x = Spatial, y = TPA, color = Year, shape = FOREST_TYPE)
   ) +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1) +
@@ -1254,7 +1254,7 @@ ggplot(
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = Spatial, y = TPA, color = `Stand Age`, shape = `Forest Type`)
+    mapping = aes(x = Spatial, y = TPA, color = `Stand Age`, shape = FOREST_TYPE)
   ) +
   coord_cartesian(xlim = c(0, 200), ylim = c(0, 200)) +
   geom_abline(intercept = 0, slope = 1) +
@@ -1313,11 +1313,11 @@ stand_measured_ba_fvs <- nk_ffe_srvy_summary |>
   mutate(BA_FVS = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
   select(StandID, Year, BA, BA_FVS) |>
   left_join(stand_descr, by = join_by(StandID == FVS_STAND_ID)) |>
-  rename(`Forest Type` = FORTYPE) |>
+  rename(FOREST_TYPE = FORTYPE) |>
   rename(`Stand Age` = STDAGE) |>
-  select(StandID, Year, BA_FVS, `Stand Age`, `Forest Type`) |>
+  select(StandID, Year, BA_FVS, `Stand Age`, FOREST_TYPE) |>
   left_join(nk_plot_crosswalk, by = join_by(StandID == FVS_STAND_ID)) |>
-  select(STAND_CN, BA_FVS, Year, `Forest Type`, `Stand Age`)
+  select(STAND_CN, BA_FVS, Year, FOREST_TYPE, `Stand Age`)
 
 knitr::kable(stand_measured_ba_fvs)
 ```
@@ -1331,7 +1331,7 @@ ggplot(
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = BA_FIA, y = BA_FVS, color = `Stand Age`, shape = `Forest Type`)
+    mapping = aes(x = BA_FIA, y = BA_FVS, color = `Stand Age`, shape = FOREST_TYPE)
   ) +
   ggtitle("Measured Basal Area\nFIA BALIVE vs. FVS BA (m2 / ha)") +
   coord_cartesian(xlim = c(0, 60), ylim = c(0, 60)) +
@@ -1372,9 +1372,9 @@ projected <- nk_ffe_none_summary |>
 compare_ba_meas_proj <- measured |>
   left_join(projected, by = join_by(StandID, Year)) |>
   left_join(stand_descr, by = join_by(StandID == FVS_STAND_ID)) |>
-  rename(`Forest Type` = FORTYPE) |>
+  rename(FOREST_TYPE = FORTYPE) |>
   rename(`Stand Age` = STDAGE) |>
-  select(StandID, Year, Measured, Projected, `Stand Age`, `Forest Type`)
+  select(StandID, Year, Measured, Projected, `Stand Age`, FOREST_TYPE)
 
 knitr::kable(compare_ba_meas_proj)
 ```
@@ -1385,7 +1385,7 @@ ggplot(
   ) +
   geom_point(
     size = 2,
-    mapping = aes(x = Measured, y = Projected, color = `Stand Age`, shape = `Forest Type`)
+    mapping = aes(x = Measured, y = Projected, color = `Stand Age`, shape = FOREST_TYPE)
   ) +
   coord_cartesian(xlim = c(0, 60), ylim = c(0, 60)) +
   geom_abline(intercept = 0, slope = 1) +

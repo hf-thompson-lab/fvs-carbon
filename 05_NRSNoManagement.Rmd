@@ -1,5 +1,5 @@
 ---
-title: "Nunery Keeton Revisited"
+title: "FVS Carbon Modeling Analysis"
 author: "Nikolaus Bates-Haus"
 output:
   html_document: default
@@ -13,36 +13,21 @@ editor_options:
 # Setup
 
 ```{r setup, include=FALSE}
+library(targets)
+library(tarchetypes)
 library(tidyverse)
 library(reshape2) # melt()
-library(RSQLite)
 library(measurements) # conv_unit and conv_multiunit
 library(maps)
-library(pbapply) # Progress bar for long operations
-library(targets)
 options(scipen = 9) # Use integer notation for numbers under 9 digits
+tar_source()
 ```
 
-```{r source-functions}
-source('R/functions.R')
-```
 
-## Use Cache
+## Load targets results from other documents
 
-Some datasets take a long time to compute; these are normally cached and
-read from cache. Set `USE_CACHE` to `FALSE` to re-compute everything, and
-`TRUE` to use cached values if available.
-
-```{r USE_CACHE}
-USE_CACHE <- TRUE
-```
-
-## Species Crosswalk
-
-Different systems use different ways of encoding species. Here's a single
-crosswalk for them all.
-
-```{r species_crosswalk}
+```{r load tar objects}
+tar_load(fiadb)
 tar_load(species_crosswalk)
 ```
 
@@ -74,142 +59,67 @@ Grow-only is described previously:
 
 The functions in `functions.R` define these filters
 
-Execute the filters to create a list of matching plots.
-
-```{r plot_grow_only}
-rds_file <- 'data/intermediate/plot_grow_only.rds'
-if (USE_CACHE & file.exists(rds_file)) {
-  plot_grow_only <- read_rds(rds_file)
-} else {
-  fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-  fia_cond <- tbl(fia, 'COND') |>
-    select(
-      STATECD, COUNTYCD, PLOT, PLT_CN, CONDID, INVYR,
-      COND_STATUS_CD, BALIVE, DSTRBCD1, DSTRBCD2, DSTRBCD3, TRTCD1, TRTCD2, TRTCD3
-    )
-  fia_plot <- tbl(fia, 'PLOT') |>
-    # Narrow and rename columns to facilitate join
-    select(CN, DESIGNCD, SRV_CN, MEASYEAR, ECOSUBCD) |>
-    rename(PLT_CN = CN)
-  fia_plotgeom <- tbl(fia, 'PLOTGEOM') |>
-    # Narrow and rename columns to facilitate join
-    select(CN, FVS_VARIANT) |>
-    rename(PLT_CN = CN)
-  
-  plot_grow_only <- fia_cond |>
-    left_join(fia_plot, by = join_by(PLT_CN)) |>
-    left_join(fia_plotgeom, by = join_by(PLT_CN)) |>
-    fvsne_plots_filter() |>
-    modern_plots_filter() |>
-    has_trees_filter() |>
-    long_measurement_filter() |>
-    forested_plots_filter() |>
-    undisturbed_plots_filter() |>
-    untreated_plots_filter() |>
-    # single_condition_plots_filter() |>
-    distinct(STATECD, COUNTYCD, PLOT) |>
-    collect() |>
-    arrange(STATECD, COUNTYCD, PLOT)
-  
-  dbDisconnect(fia)
-  remove(fia, fia_cond, fia_plot, fia_plotgeom)
-  
-  write_rds(plot_grow_only, rds_file)
-}
-nrow(plot_grow_only)
-```
-
-Many plots have trees that are not supported by FVSne; filter to plots
-where the most recent measurement shows at least 90% of basal area
+In addition, some plots have a lot of trees that are not supported by FVSne;
+filter to plots where the most recent measurement shows at least 90% of basal area
 is in trees supported by FVSne.
 
-```{r}
-fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+Execute the filters to create a list of matching plots.
 
-fia_tree_mixin <- tbl(fia, 'tree') |>
-  select(PLT_CN, SPCD, DIA)
-
-fvs_species_mixin <- species_mixin |>
+```{targets nrs_plots_grown, tar_simple = TRUE}
+# fvs_spcds: FIA SPCD if the species is supported by FVS
+fvs_spcds <- species_crosswalk |>
   filter(!is.na(FVS_SPCD)) |>
-  select(SPCD, FVS_SPCD)
+  select(SPCD)
 
-plot_fvs_frac <- tbl(fia, 'PLOT') |>
-  semi_join(plot_grow_only, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
-  group_by(STATECD, COUNTYCD, PLOT) |>
-  filter(MEASYEAR == max(MEASYEAR, na.rm = TRUE)) |>
-  ungroup() |>
-  select(CN, STATECD, COUNTYCD, PLOT) |>
-  rename(PLT_CN = CN) |>
-  left_join(fia_tree_mixin, by = join_by(PLT_CN)) |>
-  left_join(fvs_species_mixin, by = join_by(SPCD), copy = TRUE) |>
-  mutate(DIA_FVS = if_else(!is.na(FVS_SPCD), DIA, 0.0)) |>
-  group_by(STATECD, COUNTYCD, PLOT) |>
-  summarize(
-    BA_FVS = sum(6 * pi * DIA_FVS^2, na.rm = TRUE),
-    BA_TOTAL = sum(6 * pi * DIA^2, na.rm = TRUE),
-    .groups = "keep"
-  ) |>
-  ungroup() |>
-  mutate(BA_FVS_FRAC = BA_FVS / BA_TOTAL) |>
-  collect()
-
-dbDisconnect(fia)
-
-rm(fia, fia_tree_mixin, fvs_species_mixin)
-
-# Replace plot_grow_only with the shortened list
-plot_grow_only <- plot_fvs_frac |>
-  filter(BA_FVS_FRAC > 0.9) |>
-  select(STATECD, COUNTYCD, PLOT)
+fia_plots_filtered(
+  fiadb, filter = \(.data, con) {
+    .data |>
+      filter_plots_fvsne(con) |>
+      filter_plots_modern(con) |>
+      filter_plots_trees(con) |>
+      filter_plots_long_measurement(con) |>
+      filter_plots_forested(con) |>
+      filter_plots_undisturbed(con) |>
+      filter_plots_untreated(con) |>
+      filter_plots_ba_frac(con, fvs_spcds, 0.9)
+  })
 ```
 
+How many plots is that?
+```{r count nrs_plots_grown, eval = FALSE}
+nrs_plots_grown |>
+  distinct(STATECD, COUNTYCD, PLOT) |>
+  nrow()
+```
 
 ## Locations
 
 Where are these plots?
 
-Fetch plots with measyear, invyr, latitude, longitude, and state information.
+First, find the states covered by FVSne.
 
-```{r plot_location}
-fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+In theory, we should use the FIA.PLOTGEOM.FVS_VARIANT to figure this out,
+but that brings in states as far west as MN that have no FVSne plots anywhere
+near them. Instead, we use NERS management area as the region.
 
-# Survey has the research station code
-fia_survey <- tbl(fia, 'SURVEY') |>
-  select(CN, RSCD) |>
-  rename(SRV_CN = CN)
+```{targets fvsne_states, tar_simple = TRUE}
+fia_plots_filtered(fiadb, plots = NULL, \(.data, con) {
+  fia_state <- tbl(con, "REF_RESEARCH_STATION") |>
+    distinct(STATECD, STATE_NAME, STATE_ABBR)
 
-# plot has invyr, measyr, lat and lon
-fia_plot <- tbl(fia, 'PLOT') |>
-  # Narrow and rename columns to facilitate join
-  select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, SRV_CN, ECOSUBCD, LAT, LON)
-
-# research station has state name and abbreviation
-fia_ref_research_station <- tbl(fia, 'REF_RESEARCH_STATION') |>
-  select(STATECD, STATE_NAME, STATE_ABBR)
-
-plot_location <- fia_plot |>
-  semi_join(plot_grow_only, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
-  left_join(fia_survey, by = join_by(SRV_CN)) |>
-  left_join(fia_ref_research_station, by = join_by(STATECD)) |>
-  group_by(STATECD, COUNTYCD, PLOT) |>
-  # Pick just the first inventory year
-  filter(min_rank(INVYR) == 1) |> 
-  ungroup() |>
-  collect() |>
-  rename(
-    long = LON,
-    lat = LAT
-  ) |>
-  mutate(group = sprintf('%02d%03d%05d', STATECD, COUNTYCD, PLOT))
-
-dbDisconnect(fia)
-remove(fia, fia_plot, fia_survey, fia_ref_research_station)
+  .data |>
+    filter_plots_ners(con) |>
+    distinct(STATECD) |>
+    left_join(fia_state, by = join_by(STATECD))
+})
 ```
 
 How many plots are in each state?
 
-```{r state_plot_counts}
-state_plot_counts <- plot_location |>
+```{r state_plot_counts, eval = FALSE}
+state_plot_counts <- nrs_plots_grown |>
+  distinct(STATECD, COUNTYCD, PLOT) |>
+  left_join(fvsne_states, by = join_by(STATECD)) |>
   group_by(STATE_NAME) |>
   summarize(COUNT = n()) |>
   ungroup() |>
@@ -219,16 +129,26 @@ knitr::kable(state_plot_counts)
 
 Show the plots on a map.
 
-```{r map_states}
-northeastern_states <- plot_location |>
+```{r map nrs_plots_grown}
+fvsne_states_map <- fvsne_states |>
   distinct(STATE_NAME) |>
-  mutate(region = str_to_lower(STATE_NAME))
-map_states <- map_data('state', northeastern_states$region)
+  rename(region = STATE_NAME) |>
+  _$region |>
+  map_data('state', region = _)
 
-ggplot(map_states, aes(long, lat, group = group)) +
+plot_locations <- nrs_plots_grown |>
+  filter(!is.na(LAT) & !is.na(LON)) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  rename(lat = LAT, long = LON) |>
+  mutate(group = sprintf('%02d%03d%05d', STATECD, COUNTYCD, PLOT))
+
+ggplot(fvsne_states_map, aes(long, lat, group = group)) +
   geom_polygon(fill = "white", color = "black") + 
-  geom_point(data = plot_location, color = alpha("blue", alpha = 0.5)) +
-  coord_quickmap()
+  geom_point(data = plot_locations, color = alpha("blue", alpha = 0.5)) +
+  coord_quickmap() +
+  theme_bw()
 ```
 
 ## Stand Statistics
@@ -236,160 +156,140 @@ ggplot(map_states, aes(long, lat, group = group)) +
 We can gather per-stand statistics such as BALIVE and CARBON_AG from the FIA
 data for these plots over time.
 
-```{r stand_stats}
-rds_file <- 'data/intermediate/stand_stats.rds'
-if (USE_CACHE & file.exists(rds_file)) {
-  stand_stats <- read_rds(rds_file)
-} else {
-  fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-  
-  measyear <- tbl(fia, 'PLOT') |>
-    select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, DESIGNCD, ECOSUBCD)
-  
-  forest_type <- tbl(fia, 'REF_FOREST_TYPE') |>
-    select(VALUE, MEANING) |>
-    rename(FORTYPCD = VALUE) |>
-    rename(FORTYPE = MEANING)
-  
-  tree_stats <- tbl(fia, 'TREE') |>
-    select(STATECD, COUNTYCD, PLOT, CONDID, INVYR, DIA, CARBON_AG, TPA_UNADJ) |>
-    group_by(STATECD, COUNTYCD, PLOT, CONDID, INVYR) |>
-    summarize(
-      CARBON_AG = sum(CARBON_AG, na.rm = TRUE),
-      CPA = sum(CARBON_AG * TPA_UNADJ, na.rm = TRUE),
-      BA_TREES = sum(if_else(DIA >= 1, TPA_UNADJ, 0), na.rm = TRUE),
-      .groups = "keep"
-    )
-  
-  stand_stats <- tbl(fia, 'COND') |>
-    select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, FORTYPCD) |>
-    semi_join(plot_grow_only, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
-    group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
-    # QMD = sqrt(sum(DIA^2) / n)
-    # Which is equivalent to
-    # QMD = sqrt(sum(BALIVE * TPA_UNADJ) / (n * k)), where n is number of trees,
-    # and k is π/576 ≅ 0.005454 for B in square feet and QMD in inches;
-    # and k is π/40000 ≅ 0.0000785 for B in square meters and QMD in centimeters.
-    # (see https://www.sciencedirect.com/science/article/pii/S2197562023000453 ,
-    # https://doi.org/10.1016/j.fecs.2023.100114 )
-    # When computing QMD from BA we need to use the same trees for BA and n;
-    # FIADB data dictionary 2.5.51 BALIVE says "Basal area in square feet per
-    # acre of all live trees ω1.0 inch d.b.h/d.r.c sampled in the condition."
-    summarize(
-      BALIVE = sum(BALIVE, na.rm = TRUE),
-      FORTYPCD = max(FORTYPCD, na.rm = TRUE),
-      STDAGE = max(STDAGE, na.rm = TRUE),
-      .groups = "keep"
-    ) |>
-    ungroup() |>
-    left_join(measyear, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
-    left_join(tree_stats, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
-    left_join(forest_type, by = join_by(FORTYPCD)) |>
-    rename(`Forest Type` = FORTYPE) |>
-    mutate(
-      STDAGE = if_else(STDAGE == -999, NA, STDAGE),
-      FORTYPCD = floor(FORTYPCD / 10) * 10
-    ) |>
-    left_join(forest_type, by = join_by(FORTYPCD)) |>
-    rename(`Forest Type Group` = FORTYPE) |>
-    collect() |>
-    modern_plots_filter() |>
-    has_trees_filter() |>
-    mutate(
-      `Forest Type Group` = str_replace(`Forest Type Group`, ' group', ''),
-      BALIVE_METRIC = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare"),
-      QMD = sqrt(BALIVE / (BA_TREES * (pi / 576))),
-      QMD_METRIC = sqrt(BALIVE_METRIC / (BA_TREES * (pi / 40000))),
-      CARBON_METRIC = conv_multiunit(CPA, "lbs / acre", "Mg / hectare")
-    ) |> 
-    group_by(STATECD, COUNTYCD, PLOT) |>
-    mutate(
-      BALIVE_START = if_else(MEASYEAR == min(MEASYEAR, na.rm = TRUE), BALIVE_METRIC, NA),
-      BALIVE_DELTA = BALIVE_METRIC - max(BALIVE_START, na.rm = TRUE),
-      YEARS = MEASYEAR - min(MEASYEAR, na.rm = TRUE)
-    ) |> 
-    ungroup()
-  
-  dbDisconnect(fia)
-  remove(fia, measyear, forest_type, tree_stats)
-  
-  write_rds(stand_stats, rds_file)
-}
+```{targets nrs_plots_stats, tar_simple = TRUE}
+fia_plots_filtered(fiadb, nrs_plots_grown, \(.data, con) {
+    plots <- .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR)
+    plots_join_by <- join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    
+    forest_type <- tbl(con, "REF_FOREST_TYPE") |>
+      select(VALUE, MEANING) |>
+      rename(FORTYPCD = VALUE) |>
+      rename(FORTYPE = MEANING)
+    
+    tree_stats <- tbl(con, "TREE") |>
+# Doing these joins makes things (much) slower, not faster!      
+#      semi_join(plots, by = plots_join_by) |>
+      select(STATECD, COUNTYCD, PLOT, INVYR, DIA, CARBON_AG, TPA_UNADJ) |>
+      group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
+      summarize(
+        CARBON_AG = sum(CARBON_AG, na.rm = TRUE),
+        CPA = sum(CARBON_AG * TPA_UNADJ, na.rm = TRUE),
+        # Restrict to trees that match those used in QMD computation, below.
+        BA_TREES = sum(if_else(DIA >= 1, TPA_UNADJ, 0), na.rm = TRUE),
+        .groups = "keep"
+      )
+    
+    cond_stats <- tbl(con, "COND") |>
+# Doing these joins makes things (much) slower, not faster!      
+#      semi_join(plots, by = plots_join_by) |>
+      select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, FORTYPCD) |>
+      group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
+      # QMD = sqrt(sum(DIA^2) / n)
+      # Which is equivalent to
+      # QMD = sqrt(sum(BALIVE * TPA_UNADJ) / (n * k)), where n is number of trees,
+      # and k is π/576 ≅ 0.005454 for B in square feet and QMD in inches;
+      # and k is π/40000 ≅ 0.0000785 for B in square meters and QMD in centimeters.
+      # (see https://www.sciencedirect.com/science/article/pii/S2197562023000453 ,
+      # https://doi.org/10.1016/j.fecs.2023.100114 )
+      # When computing QMD from BA we need to use the same trees for BA and n;
+      # FIADB data dictionary 2.5.51 BALIVE says "Basal area in square feet per
+      # acre of all live trees ω1.0 inch d.b.h/d.r.c sampled in the condition."
+      summarize(
+        BALIVE = sum(BALIVE, na.rm = TRUE),
+        FORTYPCD = max(FORTYPCD, na.rm = TRUE),
+        STDAGE = max(STDAGE, na.rm = TRUE),
+        .groups = "keep"
+      ) |>
+      ungroup()
+    
+    .data |>
+      select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR) |>
+      left_join(cond_stats, by = plots_join_by) |>
+      left_join(tree_stats, by = plots_join_by) |>
+      left_join(forest_type, by = join_by(FORTYPCD)) |>
+      rename(FOREST_TYPE = FORTYPE) |>
+      mutate(
+        STDAGE = if_else(STDAGE < 0, NA, STDAGE),
+        FRTYGRCD = floor(FORTYPCD / 10) * 10
+      ) |>
+      left_join(forest_type, by = join_by(FRTYGRCD == FORTYPCD)) |>
+      rename(FOREST_TYPE_GROUP = FORTYPE)
+  }) |>
+  filter_decode_forest_type_group() |>
+  mutate(
+    BALIVE_METRIC = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare"),
+    QMD = sqrt(BALIVE / (BA_TREES * (pi / 576))),
+    QMD_METRIC = sqrt(BALIVE_METRIC / (BA_TREES * (pi / 40000))),
+    CARBON_METRIC = conv_multiunit(CPA, "lbs / acre", "Mg / hectare")
+  ) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  mutate(
+    BALIVE_START = if_else(MEASYEAR == min(MEASYEAR, na.rm = TRUE), BALIVE_METRIC, NA),
+    BALIVE_DELTA = BALIVE_METRIC - max(BALIVE_START, na.rm = TRUE),
+    YEARS = MEASYEAR - min(MEASYEAR, na.rm = TRUE)
+  ) |> 
+  ungroup()
 ```
 
-Plot location with visual distinction by ecotype and forest type
+Plot location with visual distinction by forest type
 
-```{r plot_location_by_ecotype}
-plot_location_tmp <- plot_location |>
+```{r plot_location_by_ecotype, eval = FALSE}
+plot_location_tmp <- nrs_plots_grown |>
+  left_join(
+    nrs_plots_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, FOREST_TYPE_GROUP),
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+  ) |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   filter(INVYR == min(INVYR, na.rm = TRUE)) |>
   ungroup() |>
-  select(STATECD, COUNTYCD, PLOT, long, lat, group)
-
-plot_location_type <- stand_stats |>
-  group_by(STATECD, COUNTYCD, PLOT) |>
-  filter(INVYR == min(INVYR, na.rm = TRUE)) |>
-  ungroup() |>
-  consolidate_forest_type_groups_filter() |>
-  select(STATECD, COUNTYCD, PLOT, INVYR, ECOSUBCD, `Forest Type`, `Forest Type Group`) |>
-  left_join(plot_location_tmp, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  select(CN, LAT, LON, FOREST_TYPE_GROUP) |>
+  rename(
+    group = CN,
+    lat = LAT,
+    long = LON
+  ) |>
+  group_by(FOREST_TYPE_GROUP) |>
   mutate(
-    # If we're just stripping off subregion, could also do this as
-    #   substr(ECOSUBCD, 1, nchar(ECOSUBCD) - 1)
-    # but using sub() gives us more flexibility.
-    ECOCD = sub(
-      x = ECOSUBCD,
-      # M? - Mountain
-      # \d+ - Region
-      # [A-Z] - Ecoregion
-      # [a-z] - Ecosubregion
-      pattern = "(M?)(\\d+)([A-Z])([a-z])",
-      replacement = "\\1\\2\\3"
-    )
-  )
+    n = n(),
+    group_name = paste0(FOREST_TYPE_GROUP, ", n=", n())
+  ) |>
+  ungroup()
 
-ggplot(map_states, aes(long, lat, group = group)) +
+ggplot(fvsne_states_map, aes(long, lat, group = group)) +
   geom_polygon(fill = "white", color = "black") + 
-#  geom_point(plot_location_type, mapping = aes(long, lat, group = group, color = `Forest Type Group`)) +
   geom_point(
-    plot_location_type,
-    mapping = aes(long, lat, group = group, color = ECOCD),
-#    show.legend = FALSE
+    plot_location_tmp,
+    mapping = aes(long, lat, group = group, color = fct_reorder(group_name, desc(n)))
   ) +
   coord_quickmap() +
-  ggtitle("Plot Location with Ecoregion")
+  theme_bw() +
+  scale_color_discrete(name = "Forest Type Group") +
+  ggtitle("FIA Grow-Only Plots using FVSne")
 
 remove(plot_location_tmp)
 ```
 
-```{r plot_location_by_forest_type}
-ggplot(map_states, aes(long, lat, group = group)) +
-  geom_polygon(fill = "white", color = "black") + 
-  geom_point(
-    plot_location_type,
-    mapping = aes(long, lat, group = group, color = `Forest Type Group`)) +
-  coord_quickmap() +
-  ggtitle("FIA Grow-Only Plots in the Northeast Region")
-```
-
 Look at BA over time; first, by stand age, then as change over calendar time.
 
-```{r balive_vs_stdage}
+```{r balive_vs_stdage, eval = FALSE}
 ggplot(
-    data = stand_stats |>
-      consolidate_forest_type_groups_filter() |>
+    data = nrs_plots_stats |>
       filter(!is.na(STDAGE)),
     mapping = aes(x = STDAGE, y = BALIVE_METRIC)
   ) +
   geom_bin2d() +
-  facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nMeasured BA (m²/ha) vs Stand Age")
+#  facet_wrap(~FOREST_TYPE_GROUP) +
+  theme_bw() +
+  ylab(bquote("Measured BA " ~ (m^2 %.% ha^-1))) +
+  xlab(bquote("Stand Age (years)")) +
+  ggtitle("Grow-Only Stands Measured BA vs Stand Age")
 ```
 
-```{r balive_delta_vs_years}
+Look at change in BA (BAI) by stand age
+
+```{r balive_delta_vs_years, eval = FALSE}
 ggplot(
-    stand_stats |>
-      consolidate_forest_type_groups_filter() |>
+    nrs_plots_stats |>
       group_by(STATECD, COUNTYCD, PLOT) |>
       filter(MEASYEAR == max(MEASYEAR)) |>
       ungroup(),
@@ -398,22 +298,20 @@ ggplot(
   geom_bin2d() +
   geom_hline(yintercept = 0, linetype = "dashed") +
   #scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
-  facet_wrap(~`Forest Type Group`) +
-  ggtitle("Grow-Only Stands\nChange in FIA Measured BA (m² / ha) vs. Projection Years")
+  #facet_wrap(~FOREST_TYPE_GROUP) +
+  ylab(bquote("Measured BA Delta " ~(m^2 %.% ha^-1))) +
+  xlab("Projection Years") +
+  ggtitle("Grow-Only Stands Measured BA Delta vs. Projection Years")
 ```
 
-```{r seen_types}
-latest_measyear <- stand_stats |>
-  group_by(STATECD, COUNTYCD, PLOT) |>
-  summarize(
-    MEASYEAR = max(MEASYEAR),
-    .groups = "keep"
-  ) |>
-  ungroup()
+Measured Carbon by Forest Type Group
 
-seen_types <- stand_stats |>
-  semi_join(latest_measyear, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR)) |>
-  group_by(`Forest Type Group`) |>
+```{r seen_types, eval = FALSE}
+seen_types <- nrs_plots_stats |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  filter(MEASYEAR == max(MEASYEAR, na.rm = TRUE)) |>
+  ungroup() |>
+  group_by(FOREST_TYPE_GROUP) |>
   summarize(
     CARBON_AG_METRIC = sum(conv_unit(CARBON_AG, "lbs", "Mg")),
     .groups = "keep"
@@ -421,13 +319,13 @@ seen_types <- stand_stats |>
 
 seen_types |>
   ggplot(
-    aes(y = fct_reorder(`Forest Type Group`, CARBON_AG_METRIC), x = CARBON_AG_METRIC)
+    aes(y = fct_reorder(FOREST_TYPE_GROUP, CARBON_AG_METRIC), x = CARBON_AG_METRIC)
   ) +
   scale_x_log10() +
   geom_col() +
-  ggtitle("Total Carbon by Forest Type Group (Mg)") +
+  ggtitle("Total Carbon by Forest Type Group") +
   ylab("Forest Type") +
-  xlab("Carbon")
+  xlab(bquote("Carbon " ~(`Mg C`)))
 ```
 
 ## Regeneration, Ingrowth, and Establishment
@@ -3111,7 +3009,7 @@ annual_vs_decadal <- stand_stats |>
   rename(Year = MEASYEAR) |>
   select(
     STAND_ID, Year,
-    STDAGE, `Forest Type`, `Forest Type Group`, ECOSUBCD
+    STDAGE, FOREST_TYPE, FOREST_TYPE_GROUP, ECOSUBCD
   ) |>
   left_join(decadal_carbon_tmp, by = join_by(STAND_ID, Year)) |>
   left_join(annual_carbon_tmp, by = join_by(STAND_ID, Year)) |>
@@ -3154,7 +3052,7 @@ ggplot(
   geom_bin2d(binwidth = 0.25) +
   scale_fill_continuous(name = "Number of Plots", transform = "log10") +
   geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") +
-  #facet_wrap(~`Forest Type Group`) +
+  #facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   ggtitle(bquote("Annual Carbon Flux for 1- vs. 10-year Timestep")) +
   coord_cartesian(xlim = c(-1, 8), ylim = c(-1, 8)) +
@@ -3170,7 +3068,7 @@ annual_vs_decadal |>
   geom_histogram(bins = 50) +
   geom_vline(xintercept = 1, linetype = "dashed", color = "red") +
   scale_x_continuous(transform = "log10", breaks = c(1, 2, 3, 5, 10, 20, 30, 50)) +
-#  facet_wrap(~`Forest Type Group`) +
+#  facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   ggtitle("Ratio of Projected Carbon using 10 vs. 1 year timestep") +
   ylab("Number of Plots") +
@@ -3245,7 +3143,7 @@ projected_vs_measured <- stand_stats |>
   rename(Year = MEASYEAR) |>
   select(
     STAND_ID, Year,
-    STDAGE, `Forest Type`, `Forest Type Group`, ECOSUBCD,
+    STDAGE, FOREST_TYPE, FOREST_TYPE_GROUP, ECOSUBCD,
     QMD, QMD_METRIC
   ) |>
   left_join(projected_tmp, by = join_by(STAND_ID, Year)) |>
@@ -3301,7 +3199,7 @@ ggplot(
   scale_fill_continuous(name = "Number of Plots") +
   theme_bw() +
   #scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
-  #facet_wrap(~`Forest Type Group`) +
+  #facet_wrap(~FOREST_TYPE_GROUP) +
   ggtitle("Grow-Only Stands\nChange in FVS Measured BA (m² / ha) vs. Projection Years")
 ```
 
@@ -3343,7 +3241,7 @@ ggplot(
     se = FALSE
   ) +
   scale_fill_continuous(name = "Number of Plots", transform = "log10") +
-#  facet_wrap(~`Forest Type Group`) +
+#  facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   theme(aspect.ratio = 1) +
   ggtitle("FVS Projected vs. FIA Measured Carbon") +
@@ -3474,7 +3372,7 @@ ggplot(
     fullrange = TRUE,
     se = FALSE
   ) +
-  facet_wrap(~`Forest Type Group`) +
+  facet_wrap(~FOREST_TYPE_GROUP) +
   theme(aspect.ratio = 1) +
   theme_bw() +
   ggtitle("Grow-Only Stands FVS Projected vs. Measured Carbon Change") +
@@ -3499,7 +3397,7 @@ ggplot(
     se = FALSE
   ) +
   scale_fill_continuous(name = "Number of Plots", transform = "log10") +
-  #facet_wrap(~`Forest Type Group`) +
+  #facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   theme(aspect.ratio = 1) +
   ggtitle("FVS Projected vs. Measured Annual Carbon Flux") +
@@ -3533,20 +3431,20 @@ projected_vs_measured |>
 ```{r projected-vs-measured-carbon-flux}
 projected_vs_measured_with_n <- projected_vs_measured |>
   filter(Projection_Years > 0) |>
-  group_by(`Forest Type Group`) |>
-  mutate(`Forest Type Group` = paste0(`Forest Type Group`, ", n=", n())) |>
+  group_by(FOREST_TYPE_GROUP) |>
+  mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
   ungroup()
   
 ggplot(
     projected_vs_measured_with_n,
-    aes(Projected_Carbon_Flux, fct_reorder(`Forest Type Group`, Measured_Carbon, .fun = sum))
+    aes(Projected_Carbon_Flux, fct_reorder(FOREST_TYPE_GROUP, Measured_Carbon, .fun = sum))
   ) +
   geom_vline(xintercept = 0, color = 'red') +
   geom_boxplot(varwidth = TRUE) +
   # scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
   geom_point(
     data = projected_vs_measured_with_n |>
-      group_by(`Forest Type Group`) |> 
+      group_by(FOREST_TYPE_GROUP) |> 
       summarize(
         Measured_Carbon_Flux = mean(Measured_Carbon_Flux),
         Measured_Carbon = sum(Measured_Carbon),
@@ -3574,7 +3472,7 @@ This is Mg of carbon per hectare per year.
 ```{r carbon-flux-by-forest-type}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
-    aes(Carbon_Flux_Residual, fct_reorder(`Forest Type Group`, Measured_Carbon, .fun = sum))
+    aes(Carbon_Flux_Residual, fct_reorder(FOREST_TYPE_GROUP, Measured_Carbon, .fun = sum))
   ) +
   geom_vline(xintercept = 0, color = 'red') +
   geom_boxplot(varwidth = TRUE) +
@@ -3582,7 +3480,7 @@ ggplot(
   geom_point(
     data = projected_vs_measured |>
       filter(Projection_Years > 0) |> 
-      group_by(`Forest Type Group`) |> 
+      group_by(FOREST_TYPE_GROUP) |> 
       summarize(
         Measured_Carbon_Flux = mean(Measured_Carbon_Flux),
         Measured_Carbon = sum(Measured_Carbon),
@@ -3612,14 +3510,14 @@ ggplot(
 ```{r carbon-flux-by-forest-type-detail}
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
-    aes(Carbon_Flux_Residual, fct_reorder(`Forest Type Group`, Measured_Carbon, .fun = sum))
+    aes(Carbon_Flux_Residual, fct_reorder(FOREST_TYPE_GROUP, Measured_Carbon, .fun = sum))
   ) +
   geom_vline(xintercept = 0, color = 'red') +
   geom_boxplot(varwidth = TRUE) +
   geom_point(
     data = projected_vs_measured |>
       filter(Projection_Years > 0) |> 
-      group_by(`Forest Type Group`) |> 
+      group_by(FOREST_TYPE_GROUP) |> 
       summarize(
         Measured_Carbon_Flux = mean(Measured_Carbon_Flux),
         Measured_Carbon = sum(Measured_Carbon),
@@ -3679,7 +3577,7 @@ ggplot(
     se = FALSE,
     color = 'brown'
   ) +
-  facet_wrap(~`Forest Type Group`) +
+  facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   scale_fill_continuous(transform = "log10") +
   ggtitle("Grow-Only Stands\nCarbon Projection Error vs. Projection Years") +
@@ -3701,7 +3599,7 @@ ggplot(
     se = FALSE,
     color = 'brown'
   ) +
-  facet_wrap(~`Forest Type Group`) +
+  facet_wrap(~FOREST_TYPE_GROUP) +
 #  coord_cartesian(xlim = c(10, 20), ylim = c(0, 1)) +
 #  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20)) +
   scale_fill_continuous(transform = "log10") +
@@ -3724,7 +3622,7 @@ ggplot(
     color = 'brown'
   ) +
   scale_fill_continuous(transform = "log10") +
-  facet_wrap(~`Forest Type Group`) +
+  facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   ggtitle("Grow-Only Stands\nCarbon Projection Flux Residual vs. Projection Years") +
   xlab("Projection Years") +
@@ -3747,7 +3645,7 @@ ggplot(
     color = 'brown'
   ) +
   scale_fill_continuous(transform = "log10") +
-  facet_wrap(~`Forest Type Group`) +
+  facet_wrap(~FOREST_TYPE_GROUP) +
   ggtitle("Grow-Only Stands\nCarbon Projection Residuals vs. Measured BA") +
   xlab(bquote("Measured BA" ~ (m^2 %.% ha^-1))) +
   ylab(bquote("Carbon Residual" ~ (`Mg C` %.% ha^-1)))
@@ -3771,7 +3669,7 @@ ggplot(
     color = 'brown'
   ) +
   scale_fill_continuous(transform = "log10") +
-  facet_wrap(~`Forest Type Group`) +
+  facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   ggtitle("Grow-Only Stands\nCarbon Projection Error vs. Measured BA") +
   xlab(bquote("Measured BA" ~ (m^2 %.% ha^-1))) +
@@ -3789,7 +3687,7 @@ ggplot(
   ) +
   geom_point() +
   coord_cartesian(ylim = c(0, NA)) +
-  facet_wrap(~`Forest Type Group`) +
+  facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   ggtitle("Grow-Only Stands\nCarbon Projection Error Outliers vs. Measured BA") +
   xlab(bquote("Measured BA" ~ (m^2 %.% ha^-1))) +
@@ -3810,7 +3708,7 @@ ggplot(
     color = 'brown'
   ) +
   scale_fill_continuous(transform = "log10") +
-  facet_wrap(~`Forest Type Group`) +
+  facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   ggtitle("Grow-Only Stands\nCarbon Flux Residual vs. Measured BA") +
   xlab(bquote("Measured BA" ~ (m^2 %.% ha^-1))) +
@@ -3834,7 +3732,7 @@ ggplot(
     color = 'brown'
   ) +
   scale_fill_continuous(transform = "log10") +
-  facet_wrap(~`Forest Type Group`) +
+  facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   ggtitle("Grow-Only Stands\nCarbon Projection Error (Mg/ha) vs. Measured QMD (cm)") +
   xlab(bquote("Measured QMD" ~ (cm))) +
@@ -3858,7 +3756,7 @@ ggplot(
   ) +
   scale_fill_continuous(transform = "log10") +
   theme_bw() +
-  facet_wrap(~`Forest Type Group`) +
+  facet_wrap(~FOREST_TYPE_GROUP) +
   ggtitle("Grow-Only Stands\nCarbon Flux Residual vs. Measured QMD") +
   xlab(bquote("QMD" ~ (cm))) +
   ylab(bquote("Carbon Flux Residual" ~ (`Mg C` %.% ha^-1 %.% yr^-1)))
@@ -3883,7 +3781,7 @@ ggplot(
 #  theme(aspect.ratio = 1) +
   scale_fill_continuous(transform = "log10") +
   geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
-  facet_wrap(~`Forest Type Group`) +
+  facet_wrap(~FOREST_TYPE_GROUP) +
   ggtitle("Grow-Only Stands\nProjected vs. Measured Basal Area") +
   xlab(bquote("Measured Basal Area" ~(m^2 %.% ha^-1))) +
   ylab(bquote("Projected Basal Area" ~(m^2 %.% ha^-1)))
@@ -3896,8 +3794,8 @@ ggplot(
       mutate(
         BA_Range = cut(Measured_BA, 0:19 * 5)
       ) |>
-      group_by(`Forest Type Group`) |>
-      mutate(`Forest Type Group` = paste0(`Forest Type Group`, ", n=", n())) |>
+      group_by(FOREST_TYPE_GROUP) |>
+      mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
       ungroup()
     ,
     aes(x = BA_Range, y = BA_Flux_Residual)
@@ -3927,22 +3825,22 @@ plot_location_type <- stand_stats |>
   filter(INVYR == max(INVYR, na.rm = TRUE)) |>
   ungroup() |>
   consolidate_forest_type_groups_filter() |>
-  select(STATECD, COUNTYCD, PLOT, INVYR, CARBON_METRIC, `Forest Type Group`) |>
+  select(STATECD, COUNTYCD, PLOT, INVYR, CARBON_METRIC, FOREST_TYPE_GROUP) |>
   left_join(plot_location_tmp, by = join_by(STATECD, COUNTYCD, PLOT)) |>
   rename(
     `Stand Carbon` = CARBON_METRIC,
-    `Forest Type` = `Forest Type Group`
+    FOREST_TYPE = FOREST_TYPE_GROUP
   ) |>
-  group_by(`Forest Type`) |>
+  group_by(FOREST_TYPE) |>
   mutate(n = n()) |>
   ungroup() |>
-  mutate(`Forest Type` = if_else(n < 144, 'Other', `Forest Type`))
+  mutate(FOREST_TYPE = if_else(n < 144, 'Other', FOREST_TYPE))
 
 ggplot(map_states, aes(long, lat, group = group)) +
   geom_polygon(fill = "white", color = "black") + 
   geom_point(
     plot_location_type,
-    mapping = aes(long, lat, group = group, color = fct_infreq(`Forest Type`), size = `Stand Carbon`)
+    mapping = aes(long, lat, group = group, color = fct_infreq(FOREST_TYPE), size = `Stand Carbon`)
   ) +
   scale_size_binned_area(max_size = 3) +
   coord_quickmap() +
@@ -3982,7 +3880,7 @@ ggplot(
     color = 'brown'
   ) +
 #  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
-  facet_wrap(~`Forest Type Group`) +
+  facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   ggtitle("Grow-Only Stands\nBA Residual vs. Projection Years") +
   xlab(bquote("Projection Years")) +
@@ -4004,7 +3902,7 @@ ggplot(
     se = FALSE,
     color = 'brown'
   ) +
-  facet_wrap(~`Forest Type Group`) +
+  facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   ggtitle("Grow-Only Stands\nBA Projection Error vs. Projection years") +
   xlab("Projection Years") +
@@ -4028,7 +3926,7 @@ ggplot(
     se = FALSE,
     color = 'brown'
   ) +
-  facet_wrap(~`Forest Type Group`) +
+  facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   ggtitle("Grow-Only Stands\nBA Projection Residual vs. Measured QMD") +
   xlab(bquote("QMD" ~(cm))) +
@@ -4042,8 +3940,8 @@ ggplot(
       mutate(
         QMD_Range = cut(QMD_METRIC, 0:19 * 5)
       ) |>
-      group_by(`Forest Type Group`) |>
-      mutate(`Forest Type Group` = paste0(`Forest Type Group`, ", n=", n())) |>
+      group_by(FOREST_TYPE_GROUP) |>
+      mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
       ungroup()
     ,
     aes(x = QMD_Range, y = BA_Flux_Residual)
@@ -4085,7 +3983,7 @@ ggplot(
   coord_cartesian( xlim = c(0, 40000), ylim = c(0, 25000)) +
   theme_bw() +
   #theme(aspect.ratio = 1) +
-  #facet_wrap(~`Forest Type Group`) +
+  #facet_wrap(~FOREST_TYPE_GROUP) +
   ggtitle("Grow-Only Stands\nProjected vs. Measured TPA") +
   xlab(bquote("Measured" ~(trees %.% acre^-1))) +
   ylab(bquote("Projected" ~(trees %.% acre^-1)))
@@ -4099,8 +3997,8 @@ ggplot(
       mutate(
         Tpa_Range = cut(Measured_Tpa, 0:10 * 2000, labels = (1:10 * 2000))
       ) |>
-      group_by(`Forest Type Group`) |>
-      mutate(`Forest Type Group` = paste0(`Forest Type Group`, ", n=", n())) |>
+      group_by(FOREST_TYPE_GROUP) |>
+      mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
       ungroup()
     ,
     aes(x = Tpa_Range, y = BA_Flux_Residual)
