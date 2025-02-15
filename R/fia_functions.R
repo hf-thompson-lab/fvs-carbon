@@ -89,7 +89,7 @@ fia_plots <- function(fiadb, plots) {
   if ("INVYR" %in% names(plots)) {
     bind_rows(
       lapply(
-        plots |> split(1:(length(plots) / chunk_size)),
+        plots |> split(ceiling(1:nrow(plots) / chunk_size)),
         \(plots_chunk) {
           tbl(con, "PLOT") |>
             semi_join(
@@ -104,7 +104,7 @@ fia_plots <- function(fiadb, plots) {
   } else {
     bind_rows(
       lapply(
-        plots |> split(1:(length(plots) / chunk_size)),
+        plots |> split(ceiling(1:nrow(plots) / chunk_size)),
         \(plots_chunk) {
           tbl(con, "PLOT") |>
             semi_join(
@@ -157,7 +157,7 @@ fia_conds <- function(fiadb, plots) {
 
   bind_rows(
     lapply(
-      plots |> split(1:(length(plots) / chunk_size)),
+      plots |> split(1:ceiling(nrow(plots) / chunk_size)),
       \(plots_chunk) {
         tbl(con, "COND") |>
           semi_join(
@@ -182,7 +182,7 @@ fia_trees <- function(fiadb, plots) {
   if ("INVYR" %in% names(plots)) {
     bind_rows(
       lapply(
-        plots |> split(1:(length(plots) / chunk_size)),
+        plots |> split(ceiling(1:nrow(plots) / chunk_size)),
         \(plots_chunk) {
           tbl(con, "TREE") |>
             semi_join(
@@ -197,7 +197,7 @@ fia_trees <- function(fiadb, plots) {
   } else {
     bind_rows(
       lapply(
-        plots |> split(1:(length(plots) / chunk_size)),
+        plots |> split(ceiling(1:nrow(plots) / chunk_size)),
         \(plots_chunk) {
           tbl(con, "TREE") |>
             semi_join(
@@ -218,7 +218,7 @@ fia_trees_by_cn <- function(fiadb, cns) {
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
   # Fetch in groups of 100
   bind_rows(
-    lapply(split(cns, 1:(length(cns) / chunk_size)), \(cns_chunk) {
+    lapply(split(cns, ceiling(1:length(cns) / chunk_size)), \(cns_chunk) {
       tbl(con, "TREE") |>
         filter(CN %in% cns_chunk) |>
         collect()

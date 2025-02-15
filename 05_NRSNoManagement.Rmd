@@ -31,6 +31,27 @@ tar_load(fiadb)
 tar_load(species_crosswalk)
 ```
 
+## Preload targets results from this document
+
+When tar_make() has already built the objects defined in this document,
+run this block to pre-load them.
+
+Regenerate this block with
+```{sh, eval = FALSE}
+fgrep '```{targets' 05_NRSNoManagement.Rmd | \
+  sed -E -e 's/```{targets /tar_load(/' -e 's/,.*/)/' 
+```
+
+```{r load tar objects defined here, eval = FALSE}
+tar_load(nrs_plots_grown)
+tar_load(fvsne_states)
+tar_load(nrs_plots_stats)
+tar_load(nrs_grm_ingrowth_all)
+tar_load(nrs_trees_ingrowth_all)
+tar_load(nrs_grm_ingrowth)
+tar_load(nrs_trees_ingrowth)
+```
+
 # Grow-Only Plots in the Northeast
 
 Find all FIA plots in the northeastern region that are grow-only, that have
@@ -366,7 +387,8 @@ Fetch the corresponding trees
 fia_trees_by_cn(fiadb, nrs_grm_ingrowth_all$TRE_CN)
 ```
 
-Some trees think they're allowed to ingrow more than once:
+We can use the trees to find duplicate records. There are duplicates because
+some trees think they're allowed to ingrow more than once.
 
 ```{r nrs_trees_ingrowth_dupes, eval = FALSE}
 nrs_trees_ingrowth_all |>
@@ -405,11 +427,13 @@ nrs_trees_ingrowth_all |>
 
 ```{r preview nrs_grm_ingrowth, eval = FALSE}
 print(paste0("Ingrown trees: ", nrs_grm_ingrowth |> nrow()))
+nrs_grm_ingrowth_with_measyear <- nrs_grm_ingrowth |>
+  left_join(nrs_plots_grown |> select(CN, MEASYEAR), by = join_by(PLT_CN == CN))
 print(paste0(
   "  ",
   nrow(nrs_grm_ingrowth) /
     nrow(nrs_plots_grown) /
-    (max(nrs_grm_ingrowth$MEASYEAR) - min(nrs_grm_ingrowth$MEASYEAR)),
+    (max(nrs_grm_ingrowth_with_measyear$MEASYEAR) - min(nrs_grm_ingrowth_with_measyear$MEASYEAR)),
   " ingrown trees / plot / year"))
 print(paste0("Ingrown trees over 3\" DBH: ", nrs_grm_ingrowth |> filter(DIA_END > 3) |> nrow()))
 ```
@@ -434,7 +458,7 @@ Appendix C on details for keywords, for HTADJ, says:
 > listed in table 1 and the height of a tree 3 inches d.b.h.
 
 ```{r nrs_grm_ingrowth_histogram, eval = FALSE}
-nrs_grm_ingrowth |>
+nrs_grm_ingrowth_with_measyear |>
   mutate(
     `> 3" DBH` = if_else(DIA_END > 3, MEASYEAR, NA),
     `≤ 3" DBH` = if_else(DIA_END <= 3, MEASYEAR, NA)
@@ -447,25 +471,26 @@ nrs_grm_ingrowth |>
   ) |>
   filter(!is.na(Year)) |>
   ggplot(aes(Year, fill = `Diameter at Ingrowth`)) +
-    geom_histogram(binwidth = 1) +
-    scale_fill_manual(values = c("red", "blue")) +
-    ggtitle('Ingrown trees on NRS grow-only plots') +
-    xlab('Year') +
-    ylab('Count')
-
+  geom_histogram(binwidth = 1) +
+  scale_fill_manual(values = c("red", "blue")) +
+  theme_bw() +
+  ggtitle('Ingrown trees on NRS grow-only plots') +
+  xlab('Year') +
+  ylab('Count')
 ```
 
 ```{r nrs_grm_ingrowth_boxplot, eval = FALSE}
-nrs_grm_ingrowth |>
+nrs_grm_ingrowth_with_measyear |>
   select(DIA_END) |>
   ggplot(aes(DIA_END)) +
   geom_histogram(binwidth = 1) +
   scale_y_continuous(transform = "log10") +
+  theme_bw() +
   xlab('Diameter at Ingrowth (inches)') +
   geom_vline(xintercept = 3, color = 'red')
 ```
 
-There are ~55,000 trees that ingrow over the 25 years, so about 2 trees per
+There are ~50,000 trees that ingrow over the 25 years, so about 2 trees per
 plot per 3 years.
 Most of these trees are over the 3"DBH diameter limit on ingrowth set by FVS.
 
@@ -491,162 +516,121 @@ We identify a Tree History by the CN of the last tree in the history.
 tree_ingrown - all tree records for ingrown trees, including pre- and
                post-ingrowth
 
-NB: This takes about 5 minutes on a laptop.
+NB: This takes about an hour on a laptop.
 
-```{r tree_ingrown, eval = FALSE}
-rds_file <- 'data/intermediate/tree_ingrown.rds'
-if (USE_CACHE & file.exists(rds_file)) {
-  tree_ingrown <- read_rds(rds_file)
-} else {
-  # CNs of the ingrown trees; these will be the heads of the tree histories
-  grm_ingrown_cns <- grm_ingrown |>
-    select(TRE_CN) |>
-    rename(CN = TRE_CN)
-  
-  # Re-use the database connection
-  fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+```{targets nrs_trees_history, tar_simple = TRUE}
+# We're going to work one plot at a time
+# Fetch all trees that have ever been live on a plot
+stashed_plot <- NULL
 
+assemble_history <- function(plots) {
   # fetch_trees - fetch all of the trees that have ever been live on a plot
-  fetch_trees <- function(row) {
-    statecd <- row[["STATECD"]]
-    countycd <- row[["COUNTYCD"]]
-    plot <- row[["PLOT"]]
-
-    measyear_mixin <- tbl(fia, 'PLOT') |>
-      select(CN, MEASYEAR) |>
-      rename(PLT_CN = CN)
+  all_trees <- fia_trees(fiadb, plots) |>
+    filter(CONDID == 1) # only live trees
   
-    all_trees <- tbl(fia, 'TREE') |>
-      filter(
-        STATECD == statecd &
-        COUNTYCD == countycd &
-        PLOT == plot
-      ) |>
-      # Only live trees
-      filter(CONDID == 1) |>
-      left_join(measyear_mixin, by = join_by(PLT_CN)) |>
-      select(
-        CN, PLT_CN, PREV_TRE_CN,
-        INVYR, MEASYEAR, STATECD, COUNTYCD, PLOT, SUBP, TREE, CONDID,
-        STATUSCD, SPCD, DIA, DIAHTCD, HT, HTCD, ACTUALHT, BHAGE, TOTAGE, SITREE,
-        PREVDIA, P2A_GRM_FLG, PREV_STATUS_CD, TPA_UNADJ
-      ) |>
-      collect()
-    
-    # Start with the trees at the time of ingrowth
-    tree_ingrown <- all_trees |>
-      semi_join(grm_ingrown_cns, by = join_by(CN))
-
-    prev_tre_cns <- tree_ingrown |>
-      select(PREV_TRE_CN) |>
-      filter(!is.na(PREV_TRE_CN)) |>
-      distinct() 
-
-    while (nrow(prev_tre_cns) > 0) {
-      more_trees <- all_trees |>
-        semi_join(prev_tre_cns, by = join_by(CN == PREV_TRE_CN))
-      tree_ingrown <- rbind(tree_ingrown, more_trees) |>
-        distinct() # Should be redundant, but isn't
-      prev_tre_cns <- more_trees |>
-        select(PREV_TRE_CN) |>
-        filter(!is.na(PREV_TRE_CN)) |>
-        distinct()
-    }
-    return(tree_ingrown)
+  # add NEXT_TRE_CN to make it easy to traverse tree lineage in either direction
+  tree_prev_next <- all_trees |>
+    left_join(
+      all_trees |>
+        select(CN, PREV_TRE_CN) |>
+        rename(NEXT_TRE_CN = CN, CN = PREV_TRE_CN),
+      by = join_by(CN)
+    )
+  
+  # current trees is the set of trees currently being examined,
+  # one for each history of an ingrown tree
+  current_trees <- tree_prev_next |>
+    semi_join(nrs_trees_ingrowth, by = join_by(CN))
+  
+  # head trees are the first trees in each history
+  # of an ingrown tree
+  head_trees <- current_trees |> filter(is.na(PREV_TRE_CN))
+  
+  # Function to fetch trees matching PREV_TRE_CN
+  earlier_trees <- function(.data) {
+    tree_prev_next |> semi_join(.data, by = join_by(CN == PREV_TRE_CN))
+  }
+  
+  # Function to fetch trees matching NEXT_TRE_CN
+  later_trees <- function(.data) {
+    tree_prev_next |> semi_join(.data, by = join_by(CN == NEXT_TRE_CN))
+  }
+  
+  # Advance current_trees
+  while ((current_trees <- earlier_trees(current_trees)) |> nrow() > 0) {
+    head_trees <- bind_rows(
+      head_trees,
+      current_trees |> filter(is.na(PREV_TRE_CN))
+    )
+  }
+  
+  # Head trees now contains the earliest trees for all ingrown trees.
+  # Create a table of the entire history of each tree, of the form
+  # CN, FIRST_CN, LAST_CN
+  # We do this in three steps:
+  # 1. CN, FIRST_CN for the head trees (CN == FIRST_CN)
+  # 2. CN, FIRST_CN for trees where PREV_TRE_CN in CN
+  # Repeat step 2 until nothing more matches
+  # 3. Fill in LAST_CN for everything
+  
+  current_trees <- head_trees |> filter(!is.na(NEXT_TRE_CN))
+  tree_history <- head_trees |> select(CN) |> mutate(FIRST_CN = CN, LAST_CN = CN)
+  
+  while ((current_trees <- later_trees(current_trees)) |> nrow() > 0) {
+    current_cns <- current_trees |> select(CN, PREV_TRE_CN) |> rename(LAST_CN = CN)
+    updated_history_rows <- tree_history |>
+      left_join(current_cns, by = join_by(LAST_CN == PREV_TRE_CN)) |>
+      mutate(LAST_CN = coalesce(LAST_CN.y, LAST_CN)) |>
+      select(CN, FIRST_CN, LAST_CN)
+    new_history_rows <- current_trees |>
+      select(CN, PREV_TRE_CN) |>
+      mutate(LAST_CN = CN) |>
+      left_join(tree_history |> select(CN, FIRST_CN), by = join_by(PREV_TRE_CN == CN)) |>
+      select(CN, FIRST_CN, LAST_CN)
+    tree_history <- bind_rows(
+      updated_history_rows,
+      new_history_rows
+    )
   }
 
-  tree_ingrown <- reduce(
-    pbapply(plot_grow_only, 1, fetch_trees),
-    bind_rows
-  )
-  
-  next_tre_mixin <- tree_ingrown |>
-    select(CN, PREV_TRE_CN) |>
-    rename(NEXT_TRE_CN = CN, CN = PREV_TRE_CN)
-
-  tree_ingrown <- tree_ingrown |>
-    left_join(next_tre_mixin, by = join_by(CN))
-  
-  dbDisconnect(fia)
-
-  remove(fia, grm_ingrown_cns, next_tre_mixin)
-
-  write_rds(tree_ingrown, rds_file)
+  # Paste metadata on to history records to be friendly
+  tree_history |>
+    left_join(
+      all_trees |> select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR),
+      by = join_by(CN)
+    )
 }
+
+plot_ids <- nrs_plots_grown |>
+  distinct(STATECD, COUNTYCD, PLOT)
+
+chunk_size <- 100
+
+bind_rows(
+  pbapply::pblapply(
+    plot_ids |> split(ceiling(1:nrow(plot_ids) / chunk_size)),
+    assemble_history
+  )
+)
 ```
 
 Walk the tree history to see what diameter we can get to.
 
-```{r tree_ingrown_last, eval = FALSE}
-# CN - the latest CN for this tree
-# DIA - the latest DIA for this tree
-# PREV_TRE_CN - the next earlier CN in this tree history, if any
-# FRST_DIA - the earliest available DIA in this tree history
-# FRST_TRE_CN - the earliest available CN in this tree history
-tree_ingrown_last <- grm_ingrown |>
-  select(TRE_CN, PREV_TRE_CN, DIA_END) |>
-  rename(CN = TRE_CN, DIA = DIA_END) |>
-  # Initialize FRST_TRE_CN to CN; we'll overwrite this
-  # as we walk the chain of PREV_TRE_CNs
-  mutate(FRST_DIA = DIA, FRST_TRE_CN = CN)
-
-trees_rhs <- tree_ingrown |>
-  select(CN, PREV_TRE_CN, DIA)
-
-tree_cns_todo <- tree_ingrown_last |>
-  select(PREV_TRE_CN) |>
-  filter(!is.na(PREV_TRE_CN)) |>
-  distinct()
-
-iterations <- 0
-while (nrow(tree_cns_todo) > 0) {
-  print(paste0(
-    "Iteration: ",
-    iterations <- iterations + 1,
-    ", CNs: ",
-    nrow(tree_cns_todo)
-  ))
-  tmp_trees <- tree_ingrown_last |>
-    left_join(trees_rhs, by = join_by(PREV_TRE_CN == CN))
-  tree_ingrown_last <- tmp_trees |>
-    rename(DIA = DIA.x) |>
-    mutate( # Update FRST_DIA
-      FRST_DIA = if_else(is.na(DIA.y), FRST_DIA, DIA.y)
-    ) |>
-    mutate( # Update FRST_CN
-      FRST_TRE_CN = if_else(is.na(PREV_TRE_CN), FRST_TRE_CN, PREV_TRE_CN)
-    ) |>
-    mutate( # Move PREV_TRE_CN one time hop
-      PREV_TRE_CN = PREV_TRE_CN.y
-    ) |>
-    select(CN, PREV_TRE_CN, DIA, FRST_TRE_CN, FRST_DIA)
-  tree_cns_todo <- tmp_trees |>
-    select(PREV_TRE_CN.y) |>
-    rename(PREV_TRE_CN = PREV_TRE_CN.y) |>
-    filter(!is.na(PREV_TRE_CN))
-}
-
-measyear_mixin <- tree_ingrown |>
-  select(CN, MEASYEAR)
-
-tree_ingrown_last <- tree_ingrown_last |>
-  left_join(measyear_mixin, by = join_by(CN)) |>
-  left_join(
-    measyear_mixin |> rename(FRST_MEASYEAR = MEASYEAR),
-    by = join_by(FRST_TRE_CN == CN)
-  )
-
-rm(trees_rhs, tree_cns_todo, tmp_trees, iterations)
-```
-
 How many trees ingrow with DBH>3?
 ```{r dbh_gt_3, eval = FALSE}
-tree_ingrown_last |> filter(DIA > 3) |> nrow()
+nrs_trees_ingrowth |> filter(DIA > 3) |> nrow()
 ```
 
 How many of those are traceable back to when they had DBH <= 3?
 ```{r dbh_le_3, eval = FALSE}
-tree_ingrown_last |> filter(DIA > 3 & FRST_DIA <= 3) |> nrow() 
+fia_trees_by_cn(
+  fiadb,
+  nrs_trees_history |>
+    distinct(FIRST_CN) |>
+    _$FIRST_CN
+  ) |>
+  filter(DIA <= 3) |>
+  nrow()
 ```
 
 For the remaining trees we will need to back-project.
