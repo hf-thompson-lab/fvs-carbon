@@ -87,7 +87,7 @@ tar_target(nrs_trees_history, {
   chunk_size <- 100
   
   bind_rows(
-    pbapply::pblapply(
+    lapply(
       plot_ids |> split(ceiling(1:nrow(plot_ids) / chunk_size)),
       assemble_history
     )
