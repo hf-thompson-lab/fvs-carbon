@@ -363,11 +363,7 @@ fia_grm_ingrowth(fiadb, nrs_plots_grown)
 ```
 Fetch the corresponding trees
 ```{targets nrs_trees_ingrowth_all, tar_simple = TRUE}
-fia_trees_by_cn(
-  fiadb,
-  nrs_grm_ingrowth_all |>
-    rename(CN=TRE_CN)
-)
+fia_trees_by_cn(fiadb, nrs_grm_ingrowth_all$TRE_CN)
 ```
 
 Some trees think they're allowed to ingrow more than once:

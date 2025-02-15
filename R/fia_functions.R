@@ -79,24 +79,43 @@ fia_fiadb_indexed <- function() {
 }
 
 fia_plots <- function(fiadb, plots) {
+  # Fetching all at once runs at ~20 rows/sec
+  # Fetching each individual plot runs at ~60 rows/sec
+  # Running with chunks other than 10 runs at ~20 rows/sec
+  # Running with chunks of 10 runs at ~1000 rows/sec
+  chunk_size <- 10
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
   if ("INVYR" %in% names(plots)) {
-    tbl(con, "PLOT") |>
-      semi_join(
-        plots |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
-        by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
-        copy = TRUE
-      ) |>
-      collect()
+    bind_rows(
+      lapply(
+        plots |> split(1:(length(plots) / chunk_size)),
+        \(plots_chunk) {
+          tbl(con, "PLOT") |>
+            semi_join(
+              plots_chunk,
+              by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
+              copy = TRUE
+            ) |>
+            collect()
+        }
+      )
+    )
   } else {
-    tbl(con, "PLOT") |>
-      semi_join(
-        plots |> distinct(STATECD, COUNTYCD, PLOT),
-        by = join_by(STATECD, COUNTYCD, PLOT),
-        copy = TRUE
-      ) |>
-      collect()
+    bind_rows(
+      lapply(
+        plots |> split(1:(length(plots) / chunk_size)),
+        \(plots_chunk) {
+          tbl(con, "PLOT") |>
+            semi_join(
+              plots_chunk,
+              by = join_by(STATECD, COUNTYCD, PLOT),
+              copy = TRUE
+            ) |>
+            collect()
+        }
+      )
+    )
   }
 }
 
@@ -109,14 +128,14 @@ fia_plots_filtered <- function(fiadb, plots = NULL, filter) {
   } else if ("INVYR" %in% names(plots)) {
     fia_plots <- tbl(con, "PLOT") |>
       semi_join(
-        plots |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
+        plots,
         by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
         copy = TRUE
       )
   } else {
     fia_plots <- tbl(con, "PLOT") |>
       semi_join(
-        plots |> distinct(STATECD, COUNTYCD, PLOT),
+        plots,
         by = join_by(STATECD, COUNTYCD, PLOT),
         copy = TRUE
       )
@@ -127,6 +146,8 @@ fia_plots_filtered <- function(fiadb, plots = NULL, filter) {
 }
 
 fia_conds <- function(fiadb, plots) {
+  chunk_size <- 10
+  
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
 
@@ -134,35 +155,70 @@ fia_conds <- function(fiadb, plots) {
     select(VALUE, MEANING) |>
     rename(FORTYPCD = VALUE, FORTYPE = MEANING)
 
-  tbl(con, "COND") |>
-    semi_join(
-      plots |> distinct(STATECD, COUNTYCD, PLOT),
-      by = join_by(STATECD, COUNTYCD, PLOT),
-      copy = TRUE
-    ) |>
-    # Dereference forest type codes
-    left_join(fia_ref_forest_type, by = join_by(FORTYPCD)) |>
-    collect()
+  bind_rows(
+    lapply(
+      plots |> split(1:(length(plots) / chunk_size)),
+      \(plots_chunk) {
+        tbl(con, "COND") |>
+          semi_join(
+            plots_chunk,
+            by = join_by(STATECD, COUNTYCD, PLOT),
+            copy = TRUE
+          ) |>
+          # Dereference forest type codes
+          left_join(fia_ref_forest_type, by = join_by(FORTYPCD)) |>
+          collect()
+      }
+    )
+  )
 }
 
 fia_trees <- function(fiadb, plots) {
+  chunk_size <- 10
+  
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
-  tbl(con, "TREE") |>
-    semi_join(
-      plots |> distinct(STATECD, COUNTYCD, PLOT),
-      by = join_by(STATECD, COUNTYCD, PLOT),
-      copy = TRUE
-    ) |>
-    collect()
+  
+  if ("INVYR" %in% names(plots)) {
+    bind_rows(
+      lapply(
+        plots |> split(1:(length(plots) / chunk_size)),
+        \(plots_chunk) {
+          tbl(con, "TREE") |>
+            semi_join(
+              plots_chunk,
+              by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
+              copy = TRUE
+            ) |>
+            collect()
+        }
+      )
+    )
+  } else {
+    bind_rows(
+      lapply(
+        plots |> split(1:(length(plots) / chunk_size)),
+        \(plots_chunk) {
+          tbl(con, "TREE") |>
+            semi_join(
+              plots_chunk,
+              by = join_by(STATECD, COUNTYCD, PLOT),
+              copy = TRUE
+            ) |>
+            collect()
+        }
+      )
+    )
+  }
 }
 
 fia_trees_by_cn <- function(fiadb, cns) {
+  chunk_size <- 10
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
   # Fetch in groups of 100
   bind_rows(
-    lapply(split(cns$CN, 1:(length(cns)/100)), \(cns_chunk) {
+    lapply(split(cns, 1:(length(cns) / chunk_size)), \(cns_chunk) {
       tbl(con, "TREE") |>
         filter(CN %in% cns_chunk) |>
         collect()
