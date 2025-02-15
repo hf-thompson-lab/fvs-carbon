@@ -596,7 +596,7 @@ assemble_history <- function(plots) {
   # Paste metadata on to history records to be friendly
   tree_history |>
     left_join(
-      all_trees |> select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR),
+      all_trees |> select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD, DIA, HT),
       by = join_by(CN)
     )
 }
@@ -607,11 +607,16 @@ plot_ids <- nrs_plots_grown |>
 chunk_size <- 100
 
 bind_rows(
-  lapply(
-    plot_ids |> split(ceiling(1:nrow(plot_ids) / chunk_size)),
-    assemble_history
+    lapply(
+      plot_ids |> split(ceiling(1:nrow(plot_ids) / chunk_size)),
+      assemble_history
+    )
+  ) |>
+  # We also need MEASYEAR for any real time measurement
+  left_join(
+    nrs_plots_grown |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
-)
 ```
 
 Walk the tree history to see what diameter we can get to.
@@ -639,7 +644,7 @@ For the remaining trees we will need to back-project.
 
 > TODO nik: use lm for all linear models!
 
-#### FIA Estimated Growth Rate
+#### GRM Estimated Growth Rate
 
 fia.TREE_GRM_COMPONENT.ANN_DIA_GROWTH specifies annual diameter growth rate.
 Looking at the values in this column, they seem small. We can check the
@@ -648,10 +653,19 @@ diameter growth backwards to the first MEASYEAR and seeing how close we
 get to the first observed diameter.
 
 ```{r tree_growth_fia, eval = FALSE}
-tree_growth_fia <- tree_ingrown_last |>
+tree_growth_fia <- nrs_trees_history |>
+  left_join(
+    nrs_grm_ingrowth |> select(TRE_CN, ANN_DIA_GROWTH),
+    by = join_by(CN == TRE_CN)
+  ) |>
+  group_by(FIRST_CN) |>
+  mutate(
+    FRST_DIA = min(DIA, na.rm = TRUE),
+    FRST_MEASYEAR = min(MEASYEAR, na.rm = TRUE)
+  ) |>
+  ungroup() |>
+  filter(!is.na(ANN_DIA_GROWTH)) |>
   filter(FRST_DIA < DIA) |>
-  # Add on FIA growth rate
-  left_join(grm_ingrown |> select(TRE_CN, ANN_DIA_GROWTH), by = join_by(CN == TRE_CN)) |>
   mutate(DIA_EST = DIA - (MEASYEAR - FRST_MEASYEAR) * ANN_DIA_GROWTH) |>
   mutate(DIA_ERR = abs(100 * (DIA_EST - FRST_DIA) / FRST_DIA)) |>
   filter(!is.na(DIA_ERR)) |>
@@ -659,13 +673,13 @@ tree_growth_fia <- tree_ingrown_last |>
 
 ggplot(tree_growth_fia, aes(DIA_ERR, after_stat(100 * count / sum(count)))) +
   geom_histogram(binwidth = 10, position = position_nudge(5)) +
-  #geom_freqpoly() +
-  ggtitle("Diameter Projection Error using FIA Growth Rate") +
+  theme_bw() +
+  ggtitle("Diameter Projection Error using GRM Growth Rate") +
   ylab("Frequency (%)") +
   xlab("Error (%) (binwidth = 10%)")
 ```
 
-This shows that using the FIA growth rate, only 20% of trees back-project
+This shows that using the FIA growth rate, only 25% of trees back-project
 to within 10% of their first surveyed diameter, so we can't rely on the FIA
 growth rate when we don't have previous tree records for an ingrown tree.
 
@@ -702,10 +716,6 @@ This also fetches trees with only a single observation; these are useful
 for calculating ingrowth.
 
 ```{r tree_growth, eval = FALSE}
-rds_file <- 'data/intermediate/tree_growth.rds'
-if (USE_CACHE & file.exists(rds_file)) {
-  tree_growth <- read_rds(rds_file)
-} else {
   # FIA.TREE.CN - sequence number
   # FIA.TREE.TREE - TREE number
   # FIA.TREE.CONDID - condition class; 1 = live tree

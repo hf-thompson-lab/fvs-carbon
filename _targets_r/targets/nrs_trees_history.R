@@ -76,7 +76,7 @@ tar_target(nrs_trees_history, {
     # Paste metadata on to history records to be friendly
     tree_history |>
       left_join(
-        all_trees |> select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR),
+        all_trees |> select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD, DIA, HT),
         by = join_by(CN)
       )
   }
@@ -87,9 +87,14 @@ tar_target(nrs_trees_history, {
   chunk_size <- 100
   
   bind_rows(
-    lapply(
-      plot_ids |> split(ceiling(1:nrow(plot_ids) / chunk_size)),
-      assemble_history
+      lapply(
+        plot_ids |> split(ceiling(1:nrow(plot_ids) / chunk_size)),
+        assemble_history
+      )
+    ) |>
+    # We also need MEASYEAR for any real time measurement
+    left_join(
+      nrs_plots_grown |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
+      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     )
-  )
 })
