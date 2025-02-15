@@ -359,26 +359,18 @@ records with other components, e.g. trees on the microplot will have a
 'SURVIVOR' record in each inventory prior to ingrowth.
 
 ```{targets nrs_grm_ingrowth, tar_simple = TRUE}
-fia_trees_filtered(fiadb, nrs_plots_grown, \(.data, con) {
-  .data |>
-    filter_trees_ingrowth(con) |>
-    # Trees can be marked as ingrown multiple times;
-    # Pick only the first ingrowth record for each tree
-    group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
-    filter(INVYR == min(INVYR, na.rm = TRUE)) |>
-    ungroup()
-})
+fia_grm_ingrowth(fiadb, nrs_plots_grown)
 ```
 
 ```{r preview nrs_grm_ingrowth, eval = FALSE}
-print(paste0("Ingrown trees: ", grm_ingrown |> nrow()))
+print(paste0("Ingrown trees: ", nrs_grm_ingrowth |> nrow()))
 print(paste0(
   "  ",
-  nrow(grm_ingrown) /
-    nrow(plot_grow_only) /
-    (max(grm_ingrown$MEASYEAR) - min(grm_ingrown$MEASYEAR)),
+  nrow(nrs_grm_ingrowth) /
+    nrow(nrs_plots_grown) /
+    (max(nrs_grm_ingrowth$MEASYEAR) - min(nrs_grm_ingrowth$MEASYEAR)),
   " ingrown trees / plot / year"))
-print(paste0("Ingrown trees over 3\" DBH: ", grm_ingrown |> filter(DIA_END > 3) |> nrow()))
+print(paste0("Ingrown trees over 3\" DBH: ", nrs_grm_ingrowth |> filter(DIA_END > 3) |> nrow()))
 ```
 
 ### FVS Restrictions on Ingrowth

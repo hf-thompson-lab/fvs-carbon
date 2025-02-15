@@ -183,3 +183,32 @@ fia_trees_filtered <- function(fiadb, plots, filter) {
     collect()
 }
 
+fia_grm_ingrowth <- function(fiadb, plots) {
+  con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
+  on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
+
+  # TREE_GRM_COMPONENT is breathtakingly slow, as in
+  # 2+ hours to do a semi_join with 3500 PLOT.CNs
+  # So fetch one plot's worth of ingrowth at a time and
+  # assemble them in memory, which takes ~7 minutes for
+  # 3500 PLOT.CNs resulting in 50,000 ingrowth records.
+  bind_rows(
+    lapply(plots$CN, \(cn) {
+      tbl(con, "TREE_GRM_COMPONENT") |>
+        filter(
+          PLT_CN == cn & (
+            MICR_COMPONENT_AL_FOREST == 'INGROWTH' |
+              SUBP_COMPONENT_AL_FOREST == 'INGROWTH'
+          )
+        ) |>
+        select(
+          TRE_CN, PREV_TRE_CN, PLT_CN,
+          DIA_BEGIN, DIA_MIDPT, DIA_END, ANN_DIA_GROWTH, ANN_HT_GROWTH,
+          MICR_COMPONENT_AL_FOREST, MICR_TPAGROW_UNADJ_AL_FOREST,
+          SUBP_COMPONENT_AL_FOREST, SUBP_TPAGROW_UNADJ_AL_FOREST
+        ) |>
+        collect()
+    })
+  )
+}
+

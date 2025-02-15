@@ -355,24 +355,6 @@ filter_plots_trees <- function(.data, con) {
     semi_join(plots_trees, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
-filter_trees_ingrowth <- function(.data, con) {
-  grm_ingrowth <- tbl(con, "TREE_GRM_COMPONENT") |> 
-    filter(
-      MICR_COMPONENT_AL_FOREST == 'INGROWTH' |
-        SUBP_COMPONENT_AL_FOREST == 'INGROWTH'
-    ) |>
-    select(
-      TRE_CN,
-      DIA_BEGIN, DIA_MIDPT, DIA_END, ANN_DIA_GROWTH, ANN_HT_GROWTH,
-      MICR_COMPONENT_AL_FOREST, MICR_TPAGROW_UNADJ_AL_FOREST,
-      SUBP_COMPONENT_AL_FOREST, SUBP_TPAGROW_UNADJ_AL_FOREST
-    ) |>
-    rename(CN = TRE_CN)
-  
-  .data |>
-    inner_join(grm_ingrowth, by = join_by(CN))
-}
-
 filter_plots_ba_frac <- function(.data, con, spcds, frac) {
   plots_ba_frac <- tbl(con, "TREE") |>
     semi_join(.data |> distinct(STATECD, COUNTYCD, PLOT), by = join_by(STATECD, COUNTYCD, PLOT)) |>
