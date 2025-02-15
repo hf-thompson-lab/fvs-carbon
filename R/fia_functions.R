@@ -157,6 +157,19 @@ fia_trees <- function(fiadb, plots) {
     collect()
 }
 
+fia_trees_by_cn <- function(fiadb, cns) {
+  con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
+  on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
+  # Fetch in groups of 100
+  bind_rows(
+    lapply(split(cns$CN, 1:(length(cns)/100)), \(cns_chunk) {
+      tbl(con, "TREE") |>
+        filter(CN %in% cns_chunk) |>
+        collect()
+    })
+  )
+}
+
 fia_trees_filtered <- function(fiadb, plots, filter) {
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)

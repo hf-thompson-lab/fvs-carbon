@@ -1,0 +1,7 @@
+tar_target(nrs_trees_ingrowth_all, {
+  fia_trees_by_cn(
+    fiadb,
+    nrs_grm_ingrowth_all |>
+      rename(CN=TRE_CN)
+  )
+})

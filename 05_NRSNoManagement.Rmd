@@ -358,9 +358,54 @@ can be marked 'INGROWTH', in different inventories. It may also have other
 records with other components, e.g. trees on the microplot will have a
 'SURVIVOR' record in each inventory prior to ingrowth.
 
-```{targets nrs_grm_ingrowth, tar_simple = TRUE}
+```{targets nrs_grm_ingrowth_all, tar_simple = TRUE}
 fia_grm_ingrowth(fiadb, nrs_plots_grown)
 ```
+Fetch the corresponding trees
+```{targets nrs_trees_ingrowth_all, tar_simple = TRUE}
+fia_trees_by_cn(
+  fiadb,
+  nrs_grm_ingrowth_all |>
+    rename(CN=TRE_CN)
+)
+```
+
+Some trees think they're allowed to ingrow more than once:
+
+```{r nrs_trees_ingrowth_dupes, eval = FALSE}
+nrs_trees_ingrowth_all |>
+  group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
+  filter(n() > 1) |>
+  summarize(.groups = "keep") |>
+  nrow()
+```
+
+```{targets nrs_grm_ingrowth, tar_simple = TRUE}
+multi_ingrowth <- nrs_trees_ingrowth_all |>
+  group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
+  arrange(INVYR) |>
+  filter(
+    n() > 1,
+    row_number() > 1
+  ) |>
+  select(CN)
+nrs_grm_ingrowth_all |>
+  anti_join(multi_ingrowth, by = join_by(TRE_CN == CN))
+```
+
+```{targets nrs_trees_ingrowth, tar_simple = TRUE}
+multi_ingrowth <- nrs_trees_ingrowth_all |>
+  group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
+  arrange(INVYR) |>
+  filter(
+    n() > 1,
+    row_number() > 1
+  ) |>
+  select(CN)
+nrs_trees_ingrowth_all |>
+  anti_join(multi_ingrowth, by = join_by(CN))
+```
+
 
 ```{r preview nrs_grm_ingrowth, eval = FALSE}
 print(paste0("Ingrown trees: ", nrs_grm_ingrowth |> nrow()))
