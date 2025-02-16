@@ -52,6 +52,7 @@ tar_load(nrs_grm_ingrowth)
 tar_load(nrs_trees_ingrowth)
 tar_load(nrs_trees_grown)
 tar_load(nrs_trees_history)
+tar_load(nrs_trees_growth)
 ```
 
 # Grow-Only Plots in the Northeast
@@ -950,7 +951,7 @@ tree_growth_multiyear <- tree_growth_with_outliers |>
 
 tree_growth_rate <- tree_growth_with_outliers |>
   distinct(STATECD, COUNTYCD, PLOT, MEASYEAR, PREV_MEASYEAR, SPCD) |>
-  left_join(species_mixin, by = join_by(SPCD)) |>
+  left_join(species_crosswalk, by = join_by(SPCD)) |>
   left_join(tree_growth_dom, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)) |>
   left_join(tree_growth_spcd, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)) |>
   left_join(tree_growth_spgrpcd, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPGRPCD)) |>
