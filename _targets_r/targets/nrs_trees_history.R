@@ -94,7 +94,7 @@ tar_target(nrs_trees_history, {
     ) |>
     left_join(
       nrs_trees_grown |>
-        select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD, DIA, HT),
+        select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD, DIA, HT, CCLCD),
       by = join_by(CN)
     ) |>
     left_join(

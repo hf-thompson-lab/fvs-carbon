@@ -619,7 +619,7 @@ nrs_trees_history <- tree_history |>
   ) |>
   left_join(
     nrs_trees_grown |>
-      select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD, DIA, HT),
+      select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD, DIA, HT, CCLCD),
     by = join_by(CN)
   ) |>
   left_join(
@@ -765,7 +765,7 @@ nrs_trees_history |>
   ) |>
   select(
     CN, PREV_TRE_CN,
-    STATECD, COUNTYCD, PLOT, SUBP, TREE, SPCD, 
+    STATECD, COUNTYCD, PLOT, SUBP, TREE, SPCD, CCLCD,
     MEASYEAR, PREV_MEASYEAR, DIA, PREV_DIA, HT, PREV_HT,
     AGE_DELTA, DIA_DELTA, ANN_DIA_DELTA, HT_DELTA, ANN_HT_DELTA
   ) |>
@@ -777,7 +777,8 @@ can look at different outlier removal strategies and the resulting distribution
 of observations:
 
 ```{r plot_tree_growth, eval = FALSE}
-tree_growth |>
+nrs_trees_growth |>
+  left_join(species_crosswalk, by = join_by(SPCD)) |>
   select(CN, SPGRPCD, JENKINS_SPGRP_NAME, ANN_DIA_DELTA) |>
   filter(!is.na(ANN_DIA_DELTA)) |>
   group_by(SPGRPCD) |>
@@ -806,13 +807,14 @@ tree_growth |>
   filter(!is.na(`Growth Rate`)) |>
   mutate(`Outliers Removed` = factor(`Outliers Removed`, levels = c("0%", "1%", "2.5%"))) |>
   ggplot(
-      aes(`Growth Rate`, fct_rev(fct_infreq(GROUP_NAME)), fill = `Outliers Removed`)
-    ) +
-    geom_boxplot() +
-    scale_fill_discrete(breaks = c("2.5%", "1%", "0%")) +
-    ggtitle("Measured Annual Growth with Outliers Removed by Species") +
-    xlab(bquote("Annual Growth " ~(inch %.% yr^-1))) +
-    ylab("Species Group")
+    aes(`Growth Rate`, fct_rev(fct_infreq(GROUP_NAME)), fill = `Outliers Removed`)
+  ) +
+  geom_boxplot() +
+  theme_bw() +
+  scale_fill_discrete(breaks = c("2.5%", "1%", "0%")) +
+  ggtitle("Measured Annual Growth by Species Group") +
+  xlab(bquote("Annual Growth " ~(inch %.% yr^-1))) +
+  ylab("Species Group")
 
 ```
 
@@ -836,7 +838,7 @@ For growth rate, we prioritize:
 tree_growth_rate - all computable growth rates for all plot/species/inventory
 
 ```{r tree_growth_rate, eval = FALSE}
-tree_growth_with_outliers <- tree_growth |>
+tree_growth_with_outliers <- nrs_trees_growth |>
   filter(!is.na(ANN_DIA_DELTA)) |>
   group_by(SPCD) |>
   arrange(ANN_DIA_DELTA) |>
@@ -846,6 +848,7 @@ tree_growth_with_outliers <- tree_growth |>
     OUTLIER_TWO = (row_number() > (n() * 0.025)) & (row_number() < (n() - n() * 0.025)),
     DIA_DELTA_TWO = if_else(OUTLIER_TWO, DIA_DELTA, NA)
   ) |>
+  left_join(species_crosswalk, by = join_by(SPCD)) |>
   ungroup()
 
 tree_growth_dom <- tree_growth_with_outliers |>

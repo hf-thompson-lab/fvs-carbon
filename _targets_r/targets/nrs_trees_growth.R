@@ -32,7 +32,7 @@ tar_target(nrs_trees_growth, {
     ) |>
     select(
       CN, PREV_TRE_CN,
-      STATECD, COUNTYCD, PLOT, SUBP, TREE, SPCD, 
+      STATECD, COUNTYCD, PLOT, SUBP, TREE, SPCD, CCLCD,
       MEASYEAR, PREV_MEASYEAR, DIA, PREV_DIA, HT, PREV_HT,
       AGE_DELTA, DIA_DELTA, ANN_DIA_DELTA, HT_DELTA, ANN_HT_DELTA
     ) |>
