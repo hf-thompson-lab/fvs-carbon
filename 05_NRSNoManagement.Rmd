@@ -193,7 +193,7 @@ fia_plots_filtered(fiadb, nrs_plots_grown, \(.data, con) {
       rename(FORTYPE = MEANING)
     
     tree_stats <- tbl(con, "TREE") |>
-      inner_join(plots |> plots_select, by = plots_join_by) |>
+      inner_join(plots |> select(STATECD, COUNTYCD, PLOT, INVYR), by = plots_join_by) |>
       select(STATECD, COUNTYCD, PLOT, INVYR, DIA, CARBON_AG, TPA_UNADJ) |>
       group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
       summarize(
@@ -205,7 +205,7 @@ fia_plots_filtered(fiadb, nrs_plots_grown, \(.data, con) {
       )
     
     cond_stats <- tbl(con, "COND") |>
-      inner_join(plots |> plots_select, by = plots_join_by) |>
+      inner_join(plots |> select(STATECD, COUNTYCD, PLOT, INVYR), by = plots_join_by) |>
       select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, FORTYPCD) |>
       group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
       # QMD = sqrt(sum(DIA^2) / n)
@@ -809,7 +809,8 @@ nrs_trees_growth |>
   ggplot(
     aes(`Growth Rate`, fct_rev(fct_infreq(GROUP_NAME)), fill = `Outliers Removed`)
   ) +
-  geom_boxplot() +
+  geom_boxplot(outlier.size = 1) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
   theme_bw() +
   scale_fill_discrete(breaks = c("2.5%", "1%", "0%")) +
   ggtitle("Measured Annual Growth by Species Group") +
@@ -1031,8 +1032,8 @@ tree_growth_rate |>
     scale_fill_discrete(breaks = c("2.5%", "1%", "0%")) +
     coord_cartesian(xlim = c(-0.2, 0.2)) +
     theme_bw() +
-    ggtitle("Measured Annual Basal Area Growth of Ingrown Trees") +
-    xlab(bquote("Annual Basal Area Growth " ~(m^2 %.% yr^-1))) +
+    ggtitle("Measured Basal Area Increment of Ingrown Trees") +
+    xlab(bquote("Basal Area Increment " ~(m^2 %.% yr^-1))) +
     ylab("Species Group")
 
 ```
@@ -1042,13 +1043,18 @@ tree_growth_rate |>
 Can we use that to back-project ingrown trees?
 
 ```{r manual_back_projection, eval = FALSE}
-location_mixin <- tree_ingrown |>
-  select(CN, STATECD, COUNTYCD, PLOT, SPCD)
-
-manual_back_projection <- tree_ingrown_last |>
+nrs_trees_growth |>
+  left_join(nrs_trees_history |> select(CN, FIRST_TRE_CN, ESTAB), by = join_by(CN)) |>
+  group_by(FIRST_TRE_CN) |>
+  arrange(MEASYEAR) |>
+  mutate(
+    FIRST_DIA = if_else(row_number() == 1, DIA, NA),
+    FIRST_MEASYEAR = if_else(row_number() == 1, MEASYEAR, NA)
+  ) |>
+  fill(FIRST_DIA, FIRST_MEASYEAR, .direction = "down") |>
+  ungroup() |>
+  filter(ESTAB) |> # trees that ingrow
   filter(FIRST_DIA < DIA) |> # Trees that grow
-  left_join(location_mixin, by = join_by(CN)) |>
-  # Add on growth rate
   left_join(tree_growth_rate, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)) |>
   mutate(
     DIA_EST = DIA - (MEASYEAR - FIRST_MEASYEAR) * ANN_DIA_DELTA_MULTIYEAR,
@@ -1058,9 +1064,7 @@ manual_back_projection <- tree_ingrown_last |>
     DIA_EST_TWO = DIA - (MEASYEAR - FIRST_MEASYEAR) * ANN_DIA_DELTA_MULTIYEAR_TWO,
     DIA_ERR_TWO = (DIA_EST_TWO - FIRST_DIA) / FIRST_DIA
   ) |>
-  arrange(DIA_ERR)
-
-manual_back_projection |>
+  arrange(DIA_ERR) |>
   group_by() |>
   summarize(
     COUNT = n(),
@@ -1092,9 +1096,9 @@ We can fill in a DIA_EST using the growth interval, and iterate until
 they're all filled in.
 
 ```{r init_stepwise_manual_back_projection, eval = FALSE}
-manual_back_projection <- tree_ingrown |>
+manual_back_projection <- nrs_trees_growth |>
   # Start with actually ingrown trees
-  semi_join(grm_ingrown, by = join_by(CN == TRE_CN)) |>
+  semi_join(nrs_trees_history |> filter(ESTAB), by = join_by(CN)) |>
   select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, PREV_TRE_CN, DIA) |>
   left_join(
     tree_growth_rate |>
@@ -1138,7 +1142,7 @@ while (nrow(prev_tre_cns) > 0) {
     ", CNs: ",
     nrow(prev_tre_cns)
   ))
-  tmp_trees <- tree_ingrown |>
+  tmp_trees <- nrs_trees_growth |>
     semi_join(prev_tre_cns, by = join_by(CN == PREV_TRE_CN)) |>
     select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, PREV_TRE_CN, DIA) |>
         # Join on growth rates
@@ -1173,7 +1177,7 @@ while (nrow(prev_tre_cns) > 0) {
       PREV_DIA_EST_ONE = DIA_EST_ONE - DIA_DELTA_ONE,
       PREV_DIA_EST_TWO = DIA_EST_TWO - DIA_DELTA_TWO
     )
-  # Apparently, some trees can be tracked back before the end of time
+  # Apparently, some trees can be tracked back before the beginning of time
   # or something, so we can end up with some PREV_TRE_CNs that are
   # dangling refrences.
   if (nrow(tmp_trees) == 0) {
@@ -1221,13 +1225,20 @@ manual_back_projection |>
 Apply Back-Projection
 
 ```{r projected_vs_measured_annual_growth, eval = FALSE}
-fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-
-projected_annual_growth <- tree_ingrown_last |>
-  filter(MEASYEAR != FIRST_MEASYEAR) |>
+projected_annual_growth <- nrs_trees_growth |>
+  left_join(nrs_trees_history |> select(CN, FIRST_TRE_CN, ESTAB), by = join_by(CN)) |>
+  group_by(FIRST_TRE_CN) |>
+  arrange(MEASYEAR) |>
+  mutate(
+    FIRST_DIA = if_else(row_number() == 1, DIA, NA),
+    FIRST_MEASYEAR = if_else(row_number() == 1, MEASYEAR, NA)
+  ) |>
+  fill(FIRST_DIA, FIRST_MEASYEAR, .direction = "down") |>
+  ungroup() |>
+  filter(ESTAB) |> # trees that ingrow
   left_join(
     manual_back_projection |>
-      select(CN, SPCD, DIA_EST, DIA_EST_ONE, DIA_EST_TWO),
+      select(CN, DIA_EST, DIA_EST_ONE, DIA_EST_TWO),
     by = join_by(FIRST_TRE_CN == CN)
   ) |>
 
@@ -1253,7 +1264,7 @@ projected_annual_growth <- tree_ingrown_last |>
     ANN_DIA_ERR_TWO = DIA_ERR_TWO / (MEASYEAR - FIRST_MEASYEAR),
   ) |>
   filter(!is.na(DIA_ERR)) |>
-  left_join(species_mixin, by = join_by(SPCD)) |>
+  left_join(species_crosswalk, by = join_by(SPCD)) |>
   group_by(JENKINS_SPGRP_NAME) |>
   mutate(GROUP_NAME = paste0(JENKINS_SPGRP_NAME, ", n=", n())) |>
   ungroup() |>
@@ -1280,8 +1291,8 @@ ggplot(
   scale_fill_discrete(breaks = rev(levels(projected_annual_growth$Series))) +
   #coord_cartesian(xlim = c(-0.2, 0.2)) +
   theme_bw() +
-  ggtitle("Projected Annual Growth of Ingrown Trees") +
-  xlab(bquote("Change in Basal Area " ~(m^2 %.% yr^-1))) +
+  ggtitle("Projected vs. Measured BAI of Ingrown Trees") +
+  xlab(bquote("Basal Area Increment " ~(m^2 %.% yr^-1))) +
   ylab("Species Group")
 ```
 
