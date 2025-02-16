@@ -7,6 +7,7 @@ tar_target(nrs_plots_grown, {
   fia_plots_filtered(
     fiadb, filter = \(.data, con) {
       .data |>
+        filter(INVYR >= 1999) |> # Do this first, it impacts later filters
         filter_plots_fvsne(con) |>
         filter_plots_modern(con) |>
         filter_plots_trees(con) |>

@@ -50,6 +50,8 @@ tar_load(nrs_grm_ingrowth_all)
 tar_load(nrs_trees_ingrowth_all)
 tar_load(nrs_grm_ingrowth)
 tar_load(nrs_trees_ingrowth)
+tar_load(nrs_trees_grown)
+tar_load(nrs_trees_history)
 ```
 
 # Grow-Only Plots in the Northeast
