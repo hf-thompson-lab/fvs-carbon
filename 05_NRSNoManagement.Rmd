@@ -582,27 +582,27 @@ while ((current_trees <- earlier_trees(current_trees)) |> nrow() > 0) {
 
 # Head trees now contains the earliest trees for all tree histories.
 # Create a table of the entire history of each tree, of the form
-# CN, FIRST_CN, LAST_CN
+# CN, FIRST_TRE_CN, LAST_TRE_CN
 # We do this in three steps:
-# 1. CN, FIRST_CN for the head trees (CN == FIRST_CN)
-# 2. CN, FIRST_CN for trees where PREV_TRE_CN in CN
+# 1. CN, FIRST_TRE_CN for the head trees (CN == FIRST_TRE_CN)
+# 2. CN, FIRST_TRE_CN for trees where PREV_TRE_CN in CN
 # Repeat step 2 until nothing more matches
-# 3. Fill in LAST_CN for everything
+# 3. Fill in LAST_TRE_CN for everything
   
 current_trees <- head_trees |> filter(!is.na(NEXT_TRE_CN))
-tree_history <- head_trees |> select(CN) |> mutate(FIRST_CN = CN, LAST_CN = CN)
+tree_history <- head_trees |> select(CN) |> mutate(FIRST_TRE_CN = CN, LAST_TRE_CN = CN)
 
 while ((current_trees <- later_trees(current_trees)) |> nrow() > 0) {
-  current_cns <- current_trees |> select(CN, PREV_TRE_CN) |> rename(LAST_CN = CN)
+  current_cns <- current_trees |> select(CN, PREV_TRE_CN) |> rename(LAST_TRE_CN = CN)
   updated_history_rows <- tree_history |>
-    left_join(current_cns, by = join_by(LAST_CN == PREV_TRE_CN)) |>
-    mutate(LAST_CN = coalesce(LAST_CN.y, LAST_CN)) |>
-    select(CN, FIRST_CN, LAST_CN)
+    left_join(current_cns, by = join_by(LAST_TRE_CN == PREV_TRE_CN)) |>
+    mutate(LAST_TRE_CN = coalesce(LAST_TRE_CN.y, LAST_TRE_CN)) |>
+    select(CN, FIRST_TRE_CN, LAST_TRE_CN)
   new_history_rows <- current_trees |>
     select(CN, PREV_TRE_CN) |>
-    mutate(LAST_CN = CN) |>
-    left_join(tree_history |> select(CN, FIRST_CN), by = join_by(PREV_TRE_CN == CN)) |>
-    select(CN, FIRST_CN, LAST_CN)
+    mutate(LAST_TRE_CN = CN) |>
+    left_join(tree_history |> select(CN, FIRST_TRE_CN), by = join_by(PREV_TRE_CN == CN)) |>
+    select(CN, FIRST_TRE_CN, LAST_TRE_CN)
   tree_history <- bind_rows(
     updated_history_rows,
     new_history_rows
@@ -614,6 +614,9 @@ stopifnot(nrs_trees_grown |> anti_join(tree_history, by = join_by(CN)) |> nrow()
 
 # Paste metadata on to history records to be friendly
 nrs_trees_history <- tree_history |>
+  left_join(
+    tree_prev_next, by = join_by(CN)
+  ) |>
   left_join(
     nrs_trees_grown |>
       select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD, DIA, HT),
@@ -647,7 +650,7 @@ How many of those are traceable back to when they had DBH <= 3?
 nrs_trees_history |>
   semi_join(
     nrs_trees_history |> filter(ESTAB == TRUE),
-    by = join_by(CN == FIRST_CN)
+    by = join_by(CN == FIRST_TRE_CN)
   ) |>
   filter(DIA <= 3) |>
   nrow()
@@ -673,16 +676,17 @@ tree_growth_fia <- nrs_trees_history |>
     nrs_grm_ingrowth |> select(TRE_CN, ANN_DIA_GROWTH),
     by = join_by(CN == TRE_CN)
   ) |>
-  group_by(FIRST_CN) |>
+  filter(!is.na(DIA)) |>
+  group_by(FIRST_TRE_CN) |>
   mutate(
-    FRST_DIA = min(DIA, na.rm = TRUE),
-    FRST_MEASYEAR = min(MEASYEAR, na.rm = TRUE)
+    FIRST_DIA = min(DIA, na.rm = TRUE),
+    FIRST_MEASYEAR = min(MEASYEAR, na.rm = TRUE)
   ) |>
   ungroup() |>
   filter(!is.na(ANN_DIA_GROWTH)) |>
-  filter(FRST_DIA < DIA) |>
-  mutate(DIA_EST = DIA - (MEASYEAR - FRST_MEASYEAR) * ANN_DIA_GROWTH) |>
-  mutate(DIA_ERR = abs(100 * (DIA_EST - FRST_DIA) / FRST_DIA)) |>
+  filter(FIRST_DIA < DIA) |>
+  mutate(DIA_EST = DIA - (MEASYEAR - FIRST_MEASYEAR) * ANN_DIA_GROWTH) |>
+  mutate(DIA_ERR = abs(100 * (DIA_EST - FIRST_DIA) / FIRST_DIA)) |>
   filter(!is.na(DIA_ERR)) |>
   arrange(DIA_ERR)
 
@@ -724,85 +728,48 @@ tree_growth - adds to each tree:
  - *_DELTA - diameter/height/age change since previous inventory
  - ANN_*_DELTA - annualize rate of diameter change since previous inventory
   
-Note that tree_growth is all trees, not just ingrown trees.
-
 This also fetches trees with only a single observation; these are useful
 for calculating ingrowth.
 
-```{r tree_growth, eval = FALSE}
-  # FIA.TREE.CN - sequence number
-  # FIA.TREE.TREE - TREE number
-  # FIA.TREE.CONDID - condition class; 1 = live tree
-  # FIA.TREE.SPCD - species code
-  # FIA.TREE.DIA - current diameter
-  # FIA.TREE.DIAHTCD - where diameter was taken, 1 = DBH
-  # FIA.TREE.HT - height
-  # FIA.TREE.SPGRPCD is broader than SPCD, group by that instead
-  # FIA.TREE.CCLCD - Crown Class code
-  # FIA.TREE.TPA_UNADJ - Trees Per Acre (Unadjusted)
-  # We want ingrowth for all the plots in plot_grow_only
-  
-  fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-  measyear_mixin <- tbl(fia, 'PLOT') |>
-    select(CN, MEASYEAR) |>
-    rename(PLT_CN = CN)
-  
-  prev_tre_mixin <- tbl(fia, 'TREE') |>
-    select(CN, PLT_CN, DIA, HT) |>
-    left_join(measyear_mixin, by = join_by(PLT_CN)) |>
-    rename(
-      PREV_TRE_CN = CN,
-      PREV_PLT_CN = PLT_CN,
-      PREV_MEASYEAR = MEASYEAR,
-      PREV_DIA = DIA,
-      PREV_HT = HT
-    )
+```{targets nrs_trees_growth, tar_simple = TRUE}
+# FIA.TREE.CN - sequence number
+# FIA.TREE.TREE - TREE number
+# FIA.TREE.CONDID - condition class; 1 = live tree
+# FIA.TREE.SPCD - species code
+# FIA.TREE.DIA - current diameter
+# FIA.TREE.DIAHTCD - where diameter was taken, 1 = DBH
+# FIA.TREE.HT - height
+# FIA.TREE.SPGRPCD is broader than SPCD, group by that instead
+# FIA.TREE.CCLCD - Crown Class code
+# FIA.TREE.TPA_UNADJ - Trees Per Acre (Unadjusted)
+# We want ingrowth for all the plots in plot_grow_only
 
-  tree_growth <- tbl(fia, 'TREE') |>
-    semi_join(
-      plot_grow_only |> arrange(STATECD, COUNTYCD, PLOT),
-      by = join_by(STATECD, COUNTYCD, PLOT),
-      copy = TRUE
-    ) |>
-    # Live trees
-    filter(CONDID == 1) |>
-    # Many trees will have no previous tree, don't filter those out.
-    # filter(!is.na(PREV_TRE_CN)) |>
-    # Self-join to previous tree to get growth increment
-    left_join(prev_tre_mixin, by = join_by(PREV_TRE_CN)) |>
-    left_join(measyear_mixin, by = join_by(PLT_CN)) |>
-    mutate(
-      DIA_DELTA = DIA - PREV_DIA,
-      AGE_DELTA = MEASYEAR - PREV_MEASYEAR,
-      ANN_DIA_DELTA = DIA_DELTA / AGE_DELTA,
-      HT_DELTA = HT - PREV_HT,
-      ANN_HT_DELTA = HT_DELTA / AGE_DELTA
-    ) |>
-    select(
-      CN, PREV_TRE_CN, PLT_CN, PREV_PLT_CN,
-      STATECD, COUNTYCD, PLOT, SUBP, TREE, SPCD, TPA_UNADJ,
-      MEASYEAR, PREV_MEASYEAR, CCLCD, DIA, PREV_DIA, HT, PREV_HT,
-      AGE_DELTA, DIA_DELTA, ANN_DIA_DELTA, HT_DELTA, ANN_HT_DELTA
-    ) |>
-    arrange(STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR) |>
-    collect()
-  
-  dbDisconnect(fia)
+prev_tre_mixin <- nrs_trees_history |>
+  select(CN, MEASYEAR, DIA, HT) |>
+  rename(
+    PREV_TRE_CN = CN,
+    PREV_MEASYEAR = MEASYEAR,
+    PREV_DIA = DIA,
+    PREV_HT = HT
+  )
 
-  tree_growth <- tree_growth |>
-    left_join(species_mixin, by = join_by(SPCD)) |>
-    mutate(SZCLCD = case_when(
-      DIA < 1 ~ 0,
-      DIA < 5 ~ 1,
-      HARD_SOFT == "SOFTWOOD" & DIA < 9 ~ 2,
-      HARD_SOFT == "HARDWOOD" & DIA < 11 ~ 2,
-      .default = 3
-    ))
-
-  rm(fia, measyear_mixin, prev_tre_mixin)
-
-  write_rds(tree_growth, rds_file)
-}
+nrs_trees_history |>
+  # Self-join to previous tree to get growth increment
+  left_join(prev_tre_mixin, by = join_by(PREV_TRE_CN)) |>
+  mutate(
+    DIA_DELTA = DIA - PREV_DIA,
+    AGE_DELTA = MEASYEAR - PREV_MEASYEAR,
+    ANN_DIA_DELTA = DIA_DELTA / AGE_DELTA,
+    HT_DELTA = HT - PREV_HT,
+    ANN_HT_DELTA = HT_DELTA / AGE_DELTA
+  ) |>
+  select(
+    CN, PREV_TRE_CN,
+    STATECD, COUNTYCD, PLOT, SUBP, TREE, SPCD, 
+    MEASYEAR, PREV_MEASYEAR, DIA, PREV_DIA, HT, PREV_HT,
+    AGE_DELTA, DIA_DELTA, ANN_DIA_DELTA, HT_DELTA, ANN_HT_DELTA
+  ) |>
+  arrange(STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR)
 ```
 
 Measurement is imperfect, leading to some outliers in the growth table. We
@@ -1076,17 +1043,17 @@ location_mixin <- tree_ingrown |>
   select(CN, STATECD, COUNTYCD, PLOT, SPCD)
 
 manual_back_projection <- tree_ingrown_last |>
-  filter(FRST_DIA < DIA) |> # Trees that grow
+  filter(FIRST_DIA < DIA) |> # Trees that grow
   left_join(location_mixin, by = join_by(CN)) |>
   # Add on growth rate
   left_join(tree_growth_rate, by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD)) |>
   mutate(
-    DIA_EST = DIA - (MEASYEAR - FRST_MEASYEAR) * ANN_DIA_DELTA_MULTIYEAR,
-    DIA_ERR = (DIA_EST - FRST_DIA) / FRST_DIA,
-    DIA_EST_ONE = DIA - (MEASYEAR - FRST_MEASYEAR) * ANN_DIA_DELTA_MULTIYEAR_ONE,
-    DIA_ERR_ONE = (DIA_EST_ONE - FRST_DIA) / FRST_DIA,
-    DIA_EST_TWO = DIA - (MEASYEAR - FRST_MEASYEAR) * ANN_DIA_DELTA_MULTIYEAR_TWO,
-    DIA_ERR_TWO = (DIA_EST_TWO - FRST_DIA) / FRST_DIA
+    DIA_EST = DIA - (MEASYEAR - FIRST_MEASYEAR) * ANN_DIA_DELTA_MULTIYEAR,
+    DIA_ERR = (DIA_EST - FIRST_DIA) / FIRST_DIA,
+    DIA_EST_ONE = DIA - (MEASYEAR - FIRST_MEASYEAR) * ANN_DIA_DELTA_MULTIYEAR_ONE,
+    DIA_ERR_ONE = (DIA_EST_ONE - FIRST_DIA) / FIRST_DIA,
+    DIA_EST_TWO = DIA - (MEASYEAR - FIRST_MEASYEAR) * ANN_DIA_DELTA_MULTIYEAR_TWO,
+    DIA_ERR_TWO = (DIA_EST_TWO - FIRST_DIA) / FIRST_DIA
   ) |>
   arrange(DIA_ERR)
 
@@ -1254,33 +1221,33 @@ Apply Back-Projection
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 
 projected_annual_growth <- tree_ingrown_last |>
-  filter(MEASYEAR != FRST_MEASYEAR) |>
+  filter(MEASYEAR != FIRST_MEASYEAR) |>
   left_join(
     manual_back_projection |>
       select(CN, SPCD, DIA_EST, DIA_EST_ONE, DIA_EST_TWO),
-    by = join_by(FRST_TRE_CN == CN)
+    by = join_by(FIRST_TRE_CN == CN)
   ) |>
 
   # Be metric
   mutate(
     DIA = conv_unit(DIA, "in", "cm"),
-    FRST_DIA = conv_unit(FRST_DIA, "in", "cm"),
+    FIRST_DIA = conv_unit(FIRST_DIA, "in", "cm"),
     DIA_EST = conv_unit(DIA_EST, "in", "cm"),
     DIA_EST_ONE = conv_unit(DIA_EST_ONE, "in", "cm"),
     DIA_EST_TWO = conv_unit(DIA_EST_TWO, "in", "cm"),
   ) |>
 
   mutate(
-    ANN_DIA = (DIA - FRST_DIA) / (MEASYEAR - FRST_MEASYEAR),
-    DIA_ERR = (FRST_DIA - DIA_EST),
-    ANN_DIA_EST = (DIA - DIA_EST) / (MEASYEAR - FRST_MEASYEAR),
-    ANN_DIA_ERR = DIA_ERR / (MEASYEAR - FRST_MEASYEAR),
-    DIA_ERR_ONE = (FRST_DIA - DIA_EST_ONE),
-    ANN_DIA_EST_ONE = (DIA - DIA_EST_ONE) / (MEASYEAR - FRST_MEASYEAR),
-    ANN_DIA_ERR_ONE = DIA_ERR_ONE / (MEASYEAR - FRST_MEASYEAR),
-    DIA_ERR_TWO = (FRST_DIA - DIA_EST_TWO),
-    ANN_DIA_EST_TWO = (DIA - DIA_EST_TWO) / (MEASYEAR - FRST_MEASYEAR),
-    ANN_DIA_ERR_TWO = DIA_ERR_TWO / (MEASYEAR - FRST_MEASYEAR),
+    ANN_DIA = (DIA - FIRST_DIA) / (MEASYEAR - FIRST_MEASYEAR),
+    DIA_ERR = (FIRST_DIA - DIA_EST),
+    ANN_DIA_EST = (DIA - DIA_EST) / (MEASYEAR - FIRST_MEASYEAR),
+    ANN_DIA_ERR = DIA_ERR / (MEASYEAR - FIRST_MEASYEAR),
+    DIA_ERR_ONE = (FIRST_DIA - DIA_EST_ONE),
+    ANN_DIA_EST_ONE = (DIA - DIA_EST_ONE) / (MEASYEAR - FIRST_MEASYEAR),
+    ANN_DIA_ERR_ONE = DIA_ERR_ONE / (MEASYEAR - FIRST_MEASYEAR),
+    DIA_ERR_TWO = (FIRST_DIA - DIA_EST_TWO),
+    ANN_DIA_EST_TWO = (DIA - DIA_EST_TWO) / (MEASYEAR - FIRST_MEASYEAR),
+    ANN_DIA_ERR_TWO = DIA_ERR_TWO / (MEASYEAR - FIRST_MEASYEAR),
   ) |>
   filter(!is.na(DIA_ERR)) |>
   left_join(species_mixin, by = join_by(SPCD)) |>
@@ -1338,13 +1305,13 @@ tree_ingrown_three <- tree_ingrown |>
   ) |>
   # Fill in estimated diameters
   mutate(
-    FRST_MEASYEAR = if_else(DIA > 3, PREV_MEASYEAR, MEASYEAR),
-    FRST_DIA_EST = if_else(DIA > 3, DIA - DIA_DELTA, DIA),
-    FRST_DIA_EST_ONE = if_else(DIA > 3, DIA - DIA_DELTA_ONE, DIA),
-    FRST_DIA_EST_TWO = if_else(DIA > 3, DIA - DIA_DELTA_TWO, DIA)
+    FIRST_MEASYEAR = if_else(DIA > 3, PREV_MEASYEAR, MEASYEAR),
+    FIRST_DIA_EST = if_else(DIA > 3, DIA - DIA_DELTA, DIA),
+    FIRST_DIA_EST_ONE = if_else(DIA > 3, DIA - DIA_DELTA_ONE, DIA),
+    FIRST_DIA_EST_TWO = if_else(DIA > 3, DIA - DIA_DELTA_TWO, DIA)
   ) |>
   mutate(
-    PREV_MEASYEAR = if_else(FRST_DIA_EST > 3, PREV_MEASYEAR, NA)
+    PREV_MEASYEAR = if_else(FIRST_DIA_EST > 3, PREV_MEASYEAR, NA)
   )
 ```
 
@@ -1393,16 +1360,16 @@ while (nrow(prev_measyears) > 0) {
     rename(PREV_MEASYEAR = PREV_MEASYEAR.y) |>
     # Update estimated diameters, but only if growth joined on
     mutate(
-      FRST_MEASYEAR = if_else(!is.na(DIA_DELTA), PREV_MEASYEAR, FRST_MEASYEAR),
-      FRST_DIA_EST =
-        if_else(!is.na(DIA_DELTA), FRST_DIA_EST - DIA_DELTA, FRST_DIA_EST),
-      FRST_DIA_EST_ONE =
-        if_else(!is.na(DIA_DELTA), FRST_DIA_EST_ONE - DIA_DELTA_ONE, FRST_DIA_EST_ONE),
-      FRST_DIA_EST_TWO =
-        if_else(!is.na(DIA_DELTA), FRST_DIA_EST_TWO - DIA_DELTA_TWO, FRST_DIA_EST_TWO)
+      FIRST_MEASYEAR = if_else(!is.na(DIA_DELTA), PREV_MEASYEAR, FIRST_MEASYEAR),
+      FIRST_DIA_EST =
+        if_else(!is.na(DIA_DELTA), FIRST_DIA_EST - DIA_DELTA, FIRST_DIA_EST),
+      FIRST_DIA_EST_ONE =
+        if_else(!is.na(DIA_DELTA), FIRST_DIA_EST_ONE - DIA_DELTA_ONE, FIRST_DIA_EST_ONE),
+      FIRST_DIA_EST_TWO =
+        if_else(!is.na(DIA_DELTA), FIRST_DIA_EST_TWO - DIA_DELTA_TWO, FIRST_DIA_EST_TWO)
     ) |>
     mutate(
-      PREV_MEASYEAR = if_else(!is.na(DIA_DELTA) & FRST_DIA_EST > 3, PREV_MEASYEAR, NA)
+      PREV_MEASYEAR = if_else(!is.na(DIA_DELTA) & FIRST_DIA_EST > 3, PREV_MEASYEAR, NA)
     )
 
   # This generally completes in 4 iterations; if we hit 10 something's wrong.
@@ -1420,12 +1387,12 @@ tree_ingrown_three |>
   group_by() |>
   summarize(
     COUNT = n(),
-    MISSING = sum(is.na(FRST_DIA_EST), na.rm = TRUE) / COUNT,
-    MISSING_ONE = sum(is.na(FRST_DIA_EST_ONE), na.rm = TRUE) / COUNT,
-    MISSING_TWO = sum(is.na(FRST_DIA_EST_TWO), na.rm = TRUE) / COUNT,
-    HIT = sum(FRST_DIA_EST <= 3, na.rm = TRUE) / COUNT,
-    HIT_ONE = sum(FRST_DIA_EST_ONE <= 3, na.rm = TRUE) / COUNT,
-    HIT_TWO = sum(FRST_DIA_EST_TWO <= 3, na.rm = TRUE) / COUNT,
+    MISSING = sum(is.na(FIRST_DIA_EST), na.rm = TRUE) / COUNT,
+    MISSING_ONE = sum(is.na(FIRST_DIA_EST_ONE), na.rm = TRUE) / COUNT,
+    MISSING_TWO = sum(is.na(FIRST_DIA_EST_TWO), na.rm = TRUE) / COUNT,
+    HIT = sum(FIRST_DIA_EST <= 3, na.rm = TRUE) / COUNT,
+    HIT_ONE = sum(FIRST_DIA_EST_ONE <= 3, na.rm = TRUE) / COUNT,
+    HIT_TWO = sum(FIRST_DIA_EST_TWO <= 3, na.rm = TRUE) / COUNT,
     .groups = 'keep'
   ) |>
   ungroup() |>
@@ -1438,23 +1405,23 @@ How'd we do?
 ```{r plot_tree_ingrown_three, eval = FALSE}
 tree_ingrown_three_validation <- tree_ingrown_three |>
   select(CN, MEASYEAR, SPCD, # STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR, SPCD,
-         FRST_MEASYEAR, FRST_DIA_EST, FRST_DIA_EST_ONE, FRST_DIA_EST_TWO) |>
-  filter(FRST_MEASYEAR != MEASYEAR) |>
+         FIRST_MEASYEAR, FIRST_DIA_EST, FIRST_DIA_EST_ONE, FIRST_DIA_EST_TWO) |>
+  filter(FIRST_MEASYEAR != MEASYEAR) |>
   #head(1000) |>
 #  left_join(
 #    tree_ingrown |> select(STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR, DIA),
-#    by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, FRST_MEASYEAR == MEASYEAR)
+#    by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, FIRST_MEASYEAR == MEASYEAR)
 #  ) |>
   left_join(species_mixin, by = join_by(SPCD)) |>
   group_by(JENKINS_SPGRP_NAME) |>
   mutate(GROUP_NAME = paste0(JENKINS_SPGRP_NAME, ", n=", n())) |>
   ungroup() |>
-  select(CN, GROUP_NAME, FRST_DIA_EST, FRST_DIA_EST_ONE, FRST_DIA_EST_TWO) |>
+  select(CN, GROUP_NAME, FIRST_DIA_EST, FIRST_DIA_EST_ONE, FIRST_DIA_EST_TWO) |>
   rename(
 #    `Measured` = DIA,
-    `Estimated` = FRST_DIA_EST,
-    `Est - 1%` = FRST_DIA_EST_ONE,
-    `Est - 2.5%` = FRST_DIA_EST_TWO
+    `Estimated` = FIRST_DIA_EST,
+    `Est - 1%` = FIRST_DIA_EST_ONE,
+    `Est - 2.5%` = FIRST_DIA_EST_TWO
   ) |>
   melt(
     id.vars = c("CN", "GROUP_NAME"),

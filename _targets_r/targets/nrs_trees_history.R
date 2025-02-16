@@ -57,27 +57,27 @@ tar_target(nrs_trees_history, {
   
   # Head trees now contains the earliest trees for all tree histories.
   # Create a table of the entire history of each tree, of the form
-  # CN, FIRST_CN, LAST_CN
+  # CN, FIRST_TRE_CN, LAST_TRE_CN
   # We do this in three steps:
-  # 1. CN, FIRST_CN for the head trees (CN == FIRST_CN)
-  # 2. CN, FIRST_CN for trees where PREV_TRE_CN in CN
+  # 1. CN, FIRST_TRE_CN for the head trees (CN == FIRST_TRE_CN)
+  # 2. CN, FIRST_TRE_CN for trees where PREV_TRE_CN in CN
   # Repeat step 2 until nothing more matches
-  # 3. Fill in LAST_CN for everything
+  # 3. Fill in LAST_TRE_CN for everything
     
   current_trees <- head_trees |> filter(!is.na(NEXT_TRE_CN))
-  tree_history <- head_trees |> select(CN) |> mutate(FIRST_CN = CN, LAST_CN = CN)
+  tree_history <- head_trees |> select(CN) |> mutate(FIRST_TRE_CN = CN, LAST_TRE_CN = CN)
   
   while ((current_trees <- later_trees(current_trees)) |> nrow() > 0) {
-    current_cns <- current_trees |> select(CN, PREV_TRE_CN) |> rename(LAST_CN = CN)
+    current_cns <- current_trees |> select(CN, PREV_TRE_CN) |> rename(LAST_TRE_CN = CN)
     updated_history_rows <- tree_history |>
-      left_join(current_cns, by = join_by(LAST_CN == PREV_TRE_CN)) |>
-      mutate(LAST_CN = coalesce(LAST_CN.y, LAST_CN)) |>
-      select(CN, FIRST_CN, LAST_CN)
+      left_join(current_cns, by = join_by(LAST_TRE_CN == PREV_TRE_CN)) |>
+      mutate(LAST_TRE_CN = coalesce(LAST_TRE_CN.y, LAST_TRE_CN)) |>
+      select(CN, FIRST_TRE_CN, LAST_TRE_CN)
     new_history_rows <- current_trees |>
       select(CN, PREV_TRE_CN) |>
-      mutate(LAST_CN = CN) |>
-      left_join(tree_history |> select(CN, FIRST_CN), by = join_by(PREV_TRE_CN == CN)) |>
-      select(CN, FIRST_CN, LAST_CN)
+      mutate(LAST_TRE_CN = CN) |>
+      left_join(tree_history |> select(CN, FIRST_TRE_CN), by = join_by(PREV_TRE_CN == CN)) |>
+      select(CN, FIRST_TRE_CN, LAST_TRE_CN)
     tree_history <- bind_rows(
       updated_history_rows,
       new_history_rows
@@ -89,6 +89,9 @@ tar_target(nrs_trees_history, {
   
   # Paste metadata on to history records to be friendly
   nrs_trees_history <- tree_history |>
+    left_join(
+      tree_prev_next, by = join_by(CN)
+    ) |>
     left_join(
       nrs_trees_grown |>
         select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD, DIA, HT),
