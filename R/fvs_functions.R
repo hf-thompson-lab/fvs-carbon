@@ -161,7 +161,11 @@ fvs_fia_input <- function(stands, fiadb, filename) {
       out,
       table,
       tbl(fia, table) |>
-        semi_join(stand_cns, by = join_by(STAND_CN), copy = TRUE) |>
+        inner_join(
+          stand_cns |> select(STAND_CN),
+          by = join_by(STAND_CN),
+          copy = TRUE
+        ) |>
         collect(),
       overwrite = TRUE
     )

@@ -185,6 +185,7 @@ data for these plots over time.
 fia_plots_filtered(fiadb, nrs_plots_grown, \(.data, con) {
     plots <- .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR)
     plots_join_by <- join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    plots_select <- select(STATECD, COUNTYCD, PLOT, INVYR)
     
     forest_type <- tbl(con, "REF_FOREST_TYPE") |>
       select(VALUE, MEANING) |>
@@ -192,8 +193,7 @@ fia_plots_filtered(fiadb, nrs_plots_grown, \(.data, con) {
       rename(FORTYPE = MEANING)
     
     tree_stats <- tbl(con, "TREE") |>
-# Doing these joins makes things (much) slower, not faster!      
-#      semi_join(plots, by = plots_join_by) |>
+      inner_join(plots |> plots_select, by = plots_join_by) |>
       select(STATECD, COUNTYCD, PLOT, INVYR, DIA, CARBON_AG, TPA_UNADJ) |>
       group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
       summarize(
@@ -205,8 +205,7 @@ fia_plots_filtered(fiadb, nrs_plots_grown, \(.data, con) {
       )
     
     cond_stats <- tbl(con, "COND") |>
-# Doing these joins makes things (much) slower, not faster!      
-#      semi_join(plots, by = plots_join_by) |>
+      inner_join(plots |> plots_select, by = plots_join_by) |>
       select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, FORTYPCD) |>
       group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
       # QMD = sqrt(sum(DIA^2) / n)
@@ -388,7 +387,7 @@ fia_grm_ingrowth(fiadb, nrs_plots_grown)
 ```
 Fetch the corresponding trees
 ```{targets nrs_trees_ingrowth_all, tar_simple = TRUE}
-fia_trees_by_cn(fiadb, nrs_grm_ingrowth_all$TRE_CN)
+fia_trees_by_cn(fiadb, nrs_grm_ingrowth_all |> select(TRE_CN) |> rename(CN = TRE_CN))
 ```
 
 We can use the trees to find duplicate records. There are duplicates because

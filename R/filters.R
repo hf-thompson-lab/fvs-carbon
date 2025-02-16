@@ -45,7 +45,7 @@ filter_plots_modern <- function(.data, con) {
     distinct(STATECD, COUNTYCD, PLOT)
   
   .data |>
-    semi_join(plots_modern, by = join_by(STATECD, COUNTYCD, PLOT))
+    inner_join(plots_modern, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
 filter_plots_long_measurement <- function(.data, con) {
@@ -60,7 +60,7 @@ filter_plots_forested <- function(.data, con) {
   plots_forested <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    semi_join(
+    inner_join(
       .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
@@ -71,14 +71,14 @@ filter_plots_forested <- function(.data, con) {
     ungroup()
   
   .data |>
-    semi_join(plots_forested, by = join_by(STATECD, COUNTYCD, PLOT))
+    inner_join(plots_forested, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
 filter_plots_undisturbed <- function(.data, con) {
   plots_undisturbed <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    semi_join(
+    inner_join(
       .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
@@ -93,14 +93,14 @@ filter_plots_undisturbed <- function(.data, con) {
     ungroup()
   
   .data |>
-    semi_join(plots_undisturbed, by = join_by(STATECD, COUNTYCD, PLOT))
+    inner_join(plots_undisturbed, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
 filter_plots_untreated <- function(.data, con) {
   plots_untreated <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    semi_join(
+    inner_join(
       .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
@@ -115,7 +115,7 @@ filter_plots_untreated <- function(.data, con) {
     ungroup()
   
   .data |>
-    semi_join(plots_untreated, by = join_by(STATECD, COUNTYCD, PLOT))
+    inner_join(plots_untreated, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
 # Note that this is a POSITIVE filter:
@@ -124,7 +124,7 @@ filter_plots_harvested <- function(.data, con) {
   plots_harvested_bycond <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    semi_join(
+    inner_join(
       .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
@@ -150,7 +150,7 @@ filter_plots_harvested <- function(.data, con) {
   plots_harvested_bytree <- tbl(con, "TREE") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    semi_join(
+    inner_join(
       .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
@@ -161,7 +161,7 @@ filter_plots_harvested <- function(.data, con) {
   plots_harvested <- union(plots_harvested_bytree, plots_harvested_bycond)
 
   .data |>
-    semi_join(plots_harvested, by = join_by(STATECD, COUNTYCD, PLOT))
+    inner_join(plots_harvested, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
 filter_plots_unfertilized <- function(.data, con) {
@@ -171,7 +171,7 @@ filter_plots_unfertilized <- function(.data, con) {
   plots_unfertilized <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    semi_join(
+    inner_join(
       .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
@@ -200,7 +200,7 @@ filter_plots_unfertilized <- function(.data, con) {
     ungroup()
 
   .data |>
-    semi_join(plots_unfertilized, by = join_by(STATECD, COUNTYCD, PLOT))
+    inner_join(plots_unfertilized, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
 filter_plots_measured_pre_post_harvest <- function(.data, con) {
@@ -215,7 +215,7 @@ filter_plots_measured_pre_post_harvest <- function(.data, con) {
   plots_harvested_bycond <- tbl(con, "COND") |> 
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    semi_join(
+    inner_join(
       .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
@@ -269,7 +269,7 @@ filter_plots_measured_pre_post_harvest <- function(.data, con) {
   plots_harvested_bytree <- tbl(con, "TREE") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    semi_join(
+    inner_join(
       .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
@@ -323,7 +323,7 @@ filter_plots_single_cond <- function(.data, con) {
   plots_single_cond <- tbl(con, "COND") |> 
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    semi_join(
+    inner_join(
       .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
@@ -333,14 +333,14 @@ filter_plots_single_cond <- function(.data, con) {
     ungroup()
   
   .data |>
-    semi_join(plots_single_cond, by = join_by(STATECD, COUNTYCD, PLOT))
+    inner_join(plots_single_cond, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
 filter_plots_trees <- function(.data, con) {
   plots_trees <- tbl(con, "COND") |> 
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    semi_join(
+    inner_join(
       .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
@@ -352,19 +352,22 @@ filter_plots_trees <- function(.data, con) {
     ungroup()
   
   .data |>
-    semi_join(plots_trees, by = join_by(STATECD, COUNTYCD, PLOT))
+    inner_join(plots_trees, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
 filter_plots_ba_frac <- function(.data, con, spcds, frac) {
   plots_ba_frac <- tbl(con, "TREE") |>
-    semi_join(.data |> distinct(STATECD, COUNTYCD, PLOT), by = join_by(STATECD, COUNTYCD, PLOT)) |>
+    inner_join(
+      .data |> distinct(STATECD, COUNTYCD, PLOT),
+      by = join_by(STATECD, COUNTYCD, PLOT)
+    ) |>
     filter(STATUSCD == 1) |> # only live trees
     # Only consider the most recent survey of the plot
     group_by(STATECD, COUNTYCD, PLOT) |>
     filter(INVYR == max(INVYR, na.rm = TRUE)) |>
     mutate(BA_TOTAL = sum(6 * pi * DIA^2, na.rm = TRUE)) |>
     ungroup() |>
-    semi_join(spcds |> distinct(SPCD), by = join_by(SPCD), copy = TRUE) |>
+    inner_join(spcds |> distinct(SPCD), by = join_by(SPCD), copy = TRUE) |>
     group_by(STATECD, COUNTYCD, PLOT) |>
     summarize(
       BA_FVS = sum(6 * pi * DIA^2, na.rm = TRUE),
@@ -373,10 +376,11 @@ filter_plots_ba_frac <- function(.data, con, spcds, frac) {
     ) |>
     ungroup() |>
     mutate(BA_FVS_FRAC = BA_FVS / BA_TOTAL) |>
-    filter(BA_FVS_FRAC >= frac)
+    filter(BA_FVS_FRAC >= frac) |>
+    select(STATECD, COUNTYCD, PLOT)
   
   .data |>
-    semi_join(plots_ba_frac, by = join_by(STATECD, COUNTYCD, PLOT))
+    inner_join(plots_ba_frac, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
 filter_decode_forest_type_group <- function(.data) {

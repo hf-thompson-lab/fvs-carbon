@@ -427,10 +427,11 @@ rhs <- matching_cond_status |>
     .groups = "keep"
   ) |>
   ungroup() |>
-  filter(GROWN_FLAG)
+  filter(GROWN_FLAG) |>
+  select(STATECD, COUNTYCD, PLOT)
 
 stand_grow_only <- nk_matching_plot |>
-  semi_join(rhs, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  inner_join(rhs, by = join_by(STATECD, COUNTYCD, PLOT)) |>
   left_join(stand_num, by = join_by(STATECD, COUNTYCD, PLOT)) |>
   left_join(nk_plot_crosswalk, by = join_by(STATECD, COUNTYCD, PLOT)) |>
   # Add STDAGE, FORTYPE, and MEASYEAR because they'll be useful later
@@ -440,7 +441,6 @@ stand_grow_only <- nk_matching_plot |>
     by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
 
-# rhs is just for the RHS of the semi_join
 rm(rhs)
   
 ggplot(

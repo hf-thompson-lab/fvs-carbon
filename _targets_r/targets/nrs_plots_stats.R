@@ -2,6 +2,7 @@ tar_target(nrs_plots_stats, {
   fia_plots_filtered(fiadb, nrs_plots_grown, \(.data, con) {
       plots <- .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR)
       plots_join_by <- join_by(STATECD, COUNTYCD, PLOT, INVYR)
+      plots_select <- select(STATECD, COUNTYCD, PLOT, INVYR)
       
       forest_type <- tbl(con, "REF_FOREST_TYPE") |>
         select(VALUE, MEANING) |>
@@ -9,8 +10,7 @@ tar_target(nrs_plots_stats, {
         rename(FORTYPE = MEANING)
       
       tree_stats <- tbl(con, "TREE") |>
-  # Doing these joins makes things (much) slower, not faster!      
-  #      semi_join(plots, by = plots_join_by) |>
+        inner_join(plots |> plots_select, by = plots_join_by) |>
         select(STATECD, COUNTYCD, PLOT, INVYR, DIA, CARBON_AG, TPA_UNADJ) |>
         group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
         summarize(
@@ -22,8 +22,7 @@ tar_target(nrs_plots_stats, {
         )
       
       cond_stats <- tbl(con, "COND") |>
-  # Doing these joins makes things (much) slower, not faster!      
-  #      semi_join(plots, by = plots_join_by) |>
+        inner_join(plots |> plots_select, by = plots_join_by) |>
         select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, FORTYPCD) |>
         group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
         # QMD = sqrt(sum(DIA^2) / n)

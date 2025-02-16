@@ -20,7 +20,7 @@ tar_target(nk_plot_crosswalk, {
   on.exit(dbDisconnect(con), add = TRUE, after = FALSE)
     
   plot_mixin <- tbl(con, 'PLOT') |>
-    semi_join(
+    inner_join(
       left |>
         distinct(STATECD, COUNTYCD, PLOT, FIA_INVYR) |>
         rename(INVYR = FIA_INVYR),
