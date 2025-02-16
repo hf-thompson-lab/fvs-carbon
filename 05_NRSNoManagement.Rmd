@@ -615,8 +615,14 @@ stopifnot(nrs_trees_grown |> anti_join(tree_history, by = join_by(CN)) |> nrow()
 # Paste metadata on to history records to be friendly
 nrs_trees_history <- tree_history |>
   left_join(
-    nrs_trees_grown |> select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD, DIA, HT),
+    nrs_trees_grown |>
+      select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD, DIA, HT),
     by = join_by(CN)
+  ) |>
+  left_join(
+    nrs_plots_grown |>
+      select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   ) |>
   # Add a flag to indicate that a particular tree is marked as ingrowth in a
   # particular year
