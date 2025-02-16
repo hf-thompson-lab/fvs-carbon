@@ -10,7 +10,7 @@ tar_target(nrs_plots_stats, {
         rename(FORTYPE = MEANING)
       
       tree_stats <- tbl(con, "TREE") |>
-        inner_join(plots |> plots_select, by = plots_join_by) |>
+        inner_join(plots |> select(STATECD, COUNTYCD, PLOT, INVYR), by = plots_join_by) |>
         select(STATECD, COUNTYCD, PLOT, INVYR, DIA, CARBON_AG, TPA_UNADJ) |>
         group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
         summarize(
@@ -22,7 +22,7 @@ tar_target(nrs_plots_stats, {
         )
       
       cond_stats <- tbl(con, "COND") |>
-        inner_join(plots |> plots_select, by = plots_join_by) |>
+        inner_join(plots |> select(STATECD, COUNTYCD, PLOT, INVYR), by = plots_join_by) |>
         select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, FORTYPCD) |>
         group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
         # QMD = sqrt(sum(DIA^2) / n)
