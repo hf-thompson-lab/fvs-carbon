@@ -95,6 +95,7 @@ fvs_spcds <- species_crosswalk |>
 fia_plots_filtered(
   fiadb, filter = \(.data, con) {
     .data |>
+      filter(INVYR >= 1999) |> # Do this first, it impacts later filters
       filter_plots_fvsne(con) |>
       filter_plots_modern(con) |>
       filter_plots_trees(con) |>
@@ -511,111 +512,118 @@ database:
 - First Tree - the Tree in a Tree History with the earliest INVYEAR
 - Last Tree - the Tree in a Tree History with the latest INVYEAR
 
-We identify a Tree History by the CN of the last tree in the history.
+We identify a Tree History by the CN of the earliest tree in the history.
 
-tree_ingrown - all tree records for ingrown trees, including pre- and
-               post-ingrowth
-
-NB: This takes about an hour on a laptop.
+Fetch all the live trees for all the grown plots. Takes a while, but makes
+everything else much faster.
+```{targets nrs_trees_grown, tar_simple = TRUE}
+nrs_trees_grown <- fia_trees(fiadb, nrs_plots_grown) |>
+    filter(CONDID == 1) # only live trees
+```
 
 ```{targets nrs_trees_history, tar_simple = TRUE}
-# We're going to work one plot at a time
-# Fetch all trees that have ever been live on a plot
-stashed_plot <- NULL
-
-assemble_history <- function(plots) {
-  # fetch_trees - fetch all of the trees that have ever been live on a plot
-  all_trees <- fia_trees(fiadb, plots) |>
-    filter(CONDID == 1) # only live trees
-  
-  # add NEXT_TRE_CN to make it easy to traverse tree lineage in either direction
-  tree_prev_next <- all_trees |>
-    left_join(
-      all_trees |>
-        select(CN, PREV_TRE_CN) |>
-        rename(NEXT_TRE_CN = CN, CN = PREV_TRE_CN),
-      by = join_by(CN)
-    )
-  
-  # current trees is the set of trees currently being examined,
-  # one for each history of an ingrown tree
-  current_trees <- tree_prev_next |>
-    semi_join(nrs_trees_ingrowth, by = join_by(CN))
-  
-  # head trees are the first trees in each history
-  # of an ingrown tree
-  head_trees <- current_trees |> filter(is.na(PREV_TRE_CN))
-  
-  # Function to fetch trees matching PREV_TRE_CN
-  earlier_trees <- function(.data) {
-    tree_prev_next |> semi_join(.data, by = join_by(CN == PREV_TRE_CN))
-  }
-  
-  # Function to fetch trees matching NEXT_TRE_CN
-  later_trees <- function(.data) {
-    tree_prev_next |> semi_join(.data, by = join_by(CN == NEXT_TRE_CN))
-  }
-  
-  # Advance current_trees
-  while ((current_trees <- earlier_trees(current_trees)) |> nrow() > 0) {
-    head_trees <- bind_rows(
-      head_trees,
-      current_trees |> filter(is.na(PREV_TRE_CN))
-    )
-  }
-  
-  # Head trees now contains the earliest trees for all ingrown trees.
-  # Create a table of the entire history of each tree, of the form
-  # CN, FIRST_CN, LAST_CN
-  # We do this in three steps:
-  # 1. CN, FIRST_CN for the head trees (CN == FIRST_CN)
-  # 2. CN, FIRST_CN for trees where PREV_TRE_CN in CN
-  # Repeat step 2 until nothing more matches
-  # 3. Fill in LAST_CN for everything
-  
-  current_trees <- head_trees |> filter(!is.na(NEXT_TRE_CN))
-  tree_history <- head_trees |> select(CN) |> mutate(FIRST_CN = CN, LAST_CN = CN)
-  
-  while ((current_trees <- later_trees(current_trees)) |> nrow() > 0) {
-    current_cns <- current_trees |> select(CN, PREV_TRE_CN) |> rename(LAST_CN = CN)
-    updated_history_rows <- tree_history |>
-      left_join(current_cns, by = join_by(LAST_CN == PREV_TRE_CN)) |>
-      mutate(LAST_CN = coalesce(LAST_CN.y, LAST_CN)) |>
-      select(CN, FIRST_CN, LAST_CN)
-    new_history_rows <- current_trees |>
+# Get trees with CN, PREV_TRE_CN and  NEXT_TRE_CN to make it easy to traverse
+# tree lineage in either direction
+tree_prev_next <- nrs_trees_grown |>
+  select(CN, PREV_TRE_CN) |>
+  left_join(
+    nrs_trees_grown |>
       select(CN, PREV_TRE_CN) |>
-      mutate(LAST_CN = CN) |>
-      left_join(tree_history |> select(CN, FIRST_CN), by = join_by(PREV_TRE_CN == CN)) |>
-      select(CN, FIRST_CN, LAST_CN)
-    tree_history <- bind_rows(
-      updated_history_rows,
-      new_history_rows
-    )
-  }
+      rename(NEXT_TRE_CN = CN, CN = PREV_TRE_CN),
+    by = join_by(CN)
+  ) |>
+  # Null out PREV_TRE_CN if it points to a tree we don't have access to.
+  left_join(
+    nrs_trees_grown |> select(CN) |> mutate(PREV_TRE_EXISTS = TRUE),
+    by = join_by(PREV_TRE_CN == CN)
+  ) |>
+  mutate(
+    PREV_TRE_CN = if_else(!is.na(PREV_TRE_EXISTS), PREV_TRE_CN, NA)
+  ) |>
+  select(!PREV_TRE_EXISTS)
+  # Don't need to worry about NEXT_TRE_CN, since that join won't have
+  # lined up and left dangling references.
 
-  # Paste metadata on to history records to be friendly
-  tree_history |>
-    left_join(
-      all_trees |> select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD, DIA, HT),
-      by = join_by(CN)
-    )
+# We've limited how far back we look in tree history, but have history
+# all the way to the present. So we'll start with the most recent trees
+# and stitch together history into the past.
+
+# current trees is the set of trees currently being examined,
+# one for each history of a tree
+current_trees <- tree_prev_next |>
+  filter(is.na(NEXT_TRE_CN))
+  
+# head trees are the first trees in each history
+# We identify tree history by the earliest tree in that line,
+# since that will never change.
+head_trees <- current_trees |> filter(is.na(PREV_TRE_CN))
+  
+# Function to fetch trees matching PREV_TRE_CN
+# This is used to walk earlier in time
+earlier_trees <- function(.data) {
+  tree_prev_next |> semi_join(.data, by = join_by(CN == PREV_TRE_CN))
 }
 
-plot_ids <- nrs_plots_grown |>
-  distinct(STATECD, COUNTYCD, PLOT)
+# Function to fetch trees matching NEXT_TRE_CN
+# This is used to walk later in time
+later_trees <- function(.data) {
+  tree_prev_next |> semi_join(.data, by = join_by(CN == NEXT_TRE_CN))
+}
 
-chunk_size <- 100
+# Walk back to the beginning of time to find all the head trees
+while ((current_trees <- earlier_trees(current_trees)) |> nrow() > 0) {
+  head_trees <- bind_rows(
+    head_trees,
+    current_trees |> filter(is.na(PREV_TRE_CN))
+  )
+}
 
-bind_rows(
-    lapply(
-      plot_ids |> split(ceiling(1:nrow(plot_ids) / chunk_size)),
-      assemble_history
-    )
-  ) |>
-  # We also need MEASYEAR for any real time measurement
+# Head trees now contains the earliest trees for all tree histories.
+# Create a table of the entire history of each tree, of the form
+# CN, FIRST_CN, LAST_CN
+# We do this in three steps:
+# 1. CN, FIRST_CN for the head trees (CN == FIRST_CN)
+# 2. CN, FIRST_CN for trees where PREV_TRE_CN in CN
+# Repeat step 2 until nothing more matches
+# 3. Fill in LAST_CN for everything
+  
+current_trees <- head_trees |> filter(!is.na(NEXT_TRE_CN))
+tree_history <- head_trees |> select(CN) |> mutate(FIRST_CN = CN, LAST_CN = CN)
+
+while ((current_trees <- later_trees(current_trees)) |> nrow() > 0) {
+  current_cns <- current_trees |> select(CN, PREV_TRE_CN) |> rename(LAST_CN = CN)
+  updated_history_rows <- tree_history |>
+    left_join(current_cns, by = join_by(LAST_CN == PREV_TRE_CN)) |>
+    mutate(LAST_CN = coalesce(LAST_CN.y, LAST_CN)) |>
+    select(CN, FIRST_CN, LAST_CN)
+  new_history_rows <- current_trees |>
+    select(CN, PREV_TRE_CN) |>
+    mutate(LAST_CN = CN) |>
+    left_join(tree_history |> select(CN, FIRST_CN), by = join_by(PREV_TRE_CN == CN)) |>
+    select(CN, FIRST_CN, LAST_CN)
+  tree_history <- bind_rows(
+    updated_history_rows,
+    new_history_rows
+  )
+}
+
+# tree_history should have a record for every live tree.
+stopifnot(nrs_trees_grown |> anti_join(tree_history, by = join_by(CN)) |> nrow() == 0)
+
+# Paste metadata on to history records to be friendly
+nrs_trees_history <- tree_history |>
   left_join(
-    nrs_plots_grown |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
-    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    nrs_trees_grown |> select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD, DIA, HT),
+    by = join_by(CN)
+  ) |>
+  # Add a flag to indicate that a particular tree is marked as ingrowth in a
+  # particular year
+  left_join(
+    nrs_grm_ingrowth |> select(TRE_CN) |> rename(CN = TRE_CN) |> mutate(ESTAB = TRUE),
+    by = join_by(CN)
+  ) |>
+  mutate(
+    ESTAB = if_else(!is.na(ESTAB), ESTAB, FALSE)
   )
 ```
 
@@ -628,11 +636,10 @@ nrs_trees_ingrowth |> filter(DIA > 3) |> nrow()
 
 How many of those are traceable back to when they had DBH <= 3?
 ```{r dbh_le_3, eval = FALSE}
-fia_trees_by_cn(
-  fiadb,
-  nrs_trees_history |>
-    distinct(FIRST_CN) |>
-    _$FIRST_CN
+nrs_trees_history |>
+  semi_join(
+    nrs_trees_history |> filter(ESTAB == TRUE),
+    by = join_by(CN == FIRST_CN)
   ) |>
   filter(DIA <= 3) |>
   nrow()
@@ -702,11 +709,10 @@ ingrown trees for which we have measurements prior to ingrowth. We can use
 our method to project these trees back in time to the earliest measurement,
 and see how close we get to the measured value.
 
-To do this, we need to caputre how much each tree grew in each inventory.
+To do this, we need to capture how much each tree grew in each inventory.
 
 tree_growth - adds to each tree:
 
- - SZCLCD - Size Class Code, 0 = Sapling, 1 = Seedling, 2 = Poletimber, 3 = Sawlog
  - *_DELTA - diameter/height/age change since previous inventory
  - ANN_*_DELTA - annualize rate of diameter change since previous inventory
   

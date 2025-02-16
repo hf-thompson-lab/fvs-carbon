@@ -174,7 +174,7 @@ fia_conds <- function(fiadb, plots) {
 }
 
 fia_trees <- function(fiadb, plots) {
-  chunk_size <- 10
+  chunk_size <- 100
   
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
