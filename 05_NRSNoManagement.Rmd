@@ -188,8 +188,7 @@ data for these plots over time.
 fia_plots_filtered(fiadb, nrs_plots_grown, \(.data, con) {
     plots <- .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR)
     plots_join_by <- join_by(STATECD, COUNTYCD, PLOT, INVYR)
-    plots_select <- select(STATECD, COUNTYCD, PLOT, INVYR)
-    
+
     forest_type <- tbl(con, "REF_FOREST_TYPE") |>
       select(VALUE, MEANING) |>
       rename(FORTYPCD = VALUE) |>
