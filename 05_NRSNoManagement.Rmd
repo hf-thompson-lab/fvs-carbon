@@ -1773,15 +1773,23 @@ Looks good, but what we actually needed was height, not diameter.
 
 #### Ingrowth Height
 
-For FVS ingrowth, we also need height when the tree is 3" DBH. FVS will 
+For FVS ingrowth, we need height when the tree is 3" DBH. FVS will 
 adjust this, so it only needs to be close.
 
-We pick fro 3 to 9 trees closest to 3" DBH, do a linear interpolation of their
+We pick from 3 to 9 trees closest to 3" DBH, do a linear interpolation of their
 height to what it might be at 3" DBH, and average them.
 
-> Poletimber-sized trees
-> - softwoods 5 inches and <9 inches d.b.h.
-> - hardwoods 5 inches and <11 inches d.b.h.
+We do not look at trees below 2.5" DBH, because growth allocation to HT vs DIA
+is very different for small vs. medium trees. Limiting to 2.5" gives us a
+reasonable chance of finding suitable trees on the microplot (min 1"), while
+limiting how often we fall back to using trees in the ecosubregion, and
+limiting the error introduced by sampling across growth regimes.
+
+We do not look at trees above 6" DBH, because growth allocation to HT vs DIA
+is very different for medium vs. large trees. Limiting to 6" gives us a
+reasonable chance of finding suitable trees on the plot (min 5"), while
+limiting how often we fall back to using trees in the ecosubregion, and
+limiting the error introduced by sampling across growth regimes.
 
 - HT_PLOT - per-species height at 3" DBH modeled only from trees on the plot
 - HT_ECOSUBCD - per-species height at 3" DBH modeled from trees in the ecosubregion
@@ -1790,7 +1798,7 @@ height to what it might be at 3" DBH, and average them.
 - HT_MIN - same as HT_NE, but populated even if fewer than 3 trees can be found
 
 ```{r tree_growth_ht, eval = FALSE}
-ecosubcd_mixin <- stand_stats |>
+ecosubcd_mixin <- nrs_plots_grown |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   arrange(MEASYEAR) |>
   filter(row_number() == 1) |>
@@ -1854,7 +1862,7 @@ tree_growth_ht_min <- trees_for_ht_estimation |>
   ungroup()
 
 tree_growth_ht <- tree_growth_with_fixed_spcd |> # unfiltered tree growth
-  semi_join(grm_ingrown, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)) |>
+  semi_join(nrs_trees_ingrowth, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)) |>
   distinct(STATECD, COUNTYCD, PLOT, SPCD) |>
   left_join(ecosubcd_mixin, by = join_by(STATECD, COUNTYCD, PLOT)) |>
   left_join(tree_growth_ht_plot, by = join_by(STATECD, COUNTYCD, PLOT, SPCD)) |>
@@ -1884,6 +1892,7 @@ tree_growth_ht |>
   ylab(NULL) +
   xlab(NULL) +
   scale_x_discrete(labels = NULL) +
+  theme_bw() +
   scale_fill_brewer(name = "Origin", palette = "Set1") +
   ggtitle("Origin of Height estimates")
 ```
@@ -1945,7 +1954,7 @@ tree_growth_ht_whence <- trees_for_ht_estimation |>
   left_join(ht_min_mixin, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)) |>
   mutate(HT = coalesce(HT_PLOT, HT_ECOSUBCD, HT_ECOCD, HT_NE, HT_MIN)) |>
   filter(!is.na(HT)) |>
-  left_join(species_mixin, by = join_by(SPCD))
+  left_join(species_crosswalk, by = join_by(SPCD))
 ```
 
 ```{r plot ht dia distribution, eval = FALSE}
