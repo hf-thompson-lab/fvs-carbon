@@ -53,6 +53,9 @@ tar_load(nrs_trees_ingrowth)
 tar_load(nrs_trees_grown)
 tar_load(nrs_trees_history)
 tar_load(nrs_trees_growth)
+tar_load(nrs_trees_spcd)
+tar_load(nrs_estab_rate)
+tar_load(nrs_estab_height)
 ```
 
 # Grow-Only Plots in the Northeast
@@ -1527,7 +1530,7 @@ We find the most common thing that is both inventoried on the plot AND
 supported by FVSne, and move things that are not supported into the most
 common.
 
-```{r tree_growth_with_fixed_spcd, eval = FALSE}
+```{targets nrs_trees_spcd, tar_simple = TRUE}
 # mcs == Most Common Species
 mcs_plot <- nrs_trees_growth |>
   left_join(species_crosswalk, by = join_by(SPCD)) |>
@@ -1583,7 +1586,7 @@ mcs_overall <- nrs_trees_growth |>
 
 # Note that this leaves Crataegus (Hawthorn) as spp. - apparently FIA has
 # passed on trying to identify species in Crataegus.
-tree_growth_with_fixed_spcd <- nrs_trees_growth |>
+nrs_trees_growth |>
   left_join(species_crosswalk |> select(SPCD, GENUS), by = join_by(SPCD)) |>
   left_join(mcs_plot, by = join_by(STATECD, COUNTYCD, PLOT, GENUS)) |>
   left_join(mcs_county, by = join_by(STATECD, COUNTYCD, GENUS)) |>
@@ -1606,7 +1609,7 @@ rbind(
     summarize(TREE_COUNT = n()) |>
     ungroup() |>
     mutate(SERIES = "Uncorrected"),
-  tree_growth_with_fixed_spcd |>
+  nrs_trees_spcd |>
     filter(is.na(FVS_SPCD)) |>
     group_by(GENUS) |>
     summarize(TREE_COUNT = n()) |>
@@ -1617,16 +1620,21 @@ rbind(
   summarise(SPECIES_COUNT = n(), TREE_COUNT = sum(TREE_COUNT))
 ```
 
+Uncorrected, there were almost 4,000 unhandled trees in 33 species (many of
+which were just not identified at the species level); corrected, we're down
+to about 1500 unhandled trees in 13 species (or things that are only identified
+at the genus level).
+
 These are the cases where we're unable to find a species code for FVSne:
 ```{r fvsne_unhandled_trees, eval = FALSE}
-plot_count_mixin <- tree_growth_with_fixed_spcd |>
+plot_count_mixin <- nrs_trees_spcd |>
   filter(is.na(FVS_SPCD)) |>
   distinct(STATECD, COUNTYCD, PLOT, SPCD) |>
   group_by(SPCD) |>
   summarize(PLOT_COUNT = n()) |>
   ungroup()
 
-fvsne_unhandled_trees <- tree_growth_with_fixed_spcd |>
+fvsne_unhandled_trees <- nrs_trees_spcd |>
   # Filter to the most recent record for each tree
   group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
   arrange(desc(MEASYEAR)) |>
@@ -1687,7 +1695,7 @@ fvsne_unhandled_trees |>
 
 Let's find out how many stems of each (corrected) species ingrow per year.
 
-```{r ingrowth_stem_rate, eval = FALSE}
+```{targets nrs_estab_rate, tar_simple = TRUE}
 time_mixin <- nrs_plots_stats |>
   distinct(STATECD, COUNTYCD, PLOT, MEASYEAR) |>
   group_by(STATECD, COUNTYCD, PLOT) |>
@@ -1698,7 +1706,7 @@ time_mixin <- nrs_plots_stats |>
   ) |>
   ungroup()
 
-ingrowth_stem_rate <- tree_growth_with_fixed_spcd |>
+nrs_trees_spcd |>
   semi_join(nrs_trees_ingrowth, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR)) |>
   left_join(time_mixin, by = join_by(STATECD, COUNTYCD, PLOT)) |>
   group_by(STATECD, COUNTYCD, PLOT, SPCD, FIRST_YEAR, LAST_YEAR) |>
@@ -1728,7 +1736,7 @@ ingrowth_stem_rate <- tree_growth_with_fixed_spcd |>
   )
 ```
 
-```{r plot-ingrowth_stem_rate, eval = FALSE}
+```{r plot-nrs_estab_rate, eval = FALSE}
 stand_stats_mixin <- nrs_plots_stats |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   arrange(MEASYEAR) |>
@@ -1736,7 +1744,7 @@ stand_stats_mixin <- nrs_plots_stats |>
   ungroup() |>
   select(STATECD, COUNTYCD, PLOT, STDAGE, BALIVE_METRIC, QMD)
 
-ingrowth_stem_rate |>
+nrs_estab_rate |>
   left_join(stand_stats_mixin, by = join_by(STATECD, COUNTYCD, PLOT)) |>
   ggplot(aes(x = QMD, y = RATE_PER_HECTARE)) +
   geom_bin2d(bins = 50) +
@@ -1752,7 +1760,7 @@ ingrowth_stem_rate |>
 Ok, who are these outliers?
 ```{r stem rate outliers, eval = FALSE}
 knitr::kable(
-  ingrowth_stem_rate |>
+  nrs_estab_rate |>
   arrange(desc(RATE)) |>
   head(10) |>
   left_join(stand_stats_mixin, by = join_by(STATECD, COUNTYCD, PLOT)) 
@@ -1766,7 +1774,7 @@ similar.
 
 
 ```{r stem rate summary, eval = FALSE}
-summary(ingrowth_stem_rate)
+summary(nrs_estab_rate)
 ```
 
 Looks good, but what we actually needed was height, not diameter.
@@ -1797,7 +1805,10 @@ limiting the error introduced by sampling across growth regimes.
 - HT_NE - per-species height at 3" DBH for the entire northeast
 - HT_MIN - same as HT_NE, but populated even if fewer than 3 trees can be found
 
-```{r tree_growth_ht, eval = FALSE}
+```{targets nrs_estab_height, tar_simple = TRUE}
+min_tree_count <- 3
+max_tree_count <- 9
+
 ecosubcd_mixin <- nrs_plots_grown |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   arrange(MEASYEAR) |>
@@ -1806,7 +1817,7 @@ ecosubcd_mixin <- nrs_plots_grown |>
   select(STATECD, COUNTYCD, PLOT, ECOSUBCD) |>
   mutate(ECOCD = substr(ECOSUBCD, 1, nchar(ECOSUBCD) - 1))
 
-trees_for_ht_estimation <- tree_growth_with_fixed_spcd |>
+trees_for_ht_estimation <- nrs_trees_spcd |>
   filter(2.5 < DIA & DIA < 6) |>
   group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
   arrange(abs(DIA - 3)) |>
@@ -1817,66 +1828,69 @@ trees_for_ht_estimation <- tree_growth_with_fixed_spcd |>
   filter(!is.na(HT) & !is.na(DIA)) |>
   left_join(ecosubcd_mixin, by = join_by(STATECD, COUNTYCD, PLOT))
 
-tree_growth_ht_plot <- trees_for_ht_estimation |>
+nrs_estab_height_plot <- trees_for_ht_estimation |>
   group_by(STATECD, COUNTYCD, PLOT, SPCD) |>
   arrange(abs(DIA - 3)) |>
-  filter(row_number() <= 9) |>
+  filter(row_number() <= max_tree_count) |>
   mutate(HT_PLOT = HT * 3 / DIA) |>
-  filter(n() >= 3) |>
+  filter(n() >= min_tree_count) |>
   summarize(HT_PLOT = mean(HT_PLOT), .groups = "keep") |>
   ungroup()
 
-tree_growth_ht_ecosubcd <- trees_for_ht_estimation |>
+nrs_estab_height_ecosubcd <- trees_for_ht_estimation |>
   group_by(ECOSUBCD, SPCD) |>
   arrange(abs(DIA - 3)) |>
-  filter(row_number() <= 9) |>
+  filter(row_number() <= max_tree_count) |>
   mutate(HT_ECOSUBCD = HT * 3 / DIA) |>
-  filter(n() >= 3) |>
+  filter(n() >= min_tree_count) |>
   summarize(HT_ECOSUBCD = mean(HT_ECOSUBCD), .groups = "keep") |>
   ungroup()
 
-tree_growth_ht_ecocd <- trees_for_ht_estimation |>
+nrs_estab_height_ecocd <- trees_for_ht_estimation |>
   group_by(ECOCD, SPCD) |>
   arrange(abs(DIA - 3)) |>
-  filter(row_number() <= 9) |>
+  filter(row_number() <= max_tree_count) |>
   mutate(HT_ECOCD = HT * 3 / DIA) |>
-  filter(n() >= 3) |>
+  filter(n() >= min_tree_count) |>
   summarize(HT_ECOCD = mean(HT_ECOCD), .groups = "keep") |>
   ungroup()
 
-tree_growth_ht_ne <- trees_for_ht_estimation |>
+nrs_estab_height_ne <- trees_for_ht_estimation |>
   group_by(SPCD) |>
   arrange(abs(DIA - 3)) |>
-  filter(row_number() <= 9) |>
+  filter(row_number() <= max_tree_count) |>
   mutate(HT_NE = HT * 3 / DIA) |>
-  filter(n() >= 3) |>
+  filter(n() >= min_tree_count) |>
   summarize(HT_NE = mean(HT_NE), .groups = "keep") |>
   ungroup()
 
-tree_growth_ht_min <- trees_for_ht_estimation |>
+# height_min ignores the minimum number of trees,
+# and will produce values even for a single tree
+# anywhere in the region. It is a last-ditch catch-all.
+nrs_estab_height_min <- trees_for_ht_estimation |>
   group_by(SPCD) |>
   arrange(abs(DIA - 3)) |> # closest to 3" first
-  filter(row_number() <= 9) |> 
+  filter(row_number() <= max_tree_count) |> 
   mutate(HT_MIN = HT * 3 / DIA) |>
   summarize(HT_MIN = mean(HT_MIN)) |>
   ungroup()
 
-tree_growth_ht <- tree_growth_with_fixed_spcd |> # unfiltered tree growth
+nrs_trees_spcd |> # unfiltered tree growth
   semi_join(nrs_trees_ingrowth, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)) |>
   distinct(STATECD, COUNTYCD, PLOT, SPCD) |>
   left_join(ecosubcd_mixin, by = join_by(STATECD, COUNTYCD, PLOT)) |>
-  left_join(tree_growth_ht_plot, by = join_by(STATECD, COUNTYCD, PLOT, SPCD)) |>
-  left_join(tree_growth_ht_ecosubcd, by = join_by(ECOSUBCD, SPCD)) |>
-  left_join(tree_growth_ht_ecocd, by = join_by(ECOCD, SPCD)) |>
-  left_join(tree_growth_ht_ne, by = join_by(SPCD)) |>
-  left_join(tree_growth_ht_min, by = join_by(SPCD)) |>
+  left_join(nrs_estab_height_plot, by = join_by(STATECD, COUNTYCD, PLOT, SPCD)) |>
+  left_join(nrs_estab_height_ecosubcd, by = join_by(ECOSUBCD, SPCD)) |>
+  left_join(nrs_estab_height_ecocd, by = join_by(ECOCD, SPCD)) |>
+  left_join(nrs_estab_height_ne, by = join_by(SPCD)) |>
+  left_join(nrs_estab_height_min, by = join_by(SPCD)) |>
   mutate(HT = coalesce(HT_PLOT, HT_ECOSUBCD, HT_ECOCD, HT_NE, HT_MIN))
 ```
 
 How specific are our heights?
 
-```{r plot tree_growth_ht origin, eval = FALSE}
-tree_growth_ht |>
+```{r plot nrs_estab_height origin, eval = FALSE}
+nrs_estab_height |>
   mutate(
     HT_ORIGIN = case_when(
       !is.na(HT_PLOT) ~ "Plot",
@@ -1945,7 +1959,7 @@ ht_min_mixin <- trees_for_ht_estimation |>
   ungroup() |>
   select(STATECD, COUNTYCD, PLOT, SUBP, TREE, HT_MIN)
 
-tree_growth_ht_whence <- trees_for_ht_estimation |>
+nrs_estab_height_whence <- trees_for_ht_estimation |>
   select(STATECD, COUNTYCD, PLOT, SUBP, TREE, SPCD, DIA) |>
   left_join(ht_plot_mixin, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)) |>
   left_join(ht_ecosubcd_mixin, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)) |>
@@ -1958,7 +1972,7 @@ tree_growth_ht_whence <- trees_for_ht_estimation |>
 ```
 
 ```{r plot ht dia distribution, eval = FALSE}
-tree_growth_ht_whence |>
+nrs_estab_height_whence |>
   ggplot(aes(y = DIA, fill = JENKINS_SPGRP_NAME)) +
   geom_boxplot(outlier.size = 0.1) +
   scale_fill_discrete(
@@ -1971,8 +1985,8 @@ tree_growth_ht_whence |>
 ```
 
 ```{r plot estab ht vs dia, eval = FALSE}
-bins = (max(tree_growth_ht_whence$DIA) - min(tree_growth_ht_whence$DIA)) * 10
-tree_growth_ht_whence |>
+bins = (max(nrs_estab_height_whence$DIA) - min(nrs_estab_height_whence$DIA)) * 10
+nrs_estab_height_whence |>
   ggplot(aes(x = DIA, y = HT)) +
   geom_bin_2d(bins = bins) +
   geom_vline(xintercept = 3, color = "red", linetype = "dashed") +
@@ -1990,9 +2004,9 @@ tree_growth_ht_whence |>
 Are we missing height for any ingrowth?
 ```{r validate height projection, eval = FALSE}
 stopifnot(
-  ingrowth_stem_rate |>
+  nrs_estab_rate |>
     distinct(STATECD, COUNTYCD, PLOT, SPCD) |> 
-    left_join(tree_growth_ht, by = join_by(STATECD, COUNTYCD, PLOT, SPCD)) |>
+    left_join(nrs_estab_height, by = join_by(STATECD, COUNTYCD, PLOT, SPCD)) |>
     # Remove the one shellbark hickory tree that doesn't get a height
     filter(SPCD != 405) |>
     filter(is.na(HT)) |>
@@ -2006,8 +2020,8 @@ Combining these, we can gather per-plot the nuber of stems of each species
 that establish each year, and the height at establishment.
 
 ```{r ingrowth_by_stem, eval = FALSE}
-ingrowth_by_stem <- ingrowth_stem_rate |>
-  left_join(tree_growth_ht, by = join_by(STATECD, COUNTYCD, PLOT, SPCD))
+ingrowth_by_stem <- nrs_estab_rate |>
+  left_join(nrs_estab_height, by = join_by(STATECD, COUNTYCD, PLOT, SPCD))
 
 ingrowth_by_stem |>
   group_by(JENKINS_SPGRPCD) |>
