@@ -102,15 +102,24 @@ fvs_Estab <- function(rows) {
   natural_regen <- function(row) {
     year <- 0
     species <- row["SPECIES"]
-    density <- row["DENSITY"] # TPA
+    density <- as.numeric(row["DENSITY"]) # TPA
     survival <- 100 # percent
     age <- ''
-    if ("height" %in% names(row)) {
+    if ("HEIGHT" %in% names(row)) {
       height <- row["HEIGHT"]
     } else {
       height <- ''
     }
     shade <- 0
+    #    result <- c()
+    # FVS has a limit of 1000 trees per tree record. Each establishment
+    # keyword creates one tree record, so if there are more than 1000 trees
+    # split it into multiple records.
+#    while (density > 1000) {
+#      result <- append(result, fvs_kwd7("Natural", year, species, 1000, survival, age, height, shade))
+#      density <- density - 1000
+#    }
+#    append(result, fvs_kwd7("Natural", year, species, density, survival, age, height, shade))
     fvs_kwd7("Natural", year, species, density, survival, age, height, shade)
   }
   if (!is.null(rows)) {
@@ -133,12 +142,15 @@ fvs_Estab <- function(rows) {
 
 # Given a dataframe with column STAND_CN, create a SQLite database
 # of input stands and trees for FVS.
+# > TODO nik: this should take FIA plots, conds, or subplots, and
+# > Do The Right Thing. fvs_run() would need to take the same
+# > input for stands.
 fvs_fia_input <- function(stands, fiadb, filename) {
-  fia <- dbConnect(RSQLite::SQLite(), fiadb, flags = SQLITE_RO)
-  on.exit(dbDisconnect(fia), add = TRUE, after = FALSE)
+  fia <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
+  on.exit(DBI::dbDisconnect(fia), add = TRUE, after = FALSE)
   
-  out <- DBI::dbConnect(RSQLite::SQLite(), filename, flags = SQLITE_RWC)
-  on.exit(dbDisconnect(out), add = TRUE, after = FALSE)
+  out <- DBI::dbConnect(RSQLite::SQLite(), filename, flags = RSQLite::SQLITE_RWC)
+  on.exit(DBI::dbDisconnect(out), add = TRUE, after = FALSE)
   
   stand_cns <- stands |> distinct(STAND_CN)
   # StandInit_Plot / TreeInit_Plot - Used when a stand is a plot.
@@ -157,7 +169,7 @@ fvs_fia_input <- function(stands, fiadb, filename) {
   # internal to SQLite, but that is a bit tricky to manage so we
   # pull it into R and write it back out.
   lapply(tables, \(table){
-    dbWriteTable(
+    DBI::dbWriteTable(
       out,
       table,
       tbl(fia, table) |>
@@ -201,6 +213,14 @@ fvs_keywordfile_section <- function(
   if (carb_calc == "FFE") { cc_code = 0 }
   else if (carb_calc == "Jenkins") { cc_code = 1 }
   else { stop(paste0("Unknown carbon calculation method: ", carb_calc)) }
+
+  # Remove any regen destined for other plots
+  if (!is.null(regen) & ("STAND_CN" %in% names(regen))) {
+    regen <- bind_rows(
+      regen |> filter(STAND_CN == stand_cn), # regen for this stand
+      regen |> filter(is.na(STAND_CN)) # regen for all stands
+    )
+  }
   
   c(
     fvs_kwd0("StdIdent"),
