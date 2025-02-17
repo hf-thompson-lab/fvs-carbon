@@ -765,7 +765,7 @@ nrs_trees_history |>
   ) |>
   select(
     CN, PREV_TRE_CN,
-    STATECD, COUNTYCD, PLOT, SUBP, TREE, SPCD, CCLCD,
+    STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD, CCLCD,
     MEASYEAR, PREV_MEASYEAR, DIA, PREV_DIA, HT, PREV_HT,
     AGE_DELTA, DIA_DELTA, ANN_DIA_DELTA, HT_DELTA, ANN_HT_DELTA
   ) |>
@@ -1304,9 +1304,9 @@ Using estimated diameter, what portion of ingrown trees
 can we project back to 3" DBH before the first MEASYEAR?
 
 ```{r init_tree_ingrown_three, eval = FALSE}
-tree_ingrown_three <- tree_ingrown |>
+tree_ingrown_three <- nrs_trees_growth |>
   # Start with actually ingrown trees
-  semi_join(grm_ingrown, by = join_by(CN == TRE_CN)) |>
+  semi_join(nrs_grm_ingrowth, by = join_by(CN == TRE_CN)) |>
   select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR, SPCD, DIA) |>
   left_join(
     tree_growth_rate |>
@@ -1426,7 +1426,7 @@ tree_ingrown_three_validation <- tree_ingrown_three |>
 #    tree_ingrown |> select(STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR, DIA),
 #    by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, FIRST_MEASYEAR == MEASYEAR)
 #  ) |>
-  left_join(species_mixin, by = join_by(SPCD)) |>
+  left_join(species_crosswalk, by = join_by(SPCD)) |>
   group_by(JENKINS_SPGRP_NAME) |>
   mutate(GROUP_NAME = paste0(JENKINS_SPGRP_NAME, ", n=", n())) |>
   ungroup() |>
@@ -1529,7 +1529,8 @@ common.
 
 ```{r tree_growth_with_fixed_spcd, eval = FALSE}
 # mcs == Most Common Species
-mcs_plot <- tree_growth |>
+mcs_plot <- nrs_trees_growth |>
+  left_join(species_crosswalk, by = join_by(SPCD)) |>
   filter(!is.na(FVS_SPCD)) |>
   group_by(STATECD, COUNTYCD, PLOT, GENUS, SPCD) |>
   summarize(COUNT = n(), .groups = "keep") |>
@@ -1541,7 +1542,8 @@ mcs_plot <- tree_growth |>
   select(!COUNT) |>
   rename(SPCD_PLOT = SPCD)
 
-mcs_county <- tree_growth |>
+mcs_county <- nrs_trees_growth |>
+  left_join(species_crosswalk, by = join_by(SPCD)) |>
   filter(!is.na(FVS_SPCD)) |>
   group_by(STATECD, COUNTYCD, GENUS, SPCD) |>
   summarize(COUNT = n(), .groups = "keep") |>
@@ -1553,7 +1555,8 @@ mcs_county <- tree_growth |>
   select(!COUNT) |>
   rename(SPCD_COUNTY = SPCD)
 
-mcs_state <- tree_growth |>
+mcs_state <- nrs_trees_growth |>
+  left_join(species_crosswalk, by = join_by(SPCD)) |>
   filter(!is.na(FVS_SPCD)) |>
   group_by(STATECD, GENUS, SPCD) |>
   summarize(COUNT = n(), .groups = "keep") |>
@@ -1565,7 +1568,8 @@ mcs_state <- tree_growth |>
   select(!COUNT) |>
   rename(SPCD_STATE = SPCD)
 
-mcs_overall <- tree_growth |>
+mcs_overall <- nrs_trees_growth |>
+  left_join(species_crosswalk, by = join_by(SPCD)) |>
   filter(!is.na(FVS_SPCD)) |>
   group_by(GENUS, SPCD) |>
   summarize(COUNT = n(), .groups = "keep") |>
@@ -1579,22 +1583,24 @@ mcs_overall <- tree_growth |>
 
 # Note that this leaves Crataegus (Hawthorn) as spp. - apparently FIA has
 # passed on trying to identify species in Crataegus.
-tree_growth_with_fixed_spcd <- tree_growth |>
+tree_growth_with_fixed_spcd <- nrs_trees_growth |>
+  left_join(species_crosswalk |> select(SPCD, GENUS), by = join_by(SPCD)) |>
   left_join(mcs_plot, by = join_by(STATECD, COUNTYCD, PLOT, GENUS)) |>
   left_join(mcs_county, by = join_by(STATECD, COUNTYCD, GENUS)) |>
   left_join(mcs_state, by = join_by(STATECD, GENUS)) |>
   left_join(mcs_overall, by = join_by(GENUS)) |>
   rename(SPCD_ORIG = SPCD) |>
   mutate(SPCD = coalesce(SPCD_PLOT, SPCD_COUNTY, SPCD_STATE, SPCD_OVERALL, SPCD_ORIG)) |>
-  select(SPCD | !any_of(names(species_mixin))) |>
-  left_join(species_mixin, by = join_by(SPCD))
+  select(SPCD | !any_of(names(species_crosswalk))) |>
+  left_join(species_crosswalk, by = join_by(SPCD))
 ```
 
 How'd we do?
 
 ```{r check fix to spcd, eval = FALSE}
 rbind(
-  tree_growth |>
+  nrs_trees_growth |>
+    left_join(species_crosswalk, by = join_by(SPCD)) |>
     filter(is.na(FVS_SPCD)) |>
     group_by(GENUS) |>
     summarize(TREE_COUNT = n()) |>
@@ -1648,24 +1654,33 @@ fvsne_unhandled_trees <- tree_growth_with_fixed_spcd |>
 #  ungroup() |>
   filter(BA_FRAC > 0) |>
   left_join(plot_count_mixin, by = join_by(SPCD)) |>
-  left_join(species_mixin, by = join_by(SPCD)) |>
+  left_join(species_crosswalk, by = join_by(SPCD)) |>
   mutate(SCIENTIFIC_NAME = factor(SCIENTIFIC_NAME)) |>
   select(SCIENTIFIC_NAME, BA, BA_FRAC, TOTAL_STAND_BA)
 ```
 
+
+> TODO nik: the following is by tree; should be by species+plot, so aggregate
+>           all trees of the same species on a plot. Numbers should look about
+>           the same.
+
 ```{r plot fvsne_unhandled_trees, eval = FALSE}
 fvsne_unhandled_trees |>
   group_by(SCIENTIFIC_NAME) |>
-  mutate(Species = paste0(SCIENTIFIC_NAME, ", n=", n())) |>
+  mutate(
+    Species = paste0(SCIENTIFIC_NAME, ", n=", n()),
+    NUM_PLOTS = n()
+  ) |>
   ungroup() |>
-  ggplot(aes(y = BA_FRAC, fill = Species)) +
+  ggplot(aes(y = BA_FRAC, fill = reorder(Species, desc(NUM_PLOTS)))) +
   geom_boxplot() +
   scale_x_continuous(breaks = NULL) +
   scale_y_log10() +
+  scale_fill_discrete(name = "Species") +
   theme_bw() +
-  ggtitle("Basal Area of tree species not handled by FVSne") +
+  ggtitle("Fraction of plot BA in species not handled by FVSne") +
   xlab("Species") +
-  ylab("Basal Area (fraction of total plot BA)")
+  ylab("Fraction of plot BA")
   
   
 ```
@@ -1673,7 +1688,7 @@ fvsne_unhandled_trees |>
 Let's find out how many stems of each (corrected) species ingrow per year.
 
 ```{r ingrowth_stem_rate, eval = FALSE}
-time_mixin <- stand_stats |>
+time_mixin <- nrs_plots_stats |>
   distinct(STATECD, COUNTYCD, PLOT, MEASYEAR) |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   summarize(
@@ -1684,7 +1699,7 @@ time_mixin <- stand_stats |>
   ungroup()
 
 ingrowth_stem_rate <- tree_growth_with_fixed_spcd |>
-  semi_join(grm_ingrown, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR)) |>
+  semi_join(nrs_trees_ingrowth, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR)) |>
   left_join(time_mixin, by = join_by(STATECD, COUNTYCD, PLOT)) |>
   group_by(STATECD, COUNTYCD, PLOT, SPCD, FIRST_YEAR, LAST_YEAR) |>
   summarize(
@@ -1698,7 +1713,7 @@ ingrowth_stem_rate <- tree_growth_with_fixed_spcd |>
     .groups = "keep"
   ) |>
   ungroup() |>
-  left_join(species_mixin, by = join_by(SPCD)) |>
+  left_join(species_crosswalk, by = join_by(SPCD)) |>
   group_by(JENKINS_SPGRPCD) |>
   mutate(
     NUM_PLOTS = n(),
@@ -1714,7 +1729,7 @@ ingrowth_stem_rate <- tree_growth_with_fixed_spcd |>
 ```
 
 ```{r plot-ingrowth_stem_rate, eval = FALSE}
-stand_stats_mixin <- stand_stats |>
+stand_stats_mixin <- nrs_plots_stats |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   arrange(MEASYEAR) |>
   filter(row_number() == 1) |>
@@ -1746,7 +1761,8 @@ knitr::kable(
 
 Looking, for example, at ALSTKCD we find that these plots are fully stocked
 or overstocked, indicating that they have large cohorts of young trees all
-coming of age at the same time.
+coming of age at the same time, so maybe these are Christmas tree farms or
+similar.
 
 
 ```{r stem rate summary, eval = FALSE}
