@@ -1,5 +1,3 @@
-# not tar_simple because we need format = "file";
-# we need format = "file" because fvs_run produces files outside targets' control
 tar_target(
   nrs_growonly_none,
   {
@@ -84,8 +82,13 @@ tar_target(
       title = title,
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
-      regen = estab_for_fvs
-    )    
+      regen = estab_for_fvs,
+      partitions = nrs_plots_grow_partitions,
+      partition = nrs_plots_grow_partition,
+      random_seed = nrs_plots_grow_randseed
+    )
   },
-  format = "file"
+  iteration = "vector",
+  # cross() and map() are unparsed targets:: functions here:
+  pattern = cross(nrs_plots_grow_randseed, map(nrs_plots_grow_partition))
 )

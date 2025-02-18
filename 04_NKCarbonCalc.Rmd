@@ -544,53 +544,46 @@ Next, we want to run FVS for each of those plots, in each of those years.
 
 Generate the keywordfile for NK Plots projected carbon using FFE algorithm.
 
-```{targets nk_ffe_none}
-# format = "file" because it produces files outside targets' control
-tar_target(
-  nk_ffe_none,
-  {
-    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-    fvs_variant <- "fvsne"      # TODO: put these in a config file
-    data_dir <- "data/fvs"
-    title <- "NKFFE"
-    mgmt_id <- "NONE"
+```{targets nk_ffe_none, tar_simple = TRUE}
+fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
+fvs_variant <- "fvsne"      # TODO: put these in a config file
+data_dir <- "data/fvs"
+title <- "NKFFE"
+mgmt_id <- "NONE"
 
-    # We communicate with FVS through files. FVSOnline shows a model in which
-    # a "project" (the inputs and outputs of a single FVS run) live in a
-    # single directory; we follow that model.
-    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
-    if (!dir.exists(project_dir)) {
-      dir.create(project_dir)
-    }
+# We communicate with FVS through files. FVSOnline shows a model in which
+# a "project" (the inputs and outputs of a single FVS run) live in a
+# single directory; we follow that model.
+project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+if (!dir.exists(project_dir)) {
+  dir.create(project_dir)
+}
 
-    nk_background_regen <- nk_extract_regen(nk_regen, "Background")
+nk_background_regen <- nk_extract_regen(nk_regen, "Background")
 
-    fvs_run(
-      fvsbin_dir,
-      fvs_variant,
-      project_dir,
-      fiadb,
-      title,
-      mgmt_id,
-      nk_plots_grown,
-      regen = nk_background_regen,
-      carb_calc = "FFE"
-    )
-  },
-  format = "file"
+fvs_run(
+  fvsbin_dir,
+  fvs_variant,
+  project_dir,
+  fiadb,
+  title,
+  mgmt_id,
+  nk_plots_grown,
+  regen = nk_background_regen,
+  carb_calc = "FFE"
 )
 ```
 
 Read back the results.
 
 ```{targets nk_ffe_none_carbon, tar_simple = TRUE}
-fvs_read_output(nk_ffe_none[3], "FVS_Carbon")
+fvs_read_output(nk_ffe_none, "FVS_Carbon")
 ```
 
 We're not using the summary yet, but define the target for it.
 
 ```{targets nk_ffe_none_summary, tar_simple = TRUE}
-fvs_read_output(nk_ffe_none[3], "FVS_Summary2_East")
+fvs_read_output(nk_ffe_none, "FVS_Summary2_East")
 ```
 
 ```{r fvs_stand_projected_ffe, eval=FALSE}
@@ -614,53 +607,46 @@ knitr::kable(fvs_stand_projected_ffe)
 
 Generate the keywordfile for NK Plots measured carbon using FFE algorithm.
 
-```{targets nk_ffe_srvy}
-# format = "file" because it produces files outside targets' control
-tar_target(
-  nk_ffe_srvy,
-  {
-    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-    fvs_variant <- "fvsne"      # TODO: put these in a config file
-    data_dir <- "data/fvs"
-    title <- "NKFFE"
-    mgmt_id <- "SRVY"
+```{targets nk_ffe_srvy, tar_simple = TRUE}
+fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
+fvs_variant <- "fvsne"      # TODO: put these in a config file
+data_dir <- "data/fvs"
+title <- "NKFFE"
+mgmt_id <- "SRVY"
 
-    # We communicate with FVS through files. FVSOnline shows a model in which
-    # a "project" (the inputs and outputs of a single FVS run) live in a
-    # single directory; we follow that model.
-    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
-    if (!dir.exists(project_dir)) {
-      dir.create(project_dir)
-    }
+# We communicate with FVS through files. FVSOnline shows a model in which
+# a "project" (the inputs and outputs of a single FVS run) live in a
+# single directory; we follow that model.
+project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+if (!dir.exists(project_dir)) {
+  dir.create(project_dir)
+}
 
-    nk_background_regen <- nk_extract_regen(nk_regen, "Background")
+nk_background_regen <- nk_extract_regen(nk_regen, "Background")
 
-    fvs_run(
-      fvsbin_dir,
-      fvs_variant,
-      project_dir,
-      fiadb,
-      title,
-      mgmt_id,
-      nk_plots_surveyed,
-      regen = nk_background_regen,
-      carb_calc = "FFE"
-    )
-  },
-  format = "file"
+fvs_run(
+  fvsbin_dir,
+  fvs_variant,
+  project_dir,
+  fiadb,
+  title,
+  mgmt_id,
+  nk_plots_surveyed,
+  regen = nk_background_regen,
+  carb_calc = "FFE"
 )
 ```
 
 Read back the results.
 
 ```{targets nk_ffe_srvy_carbon, tar_simple = TRUE}
-fvs_read_output(nk_ffe_srvy[3], "FVS_Carbon")
+fvs_read_output(nk_ffe_srvy, "FVS_Carbon")
 ```
 
 We're not using the summary yet, but define the target for it.
 
 ```{targets nk_ffe_srvy_summary, tar_simple = TRUE}
-fvs_read_output(nk_ffe_srvy[3], "FVS_Summary2_East")
+fvs_read_output(nk_ffe_srvy, "FVS_Summary2_East")
 ```
 
 
@@ -679,53 +665,46 @@ knitr::kable(fvs_stand_measured_ffe)
 #### Jenkins Projected
 
 Generate the keywordfile for NK Plots projected carbon using Jenkins algorithm.
-```{targets nk_jenkins_none}
-# format = "file" because it produces files outside targets' control
-tar_target(
-  nk_jenkins_none,
-  {
-    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-    fvs_variant <- "fvsne"      # TODO: put these in a config file
-    data_dir <- "data/fvs"
-    title <- "NKJenkins"
-    mgmt_id <- "NONE"
+```{targets nk_jenkins_none, tar_simple = TRUE}
+fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
+fvs_variant <- "fvsne"      # TODO: put these in a config file
+data_dir <- "data/fvs"
+title <- "NKJenkins"
+mgmt_id <- "NONE"
 
-    # We communicate with FVS through files. FVSOnline shows a model in which
-    # a "project" (the inputs and outputs of a single FVS run) live in a
-    # single directory; we follow that model.
-    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
-    if (!dir.exists(project_dir)) {
-      dir.create(project_dir)
-    }
+# We communicate with FVS through files. FVSOnline shows a model in which
+# a "project" (the inputs and outputs of a single FVS run) live in a
+# single directory; we follow that model.
+project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+if (!dir.exists(project_dir)) {
+  dir.create(project_dir)
+}
 
-    nk_background_regen <- nk_extract_regen(nk_regen, "Background")
+nk_background_regen <- nk_extract_regen(nk_regen, "Background")
 
-    fvs_run(
-      fvsbin_dir,
-      fvs_variant,
-      project_dir,
-      fiadb,
-      title,
-      mgmt_id,
-      nk_plots_grown,
-      regen = nk_background_regen,
-      carb_calc = "Jenkins"
-    )
-  },
-  format = "file"
+fvs_run(
+  fvsbin_dir,
+  fvs_variant,
+  project_dir,
+  fiadb,
+  title,
+  mgmt_id,
+  nk_plots_grown,
+  regen = nk_background_regen,
+  carb_calc = "Jenkins"
 )
 ```
 
 Read back the results.
 
 ```{targets nk_jenkins_none_carbon, tar_simple = TRUE}
-fvs_read_output(nk_jenkins_none[3], "FVS_Carbon")
+fvs_read_output(nk_jenkins_none, "FVS_Carbon")
 ```
 
 We're not using the summary yet, but define the target for it.
 
 ```{targets nk_jenkins_none_summary, tar_simple = TRUE}
-fvs_read_output(nk_jenkins_none[3], "FVS_Summary2_East")
+fvs_read_output(nk_jenkins_none, "FVS_Summary2_East")
 ```
 
 ```{r fvs_stand_projected_jenkins, eval = FALSE}
@@ -744,53 +723,46 @@ knitr::kable(fvs_stand_projected_jenkins)
 
 Generate the keywordfile for NK Plots measured carbon using FFE algorithm.
 
-```{targets nk_jenkins_srvy}
-# format = "file" because it produces files outside targets' control
-tar_target(
-  nk_jenkins_srvy,
-  {
-    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-    fvs_variant <- "fvsne"      # TODO: put these in a config file
-    data_dir <- "data/fvs"
-    title <- "NKJenkins"
-    mgmt_id <- "SRVY"
+```{targets nk_jenkins_srvy, tar_simple = TRUE}
+fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
+fvs_variant <- "fvsne"      # TODO: put these in a config file
+data_dir <- "data/fvs"
+title <- "NKJenkins"
+mgmt_id <- "SRVY"
 
-    # We communicate with FVS through files. FVSOnline shows a model in which
-    # a "project" (the inputs and outputs of a single FVS run) live in a
-    # single directory; we follow that model.
-    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
-    if (!dir.exists(project_dir)) {
-      dir.create(project_dir)
-    }
+# We communicate with FVS through files. FVSOnline shows a model in which
+# a "project" (the inputs and outputs of a single FVS run) live in a
+# single directory; we follow that model.
+project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+if (!dir.exists(project_dir)) {
+  dir.create(project_dir)
+}
 
-    nk_background_regen <- nk_extract_regen(nk_regen, "Background")
+nk_background_regen <- nk_extract_regen(nk_regen, "Background")
 
-    fvs_run(
-      fvsbin_dir,
-      fvs_variant,
-      project_dir,
-      fiadb,
-      title,
-      mgmt_id,
-      nk_plots_surveyed,
-      regen = nk_background_regen,
-      carb_calc = "Jenkins"
-    )
-  },
-  format = "file"
+fvs_run(
+  fvsbin_dir,
+  fvs_variant,
+  project_dir,
+  fiadb,
+  title,
+  mgmt_id,
+  nk_plots_surveyed,
+  regen = nk_background_regen,
+  carb_calc = "Jenkins"
 )
 ```
 
 Read back the results.
 
 ```{targets nk_jenkins_srvy_carbon, tar_simple = TRUE}
-fvs_read_output(nk_jenkins_srvy[3], "FVS_Carbon")
+fvs_read_output(nk_jenkins_srvy, "FVS_Carbon")
 ```
 
 We're not using the summary yet, but define the target for it.
 
 ```{targets nk_jenkins_srvy_summary, tar_simple = TRUE}
-fvs_read_output(nk_jenkins_srvy[3], "FVS_Summary2_East")
+fvs_read_output(nk_jenkins_srvy, "FVS_Summary2_East")
 ```
 
 ```{r fvs_stand_measured_jenkins, eval = FALSE}

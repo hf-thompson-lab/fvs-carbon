@@ -2337,10 +2337,52 @@ We gather two series of stands:
 Find the stands we want to project; these are the grow-only stands starting
 in their first measurement year.
 
-> TODO nik: re-introduce partitions and random seeds
-
 When generating keyword files, we create one per partition,
 distributing across partitions using round-robin on STAND_ID.
+
+```{targets nrs_plots_grow_partitions, tar_simple = TRUE}
+# This is a list of partitons; we can come up with it however we want.
+# For now, one partition per worker is resonable.
+partitions <- 1
+crew_controller <- tar_option_get(controller)
+if (!is.null(crew_controller)) {
+  partitions <- crew_controller$launcher$workers
+}
+partitions
+```
+
+Create a list of partitions; each replica will get one of these.
+```{targets nrs_plots_grow_partition, tar_simple = TRUE}
+1:nrs_plots_grow_partitions
+```
+
+> TODO nik: re-introduce partitions and random seeds
+> An example _targets.R that runs each partition with each seed:
+> list(
+>  tar_target(partition, 1:9),
+>  tar_target(seed, 1:3),
+>  tar_target(data, 111:999),
+>  tar_target(
+>    process,
+>    f(partition, seed, data),
+>    iteration = "vector",
+>    pattern = cross(seed, map(partition))
+>  )
+> )
+> Note that f() needs to take partition and seed as parameters, and needs
+> to append them as columns to its output dataframe.
+
+Run with multiple random seeds. In theory, we chould have `tarchetypes::tar_rep()`
+manage this for us, but tar_rep doesn't support repetition in combination with
+dynamic branching (which we're using for partitioning). So we manage random
+seeds explicitly.
+
+```{targets nrs_plots_grow_randseed, tar_simple = TRUE}
+# We can have as many seeds as we want. We'll convert these to valid FVS
+# random seeds later.
+# Start with 3, so it's reasonably fast but we get some benefit from it.
+1:3
+```
 
 keywordfile_section is a function to generate a keywordfile section from
 information about a run and a stand.
@@ -2353,10 +2395,7 @@ It cooks a StdIdent that can be parsed later:
 
 The first set of keyword files is to project from the first measurement year to 2025.
 
-
 ```{targets nrs_growonly_none}
-# not tar_simple because we need format = "file";
-# we need format = "file" because fvs_run produces files outside targets' control
 tar_target(
   nrs_growonly_none,
   {
@@ -2441,72 +2480,77 @@ tar_target(
       title = title,
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
-      regen = estab_for_fvs
-    )    
+      regen = estab_for_fvs,
+      partitions = nrs_plots_grow_partitions,
+      partition = nrs_plots_grow_partition,
+      random_seed = nrs_plots_grow_randseed
+    )
   },
-  format = "file"
+  iteration = "vector",
+  # cross() and map() are unparsed targets:: functions here:
+  pattern = cross(nrs_plots_grow_randseed, map(nrs_plots_grow_partition))
 )
 ```
 
 The second run is a zero-year projection to have FVS calculate the carbon
-in surveyed stands in each year they are surveyed.
-
-```{r stands_surveyed, eval = FALSE}
-fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-fia_fvs_standinit_plot <- tbl(fia, 'FVS_StandInit_Plot') |>
-  select(STAND_CN, STAND_ID)
-
-stands_surveyed <- tbl(fia, 'PLOT') |>
-  select(CN, STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, DESIGNCD) |>
-  filter(DESIGNCD == 1) |>
-  rename(STAND_CN = CN) |>
-  semi_join(plot_grow_only, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
-  left_join(fia_fvs_standinit_plot, by = join_by(STAND_CN)) |>
-  collect()
-
-dbDisconnect(fia)
-remove(fia, fia_fvs_standinit_plot)
-```
-
-The second run is to do a 0-year projection for each measurement year. These
+in surveyed stands in each year they are surveyed. These
 are given management ID "SRVY".
 
-```{r NRSGrowOnly SRVY, eval = FALSE}
-# We're running 0-year timesteps, but FVS requires us to run at least one
-# year, so we run 0-year timesteps for 1 year.
-timestep <- 1
-title <- "NRSGrowOnly"
-mgmtid <- "SRVY"
-for (partition in 1:num_partitions) {
-  filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".key")
-  if (!USE_CACHE | !file.exists(filename)) {
-    unlink(filename)
-    print(paste0("Writing ", filename))
-    apply(
-      stands_surveyed |>
-        filter((as.numeric(STAND_ID) %% num_partitions) == (partition - 1)) |>
-        arrange(STAND_ID, MEASYEAR),
-      1,
-      function(row) {
-        write_lines(
-          keywordfile_section(
-            title,
-            mgmtid,
-            row['STAND_ID'],
-            row['STAND_CN'],
-            row['MEASYEAR'],
-            row['MEASYEAR'],
-            timestep,
-            partition
-          ),
-          filename,
-          append = TRUE
-        )
-      }
+```{targets nrs_growonly_srvy}
+tar_target(
+  nrs_growonly_srvy,
+  {
+    plots_for_fvs <- nrs_plots_grown |>
+      rename(
+        STAND_CN = CN,
+        FIRST_YEAR = MEASYEAR
+      ) |>
+      mutate(
+        LAST_YEAR = FIRST_YEAR,
+        # STAND_ID matches STAND_ID for NRSGrowOnly GROW, but this isn't
+        # actually necessary. We'll line things up later using CN.
+        STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
+      )
+    
+    # No establishment for survey runs
+    
+    # We're running 0-year timesteps, but FVS requires us to run at least one
+    # year, so we run 0-year timesteps for 1 year.
+    timestep <- 1
+    
+    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
+    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    data_dir <- "data/fvs"
+    title <- "NRSGrowOnly"
+    mgmt_id <- "SRVY"
+
+    # We communicate with FVS through files. FVSOnline shows a model in which
+    # a "project" (the inputs and outputs of a single FVS run) live in a
+    # single directory; we follow that model.
+    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+    if (!dir.exists(project_dir)) {
+      dir.create(project_dir)
+    }
+    
+    fvs_run(
+      fvsbin_dir = fvsbin_dir,
+      fvs_variant = fvs_variant,
+      project_dir = project_dir,
+      fiadb = fiadb,
+      title = title,
+      mgmt_id = mgmt_id,
+      stands = plots_for_fvs,
+      regen = estab_for_fvs,
+      partitions = nrs_plots_grow_partitions,
+      partition = nrs_plots_grow_partition,
+      random_seed = nrs_plots_grow_randseed
     )
-    write_lines("Stop", filename, append = TRUE)
-  }
-}
+  },
+  iteration = "vector",
+  # cross() and map() are unparsed targets:: functions here:
+  pattern = cross(nrs_plots_grow_randseed, map(nrs_plots_grow_partition))
+)
+
 ```
 
 ### Run FVS

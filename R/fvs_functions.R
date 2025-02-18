@@ -306,15 +306,37 @@ fvs_run <- function(
     mgmt_id,
     stands,
     regen = NULL,
-    carb_calc = "Jenkins"
+    carb_calc = "Jenkins",
+    num_partitions = NULL,
+    partition = NULL,
+    random_seed = NULL
 ) {
-  fvs_keyword_filename <- file.path(project_dir, paste0("FVS_", title, "_", mgmt_id, ".key"))
+  # We need to separate inputs and outputs for each partition and each replica
+  # Each partition will process a different subset of records;
+  # Each replica will process using a different random seed
+  file_basename <- paste0(
+    "FVS_", title,
+    "_", mgmt_id,
+    if (!is.null(partition)) {
+      paste0("_P", partition)
+    },
+    if (!is.null(random_seed)) {
+      paste0("_R", random_seed)
+    }
+  )
+  
+  fvs_keyword_filename <- file.path(project_dir, paste0(file_basename, ".key"))
   if (file.exists(fvs_keyword_filename)) {
     unlink(fvs_keyword_filename)
   }
   
-  fvs_input_db <- fvs_fia_input(stands, fiadb, file.path(project_dir, "FVS_Input.db"))
-  fvs_output_db <- file.path(project_dir, "FVS_Output.db")
+  if (!is.null(partition)) {
+    stands <- stands |>
+      filter((as.numeric(STAND_CN) %% num_partitions) == (partition - 1))
+  }
+  
+  fvs_input_db <- fvs_fia_input(stands, fiadb, file.path(project_dir, paste0(file_basename, "_Input.db")))
+  fvs_output_db <- file.path(project_dir, paste0(file_basename, "_Output.db"))
   if (file.exists(fvs_output_db)) {
     unlink(fvs_output_db)
   }
@@ -324,13 +346,6 @@ fvs_run <- function(
   fvs_output_filename <- sub("\\.key$", ".out", fvs_keyword_filename)
   if (file.exists(fvs_output_filename)) {
     unlink(fvs_output_filename)
-  }
-  
-  # Invented Here:
-  # Write the exit status to a separate file so it can be read later
-  fvs_error_filename <- sub("\\.key$", ".err", fvs_keyword_filename)
-  if (file.exists(fvs_error_filename)) {
-    unlink(fvs_error_filename)
   }
   
   fvs_write_keyword_file(
@@ -351,18 +366,31 @@ fvs_run <- function(
     wd = dirname(fvs_keyword_filename)
   )
   fvs$wait()
-  write_lines(fvs$get_exit_status(), fvs_error_filename)
-  
-  # Give back three pieces of information:
-  # 1 - a file containing the exit status
-  # 2 - a file containing the textual output
-  # 3 - a file containing the data output
-  c(fvs_error_filename, fvs_output_filename, fvs_output_db)
+
+  tibble::tibble(
+    title = title,
+    mgmt_id = mgmt_id,
+    partitions = partitions,
+    partition = partition,
+    random_seed = random_seed,
+    exit_status = fvs$get_exit_status(),
+    output = fvs_output_filename,
+    keyword_file = fvs_keyword_filename,
+    input_db = fvs_input_db,
+    output_db = fvs_output_db
+  )
 }
 
-fvs_read_output <- function(fvs_output_db, table) {
-  out <- DBI::dbConnect(RSQLite::SQLite(), fvs_output_db, flags = SQLITE_RO)
-  on.exit(dbDisconnect(out), add = TRUE, after = FALSE)
-
-  tbl(out, table) |> collect()
+fvs_read_output <- function(fvs_output, table) {
+  bind_rows(
+    apply(fvs_output, 1, \(row) {
+      output_db <- row["output_db"]
+      con <- DBI::dbConnect(RSQLite::SQLite(), output_db, flags = SQLITE_RO)
+      on.exit(dbDisconnect(out), add = TRUE, after = FALSE)
+      
+      tbl(out, table) |>
+        collect() |>
+        cross(row) # Attach all the run metadata to each row
+    })
+  )
 }
