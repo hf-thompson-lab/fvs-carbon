@@ -83,7 +83,7 @@ tar_target(
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
       regen = estab_for_fvs,
-      partitions = nrs_plots_grow_partitions,
+      num_partitions = nrs_plots_grow_partitions,
       partition = nrs_plots_grow_partition,
       random_seed = nrs_plots_grow_randseed
     )

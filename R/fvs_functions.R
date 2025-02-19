@@ -370,9 +370,9 @@ fvs_run <- function(
   tibble::tibble(
     title = title,
     mgmt_id = mgmt_id,
-    partitions = partitions,
-    partition = partition,
-    random_seed = random_seed,
+    num_partitions = if (!is.null(num_partitions)) {num_partitions} else {NA},
+    partition = if (!is.null(partition)) {partition} else {NA},
+    random_seed = if (!is.null(random_seed)) {random_seed} else {NA},
     exit_status = fvs$get_exit_status(),
     output = fvs_output_filename,
     keyword_file = fvs_keyword_filename,
@@ -383,14 +383,15 @@ fvs_run <- function(
 
 fvs_read_output <- function(fvs_output, table) {
   bind_rows(
-    apply(fvs_output, 1, \(row) {
-      output_db <- row["output_db"]
-      con <- DBI::dbConnect(RSQLite::SQLite(), output_db, flags = SQLITE_RO)
-      on.exit(dbDisconnect(out), add = TRUE, after = FALSE)
+    lapply(1:nrow(fvs_output), \(n) {
+      row <- fvs_output[n,]
+      output_db <- row[["output_db"]]
+      con <- DBI::dbConnect(RSQLite::SQLite(), output_db, flags = RSQLite::SQLITE_RO)
+      on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
       
-      tbl(out, table) |>
+      tbl(con, table) |>
         collect() |>
-        cross(row) # Attach all the run metadata to each row
+        cross_join(row) # Attach all the run metadata to each row
     })
   )
 }

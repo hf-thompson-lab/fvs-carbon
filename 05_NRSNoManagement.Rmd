@@ -2344,7 +2344,7 @@ distributing across partitions using round-robin on STAND_ID.
 # This is a list of partitons; we can come up with it however we want.
 # For now, one partition per worker is resonable.
 partitions <- 1
-crew_controller <- tar_option_get(controller)
+crew_controller <- targets::tar_option_get("controller")
 if (!is.null(crew_controller)) {
   partitions <- crew_controller$launcher$workers
 }
@@ -2481,7 +2481,7 @@ tar_target(
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
       regen = estab_for_fvs,
-      partitions = nrs_plots_grow_partitions,
+      num_partitions = nrs_plots_grow_partitions,
       partition = nrs_plots_grow_partition,
       random_seed = nrs_plots_grow_randseed
     )
@@ -2540,8 +2540,7 @@ tar_target(
       title = title,
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
-      regen = estab_for_fvs,
-      partitions = nrs_plots_grow_partitions,
+      num_partitions = nrs_plots_grow_partitions,
       partition = nrs_plots_grow_partition,
       random_seed = nrs_plots_grow_randseed
     )

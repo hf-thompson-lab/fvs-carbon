@@ -9,6 +9,6 @@ tar_option_set(
     "maps",
     "pbapply"
   ),
-  controller = crew::crew_controller_local(workers = 4)
+  controller = crew::crew_controller_local(workers = 8)
 )
 tar_source()
