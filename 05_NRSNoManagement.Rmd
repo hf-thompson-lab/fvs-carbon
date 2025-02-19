@@ -39,7 +39,7 @@ run this block to pre-load them.
 Regenerate this block with
 ```{sh, eval = FALSE}
 fgrep '```{targets' 05_NRSNoManagement.Rmd | \
-  sed -E -e 's/```{targets /tar_load(/' -e 's/,.*/)/' 
+  sed -E -e 's/```\{targets /tar_load(/' -e 's/[,}].*/)/' 
 ```
 
 ```{r load tar objects defined here, eval = FALSE}
@@ -56,6 +56,11 @@ tar_load(nrs_trees_growth)
 tar_load(nrs_trees_spcd)
 tar_load(nrs_estab_rate)
 tar_load(nrs_estab_height)
+tar_load(nrs_plots_grow_partitions)
+tar_load(nrs_plots_grow_partition)
+tar_load(nrs_plots_grow_randseed)
+tar_load(nrs_growonly_none)
+tar_load(nrs_growonly_srvy)
 ```
 
 # Grow-Only Plots in the Northeast
@@ -2343,12 +2348,7 @@ distributing across partitions using round-robin on STAND_ID.
 ```{targets nrs_plots_grow_partitions, tar_simple = TRUE}
 # This is a list of partitons; we can come up with it however we want.
 # For now, one partition per worker is resonable.
-partitions <- 1
-crew_controller <- targets::tar_option_get("controller")
-if (!is.null(crew_controller)) {
-  partitions <- crew_controller$launcher$workers
-}
-partitions
+partitions <- 8
 ```
 
 Create a list of partitions; each replica will get one of these.
@@ -2494,7 +2494,8 @@ tar_target(
 
 The second run is a zero-year projection to have FVS calculate the carbon
 in surveyed stands in each year they are surveyed. These
-are given management ID "SRVY".
+are given management ID "SRVY". We also run only once, with no random seed,
+since we're not actually growing anything.
 
 ```{targets nrs_growonly_srvy}
 tar_target(
@@ -2541,28 +2542,14 @@ tar_target(
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
       num_partitions = nrs_plots_grow_partitions,
-      partition = nrs_plots_grow_partition,
-      random_seed = nrs_plots_grow_randseed
+      partition = nrs_plots_grow_partition
     )
   },
   iteration = "vector",
   # cross() and map() are unparsed targets:: functions here:
-  pattern = cross(nrs_plots_grow_randseed, map(nrs_plots_grow_partition))
+  pattern = map(nrs_plots_grow_partition)
 )
 
-```
-
-### Run FVS
-
-```{r run_fvs, eval = FALSE}
-# TODO nik: Run FVS directly from R.
-# Batch file to run FVS in parallel:
-# for %%p in (FVS_%1_%2_*.key) do del %%~np.db
-# for %%p in (FVS_%1_%2_*.key) do start \FVS\FVSbin\FVSne.exe --keywordfile=%%p
-# Run it as:
-# runfvs.bat NRSGrowOnly GROW
-# Could be clever and create a ".done" file for each ".key" file when done,
-# and poll for existence of all of them.
 ```
 
 # Results
@@ -2866,78 +2853,24 @@ We can decide to not worry about them.
 
 Load the output from all FVS partitions into a single dataframe
 
-```{r FVS_Carbon, eval = FALSE}
-FVS_Carbon <- NULL
-FVS_Summary2_East <- NULL
-
-title <- "NRSGrowOnly"
-for (mgmtid in c("GROW", "SRVY")) {
-  for (partition in 1:num_partitions) {
-    filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".db")
-    if (file.exists(filename)) {
-      print(paste0("Reading ", filename))
-      fvs_out_db <- DBI::dbConnect(RSQLite::SQLite(), filename)
-      fvs_carbon_tbl = tbl(fvs_out_db, 'FVS_Carbon') |>
-        collect() |>
-        mutate(
-          Title = title,
-          MgmtId = mgmtid,
-          Timestep = sub("^.*_Y([0-9]+).*$", "\\1", StandID), # Extract timestep
-          RanNSeed = sub("^.*_R([0-9]+).*$", "\\1", StandID), # Extract random seed
-          Partition = partition,
-          StandID = sub("^([^_]+)_.*$", "\\1", StandID) # Extract stand ID
-        )
-      FVS_Carbon <- bind_rows(FVS_Carbon, fvs_carbon_tbl)
-  
-      fvs_summary2_east_tbl = tbl(fvs_out_db, 'FVS_Summary2_East') |>
-        collect() |>
-        mutate(
-          Title = title,
-          MgmtId = mgmtid,
-          Timestep = sub("^.*_Y([^_]+)_.*$", "\\1", StandID), # Extract timestep
-          RanNSeed = sub("^.*_R([^_]+)_.*$", "\\1", StandID), # Extract random seed
-          Partition = partition,
-          StandID = sub("^([^_]+)_.*$", "\\1", StandID) # Extract stand ID
-        )
-        FVS_Summary2_East <- bind_rows(FVS_Summary2_East, fvs_summary2_east_tbl)
-    
-        dbDisconnect(fvs_out_db)
-    } else {
-      print(paste0("Skipping ", filename))
-    }
-  }
-}
-
-remove(fvs_out_db, fvs_carbon_tbl, fvs_summary2_east_tbl)
+```{r nrs_growonly_none_carbon, eval = FALSE}
+nrs_growonly_none_carbon <- fvs_read_output(nrs_growonly_none, "FVS_Carbon")
 ```
+
+```{r nrs_growonly_srvy_carbon, eval = FALSE}
+nrs_growonly_srvy_carbon <- fvs_read_output(nrs_growonly_srvy, "FVS_Carbon")
+```
+
 Consolidate outputs; average the multiple runs with different random seeds.
 
+
 ```{r FVS_Carbon_NONE, eval = FALSE}
-FVS_Carbon_NONE <- FVS_Carbon |>
-  filter(MgmtId == "GROW" & Timestep == 10) |>
-  group_by(StandID, Year) |>
-  summarize(
-    Aboveground_Total_Live = mean(Aboveground_Total_Live),
-    Total_Stand_Carbon = mean(Total_Stand_Carbon),
-    .groups = 'keep'
-  ) |>
-  ungroup()
+FVS_Carbon_NONE <- nrs_growonly_none_carbon |>
+  group_by(StandID, Year) |> # Combine results from different random seeds
+  summarize(Aboveground_Total_Live = mean(Abovegroun_Total_Live))
 
-FVS_Carbon_ANNL <- FVS_Carbon |>
-  filter(MgmtId == "GROW" & Timestep == 1) |>
-  group_by(StandID, Year) |>
-  summarize(
-    Aboveground_Total_Live = mean(Aboveground_Total_Live),
-    Total_Stand_Carbon = mean(Total_Stand_Carbon),
-    .groups = 'keep'
-  ) |>
-  ungroup()
-
-# There is no projection for the observed run, so no need to average
-FVS_Carbon_SRVY <- FVS_Carbon |>  
-  filter(MgmtId == "SRVY")
+FVS_Carbon_SRVY <- nrs_growonly_srvy_carbon
 ```
-
 Sanity check: did we get the outputs we requested?
 
 ```{r sanity-check-expected-output, eval = FALSE}

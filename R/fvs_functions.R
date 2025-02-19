@@ -332,7 +332,7 @@ fvs_run <- function(
   
   if (!is.null(partition)) {
     stands <- stands |>
-      filter((as.numeric(STAND_CN) %% num_partitions) == (partition - 1))
+      filter((digest::digest2int(STAND_CN) %% num_partitions) == (partition - 1))
   }
   
   fvs_input_db <- fvs_fia_input(stands, fiadb, file.path(project_dir, paste0(file_basename, "_Input.db")))

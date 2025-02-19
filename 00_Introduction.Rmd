@@ -62,7 +62,8 @@ tar_option_set(
     "measurements",
     "reshape2",
     "maps",
-    "pbapply"
+    "pbapply",
+    "digest"
   ),
   controller = crew::crew_controller_local(workers = 8)
 )
