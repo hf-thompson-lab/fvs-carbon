@@ -2853,49 +2853,68 @@ We can decide to not worry about them.
 
 Load the output from all FVS partitions into a single dataframe
 
-```{r nrs_growonly_none_carbon, eval = FALSE}
-nrs_growonly_none_carbon <- fvs_read_output(nrs_growonly_none, "FVS_Carbon")
-```
-
-```{r nrs_growonly_srvy_carbon, eval = FALSE}
-nrs_growonly_srvy_carbon <- fvs_read_output(nrs_growonly_srvy, "FVS_Carbon")
-```
-
-Consolidate outputs; average the multiple runs with different random seeds.
-
+Consolidate outputs that use multiple random seeds;
+average the multiple runs with different random seeds.
 
 ```{r FVS_Carbon_NONE, eval = FALSE}
-FVS_Carbon_NONE <- nrs_growonly_none_carbon |>
+FVS_Carbon_NONE <- fvs_read_output(nrs_growonly_none, "FVS_Carbon") |>
   group_by(StandID, Year) |> # Combine results from different random seeds
-  summarize(Aboveground_Total_Live = mean(Abovegroun_Total_Live))
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    .groups = "keep"
+  ) |>
+  ungroup()
 
-FVS_Carbon_SRVY <- nrs_growonly_srvy_carbon
+FVS_Summary2_East_NONE <- fvs_read_output(nrs_growonly_none, "FVS_Summary2_East") |>
+  group_by(StandID, Year) |>
+  summarize(
+    BA = mean(BA),
+    Tpa = mean(Tpa),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+
+FVS_Carbon_SRVY <- fvs_read_output(nrs_growonly_srvy, "FVS_Carbon") |>
+  select(StandID, Year, Aboveground_Total_Live)
+
+FVS_Summary2_East_SRVY <- fvs_read_output(nrs_growonly_srvy, "FVS_Summary2_East") |>
+  select(StandID, Year, BA, Tpa)
 ```
 Sanity check: did we get the outputs we requested?
 
 ```{r sanity-check-expected-output, eval = FALSE}
-matched_carbon_tmp <- stands_projected |>
+matched_carbon_tmp <- nrs_plots_grown |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  summarize(
+    FIRST_YEAR = min(MEASYEAR, na.rm = TRUE),
+    LAST_YEAR = max(MEASYEAR, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  mutate(
+    # STAND_ID won't match FVS_PLOTINIT_PLOT.STAND_ID; that's OK
+    STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
+  ) |>
   left_join(
     FVS_Carbon_NONE |>
       select(StandID, Year, Aboveground_Total_Live) |> 
       rename(
         STAND_ID = StandID,
-        FIRSTYEAR = Year,
+        FIRST_YEAR = Year,
         Starting_Carbon = Aboveground_Total_Live
       ),
-    by = join_by(STAND_ID, FIRSTYEAR)
+    by = join_by(STAND_ID, FIRST_YEAR)
   ) |>
   left_join(
     FVS_Carbon_NONE |>
       select(StandID, Year, Aboveground_Total_Live) |>
       rename(
         STAND_ID = StandID,
-        LASTYEAR = Year,
+        LAST_YEAR = Year,
         Ending_Carbon = Aboveground_Total_Live
         ),
-    by = join_by(STAND_ID, LASTYEAR)
-  ) |>
-  mutate(partition = (as.numeric(STAND_ID) %% num_partitions) + 1)
+    by = join_by(STAND_ID, LAST_YEAR)
+  )
 missing_start <- matched_carbon_tmp |>
   filter(is.na(Starting_Carbon)) |> 
   nrow()
@@ -2914,6 +2933,8 @@ remove(
 ```
 
 ## Annual vs. Decadal Projections
+
+TODO: bring back annual, it's not currently processed
 
 ```{r annual_vs_decadal, eval = FALSE}
 decadal_carbon_tmp <- FVS_Carbon_NONE |>
@@ -3021,21 +3042,8 @@ of interest in the first and last year, and nothing in between.
 
 ```{r projected_vs_measured, eval = FALSE}
 projected_carbon_tmp <- FVS_Carbon_NONE |>
-  select(StandID, Year, Total_Stand_Carbon) |>
-  rename(Projected_Carbon = Total_Stand_Carbon)
-
-FVS_Summary2_East_NONE <- FVS_Summary2_East |>
-  filter(MgmtId == "GROW" & Timestep == 10) |>
-  group_by(StandID, Year) |>
-  summarize(
-    BA = mean(BA),
-    Tpa = mean(Tpa),
-    .groups = 'keep'
-  ) |>
-  ungroup()
-
-FVS_Summary2_East_SRVY <- FVS_Summary2_East |>  
-  filter(MgmtId == "SRVY")
+  select(StandID, Year, Aboveground_Total_Live) |>
+  rename(Projected_Carbon = Aboveground_Total_Live)
 
 projected_ba_tmp <- FVS_Summary2_East_NONE |>
   select(StandID, Year, BA, Tpa) |>
@@ -3044,15 +3052,11 @@ projected_ba_tmp <- FVS_Summary2_East_NONE |>
 
 projected_tmp <- projected_carbon_tmp |>
   full_join(projected_ba_tmp, by = join_by(StandID, Year)) |>
-  mutate(STAND_ID = paste0(
-     substring(StandID, 1, 2),
-     substring(StandID, 5, 12)
-  )) |>
-  select(STAND_ID, Year, Projected_Carbon, Projected_BA, Projected_Tpa)
+  select(StandID, Year, Projected_Carbon, Projected_BA, Projected_Tpa)
 
 surveyed_carbon_tmp <- FVS_Carbon_SRVY |>
-  select(StandID, Year, Total_Stand_Carbon) |>
-  rename(Measured_Carbon = Total_Stand_Carbon)
+  select(StandID, Year, Aboveground_Total_Live) |>
+  rename(Measured_Carbon = Aboveground_Total_Live)
 
 surveyed_ba_tmp <- FVS_Summary2_East_SRVY |>
   select(StandID, Year, BA, Tpa) |>
@@ -3061,27 +3065,25 @@ surveyed_ba_tmp <- FVS_Summary2_East_SRVY |>
 
 surveyed_tmp <- surveyed_carbon_tmp |>
   full_join(surveyed_ba_tmp, by = join_by(StandID, Year)) |>
-  mutate(STAND_ID = paste0(
-     substring(StandID, 1, 2),
-     substring(StandID, 5, 12)
-  )) |>
-  select(STAND_ID, Year, Measured_Carbon, Measured_BA, Measured_Tpa)
+  filter(!is.na(Measured_Carbon)) |> # other metrics get an extra year
+  select(StandID, Year, Measured_Carbon, Measured_BA, Measured_Tpa)
 
-projected_vs_measured <- stand_stats |>
-  mutate(STAND_ID = sprintf(paste0(
-    '%02d',  '%03d',   '%05d'),
+projected_vs_measured <- nrs_plots_grown |>
+  mutate(StandID = sprintf(paste0(
+    '%04d',  '%03d',   '%05d'),
     STATECD, COUNTYCD, PLOT
   )) |>
   rename(Year = MEASYEAR) |>
+  left_join(nrs_plots_stats, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
   select(
-    STAND_ID, Year,
+    StandID, Year,
     STDAGE, FOREST_TYPE, FOREST_TYPE_GROUP, ECOSUBCD,
     QMD, QMD_METRIC
   ) |>
-  left_join(projected_tmp, by = join_by(STAND_ID, Year)) |>
-  left_join(surveyed_tmp, by = join_by(STAND_ID, Year)) |>
-  consolidate_forest_type_groups_filter() |>
-  group_by(STAND_ID) |>
+  left_join(projected_tmp, by = join_by(StandID, Year)) |>
+  left_join(surveyed_tmp, by = join_by(StandID, Year)) |>
+  filter_decode_forest_type_group() |>
+  group_by(StandID) |>
   mutate(
     ECOCD = substr(ECOSUBCD, 1, nchar(ECOSUBCD) - 1),
     First_Year = min(Year, na.rm = TRUE),
@@ -3176,22 +3178,10 @@ ggplot(
 #  facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  ggtitle("FVS Projected vs. FIA Measured Carbon") +
+  ggtitle("FVS Projected vs. Measured Carbon") +
   xlab(bquote("Projected Stand Carbon" ~(`Mg C` %.% ha^-1))) +
-  ylab(bquote("Measured Stand Carbon" ~(`Mg C` %.% ha^-1))) +
-  coord_cartesian(xlim = c(0, 800), ylim = c(0, 800))
-```
-
-```{r, eval = FALSE}
-only_ends <- projected_vs_measured |> filter(Projection_Years > 0)
-p <- sum(only_ends$Projected_Carbon) / nrow(only_ends)
-m <- sum(only_ends$Measured_Carbon) / nrow(only_ends)
-y <- mean(only_ends$Projection_Years)
-p
-m
-(p - m)
-(p - m) / m
-y
+  ylab(bquote("Measured Stand Carbon" ~(`Mg C` %.% ha^-1)))# +
+  #coord_cartesian(xlim = c(0, 800), ylim = c(0, 800))
 ```
 
 ### Carbon Flux
