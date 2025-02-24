@@ -1921,12 +1921,17 @@ nrs_estab_height |>
     ),
     HT_ORIGIN = ordered(HT_ORIGIN, levels = c("Plot", "EcoSubRegion", "EcoRegion", "Region", "All"))
   ) |>
-  ggplot(aes(x = factor(1), fill = HT_ORIGIN)) +
+  left_join(species_crosswalk, by = join_by(SPCD)) |>
+  group_by(JENKINS_SPGRP_NAME) |>
+  mutate(N = n()) |>
+  ungroup() |>
+  ggplot(aes(x = reorder(JENKINS_SPGRP_NAME, desc(N)), fill = HT_ORIGIN)) +
   geom_bar(width = 1) + 
   ylab(NULL) +
   xlab(NULL) +
-  scale_x_discrete(labels = NULL) +
+#  scale_x_discrete(labels = NULL) +
   theme_bw() +
+  theme(axis.text.x = element_text(angle = -15, hjust = 0, vjust = 1)) +
   scale_fill_brewer(name = "Origin", palette = "Set1") +
   ggtitle("Origin of Height estimates")
 ```
@@ -3316,7 +3321,7 @@ FVS_Carbon_SRVY |>
   geom_hline(yintercept = 0, linetype = "dashed") +
   scale_fill_continuous(name = "Number of Plots", transform = "log10") +
   theme_bw() +
-  ggtitle("FVS Observed Annual Carbon Flux for Grow-Only Plots") +
+  ggtitle("Observed Annual Carbon Flux for Grow-Only Plots") +
   ylab(bquote("Observed Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) #+;
 
 ```
