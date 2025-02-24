@@ -1753,12 +1753,28 @@ nrs_estab_rate |>
   ggplot(aes(x = QMD, y = RATE_PER_HECTARE)) +
   geom_bin2d(bins = 50) +
   scale_fill_continuous(name = "Number of Plots", transform = "log10", limits = c(1, 1000)) +
+  #facet_wrap(~GROUP_NAME) +
+  theme_bw() +
+  #xlab(bquote("Basal Area" ~(m^2 %.% ha^-1))) +
+  xlab(bquote("QMD (cm)")) +
+  ylab(bquote("Ingrowth Rate" ~(stems %.% ha^-1 %.% yr^-1))) +
+  ggtitle("Per-Plot Ingrowth Stem Rate")
+```
+
+By species group:
+```{r plot nrs_estab_rate by sp grp, eval = FALSE}
+nrs_estab_rate |>
+  left_join(stand_stats_mixin, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  ggplot(aes(x = QMD, y = RATE_PER_HECTARE)) +
+  geom_bin2d(bins = 50) +
+  scale_fill_continuous(name = "Number of Plots", transform = "log10", limits = c(1, 1000)) +
   facet_wrap(~GROUP_NAME) +
   theme_bw() +
   #xlab(bquote("Basal Area" ~(m^2 %.% ha^-1))) +
   xlab(bquote("QMD (cm)")) +
   ylab(bquote("Ingrowth Rate" ~(stems %.% ha^-1 %.% yr^-1))) +
   ggtitle("Per-Plot Ingrowth Stem Rate")
+
 ```
 
 Ok, who are these outliers?
@@ -2034,6 +2050,32 @@ ingrowth_by_stem |>
     GROUP_NAME = paste0(JENKINS_SPGRP_NAME, ", n=", n())
   ) |>
   ungroup() |>
+  filter(!is.na(RATE_PER_ACRE)) |> # remove that pesky shellbark hickory tree
+  ggplot(aes(
+    fct_rev(reorder(GROUP_NAME, PLOT_COUNT)),
+    RATE_PER_ACRE,
+    fill = fct_rev(reorder(GROUP_NAME, PLOT_COUNT))
+  )) +
+  geom_boxplot(outlier.size = 0.1) +
+  scale_x_discrete(labels = NULL) +
+  theme_bw() +
+  xlab("Species Group") +
+  ylab(bquote("Ingrowth Rate " ~ (`stems` %.% acre^-1 %.% year^-1))) +
+  scale_fill_discrete(name = "Species Group") +
+  ggtitle("Observed Ingrowth Rate")
+```
+
+```{r ingrowth_by_stem, eval = FALSE}
+ingrowth_by_stem <- nrs_estab_rate |>
+  left_join(nrs_estab_height, by = join_by(STATECD, COUNTYCD, PLOT, SPCD))
+
+ingrowth_by_stem |>
+  group_by(JENKINS_SPGRPCD) |>
+  mutate(
+    PLOT_COUNT = n(),
+    GROUP_NAME = paste0(JENKINS_SPGRP_NAME, ", n=", n())
+  ) |>
+  ungroup() |>
   filter(!is.na(HT)) |> # remove that pesky shellbark hickory tree
   ggplot(aes(
     fct_rev(reorder(GROUP_NAME, PLOT_COUNT)),
@@ -2042,6 +2084,7 @@ ingrowth_by_stem |>
   )) +
   geom_boxplot(outlier.size = 0.1) +
   scale_x_discrete(labels = NULL) +
+  scale_y_continuous(limits = c(0, NA)) +
   theme_bw() +
   xlab("Species Group") +
   ylab("Height at 3\" DBH (feet)") +
@@ -3088,14 +3131,16 @@ projected_vs_measured <- nrs_plots_grown |>
     ECOCD = substr(ECOSUBCD, 1, nchar(ECOSUBCD) - 1),
     First_Year = min(Year, na.rm = TRUE),
     Last_Year = max(Year, na.rm = TRUE),
-    Starting_Carbon = max(if_else(Year == First_Year, Measured_Carbon, 0), na.rm = TRUE),
+    Starting_Carbon = min(if_else(Year == First_Year, Measured_Carbon, NA), na.rm = TRUE),
     Projected_Carbon_Delta = Projected_Carbon - Starting_Carbon,
     Projected_Carbon_Flux = if_else(Year == First_Year, 0, Projected_Carbon_Delta / (Year - First_Year)),
     Measured_Carbon_Delta = Measured_Carbon - Starting_Carbon,
     Measured_Carbon_Flux = if_else(Year == First_Year, 0, Measured_Carbon_Delta / (Year - First_Year)),
-    Starting_BA = max(if_else(Year == First_Year, Measured_BA, 0), na.rm = TRUE),
+    Starting_BA = min(if_else(Year == First_Year, Measured_BA, NA), na.rm = TRUE),
     Projected_BA_Delta = Projected_BA - Starting_BA,
-    Measured_BA_Delta = Measured_BA - Starting_BA
+    Projected_BAI = if_else(Year == First_Year, 0, Projected_BA_Delta / (Year - First_Year)),
+    Measured_BA_Delta = Measured_BA - Starting_BA,
+    Measured_BAI = if_else(Year == First_Year, 0, Measured_BA_Delta / (Year - First_Year))
   ) |>
   ungroup() |>
   filter(Year == First_Year | Year == Last_Year) |>
@@ -3236,12 +3281,6 @@ all_years <- tibble(Year = min(FVS_Carbon_SRVY$Year):max(FVS_Carbon_SRVY$Year))
 num_years <- all_years |> nrow()
 
 FVS_Carbon_SRVY |>
-  left_join(
-    stands_surveyed |> select(STAND_ID, STATECD, COUNTYCD, PLOT),
-    by = join_by(StandID == STAND_ID)
-  ) |>
-  mutate(StandID = sprintf('%02d%03d%05d', STATECD, COUNTYCD, PLOT)) |>
-  select(StandID, Year, Aboveground_Total_Live) |>
   group_by(StandID) |>
   arrange(Year) |>
   mutate(
@@ -3253,11 +3292,14 @@ FVS_Carbon_SRVY |>
     Annual_C_Flux = C_Flux / (Year - Prev_Year)
   ) |>
   group_by(StandID) |>
-  mutate(Min_Year = min(Year), Max_Year = max(Year)) |>
+  mutate(
+    Min_Year = min(Year),
+    Max_Year = max(Year)
+  ) |>
   ungroup() |>
   full_join(
     expand.grid(
-      StandID = unique(projected_vs_measured$STAND_ID),
+      StandID = unique(projected_vs_measured$StandID),
       Year = all_years$Year
     ),
     by = join_by(StandID, Year)
@@ -3310,22 +3352,23 @@ ggplot(
   ) +
   geom_bin2d(bins = 50) +
   geom_abline(intercept = 0, slope = 1) +
-  geom_smooth(
-    method = lm,
-    formula = 'y ~ x',
-    color = 'brown',
-    linetype = 'dashed',
-    fullrange = TRUE,
-    se = FALSE
-  ) +
+  #geom_smooth(
+  #  method = lm,
+  #  formula = 'y ~ x',
+  #  color = 'brown',
+  #  linetype = 'dashed',
+  #  fullrange = TRUE,
+  #  se = FALSE
+  #) +
   scale_fill_continuous(name = "Number of Plots", transform = "log10") +
-  #facet_wrap(~FOREST_TYPE_GROUP) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
   theme_bw() +
   theme(aspect.ratio = 1) +
   ggtitle("FVS Projected vs. Measured Annual Carbon Flux") +
   xlab(bquote("Measured Annual Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) +
-  ylab(bquote("Projected Annual Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) #+
-  #coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
+  ylab(bquote("Projected Annual Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) +
+  coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
 ```
 
 ```{r carbon flux ratio, eval = FALSE}
@@ -3400,7 +3443,7 @@ ggplot(
     aes(Carbon_Flux_Residual, fct_reorder(FOREST_TYPE_GROUP, Measured_Carbon, .fun = sum))
   ) +
   geom_vline(xintercept = 0, color = 'red') +
-  geom_boxplot(varwidth = TRUE) +
+  geom_boxplot(varwidth = TRUE, outlier.size = 0.1) +
   # scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
   geom_point(
     data = projected_vs_measured |>
@@ -3423,11 +3466,8 @@ ggplot(
     "\n",
     "for Grow-Only FIA Plots in the Northeast"
   )) +
-  xlab(paste0(
-    "Carbon Flux Residual (Mg C/ha/year)",
-    "\n",
-    "X = Mean Measured Carbon Flux (Mg C/ha/year)"
-  )) +
+  xlab(bquote("Carbon Flux Residual " ~(`Mg C` %.% ha^-1 %.% year^-1))) +
+  labs(caption = bquote("X = Mean Measured Carbon Flux " ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
   ylab("Forest Type Group")
 
 ```
@@ -3438,7 +3478,7 @@ ggplot(
     aes(Carbon_Flux_Residual, fct_reorder(FOREST_TYPE_GROUP, Measured_Carbon, .fun = sum))
   ) +
   geom_vline(xintercept = 0, color = 'red') +
-  geom_boxplot(varwidth = TRUE) +
+  geom_boxplot(varwidth = TRUE, outlier.size = 0.1) +
   geom_point(
     data = projected_vs_measured |>
       filter(Projection_Years > 0) |> 
@@ -3463,11 +3503,8 @@ ggplot(
     "\n",
     "for Grow-Only FIA Plots in the Northeast"
   )) +
-  xlab(paste0(
-    "Carbon Flux Residual (Mg C/ha/year)",
-    "\n",
-    "X = Mean Measured Carbon Flux(Mg C/ha/year)"
-  )) +
+  xlab(bquote("Carbon Flux Residual " ~(`Mg C` %.% ha^-1 %.% year^-1))) +
+  labs(caption = bquote("X = Mean Measured Carbon Flux " ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
   ylab("Forest Type Group")
 ```
 
@@ -3477,7 +3514,7 @@ ggplot(
     aes(Carbon_Flux_Residual, fct_reorder(ECOCD, Measured_Carbon, .fun = sum))
   ) +
   geom_vline(xintercept = 0, color = 'red') +
-  geom_boxplot(varwidth = TRUE) +
+  geom_boxplot(varwidth = TRUE, outlier.size = 0.1) +
 #  scale_y_discrete(guide = guide_axis(n.dodge = 2)) +
   coord_cartesian(xlim = c(-10, 10)) +
 #  scale_x_continuous(breaks = c(-10, -2.5, 0, 2.5, 5)) +
@@ -3571,6 +3608,7 @@ ggplot(
   ) +
   scale_fill_continuous(transform = "log10") +
   facet_wrap(~FOREST_TYPE_GROUP) +
+  theme_bw() +
   ggtitle("Grow-Only Stands\nCarbon Projection Residuals vs. Measured BA") +
   xlab(bquote("Measured BA" ~ (m^2 %.% ha^-1))) +
   ylab(bquote("Carbon Residual" ~ (`Mg C` %.% ha^-1)))
@@ -3734,6 +3772,30 @@ ggplot(
   theme_bw() +
   coord_cartesian(ylim = c(-2, 3))
 
+```
+
+```{r p_vs_m_bai, eval=FALSE}
+ggplot(
+    projected_vs_measured |> filter(Projection_Years > 0),
+    aes(x = Measured_BAI, y = Projected_BAI)
+  ) +
+  geom_bin2d(binwidth = 0.1) +
+#  geom_smooth(
+#    method = lm,
+#    formula = 'y ~ x',
+#    fullrange = TRUE,
+#    se = FALSE,
+#    color = 'brown'
+#  ) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  scale_fill_continuous(transform = "log10") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
+  ggtitle("Grow-Only Stands\nProjected vs. Measured Basal Area Increment") +
+  xlab(bquote("Measured Basal Area Increment " ~(m^2 %.% ha^-1 %.% year^-1))) +
+  ylab(bquote("Projected Basal Area Increment " ~(m^2 %.% ha^-1 %.% year^-1)))
 ```
 
 Can we plot plot location with size proportional to BA?
