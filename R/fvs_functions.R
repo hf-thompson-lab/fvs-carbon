@@ -197,7 +197,8 @@ fvs_keywordfile_section <- function(
     first_year,
     last_year,
     regen,
-    carb_calc
+    carb_calc,
+    random_seed
 ) {
   stand_table <- "FVS_StandInit_Plot"
   tree_table <- "FVS_TreeInit_Plot"
@@ -222,6 +223,12 @@ fvs_keywordfile_section <- function(
     )
   }
   
+  if (!is.null(random_seed)) {
+    RannSeed <- fvs_kwd1("RanNSeed", random_seed)
+  } else {
+    RannSeed <- c()
+  }
+  
   c(
     fvs_kwd0("StdIdent"),
     paste0(stand_id, " ", title),
@@ -230,6 +237,10 @@ fvs_keywordfile_section <- function(
     fvs_kwd0("MgmtId"),
     mgmt_id,
     fvs_TimeConfig(first_year, last_year, 10),
+    RannSeed,
+    fvs_kwd1("CutList", 0),
+    fvs_kwd1("ATrtList", 0),
+    fvs_kwd1("TreeList", 0),
     fvs_kwd0("FMIn"), # Fire and Fuels Extension
     fvs_kwd0("CarbRept"),
     fvs_kwd0("CarbCut"),
@@ -251,9 +262,12 @@ fvs_keywordfile_section <- function(
     fvs_kwd1("Summary",  2),
     fvs_kwd2("Computdb", 0, 1),
     fvs_kwd1("MisRpts",  2),
+    fvs_kwd1("ATrtLiDB", 2),
     fvs_kwd1("CarbReDB", 2),
+    fvs_kwd1("CutLiDB", 2),
     fvs_kwd1("FuelReDB", 2),
     fvs_kwd1("FuelsOut", 2),
+    fvs_kwd1("TreeLiDB", 2),
     fvs_kwd0("End"), # Database
     fvs_Estab(regen),
     fvs_kwd0("Process")
@@ -270,7 +284,8 @@ fvs_write_keyword_file <- function(
   mgmt_id,
   stands,
   regen,
-  carb_calc
+  carb_calc,
+  random_seed
 ) {
   unlink(keyword_filename)
   apply(stands, 1, \(row) {
@@ -285,7 +300,8 @@ fvs_write_keyword_file <- function(
         first_year = row["FIRST_YEAR"],
         last_year = row["LAST_YEAR"],
         regen = regen,
-        carb_calc = carb_calc
+        carb_calc = carb_calc,
+        random_seed = random_seed
       ),
       keyword_filename,
       append = TRUE
@@ -356,7 +372,8 @@ fvs_run <- function(
     mgmt_id = mgmt_id,
     stands = stands,
     regen = regen,
-    carb_calc = carb_calc
+    carb_calc = carb_calc,
+    random_seed = random_seed
   )
   
   # Return the name of the keyword file and output database
