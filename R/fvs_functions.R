@@ -1,61 +1,14 @@
-fvs_kwd0 <- function(kwd) {
-  sprintf('%-10s', kwd)
-}
-
-fvs_kwd1 <- function(kwd, arg1) {
-  arg1 <- as.character(arg1)
-  sprintf('%-10s%10s', kwd, arg1)
-}
-
-fvs_kwd2 <- function(kwd, arg1, arg2) {
-  arg1 <- as.character(arg1)
-  arg2 <- as.character(arg2)
-  sprintf('%-10s%10s%10s', kwd, arg1, arg2)
-}
-
-fvs_kwd3 <- function(kwd, arg1, arg2, arg3) {
-  arg1 <- as.character(arg1)
-  arg2 <- as.character(arg2)
-  arg3 <- as.character(arg3)
-  sprintf('%-10s%10s%10s%10s', kwd, arg1, arg2, arg3)
-}
-
-fvs_kwd4 <- function(kwd, arg1, arg2, arg3, arg4) {
-  arg1 <- as.character(arg1)
-  arg2 <- as.character(arg2)
-  arg3 <- as.character(arg3)
-  arg4 <- as.character(arg4)
-  sprintf('%-10s%10s%10s%10s%10s', kwd, arg1, arg2, arg3, arg4)
-}
-
-fvs_kwd5 <- function(kwd, arg1, arg2, arg3, arg4, arg5) {
-  arg1 <- as.character(arg1)
-  arg2 <- as.character(arg2)
-  arg3 <- as.character(arg3)
-  arg4 <- as.character(arg4)
-  arg5 <- as.character(arg5)
-  sprintf('%-10s%10s%10s%10s%10s%10s', kwd, arg1, arg2, arg3, arg4, arg5)
-}
-
-fvs_kwd6 <- function(kwd, arg1, arg2, arg3, arg4, arg5, arg6) {
-  arg1 <- as.character(arg1)
-  arg2 <- as.character(arg2)
-  arg3 <- as.character(arg3)
-  arg4 <- as.character(arg4)
-  arg5 <- as.character(arg5)
-  arg6 <- as.character(arg6)
-  sprintf('%-10s%10s%10s%10s%10s%10s%10s', kwd, arg1, arg2, arg3, arg4, arg5, arg6)
-}
-
-fvs_kwd7 <- function(kwd, arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
-  arg1 <- as.character(arg1)
-  arg2 <- as.character(arg2)
-  arg3 <- as.character(arg3)
-  arg4 <- as.character(arg4)
-  arg5 <- as.character(arg5)
-  arg6 <- as.character(arg6)
-  arg7 <- as.character(arg7)
-  sprintf('%-10s%10s%10s%10s%10s%10s%10s%10s', kwd, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+fvs_kwd <- function(kwd, ...) {
+  paste0(
+    sprintf("%-10s", kwd),
+    paste0(
+      lapply(
+        list(...),
+        \(arg) sprintf("%10s", as.character(arg))
+      ),
+      collapse = ""
+    )
+  )
 }
 
 fvs_TimeConfig <- function(FirstYear, LastYear, Timestep) {
@@ -66,9 +19,9 @@ fvs_TimeConfig <- function(FirstYear, LastYear, Timestep) {
   if (FirstYear == LastYear) {
     # Produce a single one-year cycle
     TimeConfig <- c(
-      fvs_kwd1("InvYear", FirstYear),
-      fvs_kwd2("TimeInt", 0, 1),
-      fvs_kwd1("NumCycle", 1)
+      fvs_kwd("InvYear", FirstYear),
+      fvs_kwd("TimeInt", 0, 1),
+      fvs_kwd("NumCycle", 1)
     )      
   } else {
     # LastYear must be the first year of the last cycle, so
@@ -79,19 +32,19 @@ fvs_TimeConfig <- function(FirstYear, LastYear, Timestep) {
       # Produce a single short cycle followed by 10-year cycles
       NumCycles <- NumCycles + 1
       TimeConfig <- c(
-        fvs_kwd1("InvYear", FirstYear),
-        fvs_kwd2("TimeInt", 0, Timestep),
-        fvs_kwd2("TimeInt", 1, ShortCycle),
-        fvs_kwd2("TimeInt", NumCycles, 1),
-        fvs_kwd1("NumCycle", NumCycles)
+        fvs_kwd("InvYear", FirstYear),
+        fvs_kwd("TimeInt", 0, Timestep),
+        fvs_kwd("TimeInt", 1, ShortCycle),
+        fvs_kwd("TimeInt", NumCycles, 1),
+        fvs_kwd("NumCycle", NumCycles)
       )
     } else {
       # No need for an initial short cycle
       TimeConfig <- c(
-        fvs_kwd1("InvYear", FirstYear),
-        fvs_kwd2("TimeInt", 0, Timestep),
-        fvs_kwd2("TimeInt", NumCycles, 1),
-        fvs_kwd1("NumCycle", NumCycles)
+        fvs_kwd("InvYear", FirstYear),
+        fvs_kwd("TimeInt", 0, Timestep),
+        fvs_kwd("TimeInt", NumCycles, 1),
+        fvs_kwd("NumCycle", NumCycles)
       )
     }
   }
@@ -116,24 +69,24 @@ fvs_Estab <- function(rows) {
     # keyword creates one tree record, so if there are more than 1000 trees
     # split it into multiple records.
 #    while (density > 1000) {
-#      result <- append(result, fvs_kwd7("Natural", year, species, 1000, survival, age, height, shade))
+#      result <- append(result, fvs_kwd("Natural", year, species, 1000, survival, age, height, shade))
 #      density <- density - 1000
 #    }
-#    append(result, fvs_kwd7("Natural", year, species, density, survival, age, height, shade))
-    fvs_kwd7("Natural", year, species, density, survival, age, height, shade)
+#    append(result, fvs_kwd("Natural", year, species, density, survival, age, height, shade))
+    fvs_kwd("Natural", year, species, density, survival, age, height, shade)
   }
   if (!is.null(rows)) {
     c(
-      fvs_kwd1("If", 0),
-      fvs_kwd0("mod(cycle,1) eq 0"),
-      fvs_kwd0("Then"),
-      fvs_kwd1("Estab", 0),
-      fvs_kwd2("MechPrep", 0, 0),
-      fvs_kwd2("BurnPrep", 0, 0),
-      fvs_kwd0("Sprout"),
+      fvs_kwd("If", 0),
+      fvs_kwd("mod(cycle,1) eq 0"),
+      fvs_kwd("Then"),
+      fvs_kwd("Estab", 0),
+      fvs_kwd("MechPrep", 0, 0),
+      fvs_kwd("BurnPrep", 0, 0),
+      fvs_kwd("Sprout"),
       apply(rows, 1, natural_regen),
-      fvs_kwd0("End"),
-      fvs_kwd0("EndIf")
+      fvs_kwd("End"),
+      fvs_kwd("EndIf")
     )
   } else {
     c()
@@ -224,53 +177,53 @@ fvs_keywordfile_section <- function(
   }
   
   if (!is.null(random_seed)) {
-    RannSeed <- fvs_kwd1("RanNSeed", random_seed)
+    RannSeed <- fvs_kwd("RanNSeed", random_seed)
   } else {
     RannSeed <- c()
   }
   
   c(
-    fvs_kwd0("StdIdent"),
+    fvs_kwd("StdIdent"),
     paste0(stand_id, " ", title),
-    fvs_kwd0("StandCN"),
+    fvs_kwd("StandCN"),
     stand_cn,
-    fvs_kwd0("MgmtId"),
+    fvs_kwd("MgmtId"),
     mgmt_id,
     fvs_TimeConfig(first_year, last_year, 10),
     RannSeed,
-    fvs_kwd1("CutList", 0),
-    fvs_kwd1("ATrtList", 0),
-    fvs_kwd1("TreeList", 0),
-    fvs_kwd0("FMIn"), # Fire and Fuels Extension
-    fvs_kwd0("CarbRept"),
-    fvs_kwd0("CarbCut"),
-    fvs_kwd2("CarbCalc", cc_code, 1),
-    fvs_kwd0("FuelOut"),
-    fvs_kwd0("FuelRept"),
-    fvs_kwd0("End"), # FMIn
-    fvs_kwd0("Database"), # Database extension
-    fvs_kwd0("DSNIn"),
+    fvs_kwd("CutList", 0),
+    fvs_kwd("ATrtList", 0),
+    fvs_kwd("TreeList", 0),
+    fvs_kwd("FMIn"), # Fire and Fuels Extension
+    fvs_kwd("CarbRept"),
+    fvs_kwd("CarbCut"),
+    fvs_kwd("CarbCalc", cc_code, 1),
+    fvs_kwd("FuelOut"),
+    fvs_kwd("FuelRept"),
+    fvs_kwd("End"), # FMIn
+    fvs_kwd("Database"), # Database extension
+    fvs_kwd("DSNIn"),
     input_db,
-    fvs_kwd0("StandSQL"),
+    fvs_kwd("StandSQL"),
     paste0("SELECT * FROM ", stand_table," WHERE Stand_CN = '%Stand_CN%'"),
-    fvs_kwd0("EndSQL"), # StandSQL
-    fvs_kwd0("TreeSQL"),
+    fvs_kwd("EndSQL"), # StandSQL
+    fvs_kwd("TreeSQL"),
     paste0("SELECT * FROM ", tree_table," WHERE Stand_CN = '%Stand_CN%'"),
-    fvs_kwd0("EndSQL"), # TreeSQL
-    fvs_kwd0("DSNOut"),
+    fvs_kwd("EndSQL"), # TreeSQL
+    fvs_kwd("DSNOut"),
     output_db,
-    fvs_kwd1("Summary",  2),
-    fvs_kwd2("Computdb", 0, 1),
-    fvs_kwd1("MisRpts",  2),
-    fvs_kwd1("ATrtLiDB", 2),
-    fvs_kwd1("CarbReDB", 2),
-    fvs_kwd1("CutLiDB", 2),
-    fvs_kwd1("FuelReDB", 2),
-    fvs_kwd1("FuelsOut", 2),
-    fvs_kwd1("TreeLiDB", 2),
-    fvs_kwd0("End"), # Database
+    fvs_kwd("Summary",  2),
+    fvs_kwd("Computdb", 0, 1),
+    fvs_kwd("MisRpts",  2),
+    fvs_kwd("ATrtLiDB", 2),
+    fvs_kwd("CarbReDB", 2),
+    fvs_kwd("CutLiDB", 2),
+    fvs_kwd("FuelReDB", 2),
+    fvs_kwd("FuelsOut", 2),
+    fvs_kwd("TreeLiDB", 2),
+    fvs_kwd("End"), # Database
     fvs_Estab(regen),
-    fvs_kwd0("Process")
+    fvs_kwd("Process")
   )
 }
 
