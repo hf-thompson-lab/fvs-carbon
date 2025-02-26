@@ -154,8 +154,19 @@ filter_plots_harvested <- function(.data, con) {
       .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
-    filter(STATUSCD == 3) |> # STATUSCD == 3: Harvested
-    # Note that we do not group by INVYR
+    mutate(
+      TPA_HRVST = if_else(STATUSCD == 3, TPA_UNADJ, NA)
+    ) |>
+    group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
+    summarize(
+      NUM_TREES = sum(TPA_UNADJ, na.rm = TRUE),
+      NUM_HRVST = sum(TPA_HRVST, na.rm = TRUE),
+      .groups = "keep"
+    ) |>
+    ungroup() |>
+    # TREE.DSTRBCD1 says significant disturbance causes "mortality or
+    # damage to 25 percent of the trees in the condition"
+    filter(NUM_HRVST / NUM_TREES >= 0.25) |>
     distinct(STATECD, COUNTYCD, PLOT)
   
   plots_harvested <- union(plots_harvested_bytree, plots_harvested_bycond)
@@ -197,6 +208,7 @@ filter_plots_unfertilized <- function(.data, con) {
         na.rm = TRUE
       ) == 0
     ) |>
+    summarize(.groups = "keep") |>
     ungroup()
 
   .data |>
@@ -205,7 +217,7 @@ filter_plots_unfertilized <- function(.data, con) {
 
 filter_plots_measured_pre_post_harvest <- function(.data, con) {
   # Remove the entire plot if:
-  # 1. The plot was not measured prior to the earliest harvest in the window,
+  # 1. The plot was not measured prior to the most recent harvest in the window,
   # and
   # 2. The plot was not measured 10 years after the most recent harvest.
   # Note that a single condition can have multiple harvest years,
@@ -219,52 +231,21 @@ filter_plots_measured_pre_post_harvest <- function(.data, con) {
       .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
+    mutate(
+      HRVYR1 = if_else(!is.na(TRTCD1) & (TRTCD1 == 10), TRTYR1, NA),
+      HRVYR2 = if_else(!is.na(TRTCD2) & (TRTCD2 == 10), TRTYR2, NA),
+      HRVYR3 = if_else(!is.na(TRTCD3) & (TRTCD3 == 10), TRTYR3, NA),
+      MIN_HRVYR = coalesce(HRVYR1, HRVYR2, HRVYR3),
+      MAX_HRVYR = coalesce(HRVYR3, HRVYR2, HRVYR1)
+    ) |>
+    filter(!is.na(MIN_HRVYR)) |>
     group_by(STATECD, COUNTYCD, PLOT) |>
-    mutate(
-      MIN_HRVYR1 = min(if_else(!is.na(TRTCD1) & (TRTCD1 == 10), TRTYR1, 9999), na.rm = TRUE),
-      MAX_HRVYR1 = max(if_else(!is.na(TRTCD1) & (TRTCD1 == 10), TRTYR1, 0), na.rm = TRUE),
-      MIN_HRVYR2 = min(if_else(!is.na(TRTCD2) & (TRTCD2 == 10), TRTYR2, 9999), na.rm = TRUE),
-      MAX_HRVYR2 = max(if_else(!is.na(TRTCD2) & (TRTCD2 == 10), TRTYR2, 0), na.rm = TRUE),
-      MIN_HRVYR3 = min(if_else(!is.na(TRTCD3) & (TRTCD3 == 10), TRTYR3, 9999), na.rm = TRUE),
-      MAX_HRVYR3 = max(if_else(!is.na(TRTCD3) & (TRTCD3 == 10), TRTYR3, 0), na.rm = TRUE)
-    ) |>
     summarize(
-      MIN_HRVYR_COND =
-        if_else(
-          MIN_HRVYR1 < MIN_HRVYR2,
-          if_else(
-            MIN_HRVYR1 < MIN_HRVYR3,
-            MIN_HRVYR1,
-            MIN_HRVYR3
-          ),
-          if_else(
-            MIN_HRVYR2 < MIN_HRVYR3,
-            MIN_HRVYR2,
-            MIN_HRVYR3
-          )
-        ),
-      MAX_HRVYR_COND =
-        if_else(
-          MAX_HRVYR1 > MAX_HRVYR2,
-          if_else(
-            MAX_HRVYR1 > MAX_HRVYR3,
-            MAX_HRVYR1,
-            MAX_HRVYR3
-          ),
-          if_else(
-            MAX_HRVYR2 > MAX_HRVYR3,
-            MAX_HRVYR2,
-            MAX_HRVYR3
-          )
-        ),
+      MIN_HRVYR = min(MIN_HRVYR, na.rm = TRUE),
+      MAX_HRVYR = max(MAX_HRVYR, na.rm = TRUE),
       .groups = "keep"
-    ) |> 
-    ungroup() |>
-    mutate(
-      MIN_HRVYR_COND = if_else(is.na(MIN_HRVYR_COND), 9999, MIN_HRVYR_COND),
-      MAX_HRVYR_COND = if_else(is.na(MAX_HRVYR_COND),    0, MAX_HRVYR_COND)
     ) |>
-    select(STATECD, COUNTYCD, PLOT, MIN_HRVYR_COND, MAX_HRVYR_COND)
+    ungroup()
   
   plots_harvested_bytree <- tbl(con, "TREE") |>
     # Expectation is that this filter will come late enough in the chain
@@ -273,37 +254,46 @@ filter_plots_measured_pre_post_harvest <- function(.data, con) {
       .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
-    filter(STATUSCD == 3) |> # STATUSCD == 3: Harvested
-    # TREE.MORTYR may have the estimated year of harvest, but it's
-    # very rarely populated (<<1%), so use MEASYEAR as an approximation
     left_join(
       tbl(con, "PLOT") |> select(CN, MEASYEAR) |> rename(PLT_CN = CN),
       by = join_by(PLT_CN)
     ) |>
+    # TREE.STATUSCD == 3 indicates that the tree was harvested
+    # TREE.MORTYR may have the estimated year of harvest, but it's
+    # very rarely populated (<<1%), so use MEASYEAR as an approximation
+    mutate(
+      TPA_HRVST = if_else(STATUSCD == 3, TPA_UNADJ, NA),
+      HRVYR     = if_else(STATUSCD == 3, MEASYEAR, NA)
+    ) |>
     # Note that we do not group by INVYR
-    group_by(STATECD, COUNTYCD, PLOT) |>
+    group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
     summarize(
-      MIN_HRVYR_TREE = min(MEASYEAR, na.rm = TRUE),
-      MAX_HRVYR_TREE = max(MEASYEAR, na.rm = TRUE),
+      MIN_HRVYR = min(HRVYR, na.rm = TRUE),
+      MAX_HRVYR = max(HRVYR, na.rm = TRUE),
+      NUM_TREES = sum(TPA_UNADJ, na.rm = TRUE),
+      NUM_HRVST = sum(TPA_HRVST, na.rm = TRUE),
       .groups = "keep"
     ) |>
     ungroup() |>
-    mutate(
-      MIN_HRVYR_TREE = if_else(is.na(MIN_HRVYR_TREE), 9999, MIN_HRVYR_TREE),
-      MAX_HRVYR_TREE = if_else(is.na(MAX_HRVYR_TREE),    0, MAX_HRVYR_TREE)
-    ) |>
-    select(STATECD, COUNTYCD, PLOT, MIN_HRVYR_TREE, MAX_HRVYR_TREE)
-  
+    # TREE.DSTRBCD1 says significant disturbance causes "mortality or
+    # damage to 25 percent of the trees in the condition"
+    filter(NUM_HRVST / NUM_TREES >= 0.25) |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    summarize(
+      MIN_HRVYR = min(MIN_HRVYR, na.rm = TRUE),
+      MAX_HRVYR = max(MAX_HRVYR, na.rm = TRUE),
+      .groups = "keep"
+    )
+
   plots_harvested <- plots_harvested_bycond |>
-    full_join(
-      plots_harvested_bytree,
-      by = join_by(STATECD, COUNTYCD, PLOT)
+    union_all(plots_harvested_bytree) |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    summarize(
+      MIN_HRVYR = min(MIN_HRVYR, na.rm = TRUE),
+      MAX_HRVYR = max(MAX_HRVYR, na.rm = TRUE),
+      .groups = "keep"
     ) |>
-    mutate(
-      MIN_HRVYR = if_else(MIN_HRVYR_COND < MIN_HRVYR_TREE, MIN_HRVYR_COND, MIN_HRVYR_TREE),
-      MAX_HRVYR = if_else(MAX_HRVYR_COND > MAX_HRVYR_TREE, MAX_HRVYR_COND, MAX_HRVYR_TREE)
-    ) |>
-    select(STATECD, COUNTYCD, PLOT, MIN_HRVYR, MAX_HRVYR)
+    ungroup()
   
   .data |>
     group_by(STATECD, COUNTYCD, PLOT) |>
@@ -312,9 +302,9 @@ filter_plots_measured_pre_post_harvest <- function(.data, con) {
       MAX_MEASYEAR = max(MEASYEAR, na.rm = TRUE)
     ) |>
     ungroup() |>
-    left_join(plots_harvested, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+    inner_join(plots_harvested, by = join_by(STATECD, COUNTYCD, PLOT)) |>
     filter(
-      (MIN_MEASYEAR < MIN_HRVYR) &
+      (MIN_MEASYEAR < MAX_HRVYR) &
       (MAX_MEASYEAR > MAX_HRVYR + 10)
     )
 }
