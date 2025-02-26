@@ -37,9 +37,9 @@ When tar_make() has already built the objects defined in this document,
 run this block to pre-load them.
 
 Regenerate this block with
-```{sh, eval = FALSE}
-fgrep '```{targets' 05_NRSNoManagement.Rmd | \
-  sed -E -e 's/```\{targets /tar_load(/' -e 's/[,}].*/)/' 
+```{sh find tar objects defined here, eval = FALSE}
+fgrep '```{targets' 05_NRSGrowOnly.Rmd | \
+  sed -E -e 's/```\{targets /tar_load(/' -e 's/[,}].*/)/'
 ```
 
 ```{r load tar objects defined here, eval = FALSE}
