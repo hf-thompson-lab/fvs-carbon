@@ -34,16 +34,12 @@ tar_load(species_crosswalk)
 ## Preload targets results from this document
 
 When tar_make() has already built the objects defined in this document,
-run this block to pre-load them.
-
-Regenerate this block with
-```{sh, eval = FALSE}
-fgrep '```{targets' 06_NRSHarvest.Rmd | \
-  sed -E -e 's/```\{targets /tar_load(/' -e 's/[,}].*/)/' 
-```
+run this block to pre-load them. You can then skip running ```{targets} blocks.
 
 ```{r load tar objects defined here, eval = FALSE}
-# None yet
+get_this_rmd_file() |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
 ```
 
 # Harvested Plots in the Northeast
@@ -60,14 +56,15 @@ Find all FIA plots that:
 * is measured both pre- and post-harvest, and
 * have a single condition for the entire plot
 
-```{r nrs_plot_prsc, cache=TRUE}
-nrs_plots_prsc <- fia_plots_filtered(fiadb, filter = \(.data, con) {
+```{targets nrs_plots_prsc, tar_simple=TRUE}
+fia_plots_filtered(fiadb, filter = \(.data, con) {
   .data |>
     filter(INVYR >= 1999) |>
     filter_plots_fvsne(con) |>
     filter_plots_trees(con) |>
     filter_plots_undisturbed(con) |>
     filter_plots_unfertilized(con) |>
+    # harvested is implied by measured_pre_post_harvest
     #filter_plots_harvested(con)
     filter_plots_measured_pre_post_harvest(con)
 })
@@ -206,6 +203,9 @@ but not all harvested trees have STATUSCD == 3. Therefore we approximate
 harvested trees by finding all trees that exist in a pre-harvest inventory,
 but do not exist (or are marked as harvested) in the corresponding harvest
 inventory.
+
+The goal is not to exactly replicate a harvest, but to tell FVSne which
+trees should be removed before the next timestep.
 
 ## Trees removed in harvest
 
