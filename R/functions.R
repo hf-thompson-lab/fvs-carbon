@@ -7,6 +7,13 @@ get_this_rmd_file <- function(){
                 rprojroot::thisfile()))
 }
 
+tar_objects_defined_in_rmd <- function(filename) {
+  read_lines(filename) |>
+    # Find targets code blocks
+    grep("^```\\{targets ", x = _, value = TRUE) |>
+    # Parse out the names of those blocks
+    sub("^[^ ]+ ([^,}]+).*", "\\1", x = _)
+}
 
 hectare_at <- function(lat, lon) {
   old_axis_order <- st_axis_order()

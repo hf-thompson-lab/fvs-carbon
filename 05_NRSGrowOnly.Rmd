@@ -26,7 +26,7 @@ tar_source()
 
 ## Load targets results from other documents
 
-```{r load tar objects}
+```{r load tar objects defined elsewhere}
 tar_load(fiadb)
 tar_load(species_crosswalk)
 ```
@@ -34,18 +34,11 @@ tar_load(species_crosswalk)
 ## Preload targets results from this document
 
 When tar_make() has already built the objects defined in this document,
-run this block to pre-load them.
+run this block to pre-load them. You can then skip running ```{targets} blocks.
 
 ```{r load tar objects defined here, eval = FALSE}
-read_lines(get_this_rmd_file()) |>
-  as.data.frame(nm="text") |>
-  # Find targets code blocks
-  filter(grepl("^```\\{targets ", text)) |>
-  # Parse out the names of those blocks
-  mutate(text = sub("^[^ ]+ ([^,}]+).*", "\\1", text)) |>
-  # Pull the names as a list
-  _$text |>
-  # Load everything in the list
+get_this_rmd_file() |>
+  tar_objects_defined_in_rmd() |>
   tar_load()
 ```
 
