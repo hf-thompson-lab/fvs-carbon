@@ -3,6 +3,7 @@ tar_option_set(
   packages = c(
     "tarchetypes",
     "tidyverse",
+    "dbplyr",
     "RSQLite",
     "measurements",
     "reshape2",

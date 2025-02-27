@@ -56,7 +56,19 @@ Find all FIA plots that:
 * is measured both pre- and post-harvest, and
 * have a single condition for the entire plot
 
-```{targets nrs_plots_prsc, tar_simple=TRUE}
+"Is harvested" is as marked on the condition by FIA. Note that conditions with
+harvested trees are not necessarily marked as harvested. To reconcile this, we
+observe that TREE.DSTRBCD1 says only "significant disturbance" is registered,
+and that "significant disturbance" is disturbance that causes "mortality or
+damage to 25 percent of the trees in the condition" Testing confirms that when
+the number of stems (TPA_UNADJ) represented by TREE.STATUSCD == 3 is >=25% of
+the pre-harvest number of stems on the plot, the condition is marked as
+harvested. To be consistent across all kinds of disturbance, we use the FIA
+definitions for all disturbance, including harvest, and therefore do NOT mark a
+plot as harvested even if there are harvested trees.
+
+
+```{targets nrs_plots_prsc_all, tar_simple=TRUE}
 fia_plots_filtered(fiadb, filter = \(.data, con) {
   .data |>
     filter(INVYR >= 1999) |>
@@ -74,8 +86,8 @@ fia_plots_filtered(fiadb, filter = \(.data, con) {
 
 Fetch more info about these stands.
 
-```{r nrs_plots_prsc_stats, tar_simple = TRUE}
-nrs_plots_prsc_stats <- fia_plots_filtered(fiadb, nrs_plots_prsc, \(.data, con) {
+```{targets nrs_plots_prsc_stats_all, tar_simple = TRUE}
+fia_plots_filtered(fiadb, nrs_plots_prsc_all, \(.data, con) {
     plots <- .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR)
     plots_join_by <- join_by(STATECD, COUNTYCD, PLOT, INVYR)
 
@@ -85,7 +97,7 @@ nrs_plots_prsc_stats <- fia_plots_filtered(fiadb, nrs_plots_prsc, \(.data, con) 
       rename(FORTYPE = MEANING)
     
     tree_stats <- tbl(con, "TREE") |>
-      inner_join(plots |> select(STATECD, COUNTYCD, PLOT, INVYR), by = plots_join_by) |>
+      inner_join(plots, by = plots_join_by) |>
       select(STATECD, COUNTYCD, PLOT, INVYR, DIA, CARBON_AG, TPA_UNADJ) |>
       group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
       summarize(
@@ -97,7 +109,7 @@ nrs_plots_prsc_stats <- fia_plots_filtered(fiadb, nrs_plots_prsc, \(.data, con) 
       )
     
     cond_stats <- tbl(con, "COND") |>
-      inner_join(plots |> select(STATECD, COUNTYCD, PLOT, INVYR), by = plots_join_by) |>
+      inner_join(plots, by = plots_join_by) |>
       select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, FORTYPCD) |>
       group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
       # QMD = sqrt(sum(DIA^2) / n)
@@ -118,13 +130,44 @@ nrs_plots_prsc_stats <- fia_plots_filtered(fiadb, nrs_plots_prsc, \(.data, con) 
       ) |>
       ungroup()
     
+    harvest_mixin <- tbl(con, "COND") |>
+      inner_join(plots, by = plots_join_by) |>
+      # Label each condition for harvest
+      mutate(HARVEST =
+         (!is.na(TRTCD1) & TRTCD1 == 10) |
+         (!is.na(TRTCD2) & TRTCD2 == 10) |
+         (!is.na(TRTCD3) & TRTCD3 == 10)
+      ) |>
+      # Collapse conditions up to plot level
+      group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
+      summarize(HARVEST = any(HARVEST, na.rm = TRUE)) |>
+      ungroup() |>
+      # Give ordinals to plot inventories
+      group_by(STATECD, COUNTYCD, PLOT) |>
+      window_order(INVYR) |>
+      mutate(
+        INVNUM = row_number(),
+        HARVEST = HARVEST & (INVNUM > 1) # Don't consider harvest in the first inventory
+      ) |>
+      ungroup() |>
+      select(STATECD, COUNTYCD, PLOT, INVYR, HARVEST, INVNUM)
+    
+    pre_harvest_mixin <- harvest_mixin |>
+      filter(HARVEST == 1) |>
+      mutate(INVNUM = INVNUM - 1) |> # the inventory prior to harvest is pre-harvest
+      rename(PRE_HARVEST = HARVEST) |>
+      select(STATECD, COUNTYCD, PLOT, INVNUM, PRE_HARVEST)
+    
     .data |>
       select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR) |>
       left_join(cond_stats, by = plots_join_by) |>
       left_join(tree_stats, by = plots_join_by) |>
+      left_join(harvest_mixin, by = plots_join_by) |>
+      left_join(pre_harvest_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVNUM)) |>
       left_join(forest_type, by = join_by(FORTYPCD)) |>
       rename(FOREST_TYPE = FORTYPE) |>
       mutate(
+        PRE_HARVEST = if_else(is.na(PRE_HARVEST), 0, PRE_HARVEST),
         STDAGE = if_else(STDAGE < 0, NA, STDAGE),
         FRTYGRCD = floor(FORTYPCD / 10) * 10
       ) |>
@@ -151,10 +194,10 @@ nrs_plots_prsc_stats <- fia_plots_filtered(fiadb, nrs_plots_prsc, \(.data, con) 
 
 Where are they?
 
-```{r map_by_ecoregion}
-plot_location_tmp <- nrs_plots_prsc |>
+```{r map_by_ecoregion, eval = FALSE}
+plot_location_tmp <- nrs_plots_prsc_all |>
   left_join(
-    nrs_plots_prsc_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, FOREST_TYPE_GROUP),
+    nrs_plots_prsc_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, FOREST_TYPE_GROUP),
     by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   ) |>
   group_by(STATECD, COUNTYCD, PLOT) |>
@@ -211,118 +254,98 @@ trees should be removed before the next timestep.
 
 Fetch trees that were standing pre-harvest, that are not standing post-harvest.
 
-```{r tree_removed_in_harvest, cache=TRUE}
-fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-
-tree_in_pre_harvest_plots <- tbl(fia, "TREE") |>
-  semi_join(
-    stand_stats |>
-      filter(PRE_HARVEST == 1) |>
-      select(STATECD, COUNTYCD, PLOT, INVYR),
-    by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
-    copy = TRUE
-  ) |>
-  filter(STATUSCD == 1 | STATUSCD == 2) |> # live or dead trees
-  select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, MORTYR, STATUSCD) |>
-  collect() |>
+```{targets nrs_trees_prsc_removed, tar_simple = TRUE}
+tree_in_pre_harvest_plots <- fia_trees_filtered(
+    fiadb,
+    nrs_plots_prsc_stats_all |> filter(PRE_HARVEST == 1),
+    filter = \(.data, com) {
+      .data |>
+        filter(STATUSCD == 1 | STATUSCD == 2) |> # live or dead trees
+        select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, MORTYR, STATUSCD)  
+  }) |>
   left_join(
-    stand_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
+    nrs_plots_prsc_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
     by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
 
-tree_in_harvested_plots <- tbl(fia, "TREE") |>
-  semi_join(
-    stand_stats |>
-      filter(HARVEST == 1) |>
-      select(STATECD, COUNTYCD, PLOT, INVYR),
-    by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
-    copy = TRUE
+tree_in_harvested_plots <- fia_trees_filtered(
+    fiadb,
+    nrs_plots_prsc_stats_all |> filter(HARVEST == 1),
+    filter = \(.data, con) {
+      .data |>
+        filter(STATUSCD == 1 | STATUSCD == 2) |> # live and dead trees are still there
+        select(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR)
+    }
   ) |>
-  filter(STATUSCD == 1 | STATUSCD == 2) |> # live and dead trees are still there
-  select(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR) |>
-  collect() |>
   left_join(
-    stand_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
+    nrs_plots_prsc_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
     by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   ) |>
+  # Move back a timestep so we can join the future onto the past
   mutate(
     INVNUM = INVNUM - 1
   )
 
-tree_removed_in_harvest <- tree_in_pre_harvest_plots |>
+tree_in_pre_harvest_plots |>
   anti_join(
     tree_in_harvested_plots,
     by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVNUM)
   )
-
-DBI::dbDisconnect(fia)
-
-remove(fia, tree_in_harvested_plots, tree_in_pre_harvest_plots)
 ```
 
 ## FIA Harvested Trees
 
 Fetch trees that FIA says were harvested.
 
-```{r tree_fia_harvested, cache=TRUE}
-fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-
-plot_mixin <- tbl(fia, 'PLOT') |>
-  select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR)
-  
-tree_fia_harvested <- tbl(fia, 'TREE') |>
-  semi_join(
-    stand_stats |> filter(HARVEST == 1),
-    by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
-    copy = TRUE
-  ) |>
-  select(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, STATUSCD) |>
-  filter(STATUSCD == 3) |>
-  left_join(plot_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
-  collect()
-
-DBI::dbDisconnect(fia)
-
-remove(fia, plot_mixin)
+```{r tree_fia_harvested, eval = FALSE}
+tree_fia_harvested <- fia_trees_filtered(
+    fiadb,
+    nrs_plots_prsc_stats_all |> filter(HARVEST == 1),
+    filter = \(.data, con) {
+      .data |>
+        filter(STATUSCD == 3) |>
+        select(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, STATUSCD)
+    }
+  )
 ```
 
 ## Validation
 
 Were all the trees that FIA says were harvested actually removed?
-```{r tree_harvested_but_not_removed}
+```{r tree_harvested_but_not_removed, eval = FALSE}
 tree_harvested_but_not_removed <- tree_fia_harvested |>
-  anti_join(tree_removed_in_harvest, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE))
+  anti_join(nrs_trees_prsc_removed, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE))
 stopifnot(tree_harvested_but_not_removed |> nrow() == 0)
 ```
 
 It is expected that FIA did not mark all removed trees as harvested.
-```{r tree_removed_but_not_harvested}
-tree_removed_but_not_harvested <- tree_removed_in_harvest |>
+```{r tree_removed_but_not_harvested, eval = FALSE}
+tree_removed_but_not_harvested <- nrs_trees_prsc_removed |>
   anti_join(tree_fia_harvested, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE))
 tree_removed_but_not_harvested |> nrow()
 ```
 
 All harvested trees should be on harvested plots.
-```{r stopifnot_tree_removed_from_non_harvested_plots}
+```{r stopifnot_tree_removed_from_non_harvested_plots, eval = FALSE}
 stopifnot(
-  tree_removed_in_harvest |>
+  nrs_trees_prsc_removed |>
     distinct(STATECD, COUNTYCD, PLOT, INVNUM) |>
     # INVNUM is the last inventory in which the tree was standing,
     # so it is marked harvested in the next inventory
     mutate(INVNUM = INVNUM + 1) |>
     anti_join(
-      stand_stats |> filter(HARVEST == 1),
+      nrs_plots_prsc_stats_all |> filter(HARVEST == 1),
       by = join_by(STATECD, COUNTYCD, PLOT, INVNUM)
     ) |>
     nrow() == 0
 )
 ```
 
-There are some plots that do not have trees removed.
-```{r plot_harvested_without_tree_removed}
-plot_harvested_without_tree_removed <- plot_harvested |>
+There are some "harvested" plots that do not have trees removed.
+```{r plot_harvested_without_tree_removed, eval = FALSE}
+plot_harvested_without_tree_removed <- nrs_plots_prsc_all |>
   anti_join(
-    tree_removed_in_harvest |>
+    nrs_trees_prsc_removed |>
       distinct(STATECD, COUNTYCD, PLOT),
     join_by(STATECD, COUNTYCD, PLOT)
   )
@@ -332,30 +355,49 @@ plot_harvested_without_tree_removed |> nrow()
 ## Remove Harvested Plots Without Removed Trees
 
 Remove those plots from consideration.
-```{r ignore plots with no trees removed}
-join_cols <- plot_harvested_without_tree_removed |>
-  names()
-plot_harvested <- plot_harvested |>
-  anti_join(plot_harvested_without_tree_removed, join_cols)
-stand_stats <- stand_stats |>
-  anti_join(plot_harvested_without_tree_removed, join_cols)
-rm(join_cols)
-```
 
+```{targets nrs_plots_prsc, tar_simple = TRUE}
+nrs_plots_prsc_all |>
+  semi_join(
+    nrs_trees_prsc_removed |> distinct(STATECD, COUNTYCD, PLOT),
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  )
+```
+```{targets nrs_plots_prsc_stats, tar_simple = TRUE}
+nrs_plots_prsc_stats_all |>
+  semi_join(
+    nrs_trees_prsc_removed |> distinct(STATECD, COUNTYCD, PLOT),
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  )
+```
 What's left?
 ```{r map_by_ecoregion2}
-map_data('state', fvsne_states$region) |> 
+plot_data <- nrs_plots_prsc |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  rename(lat = LAT, long = LON, group = CN) |>
+  left_join(
+    nrs_plots_prsc_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, FOREST_TYPE, FOREST_TYPE_GROUP),
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+  ) |>
+  group_by(FOREST_TYPE_GROUP) |>
+  mutate(
+    N = n(),
+    group = paste0(FOREST_TYPE_GROUP, ", n=", n())
+  ) |>
+  ungroup()
+
+map_data('state', fvsne_states$STATE_NAME) |> 
   ggplot(aes(long, lat, group = group)) +
   geom_polygon(fill = "white", color = "black") + 
   geom_point(
-    data = stand_stats |>
-      group_by(STATECD, COUNTYCD, PLOT) |>
-      filter(row_number() == 1),
-    aes(color = ECOCD)
+    data = plot_data,
+    aes(color = fct_reorder(group, desc(N)))
   ) +
   coord_quickmap() +
   theme_bw() +
-  scale_color_discrete(name = "Ecoregion")
+  scale_color_discrete(name = "Forest Type")
 ```
 # Harvest Prescription for FVS
 

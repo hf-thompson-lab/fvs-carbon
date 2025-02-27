@@ -144,35 +144,45 @@ filter_plots_harvested <- function(.data, con) {
     ungroup()
   
   # Some conditions are not marked as harvested, but they
-  # contain trees that are harvested. We mark a plot as
-  # harvested if it contains either conditions or trees that
-  # are harvested.
-  plots_harvested_bytree <- tbl(con, "TREE") |>
-    # Expectation is that this filter will come late enough in the chain
-    # that it's more efficient to filter conditions prior to grouping
-    inner_join(
-      .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
-      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
-    ) |>
-    mutate(
-      TPA_HRVST = if_else(STATUSCD == 3, TPA_UNADJ, NA)
-    ) |>
-    group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
-    summarize(
-      NUM_TREES = sum(TPA_UNADJ, na.rm = TRUE),
-      NUM_HRVST = sum(TPA_HRVST, na.rm = TRUE),
-      .groups = "keep"
-    ) |>
-    ungroup() |>
-    # TREE.DSTRBCD1 says significant disturbance causes "mortality or
-    # damage to 25 percent of the trees in the condition"
-    filter(NUM_HRVST / NUM_TREES >= 0.25) |>
-    distinct(STATECD, COUNTYCD, PLOT)
-  
-  plots_harvested <- union(plots_harvested_bytree, plots_harvested_bycond)
+  # contain trees that are harvested.
+  # TREE.STATUSCD == 3 indicates that the tree was harvested
+  # TREE.MORTYR may have the estimated year of harvest, but it's
+  # very rarely populated (<<1%), so use MEASYEAR as an approximation
+  # TREE.DSTRBCD1 says only "significant disturbance" is registered, and that
+  # "significant disturbance" is disturbance that causes "mortality or
+  # damage to 25 percent of the trees in the condition"
+  # Testing confirms that when the number of stems (TPA_UNADJ) represented
+  # by TREE.STATUSCD == 3 is >=25% of the pre-harvest number of stems on the
+  # plot, the condition is marked as harvested.
+  # To be consistent across all kinds of disturbance, we use the FIA
+  # definitions for all disturbance, including harvest, and therefore
+  # do NOT mark a plot as harvested if there are harvested trees.
+  #plots_harvested_bytree <- tbl(con, "TREE") |>
+  #  # Expectation is that this filter will come late enough in the chain
+  #  # that it's more efficient to filter conditions prior to grouping
+  #  inner_join(
+  #    .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
+  #    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+  #  ) |>
+  #  mutate(
+  #    TPA_HRVST = if_else(STATUSCD == 3, TPA_UNADJ, NA)
+  #  ) |>
+  #  group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
+  #  summarize(
+  #    NUM_TREES = sum(TPA_UNADJ, na.rm = TRUE),
+  #    NUM_HRVST = sum(TPA_HRVST, na.rm = TRUE),
+  #    .groups = "keep"
+  #  ) |>
+  #  ungroup() |>
+  #  # TREE.DSTRBCD1 says significant disturbance causes "mortality or
+  #  # damage to 25 percent of the trees in the condition"
+  #  filter(NUM_HRVST / NUM_TREES >= 0.25) |>
+  #  distinct(STATECD, COUNTYCD, PLOT)
+  #  
+  #plots_harvested <- union(plots_harvested_bytree, plots_harvested_bycond)
 
   .data |>
-    inner_join(plots_harvested, by = join_by(STATECD, COUNTYCD, PLOT))
+    inner_join(plots_harvested_bycond, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
 filter_plots_unfertilized <- function(.data, con) {
@@ -247,53 +257,55 @@ filter_plots_measured_pre_post_harvest <- function(.data, con) {
     ) |>
     ungroup()
   
-  plots_harvested_bytree <- tbl(con, "TREE") |>
-    # Expectation is that this filter will come late enough in the chain
-    # that it's more efficient to filter conditions prior to grouping
-    inner_join(
-      .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
-      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
-    ) |>
-    left_join(
-      tbl(con, "PLOT") |> select(CN, MEASYEAR) |> rename(PLT_CN = CN),
-      by = join_by(PLT_CN)
-    ) |>
-    # TREE.STATUSCD == 3 indicates that the tree was harvested
-    # TREE.MORTYR may have the estimated year of harvest, but it's
-    # very rarely populated (<<1%), so use MEASYEAR as an approximation
-    mutate(
-      TPA_HRVST = if_else(STATUSCD == 3, TPA_UNADJ, NA),
-      HRVYR     = if_else(STATUSCD == 3, MEASYEAR, NA)
-    ) |>
-    # Note that we do not group by INVYR
-    group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
-    summarize(
-      MIN_HRVYR = min(HRVYR, na.rm = TRUE),
-      MAX_HRVYR = max(HRVYR, na.rm = TRUE),
-      NUM_TREES = sum(TPA_UNADJ, na.rm = TRUE),
-      NUM_HRVST = sum(TPA_HRVST, na.rm = TRUE),
-      .groups = "keep"
-    ) |>
-    ungroup() |>
-    # TREE.DSTRBCD1 says significant disturbance causes "mortality or
-    # damage to 25 percent of the trees in the condition"
-    filter(NUM_HRVST / NUM_TREES >= 0.25) |>
-    group_by(STATECD, COUNTYCD, PLOT) |>
-    summarize(
-      MIN_HRVYR = min(MIN_HRVYR, na.rm = TRUE),
-      MAX_HRVYR = max(MAX_HRVYR, na.rm = TRUE),
-      .groups = "keep"
-    )
+  # See note in filter_plots_harvested for why we no not look at
+  # harvest at the tree level.
+  #plots_harvested_bytree <- tbl(con, "TREE") |>
+  #  # Expectation is that this filter will come late enough in the chain
+  #  # that it's more efficient to filter conditions prior to grouping
+  #  inner_join(
+  #    .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
+  #    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+  #  ) |>
+  #  left_join(
+  #    tbl(con, "PLOT") |> select(CN, MEASYEAR) |> rename(PLT_CN = CN),
+  #    by = join_by(PLT_CN)
+  #  ) |>
+  #  # TREE.STATUSCD == 3 indicates that the tree was harvested
+  #  # TREE.MORTYR may have the estimated year of harvest, but it's
+  #  # very rarely populated (<<1%), so use MEASYEAR as an approximation
+  #  mutate(
+  #    TPA_HRVST = if_else(STATUSCD == 3, 74.96528, NA), #TPA_UNADJ is NA for dead trees
+  #    HRVYR     = if_else(STATUSCD == 3, MEASYEAR, NA)
+  #  ) |>
+  #  # Note that we do not group by INVYR
+  #  group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
+  #  summarize(
+  #    MIN_HRVYR = min(HRVYR, na.rm = TRUE),
+  #    MAX_HRVYR = max(HRVYR, na.rm = TRUE),
+  #    NUM_TREES = sum(TPA_UNADJ, na.rm = TRUE),
+  #    NUM_HRVST = sum(TPA_HRVST, na.rm = TRUE),
+  #    .groups = "keep"
+  #  ) |>
+  #  ungroup() |>
+  #  # TREE.DSTRBCD1 says significant disturbance causes "mortality or
+  #  # damage to 25 percent of the trees in the condition"
+  #  filter(NUM_HRVST / (NUM_TREES + NUM_HRVST) >= 0.25) |>
+  #  group_by(STATECD, COUNTYCD, PLOT) |>
+  #  summarize(
+  #    MIN_HRVYR = min(MIN_HRVYR, na.rm = TRUE),
+  #    MAX_HRVYR = max(MAX_HRVYR, na.rm = TRUE),
+  #    .groups = "keep"
+  #  )
 
-  plots_harvested <- plots_harvested_bycond |>
-    union_all(plots_harvested_bytree) |>
-    group_by(STATECD, COUNTYCD, PLOT) |>
-    summarize(
-      MIN_HRVYR = min(MIN_HRVYR, na.rm = TRUE),
-      MAX_HRVYR = max(MAX_HRVYR, na.rm = TRUE),
-      .groups = "keep"
-    ) |>
-    ungroup()
+  #plots_harvested <- plots_harvested_bycond |>
+  #  union_all(plots_harvested_bytree) |>
+  #  group_by(STATECD, COUNTYCD, PLOT) |>
+  #  summarize(
+  #    MIN_HRVYR = min(MIN_HRVYR, na.rm = TRUE),
+  #    MAX_HRVYR = max(MAX_HRVYR, na.rm = TRUE),
+  #    .groups = "keep"
+  #  ) |>
+  #  ungroup()
   
   .data |>
     group_by(STATECD, COUNTYCD, PLOT) |>
@@ -302,9 +314,9 @@ filter_plots_measured_pre_post_harvest <- function(.data, con) {
       MAX_MEASYEAR = max(MEASYEAR, na.rm = TRUE)
     ) |>
     ungroup() |>
-    inner_join(plots_harvested, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+    inner_join(plots_harvested_bycond, by = join_by(STATECD, COUNTYCD, PLOT)) |>
     filter(
-      (MIN_MEASYEAR < MAX_HRVYR) &
+      (MIN_MEASYEAR < MIN_HRVYR) &
       (MAX_MEASYEAR > MAX_HRVYR + 10)
     )
 }
