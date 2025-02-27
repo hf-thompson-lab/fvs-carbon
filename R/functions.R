@@ -1,3 +1,13 @@
+# From https://github.com/charlotte-ngs/rmdhelp/blob/master/R/misc_helper.R
+# (MIT Licensed)
+get_this_rmd_file <- function(){
+  # return the current rmd file depending on usage mode
+  return(ifelse(rstudioapi::isAvailable(),
+                rstudioapi::getSourceEditorContext()$path,
+                rprojroot::thisfile()))
+}
+
+
 hectare_at <- function(lat, lon) {
   old_axis_order <- st_axis_order()
   st_axis_order(TRUE)

@@ -36,31 +36,17 @@ tar_load(species_crosswalk)
 When tar_make() has already built the objects defined in this document,
 run this block to pre-load them.
 
-Regenerate this block with
-```{sh find tar objects defined here, eval = FALSE}
-fgrep '```{targets' 05_NRSGrowOnly.Rmd | \
-  sed -E -e 's/```\{targets /tar_load(/' -e 's/[,}].*/)/'
-```
-
 ```{r load tar objects defined here, eval = FALSE}
-tar_load(nrs_plots_grown)
-tar_load(fvsne_states)
-tar_load(nrs_plots_stats)
-tar_load(nrs_grm_ingrowth_all)
-tar_load(nrs_trees_ingrowth_all)
-tar_load(nrs_grm_ingrowth)
-tar_load(nrs_trees_ingrowth)
-tar_load(nrs_trees_grown)
-tar_load(nrs_trees_history)
-tar_load(nrs_trees_growth)
-tar_load(nrs_trees_spcd)
-tar_load(nrs_estab_rate)
-tar_load(nrs_estab_height)
-tar_load(nrs_plots_grow_partitions)
-tar_load(nrs_plots_grow_partition)
-tar_load(nrs_plots_grow_randseed)
-tar_load(nrs_growonly_none)
-tar_load(nrs_growonly_srvy)
+read_lines(get_this_rmd_file()) |>
+  as.data.frame(nm="text") |>
+  # Find targets code blocks
+  filter(grepl("^```\\{targets ", text)) |>
+  # Parse out the names of those blocks
+  mutate(text = sub("^[^ ]+ ([^,}]+).*", "\\1", text)) |>
+  # Pull the names as a list
+  _$text |>
+  # Load everything in the list
+  tar_load()
 ```
 
 # Grow-Only Plots in the Northeast
