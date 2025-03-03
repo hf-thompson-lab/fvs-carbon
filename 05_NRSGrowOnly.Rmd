@@ -3344,26 +3344,42 @@ ggplot(
 ```
 
 ```{r measured_vs_projected_carbon_flux, eval = FALSE}
+lr <- lm(
+  Projected_Carbon_Flux ~ Measured_Carbon_Flux,
+  data = projected_vs_measured |> filter(Projection_Years > 0)
+)
 ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux)
   ) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
+  geom_vline(xintercept = 0, linewidth = 0.25, color = "black") +
+  geom_abline(intercept = 0, slope = 1, linewidth = 0.25, linetype = "dashed", color = "lightgray") +
   geom_bin2d(bins = 50) +
-  geom_abline(intercept = 0, slope = 1) +
-  #geom_smooth(
-  #  method = lm,
-  #  formula = 'y ~ x',
-  #  color = 'brown',
-  #  linetype = 'dashed',
-  #  fullrange = TRUE,
-  #  se = FALSE
-  #) +
-  scale_fill_continuous(name = "Number of Plots", transform = "log10") +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
+  geom_abline(
+    intercept = lr$coefficients[1],
+    slope = lr$coefficients[2],
+    linetype = "dashed",
+    color = "darkblue"
+  ) +
+#  geom_smooth(
+#    method = lm,
+#    formula = 'y ~ x',
+#    color = 'darkblue',
+#    linetype = 'dashed',
+#    linewidth = 0.5,
+#    # fullrange = TRUE,
+#    se = FALSE
+#  ) +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  ggtitle("FVS Projected vs. Measured Annual Carbon Flux") +
+  ggtitle(scales::label_wrap(35)("FVS Projected vs. FIA Measured Forest Carbon Sink")) +
   xlab(bquote("Measured Annual Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) +
   ylab(bquote("Projected Annual Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) +
   coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
