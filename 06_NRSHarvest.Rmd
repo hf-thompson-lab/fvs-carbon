@@ -18,6 +18,7 @@ library(reshape2) # melt()
 library(dbplyr) # window_order()
 library(measurements) # conv_unit and conv_multiunit
 library(maps)
+library(ggspatial)
 library(pbapply) # Progress bar for long operations
 options(scipen = 9) # Use integer notation for numbers under 9 digits
 tar_source()
@@ -229,7 +230,13 @@ ggplot(fvsne_states_map, aes(long, lat, group = group)) +
     plot_location_tmp,
     mapping = aes(long, lat, group = group, color = fct_reorder(group_name, desc(n)))
   ) +
-  coord_quickmap() +
+  coord_sf(crs = 4326) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tl",
+    width = unit(1, "cm"),
+    pad_x = unit(0.75, "cm"),
+    pad_y = unit(0.5, "cm")
+  ) +
   theme_bw() +
   scale_color_discrete(name = "Forest Type Group") +
   ggtitle("FIA Harvested Plots using FVSne")
@@ -395,7 +402,13 @@ map_data('state', fvsne_states$STATE_NAME) |>
     data = plot_data,
     aes(color = fct_reorder(group, desc(N)))
   ) +
-  coord_quickmap() +
+  coord_sf(crs = 4326) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tl",
+    width = unit(1, "cm"),
+    pad_x = unit(0.75, "cm"),
+    pad_y = unit(0.5, "cm")
+  ) +
   theme_bw() +
   scale_color_discrete(name = "Forest Type")
 ```

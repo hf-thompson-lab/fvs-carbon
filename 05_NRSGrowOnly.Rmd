@@ -19,6 +19,7 @@ library(tidyverse)
 library(reshape2) # melt()
 library(measurements) # conv_unit and conv_multiunit
 library(maps)
+library(ggspatial)
 options(scipen = 9) # Use integer notation for numbers under 9 digits
 tar_source()
 ```
@@ -159,7 +160,13 @@ plot_locations <- nrs_plots_grown |>
 ggplot(fvsne_states_map, aes(long, lat, group = group)) +
   geom_polygon(fill = "white", color = "black") + 
   geom_point(data = plot_locations, color = alpha("blue", alpha = 0.5)) +
-  coord_quickmap() +
+  coord_sf(crs = 4326) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tl",
+    width = unit(1, "cm"),
+    pad_x = unit(0.75, "cm"),
+    pad_y = unit(0.5, "cm")
+  ) +
   theme_bw()
 ```
 
@@ -271,7 +278,13 @@ ggplot(fvsne_states_map, aes(long, lat, group = group)) +
     plot_location_tmp,
     mapping = aes(long, lat, group = group, color = fct_reorder(group_name, desc(n)))
   ) +
-  coord_quickmap() +
+  coord_sf(crs = 4326) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tl",
+    width = unit(1, "cm"),
+    pad_x = unit(0.75, "cm"),
+    pad_y = unit(0.5, "cm")
+  ) +
   theme_bw() +
   scale_color_discrete(name = "Forest Type Group") +
   ggtitle("FIA Grow-Only Plots using FVSne")
@@ -3815,7 +3828,13 @@ ggplot(map_states, aes(long, lat, group = group)) +
     mapping = aes(long, lat, group = group, color = fct_infreq(FOREST_TYPE), size = `Stand Carbon`)
   ) +
   scale_size_binned_area(max_size = 3) +
-  coord_quickmap() +
+  coord_sf(crs = 4326) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tl",
+    width = unit(1, "cm"),
+    pad_x = unit(0.75, "cm"),
+    pad_y = unit(0.5, "cm")
+  ) +
   ggtitle("FIA Grow-Only Plots in the Northeast Region") +
   scale_color_hue(name = "Forest Type", breaks = c(
     'Maple / beech / birch',
