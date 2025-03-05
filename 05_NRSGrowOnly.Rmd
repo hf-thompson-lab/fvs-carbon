@@ -286,8 +286,9 @@ ggplot(fvsne_states_map, aes(long, lat, group = group)) +
     pad_y = unit(0.5, "cm")
   ) +
   theme_bw() +
-  scale_color_discrete(name = "Forest Type Group") +
-  ggtitle("FIA Grow-Only Plots using FVSne")
+  theme(legend.position = "bottom") +
+  scale_color_discrete(name = NULL) +
+  ggtitle("FIA Grow-Only Plots in the Northeast Region")
 
 remove(plot_location_tmp)
 ```
