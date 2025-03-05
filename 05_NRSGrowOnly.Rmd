@@ -2527,8 +2527,13 @@ tar_target(
       random_seed = nrs_plots_grow_randseed
     )
   },
+  # iteration = "vector" branches execution for each partition value (see below)
   iteration = "vector",
-  # cross() and map() are unparsed targets:: functions here:
+  # cross() and map() are unparsed targets:: functions here.
+  # cross() ensures that every combination of values for its arguments is processed
+  # map() distributes each value of its argument to a separate sub-target (branch)
+  # so cross(randseed, map(partition)) will run each partition in a separate branch,
+  # and each branch will run with each value of randseed
   pattern = cross(nrs_plots_grow_randseed, map(nrs_plots_grow_partition))
 )
 ```
@@ -3131,9 +3136,9 @@ projected_vs_measured <- nrs_plots_grown |>
     Last_Year = max(Year, na.rm = TRUE),
     Starting_Carbon = min(if_else(Year == First_Year, Measured_Carbon, NA), na.rm = TRUE),
     Projected_Carbon_Delta = Projected_Carbon - Starting_Carbon,
-    Projected_Carbon_Flux = if_else(Year == First_Year, 0, Projected_Carbon_Delta / (Year - First_Year)),
+    Projected_Carbon_Flux = if_else(Year == First_Year, 0, -(Projected_Carbon_Delta / (Year - First_Year))),
     Measured_Carbon_Delta = Measured_Carbon - Starting_Carbon,
-    Measured_Carbon_Flux = if_else(Year == First_Year, 0, Measured_Carbon_Delta / (Year - First_Year)),
+    Measured_Carbon_Flux = if_else(Year == First_Year, 0, -(Measured_Carbon_Delta / (Year - First_Year))),
     Starting_BA = min(if_else(Year == First_Year, Measured_BA, NA), na.rm = TRUE),
     Projected_BA_Delta = Projected_BA - Starting_BA,
     Projected_BAI = if_else(Year == First_Year, 0, Projected_BA_Delta / (Year - First_Year)),
@@ -3208,23 +3213,29 @@ ggplot(
     aes(x = Measured_Carbon, y = Projected_Carbon)
   ) +
   geom_bin2d(bins = 50) +
-  geom_abline(intercept = 0, slope = 1) +
+  geom_abline(intercept = 0, slope = 1, linewidth = 0.5, linetype = "dashed", color = "lightgray") +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
-    color = 'brown',
+    color = 'darkblue',
     linetype = 'dashed',
+    linewidth = 0.5,
     fullrange = TRUE,
     se = FALSE
   ) +
-  scale_fill_continuous(name = "Number of Plots", transform = "log10") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
 #  facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   theme(aspect.ratio = 1) +
   ggtitle("FVS Projected vs. Measured Carbon") +
-  xlab(bquote("Projected Stand Carbon" ~(`Mg C` %.% ha^-1))) +
-  ylab(bquote("Measured Stand Carbon" ~(`Mg C` %.% ha^-1)))# +
-  #coord_cartesian(xlim = c(0, 800), ylim = c(0, 800))
+  xlab(bquote("Projected Stand AGL Carbon" ~(`Mg C` %.% ha^-1))) +
+  ylab(bquote("Measured Stand AGL Carbon" ~(`Mg C` %.% ha^-1))) +
+  coord_cartesian(xlim = c(0, 300), ylim = c(0, 300))
 ```
 
 ### Carbon Flux
@@ -3241,7 +3252,9 @@ FVS_Carbon_NONE |>
   group_by(StandID) |>
   arrange(Year) |>
   mutate(
-    C_Flux = Aboveground_Total_Live - lag(Aboveground_Total_Live),
+    # Positive flux is into atmosphere / out of forest;
+    # Negative flux is out of atmosphere / into forest.
+    C_Flux = -(Aboveground_Total_Live - lag(Aboveground_Total_Live)),
     Prev_Year = lag(Year)
   ) |>
   ungroup() |>
@@ -3267,7 +3280,12 @@ FVS_Carbon_NONE |>
   ) +
   geom_bin2d(binwidth = c(1, 1)) +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  scale_fill_continuous(name = "Number of Plots", transform = "log10") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
   theme_bw() +
   ggtitle("FVS Projected Annual Carbon Flux for Grow-Only Plots") +
   ylab(bquote("Projected Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) #+;
@@ -3282,7 +3300,7 @@ FVS_Carbon_SRVY |>
   group_by(StandID) |>
   arrange(Year) |>
   mutate(
-    C_Flux = Aboveground_Total_Live - lag(Aboveground_Total_Live),
+    C_Flux = -(Aboveground_Total_Live - lag(Aboveground_Total_Live)),
     Prev_Year = lag(Year)
   ) |>
   ungroup() |>
@@ -3311,7 +3329,12 @@ FVS_Carbon_SRVY |>
   ) +
   geom_bin2d(binwidth = c(1, 1)) +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  scale_fill_continuous(name = "Number of Plots", transform = "log10") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
   theme_bw() +
   ggtitle("Observed Annual Carbon Flux for Grow-Only Plots") +
   ylab(bquote("Observed Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) #+;
@@ -3323,24 +3346,32 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0) |> arrange(Projection_Years),
     aes(x = Measured_Carbon_Delta, y = Projected_Carbon_Delta)
   ) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
+  geom_vline(xintercept = 0, linewidth = 0.25, color = "black") +
+  geom_abline(intercept = 0, slope = 1, linewidth = 0.5, linetype = "dashed", color = "lightgray") +
   geom_bin2d(bins = 20) +
-  scale_fill_continuous(transform = "log10") +
-  geom_abline(intercept = 0, slope = 1) +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
-    color = 'brown',
+    color = 'darkblue',
     linetype = 'dashed',
+    linewidth = 0.5,
     fullrange = TRUE,
     se = FALSE
   ) +
   facet_wrap(~FOREST_TYPE_GROUP) +
   theme(aspect.ratio = 1) +
   theme_bw() +
-  ggtitle("Grow-Only Stands FVS Projected vs. Measured Carbon Change") +
-  ylab(bquote("Projected Carbon Delta" ~(`Mg C` %.% ha^-1))) +
-  xlab(bquote("Measured Carbon Delta" ~(`Mg C` %.% ha^-1))) #+
-  #coord_cartesian(xlim = c(-100, 100), ylim = c(-100, 100))
+  ggtitle(scales::label_wrap(50)("FVS Projected vs. FIA Measured AGL Carbon Change in Grow-Only Stands")) +
+  ylab(bquote("Projected AGL Carbon Delta" ~(`Mg C` %.% ha^-1))) +
+  xlab(bquote("Measured AGL Carbon Delta" ~(`Mg C` %.% ha^-1))) +
+  coord_cartesian(xlim = c(-100, 100), ylim = c(-100, 100))
 ```
 
 ```{r measured_vs_projected_carbon_flux, eval = FALSE}
@@ -3379,7 +3410,7 @@ ggplot(
 #  ) +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  ggtitle(scales::label_wrap(35)("FVS Projected vs. FIA Measured Forest Carbon Sink")) +
+  ggtitle(scales::label_wrap(35)("FVS Projected vs. FIA Measured AGL Carbon Flux in Grow-Only Stands")) +
   xlab(bquote("Measured Annual Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) +
   ylab(bquote("Projected Annual Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) +
   coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
@@ -3509,7 +3540,7 @@ ggplot(
     size = 3
   ) +
 #  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
-  coord_cartesian(xlim = c(0, 10)) +
+  coord_cartesian(xlim = c(-5, 0)) +
   theme_bw() +
   #scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5)) +
   ggtitle(paste0(
@@ -3545,18 +3576,26 @@ ggplot(
     projected_vs_measured|> filter(Projection_Years > 0),
     aes(x = Projection_Years, y = Carbon_Residual)
   ) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
     fullrange = TRUE,
     se = FALSE,
-    color = 'brown'
+    linetype = "dashed",
+    linewidth = 0.5,
+    color = 'darkblue'
   ) +
   facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
-  scale_fill_continuous(transform = "log10") +
-  ggtitle("Grow-Only Stands\nCarbon Projection Error vs. Projection Years") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
+  ggtitle("Carbon Projection Residual vs. Projection Years\nin Grow-Only Stands") +
   xlab("Projection Years") +
   ylab(bquote("Carbon Residual" ~(`Mg C` %.% ha^-1)))
 ```
@@ -3573,12 +3612,19 @@ ggplot(
     formula = 'y ~ x',
     fullrange = TRUE,
     se = FALSE,
-    color = 'brown'
+    color = 'darkblue',
+    linetype = "dashed",
+    linewidth = 0.5
   ) +
   facet_wrap(~FOREST_TYPE_GROUP) +
 #  coord_cartesian(xlim = c(10, 20), ylim = c(0, 1)) +
 #  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20)) +
-  scale_fill_continuous(transform = "log10") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
   theme_bw() +
   ggtitle("Grow-Only Stands\nCarbon Projection Error (fraction) vs. Projection years")
   
@@ -3589,15 +3635,23 @@ ggplot(
     projected_vs_measured|> filter(Projection_Years > 0),
     aes(x = Projection_Years, y = Carbon_Flux_Residual)
   ) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
     fullrange = TRUE,
     se = FALSE,
-    color = 'brown'
+    color = 'darkblue',
+    linetype = "dashed",
+    linewidth = 0.5
   ) +
-  scale_fill_continuous(transform = "log10") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
   facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   ggtitle("Grow-Only Stands\nCarbon Projection Flux Residual vs. Projection Years") +
@@ -3612,18 +3666,26 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     mapping = aes(x = Measured_BA, y = Carbon_Residual)
   ) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
     fullrange = TRUE,
     se = FALSE,
-    color = 'brown'
+    color = 'darkblue',
+    linetype = 'dashed',
+    linewidth = 0.5
   ) +
-  scale_fill_continuous(transform = "log10") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
   facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
-  ggtitle("Grow-Only Stands\nCarbon Projection Residuals vs. Measured BA") +
+  ggtitle("Carbon Projection Residuals vs. Measured BA\n in Grow-Only Stands") +
   xlab(bquote("Measured BA" ~ (m^2 %.% ha^-1))) +
   ylab(bquote("Carbon Residual" ~ (`Mg C` %.% ha^-1)))
   
@@ -3637,18 +3699,26 @@ ggplot(
       filter(Carbon_Error < 1),
     aes(x = Measured_BA, y = Carbon_Error)
   ) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
     fullrange = TRUE,
     se = FALSE,
-    color = 'brown'
+    color = 'darkblue',
+    linetype = 'dashed',
+    linewidth = 0.5
   ) +
-  scale_fill_continuous(transform = "log10") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
   facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
-  ggtitle("Grow-Only Stands\nCarbon Projection Error vs. Measured BA") +
+  ggtitle("Carbon Projection Error vs. Measured BA\nin Grow-Only Stands") +
   xlab(bquote("Measured BA" ~ (m^2 %.% ha^-1))) +
   ylab(bquote("Carbon Projection Error (fraction)"))
 ```
@@ -3676,18 +3746,26 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     mapping = aes(x = Measured_BA, y = Carbon_Flux_Residual)
   ) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
     fullrange = TRUE,
     se = FALSE,
-    color = 'brown'
+    color = 'darkblue',
+    linetype = "dashed",
+    linewidth = 0.5
   ) +
-  scale_fill_continuous(transform = "log10") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
   facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
-  ggtitle("Grow-Only Stands\nCarbon Flux Residual vs. Measured BA") +
+  ggtitle("Carbon Flux Residual vs. Measured BA\nin Grow-Only Stands") +
   xlab(bquote("Measured BA" ~ (m^2 %.% ha^-1))) +
   ylab(bquote("Carbon Flux Residual" ~(`Mg C` %.% ha^-1 %.% yr^-1)))
   
@@ -3700,18 +3778,26 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
     aes(x = QMD_METRIC, y = Carbon_Residual)
   ) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
     fullrange = TRUE,
     se = FALSE,
-    color = 'brown'
+    color = 'darkblue',
+    linetype = "dashed",
+    linewidth = 0.5
   ) +
-  scale_fill_continuous(transform = "log10") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10"
+    low = "lightblue",
+    high = "darkblue"
+  ) +
   facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
-  ggtitle("Grow-Only Stands\nCarbon Projection Error (Mg/ha) vs. Measured QMD (cm)") +
+  ggtitle("Carbon Projection Error vs. Measured QMD\nin Grow-Only Stands") +
   xlab(bquote("Measured QMD" ~ (cm))) +
   ylab(bquote("Carbon Residual" ~ (`Mg C` %.% ha^-1)))
   
@@ -3722,6 +3808,7 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
     aes(x = QMD_METRIC, y = Carbon_Flux_Residual)
   ) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
   scale_x_log10() +
   geom_smooth(
@@ -3729,9 +3816,16 @@ ggplot(
     formula = 'y ~ x',
     fullrange = TRUE,
     se = FALSE,
-    color = 'brown'
+    color = 'darkblue',
+    linetype = "dashed",
+    linewidth = 0.5
   ) +
-  scale_fill_continuous(transform = "log10") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
   theme_bw() +
   facet_wrap(~FOREST_TYPE_GROUP) +
   ggtitle("Grow-Only Stands\nCarbon Flux Residual vs. Measured QMD") +
@@ -3746,20 +3840,27 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Measured_BA, y = Projected_BA)
   ) +
-  geom_bin2d(bins = 20) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", linewidth = 0.25, color = "lightgray") +
+  geom_bin2d(binwidth = 2.5) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
     fullrange = TRUE,
     se = FALSE,
-    color = 'brown'
+    color = 'darkblue',
+    linetype = 'dashed',
+    linewidth = 0.5
   ) +
   theme_bw() +
-#  theme(aspect.ratio = 1) +
-  scale_fill_continuous(transform = "log10") +
-  geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
-  facet_wrap(~FOREST_TYPE_GROUP) +
-  ggtitle("Grow-Only Stands\nProjected vs. Measured Basal Area") +
+  theme(aspect.ratio = 1) +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
+  #facet_wrap(~FOREST_TYPE_GROUP) +
+  ggtitle("Projected vs. Measured Basal Area\nin Grow-Only Stands") +
   xlab(bquote("Measured Basal Area" ~(m^2 %.% ha^-1))) +
   ylab(bquote("Projected Basal Area" ~(m^2 %.% ha^-1)))
 ```
@@ -3793,6 +3894,9 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Measured_BAI, y = Projected_BAI)
   ) +
+  geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.25, color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.25, color = "black") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", linewidth = 0.25, color = "lightgray") +
   geom_bin2d(binwidth = 0.1) +
 #  geom_smooth(
 #    method = lm,
@@ -3801,13 +3905,15 @@ ggplot(
 #    se = FALSE,
 #    color = 'brown'
 #  ) +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  scale_fill_continuous(transform = "log10") +
-  geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
-  ggtitle("Grow-Only Stands\nProjected vs. Measured Basal Area Increment") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
+  ggtitle("Projected vs. Measured Basal Area Increment\nin Grow-Only Stands") +
   xlab(bquote("Measured Basal Area Increment " ~(m^2 %.% ha^-1 %.% year^-1))) +
   ylab(bquote("Projected Basal Area Increment " ~(m^2 %.% ha^-1 %.% year^-1)))
 ```
@@ -3877,19 +3983,27 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Projection_Years, y = BA_Residual)
   ) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
-  scale_fill_continuous(transform = "log10") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
     fullrange = TRUE,
     se = FALSE,
-    color = 'brown'
+    color = 'darkblue',
+    linetype = 'dashed',
+    linewidth = 0.5
   ) +
 #  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
   facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
-  ggtitle("Grow-Only Stands\nBA Residual vs. Projection Years") +
+  ggtitle("BA Residual vs. Projection Years\nin Grow-Only Stands") +
   xlab(bquote("Projection Years")) +
   ylab(bquote("BA Residual" ~(m^2 %.% ha^-1)))
   
@@ -3901,17 +4015,24 @@ ggplot(
     aes(x = Projection_Years, y = BA_Error)
   ) +
   geom_bin2d(bins = 20) +
-  scale_fill_continuous(transform = "log10") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
     fullrange = TRUE,
     se = FALSE,
-    color = 'brown'
+    color = 'darkblue',
+    linetype = 'dashed',
+    linewidth = 0.5
   ) +
   facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
-  ggtitle("Grow-Only Stands\nBA Projection Error vs. Projection years") +
+  ggtitle("BA Projection Error vs. Projection years\nin Grow-Only Stands") +
   xlab("Projection Years") +
   ylab("BA Projection Error (fraction)")
   
@@ -3924,18 +4045,26 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
     aes(x = QMD_METRIC, y = BA_Residual)
   ) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
-  scale_fill_continuous(transform = "log10") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    #transform = "log10",
+    low = "lightblue",
+    high = "darkblue"
+  ) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
     fullrange = TRUE,
     se = FALSE,
-    color = 'brown'
+    color = 'darkblue',
+    linetype = "dashed",
+    linewidth = 0.5
   ) +
   facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
-  ggtitle("Grow-Only Stands\nBA Projection Residual vs. Measured QMD") +
+  ggtitle("BA Projection Residual vs. Measured QMD\nin Grow-Only Stands") +
   xlab(bquote("QMD" ~(cm))) +
   ylab(bquote("BA Residual" ~(m^2 %.% ha^-1)))
 ```
@@ -3969,29 +4098,31 @@ ggplot(
     projected_vs_measured |> filter(Projection_Years > 0),
     aes(x = Measured_Tpa, y = Projected_Tpa)
   ) +
+  geom_abline(intercept = c(0, 0), slope = 1, linetype = "dashed", linewidth = 0.25, color = "lightgray") +
   geom_bin_2d(
     binwidth = 500
     #alpha = 0.25
   ) +
   scale_fill_gradient(
-    name = "count",
-    trans = "log",
-    breaks = c(1, 10, 100),
-    labels = c(1, 10, 100)
+    name = "Number of Plots",
+    #trans = "log",
+    low = "lightblue",
+    high = "darkblue"
   ) +
   geom_smooth(
     method = lm,
     formula = 'y ~ x',
     fullrange = TRUE,
     se = FALSE,
-    color = 'brown'
+    color = 'darkblue',
+    linetype = 'dashed',
+    linewidth = 0.5
   ) +
-  geom_abline(intercept = c(0, 0), slope = 1, linetype = "dashed") +
-  coord_cartesian( xlim = c(0, 40000), ylim = c(0, 25000)) +
+  # coord_cartesian( xlim = c(0, 40000), ylim = c(0, 25000)) +
   theme_bw() +
   #theme(aspect.ratio = 1) +
   #facet_wrap(~FOREST_TYPE_GROUP) +
-  ggtitle("Grow-Only Stands\nProjected vs. Measured TPA") +
+  ggtitle("Projected vs. Measured TPA\nin Grow-Only Stands") +
   xlab(bquote("Measured" ~(trees %.% acre^-1))) +
   ylab(bquote("Projected" ~(trees %.% acre^-1)))
 ```
