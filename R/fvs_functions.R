@@ -93,12 +93,26 @@ fvs_Estab <- function(rows) {
   }
 }
 
+fvs_ThinPRSC <- function(rows) {
+  thinprsc <- function(row) {
+    year <- row["YEAR"]
+    if ("PERCENT" %in% names(row)) {
+      percent <- row["PERCENT"] # CUTEFF - Efficiency, 0 - 1
+    } else {
+      percent <- 1
+    }
+    prsc <- row["PRESCRIPTION"]
+    fvs_kwd("ThinPRSC", year, percent, prsc)
+  }
+  apply(rows, 1, thinprsc)
+}
+
 # Given a dataframe with column STAND_CN, create a SQLite database
 # of input stands and trees for FVS.
 # > TODO nik: this should take FIA plots, conds, or subplots, and
 # > Do The Right Thing. fvs_run() would need to take the same
 # > input for stands.
-fvs_fia_input <- function(stands, fiadb, filename) {
+fvs_fia_input <- function(fiadb, stands, harvest, filename) {
   fia <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(fia), add = TRUE, after = FALSE)
   
@@ -111,13 +125,27 @@ fvs_fia_input <- function(stands, fiadb, filename) {
   # PlotInit_Plot / TreeInit_Plot - Used when a stand is a subplot.
   # 
   # These tables are described in the FIA Data Quick Start guide.
-  tables <- c(
-    "FVS_PlotInit_Plot",
-    "FVS_StandInit_Cond",
-    "FVS_StandInit_Plot",
-    "FVS_TreeInit_Cond",
-    "FVS_TreeInit_Plot"
-  )
+  if (is.null(harvest)) {
+    tables <- c(
+      "FVS_PlotInit_Plot",
+      "FVS_StandInit_Cond",
+      "FVS_StandInit_Plot",
+      "FVS_TreeInit_Cond",
+      "FVS_TreeInit_Plot"
+    )
+    tree_tables <- c()
+  } else {
+    tables <- c(
+      "FVS_PlotInit_Plot",
+      "FVS_StandInit_Cond",
+      "FVS_StandInit_Plot"
+    )
+    tree_tables <- c(
+      "FVS_TreeInit_Cond",
+      "FVS_TreeInit_Plot"
+    )
+  }
+  
   # In theory, we could ATTACH the output database and do this copy
   # internal to SQLite, but that is a bit tricky to manage so we
   # pull it into R and write it back out.
@@ -132,6 +160,26 @@ fvs_fia_input <- function(stands, fiadb, filename) {
           copy = TRUE
         ) |>
         collect(),
+      overwrite = TRUE
+    )
+  })
+  
+  lapply(tree_tables, \(table){
+    DBI::dbWriteTable(
+      out,
+      table,
+      tbl(fia, table) |>
+        inner_join(
+          stand_cns |> select(STAND_CN),
+          by = join_by(STAND_CN),
+          copy = TRUE
+        ) |>
+        collect() |>
+        select(!PRESCRIPTION) |>
+        left_join(
+          table |> select(TREE_CN, PRESCRIPTION),
+          by = join_by(TREE_CN)
+        ),
       overwrite = TRUE
     )
   })
@@ -274,6 +322,7 @@ fvs_run <- function(
     title,
     mgmt_id,
     stands,
+    harvest = NULL,
     regen = NULL,
     carb_calc = "Jenkins",
     num_partitions = NULL,
@@ -304,7 +353,18 @@ fvs_run <- function(
       filter((digest::digest2int(STAND_CN) %% num_partitions) == (partition - 1))
   }
   
-  fvs_input_db <- fvs_fia_input(stands, fiadb, file.path(project_dir, paste0(file_basename, "_Input.db")))
+  if (!is.null(harvest)) {
+    harvest <- harvest |>
+      filter((digest::digest2int(STAND_CN) %% num_partitions) == (partition - 1))
+  }
+  
+  fvs_input_db <- fvs_fia_input(
+    fiadb,
+    stands,
+    harvest,
+    file.path(project_dir, paste0(file_basename, "_Input.db"))
+  )
+
   fvs_output_db <- file.path(project_dir, paste0(file_basename, "_Output.db"))
   if (file.exists(fvs_output_db)) {
     unlink(fvs_output_db)
