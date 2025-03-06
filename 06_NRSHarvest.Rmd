@@ -30,9 +30,9 @@ tar_source()
 tar_load(fiadb)
 tar_load(fvsne_states)
 tar_load(species_crosswalk)
-tar_load(nrs_plots_grow_partitions)
-tar_load(nrs_plots_grow_partition)
-tar_load(nrs_plots_grow_randseed)
+tar_load(fvs_num_partitions)
+tar_load(fvs_partition)
+tar_load(fvs_randseed)
 ```
 
 ## Preload targets results from this document
@@ -662,9 +662,9 @@ tar_target(
       stands = plots_for_fvs,
       #regen = estab_for_fvs,
       harvest = harvest_for_fvs,
-      num_partitions = nrs_plots_grow_partitions,
-      partition = nrs_plots_grow_partition,
-      random_seed = nrs_plots_grow_randseed
+      num_partitions = fvs_num_partitions,
+      partition = fvs_partition,
+      random_seed = fvs_randseed
     )
   },
   # iteration = "vector" branches execution for each partition value (see below)
@@ -674,7 +674,7 @@ tar_target(
   # map() distributes each value of its argument to a separate sub-target (branch)
   # so cross(randseed, map(partition)) will run each partition in a separate branch,
   # and each branch will run with each value of randseed
-  pattern = cross(nrs_plots_grow_randseed, map(nrs_plots_grow_partition))
+  pattern = cross(fvs_randseed, map(fvs_partition))
 )
 ```
 

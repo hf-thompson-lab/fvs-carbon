@@ -2386,15 +2386,15 @@ in their first measurement year.
 When generating keyword files, we create one per partition,
 distributing across partitions using round-robin on STAND_ID.
 
-```{targets nrs_plots_grow_partitions, tar_simple = TRUE}
+```{targets fvs_num_partitions, tar_simple = TRUE}
 # This is a list of partitons; we can come up with it however we want.
 # For now, one partition per worker is resonable.
 partitions <- 8
 ```
 
 Create a list of partitions; each replica will get one of these.
-```{targets nrs_plots_grow_partition, tar_simple = TRUE}
-1:nrs_plots_grow_partitions
+```{targets fvs_partition, tar_simple = TRUE}
+1:fvs_num_partitions
 ```
 
 > TODO nik: re-introduce partitions and random seeds
@@ -2418,7 +2418,7 @@ manage this for us, but tar_rep doesn't support repetition in combination with
 dynamic branching (which we're using for partitioning). So we manage random
 seeds explicitly.
 
-```{targets nrs_plots_grow_randseed, tar_simple = TRUE}
+```{targets fvs_randseed, tar_simple = TRUE}
 # We can have as many seeds as we want. We'll convert these to valid FVS
 # random seeds later.
 # Start with 3, so it's reasonably fast but we get some benefit from it.
@@ -2523,9 +2523,9 @@ tar_target(
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
       regen = estab_for_fvs,
-      num_partitions = nrs_plots_grow_partitions,
-      partition = nrs_plots_grow_partition,
-      random_seed = nrs_plots_grow_randseed
+      num_partitions = fvs_num_partitions,
+      partition = fvs_partition,
+      random_seed = fvs_randseed
     )
   },
   # iteration = "vector" branches execution for each partition value (see below)
@@ -2535,7 +2535,7 @@ tar_target(
   # map() distributes each value of its argument to a separate sub-target (branch)
   # so cross(randseed, map(partition)) will run each partition in a separate branch,
   # and each branch will run with each value of randseed
-  pattern = cross(nrs_plots_grow_randseed, map(nrs_plots_grow_partition))
+  pattern = cross(fvs_randseed, map(fvs_partition))
 )
 ```
 
@@ -2588,13 +2588,13 @@ tar_target(
       title = title,
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
-      num_partitions = nrs_plots_grow_partitions,
-      partition = nrs_plots_grow_partition
+      num_partitions = fvs_num_partitions,
+      partition = fvs_partition
     )
   },
   iteration = "vector",
   # cross() and map() are unparsed targets:: functions here:
-  pattern = map(nrs_plots_grow_partition)
+  pattern = map(fvs_partition)
 )
 
 ```

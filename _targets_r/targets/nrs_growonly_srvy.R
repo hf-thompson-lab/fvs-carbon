@@ -41,12 +41,12 @@ tar_target(
       title = title,
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
-      num_partitions = nrs_plots_grow_partitions,
-      partition = nrs_plots_grow_partition
+      num_partitions = fvs_num_partitions,
+      partition = fvs_partition
     )
   },
   iteration = "vector",
   # cross() and map() are unparsed targets:: functions here:
-  pattern = map(nrs_plots_grow_partition)
+  pattern = map(fvs_partition)
 )
 
