@@ -588,7 +588,9 @@ tar_target(
         fiadb,
         nrs_plots_prsc_stats |> filter(PRE_HARVEST == 1),
         filter = \(.data, com) {
-          .data |> select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE)
+          .data |>
+            select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
+            rename(TREE_CN = CN)
       }) |>
       inner_join(
         nrs_trees_prsc_harvested |>
@@ -598,13 +600,21 @@ tar_target(
       left_join(
         nrs_plots_prsc_stats |>
           filter(HARVEST == 1) |>
-          select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM, HRVYR),
+          select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM, HRVYR) |>
+          rename(PRESCRIPTION = INVNUM),
         by = join_by(STATECD, COUNTYCD, PLOT)
-      )
+      ) |>
+      left_join(
+        nrs_plots_prsc |>
+          select(STATECD, COUNTYCD, PLOT, INVYR, CN) |>
+          rename(STAND_CN = CN),
+        by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+      ) |>
+      select(STAND_CN, TREE_CN, PREV_TRE_CN, HRVYR, PRESCRIPTION)
 
     # Verify that, in all cases where PREV_TRE_CN is not NULL, we lined
     # up the harvested tree with the correct pre-harvest tree.
-    stopifnot(harvest_for_fvs |> filter(CN != PREV_TRE_CN) |> nrow() == 0)
+    stopifnot(harvest_for_fvs |> filter(TREE_CN != PREV_TRE_CN) |> nrow() == 0)
 
     # fvs_run wants establishment in the form:
     # STAND_CN
