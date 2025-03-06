@@ -325,15 +325,19 @@ tree_in_pre_harvest_plots |>
 
 Fetch trees that FIA says were harvested.
 
-```{r tree_fia_harvested, eval = FALSE}
-tree_fia_harvested <- fia_trees_filtered(
+```{targets nrs_trees_prsc_harvested, tar_simple = TRUE}
+fia_trees_filtered(
     fiadb,
     nrs_plots_prsc_stats_all |> filter(HARVEST == 1),
     filter = \(.data, con) {
       .data |>
         filter(STATUSCD == 3) |>
-        select(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, STATUSCD)
+        select(CN, PREV_TRE_CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, STATUSCD)
     }
+  ) |>
+  left_join(
+    nrs_plots_prsc_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
 ```
 
@@ -351,6 +355,25 @@ It is expected that FIA did not mark all removed trees as harvested.
 tree_removed_but_not_harvested <- nrs_trees_prsc_removed |>
   anti_join(tree_fia_harvested, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE))
 tree_removed_but_not_harvested |> nrow()
+```
+
+Make sure all harvested trees exist in the pre-harvest inventory.
+```{r tree_harvested_but_not_in_pre_harvest, eval = FALSE}
+tree_in_pre_harvest_plots <- fia_trees_filtered(
+    fiadb,
+    nrs_plots_prsc_stats_all |> filter(PRE_HARVEST == 1),
+    filter = \(.data, com) {
+      .data |>
+        select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, STATUSCD)
+  }) |>
+  left_join(
+    nrs_plots_prsc_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+  )
+
+tree_harvested_but_not_in_pre_harvest <- nrs_trees_prsc_harvested |>
+  anti_join(tree_in_pre_harvest_plots, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE))
+stopifnot(tree_harvested_but_not_in_pre_harvest |> nrow() == 0)
 ```
 
 All harvested trees should be on harvested plots.
