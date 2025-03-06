@@ -185,6 +185,37 @@ filter_plots_harvested <- function(.data, con) {
     inner_join(plots_harvested_bycond, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
+# Note that this is a POSITIVE filter:
+# unlike other filters, it RETAINS plots that are harvested exactly once
+filter_plots_single_harvest <- function(.data, con) {
+  plots_single_harvest <- tbl(con, "COND") |>
+    inner_join(
+      .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
+      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    ) |>
+    # Each condition can be harvested separately; gather
+    # all they inventories in which any condition was harvested
+    mutate(
+      HARVEST_INVENTORY =
+        if_else(!is.na(TRTCD1) & TRTCD1 == 10, INVYR,
+          if_else(!is.na(TRTCD2) & TRTCD2 == 10, INVYR,
+            if_else(!is.na(TRTCD3) & TRTCD3 == 10, INVYR, NA)
+          )
+        )
+    ) |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    # count the number of distinct HARVEST_INVENTORY
+    summarize(
+      NUM_HARVEST = n_distinct(HARVEST_INVENTORY),
+      .groups = "keep"
+    ) |>
+    ungroup() |>
+    filter(NUM_HARVEST == 1)
+
+  .data |>
+    inner_join(plots_single_harvest, by = join_by(STATECD, COUNTYCD, PLOT))
+}
+
 filter_plots_unfertilized <- function(.data, con) {
   # Filter out the entire plot if it was treated to encourage growth
   # TRTCD 30 - Artificial regeneration - planting or direct seeding

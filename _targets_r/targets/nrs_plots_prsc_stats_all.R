@@ -45,14 +45,23 @@ tar_target(nrs_plots_prsc_stats_all, {
       harvest_mixin <- tbl(con, "COND") |>
         inner_join(plots, by = plots_join_by) |>
         # Label each condition for harvest
-        mutate(HARVEST =
-           (!is.na(TRTCD1) & TRTCD1 == 10) |
-           (!is.na(TRTCD2) & TRTCD2 == 10) |
-           (!is.na(TRTCD3) & TRTCD3 == 10)
+        mutate(
+          HARVEST =
+            (!is.na(TRTCD1) & TRTCD1 == 10) |
+            (!is.na(TRTCD2) & TRTCD2 == 10) |
+            (!is.na(TRTCD3) & TRTCD3 == 10),
+          HRVYR1 = if_else(!is.na(TRTCD1) & (TRTCD1 == 10), TRTYR1, NA),
+          HRVYR2 = if_else(!is.na(TRTCD2) & (TRTCD2 == 10), TRTYR2, NA),
+          HRVYR3 = if_else(!is.na(TRTCD3) & (TRTCD3 == 10), TRTYR3, NA),
+          HRVYR = coalesce(HRVYR3, HRVYR2, HRVYR1)
         ) |>
         # Collapse conditions up to plot level
         group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
-        summarize(HARVEST = any(HARVEST, na.rm = TRUE)) |>
+        summarize(
+          HARVEST = any(HARVEST, na.rm = TRUE),
+          HRVYR = max(HRVYR, na.rm = TRUE),
+          .groups = "keep"
+        ) |>
         ungroup() |>
         # Give ordinals to plot inventories
         group_by(STATECD, COUNTYCD, PLOT) |>
@@ -62,7 +71,7 @@ tar_target(nrs_plots_prsc_stats_all, {
           HARVEST = HARVEST & (INVNUM > 1) # Don't consider harvest in the first inventory
         ) |>
         ungroup() |>
-        select(STATECD, COUNTYCD, PLOT, INVYR, HARVEST, INVNUM)
+        select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM, HARVEST, HRVYR)
       
       pre_harvest_mixin <- harvest_mixin |>
         filter(HARVEST == 1) |>
@@ -83,6 +92,12 @@ tar_target(nrs_plots_prsc_stats_all, {
           STDAGE = if_else(STDAGE < 0, NA, STDAGE),
           FRTYGRCD = floor(FORTYPCD / 10) * 10
         ) |>
+        # Mark inventories that come before the pre-harvest inventory
+        mutate(PREHRVYEAR = if_else(PRE_HARVEST == 1, MEASYEAR, NA)) |>
+        group_by(STATECD, COUNTYCD, PLOT) |>
+        window_order(MEASYEAR) |>
+        mutate(PRE_PRE_HARVEST = (MEASYEAR < min(PREHRVYEAR, na.rm = TRUE))) |>
+        ungroup() |>
         left_join(forest_type, by = join_by(FRTYGRCD == FORTYPCD)) |>
         rename(FOREST_TYPE_GROUP = FORTYPE)
     }) |>
