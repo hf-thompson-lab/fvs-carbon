@@ -88,7 +88,12 @@ tar_target(
       random_seed = fvs_randseed
     )
   },
+  # iteration = "vector" branches execution for each partition value (see below)
   iteration = "vector",
-  # cross() and map() are unparsed targets:: functions here:
+  # cross() and map() are unparsed targets:: functions here.
+  # cross() ensures that every combination of values for its arguments is processed
+  # map() distributes each value of its argument to a separate sub-target (branch)
+  # so cross(randseed, map(partition)) will run each partition in a separate branch,
+  # and each branch will run with each value of randseed
   pattern = cross(fvs_randseed, map(fvs_partition))
 )
