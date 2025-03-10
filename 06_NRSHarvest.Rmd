@@ -835,7 +835,7 @@ fvs_read_output(nrshrv_prsc, "FVS_Summary2_East") |>
 
 TreeList
 
-```{targets nrshrv_treelist, tar_simple = TRUE}
+```{targets nrshrv_prsc_treelist, tar_simple = TRUE}
 fvs_read_output(nrshrv_prsc, "FVS_TreeList_East")
 ```
 
