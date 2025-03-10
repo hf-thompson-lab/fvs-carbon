@@ -469,7 +469,7 @@ map_data('state', fvsne_states$STATE_NAME) |>
   scale_color_discrete(name = "Forest Type")
 ```
 
-# Harvest Prescription for FVS
+# Run FVS
 
 We will use prescription harvest to tell FVS which trees to harvest, when.
 The FVS Keyword Reference section on keyword ThinPRSC says:
@@ -550,6 +550,8 @@ WHERE t.TREE_CN = p.TREE_CN AND
 
 So we need to write an entire database with the information FVS needs, which is
 the FVS_StandInit_Plot and FVS_TreeInit_Plot tables.
+
+## Run FVS: Harvest
 
 ```{targets nrs_harvest_prsc}
 tar_target(
@@ -688,474 +690,182 @@ tar_target(
 )
 ```
 
-
-## Thin Prescription Table
-
-Create a table describing thinning prescriptions by year
-
-```{r keyfile_thin_section}
-keyfile_thin_section <- function(StandCN) {
-  # StandCN refers to STAND_CN in stand_stats
-  # swizzle that to CN, which is what trtyr_mixin uses
-  stand_cn <- stand_stats |>
-    filter(STAND_CN == StandCN) |>
-    select(CN) |>
-    rename(STAND_CN = CN)
-  pertinent <- trtyr_mixin |>
-    semi_join(stand_cn, by = join_by(STAND_CN)) |>
-    filter(!is.na(TRTNUM)) |>
-    rename(year = TRTYR) |>
-    mutate(prescription = TRTNUM + 1) |>
-    select(year, prescription)
-  if (nrow(pertinent) > 0) {
-    fvs_ThinPRSC(pertinent)
-  } else {
-    ''
-  }
-}
-```
-
-
-## Harvest Keyword File Generation
-
-```{r fvs_stands_prsc, eval = FALSE}
-fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-stand_id_mixin <- tbl(fia, 'FVS_StandInit_Plot') |>
-  semi_join(
-    fvs_starting_stands |>
-      select(CN) |>
-      rename(STAND_CN = CN),
-    by = join_by(STAND_CN),
-    copy = TRUE
-  ) |>
-  select(STAND_CN, STAND_ID) |>
-  rename(CN = STAND_CN) |>
-  collect()
-
-fvs_stands_prsc <- fvs_starting_stands |>
-  left_join(stand_id_mixin, by = join_by(CN))
-
-dbDisconnect(fia)
-remove(fia, stand_id_mixin)
-
-# Every stand must have a STAND_ID
-stopifnot(fvs_stands_prsc |> filter(is.na(STAND_ID)) |> nrow() == 0)
-```
-
-```{r NRSHarvest PRSC}
-num_partitions <- 60 # The number of simultaneous processes to use
-timestep <- 10
-title <- "NRSHarvest"
-mgmtid <- "PRSC"
-for (partition in 1:num_partitions) {
-  filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".key")
-  unlink(filename)
-#    print(paste0("Writing ", filename))
-  apply(
-    expand.grid(rannseed = c(1, 3, 5)),
-    1,
-    \(runconfig) {
-      rannseed <- runconfig["rannseed"]
-      apply(
-        fvs_stands_prsc |> 
-          filter((as.numeric(STAND_ID) %% num_partitions) == (partition - 1)) |>
-          arrange(STAND_ID, MIN_MEASYEAR),
-        1,
-        function(row) {
-          write_lines(
-            keywordfile_section(
-              title,
-              mgmtid,
-              row['STAND_ID'],
-              row['STAND_CN'],
-              row['MIN_MEASYEAR'],
-              row['MAX_MEASYEAR'],
-              timestep,
-              partition,
-              rannseed
-            ),
-            filename,
-            append = TRUE
-          )
-        }
-      )
-    }
-  )
-  write_lines("Stop", filename, append = TRUE)
-}
-```
-
-## Survey Keyword File Generation
+## Run FVS: Survey
 
 We also do 0-year projections of the same stands in every measurement year
 to provide a comparison.
 
-```{r fvs_stands_srvy}
-fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-fia_fvs_standinit_plot <- tbl(fia, 'FVS_StandInit_Plot') |>
-  select(STAND_CN, STAND_ID)
-
-fvs_stands_srvy <- tbl(fia, 'PLOT') |>
-  semi_join(plot_harvested, by = join_by(STATECD, COUNTYCD, PLOT), copy = TRUE) |>
-  select(CN, STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, DESIGNCD) |>
-  rename(STAND_CN = CN) |>
-  left_join(fia_fvs_standinit_plot, by = join_by(STAND_CN)) |>
-  collect()
-
-dbDisconnect(fia)
-remove(fia, fia_fvs_standinit_plot)
-```
-
-The second run is to do a 0-year projection for each measurement year. These
-are given management ID "SRVY".
-
-```{r NRSGrowOnly SRVY}
-# We're running 0-year timesteps, but FVS requires us to run at least one
-# year, so we run 0-year timesteps for 1 year.
-timestep <- 1
-title <- "NRSHarvest"
-mgmtid <- "SRVY"
-for (partition in 1:num_partitions) {
-  filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".key")
-  unlink(filename)
-  #print(paste0("Writing ", filename))
-  apply(
-    fvs_stands_srvy |>
-      filter((as.numeric(STAND_ID) %% num_partitions) == (partition - 1)) |>
-      arrange(STAND_ID, MEASYEAR),
-    1,
-    function(row) {
-      write_lines(
-        keywordfile_section(
-          title,
-          mgmtid,
-          row['STAND_ID'],
-          row['STAND_CN'],
-          row['MEASYEAR'],
-          row['MEASYEAR'],
-          timestep,
-          partition
-        ),
-        filename,
-        append = TRUE
+```{targets nrs_harvest_srvy}
+tar_target(
+  nrs_harvest_srvy,
+  {
+    # fvs_run wants a table of the form:
+    # STAND_ID - arbitrary identifier for a stand
+    # STAND_CN - CN for the plot
+    # FIRST_YEAR - start of the projection; if this doesn't align with the actual
+    #   year (MEASYEAR) of first survey, the stand will be projected from the
+    #   survey year to the start of the projection.
+    # LAST_YEAR - end of the projection
+    timestep <- 10 # years; determined by FVSne variant
+    
+    plots_for_fvs <- nrs_plots_prsc |>
+      rename(
+        STAND_CN = CN,
+        FIRST_YEAR = MEASYEAR
+      ) |>
+      mutate(
+        LAST_YEAR = FIRST_YEAR,
+        # STAND_ID won't match FVS_PLOTINIT_PLOT.STAND_ID; that's OK
+        STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
       )
-    }
-  )
-  write_lines("Stop", filename, append = TRUE)
-}
-```
-# Run FVS
 
-> TODO nik: do this automatically; that'll be easier using targets
+    # fvs_run wants establishment in the form:
+    # STAND_CN
+    # SPECIES (FVS_SPCD)
+    # DENSITY (TPA)
+    # HEIGHT (FT)
+    #estab_for_fvs <- nrs_estab_rate |>
+    #  mutate(
+    #    STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
+    #  ) |>
+    #  left_join(
+    #    plots_for_fvs |> select(STAND_ID, STAND_CN),
+    #    by = join_by(STAND_ID)
+    #  ) |>
+    #  select(STAND_CN, STATECD, COUNTYCD, PLOT, SPCD, RATE_PER_ACRE) |>
+    #  mutate(RATE_PER_ACRE = floor(RATE_PER_ACRE * timestep)) |>
+    #  rename(DENSITY = RATE_PER_ACRE) |>
+    #  left_join(
+    #    nrs_estab_height |>
+    #      select(STATECD, COUNTYCD, PLOT, SPCD, HT),
+    #    by = join_by(STATECD, COUNTYCD, PLOT, SPCD)
+    #  ) |>
+    #  mutate(HT = floor(HT)) |>
+    #  rename(HEIGHT = HT) |>
+    #  left_join(
+    #    species_crosswalk |>
+    #      select(SPCD, FVS_SPCD),
+    #    by = join_by(SPCD)
+    #  ) |>
+    #  rename(SPECIES = FVS_SPCD) |>
+    #  filter(!is.na(SPECIES) & !is.na(DENSITY) & !is.na(HEIGHT)) |>
+    #  select(STAND_CN, SPECIES, DENSITY, HEIGHT)
+      
+    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
+    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    data_dir <- "data/fvs"
+    title <- "NRSHarvest"
+    mgmt_id <- "SRVY"
+    
+    # We communicate with FVS through files. FVSOnline shows a model in which
+    # a "project" (the inputs and outputs of a single FVS run) live in a
+    # single directory; we follow that model.
+    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+    if (!dir.exists(project_dir)) {
+      dir.create(project_dir)
+    }
+    
+    fvs_run(
+      fvsbin_dir = fvsbin_dir,
+      fvs_variant = fvs_variant,
+      project_dir = project_dir,
+      fiadb = fiadb,
+      title = title,
+      mgmt_id = mgmt_id,
+      stands = plots_for_fvs,
+      #regen = estab_for_fvs,
+      harvest = harvest_for_fvs,
+      num_partitions = fvs_num_partitions,
+      partition = fvs_partition,
+      random_seed = fvs_randseed
+    )
+  },
+  # iteration = "vector" branches execution for each partition value (see below)
+  iteration = "vector",
+  # cross() and map() are unparsed targets:: functions here.
+  # cross() ensures that every combination of values for its arguments is processed
+  # map() distributes each value of its argument to a separate sub-target (branch)
+  # so cross(randseed, map(partition)) will run each partition in a separate branch,
+  # and each branch will run with each value of randseed
+  pattern = cross(fvs_randseed, map(fvs_partition))
+)
+```
+
 
 # Results
 
 ## Fault Analysis
 
-### Parse Faults
-
-What errors and warnings do we get?
-```{r fvs warnings, cache=TRUE}
-mgmtid <- "PRSC"
-fvs_warnings <- NULL
-for (partition in 1:num_partitions) {
-  filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".out")
-  fvs_warnings <- bind_rows(
-    fvs_warnings,
-    read_lines(filename) |>
-      as.data.frame(nm="text") |>
-      # Filter to just initial STAND ID and WARNING lines
-      filter(
-        grepl("^ +STAND ID=", text) |
-          grepl("^\\*{8} ", text)
-      ) |>
-      # Parse out the STAND ID and fill it into the following lines
-      mutate(
-        STAND_ID = case_when(
-          grepl("^ +STAND ID=", text) ~ sub("^ +STAND ID= *([^ ]+) .*$", "\\1", text)
-        )
-      ) |>
-      fill(STAND_ID) |>
-      # Remove everything but warnings (which now have STAND_ID)
-      filter(
-        grepl("^\\*{8} ", text)
-      )
-  )
-}
-```
-
-Find the distinct faults
-
-```{r distinct fvs warnings}
-fvs_warnings_distinct <- fvs_warnings |>
-  # Most faults have some leading text, the tag ERROR: or WARNING:,
-  # then descriptive text; if there's a number in the descriptive text,
-  # it's probably pulled from the data, so we chop off the descriptive
-  # text starting at the first number to find the truly distinct warnings
-  mutate(
-    PROBLEM = case_when(
-      grepl("WARNING:", text) ~ sub("^[*. ]*(.*WARNING: [^0-9]+)([0-9].*)?$", "\\1", text),
-      grepl("ERROR:", text) ~ sub("^[*. ]*(.*ERROR: [^0-9]+)([0-9].*)?$", "\\1", text),
-      .default = text
-    ),
-    PROBLEM = sub("\\s+$", "", PROBLEM)
-  ) |>
-  distinct(PROBLEM) |>
-  arrange(PROBLEM)
-knitr::kable(fvs_warnings_distinct)
-```
-### Plot Count Mismatch
-
-Plot counts do not match data on the design record could indicate a data prep
-error.
-
-```{r keyword context}
-debug_stand_id <- fvs_warnings |>
-  filter(grepl("FVS09 WARNING: ", text)) |>
-  head(1) |>
-  pull("STAND_ID")
-fvs_warnings |>
-  filter(STAND_ID == debug_stand_id)
-```
-
-From Essential FVS:
-```
-This
-warning message is printed when either the plot count or nonstockable count determined
-from reading the tree data records differs from the values coded on the DESIGN record.
-```
-
-Which partition is it in?
-```{r keyword context partition}
-as.numeric(sub("^([^_]+)_.*$", "\\1", debug_stand_id)) %% num_partitions
-```
-
-so the 16th partition, which is partition 17.
-
-Here's the keyword file section:
-```
-StdIdent  
-420301305916_Y10_R1 NRSHarvest
-StandCN   
-58377688010538
-MgmtId    
-PRSC
-InvYear         2003
-TimeInt            0        10
-TimeInt            1         7
-TimeInt            3         1
-NumCycle           3
-RANNSEED           1
-FMIn      
-CarbRept  
-CarbCut   
-CarbCalc           1         1    0.0425         9        11
-FuelOut   
-FuelRept  
-End       
-Database  
-DSNIn     
-FVS_NRSHarvest_PRSC.db
-StandSQL  
-SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'
-EndSQL    
-TreeSQL   
-SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'
-EndSQL    
-DSNOut    
-FVS_NRSHarvest_PRSC_17.db
-Summary            2
-Computdb           0         1
-MisRpts            2
-CarbReDB           2
-FuelReDB           2
-FuelsOut           2
-End       
-ThinPRSC        2006         1         3
-Process   
-```
-
-from the .out file, when processing TreeSQL:
-> NUMBER ROWS PROCESSED:   18
-
-The number of plots should match the number of distinct SUBP in FIA:
-```{r debug_fia_plot}
-debug_fia_plot <- fvs_stands_prsc |>
-  filter(STAND_ID == sub("^([^_]+)_.*$", "\\1", debug_stand_id)) |>
-  select(STATECD, COUNTYCD, PLOT, INVYR)
-tree_removed_in_harvest |>
-  semi_join(debug_fia_plot, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
-  distinct(SUBP) |>
-  nrow()
-```
-
-This is probably benign - it means there were trees on only 2 out of 4 subplots
-at the start of the run.
-
-How common is this?
-```{r fvs09 warnings}
-fvs_warnings |>
-  filter(grepl("FVS09 WARNING: ", text)) |>
-  nrow()
-```
-
-This happens on 9 out of 400 plots; ignore.
-
-### One Thousand Trees
-
-The TPA fault may indicate a keyword file generation error; let's track it down.
-```{r one thousand trees}
-debug_stand_id <- fvs_warnings |>
-  filter(grepl(" TPA ", text)) |>
-  head(1) |>
-  pull("STAND_ID")
-fvs_warnings |>
-  filter(STAND_ID == debug_stand_id)
-```
-
-a'ight, what's the species?
-
-```{r fvs species 9}
-debug_species <- fvs_warnings |>
-  filter(grepl("FVS40 WARNING:", text) & grepl("SPECIES=", text)) |>
-  mutate(FVS_SPNO = as.integer(sub("^.*SPECIES=\\s*(\\d+) .*$", "\\1", text))) |>
-  group_by(FVS_SPNO) |>
-  summarize(N = n(), .groups = "keep") |>
-  ungroup() |>
-  arrange(desc(N)) |>
-  left_join(species_mixin, by = join_by(FVS_SPNO))
-debug_species
-```
-
-These are plots where the number of seedlings / saplings on the microplots
-tally to >1000 TPA.
-
-I think we note that these exist, and ignore them.
-
-How often does this occur?
-
-```{r fvs tpa warnings}
-fvs_warnings |>
-  filter(grepl(" TPA ", text)) |>
-  nrow()
-```
-
-27 out of 400 plots.
-
-We can decide to not worry about them.
+Skipped for now.
 
 ## Load Results
 
-Load the output from all FVS partitions into a single database.
-Particularly with the tree list, these start to get big, so we want to 
-put them into SQLite where we can quickly read in just those portions
-we're interested in.
 
-```{r consolidate_results}
-mgmt_ids <- c("PRSC", "SRVY")
-partitions <- 1:num_partitions
+Load the output from all FVS partitions into a single dataframe
 
-fvs_output_partition <- function(title, mgmtid, partition) {
-  paste0("data/fvs/FVS_", title, "_", mgmtid, "_", partition, ".db")
-}
+Consolidate outputs that use multiple random seeds;
+average the multiple runs with different random seeds.
 
-fvs_output_consolidated <- function(title, mgmtid) {
-  paste0("data/fvs/FVS_", title, "_", mgmtid, "_Results.db")
-}
+### NRS Harvest PRSC
 
-fvs_consolidate_output <- function(title, mgmtid, partitions) {
-  dest <- dbConnect(RSQLite::SQLite(), fvs_output_consolidated(title, mgmtid))
-  on.exit(dbDisconnect(dest), add = TRUE, after = FALSE)
+Carbon
 
-  pblapply(partitions, \(partition) {
-    part <- dbConnect(RSQLite::SQLite(), fvs_output_partition(title, mgmtid, partition))
-    on.exit(dbDisconnect(part), add = TRUE, after = FALSE)
-    
-    tables <- dbListTables(part)
-    lapply(tables, \(table) {
-      dbWriteTable(dest, table, tbl(part, table) |> collect(), append = TRUE)
-    })
-  })
-}
-
-invisible(
-  lapply(mgmt_ids, \(mgmtid) {
-    filename <- fvs_output_consolidated(title, mgmtid)
-    print(paste0("Writing ", filename))
-    if (file.exists(filename)) {
-      unlink(filename)
-    }
-    # Notable SQLite restrictions:
-    # - One statement per dbExecute - so, no semicolon-separated statements
-    # - Maximum of 10 connections at a time
-    # - Not all tables exist in all outputs; e.g. FVS_Error only exists
-    #   if an error was observed
-    # Rather than try to be clever and have SQLite copy the tables,
-    # it's easier (and about as fast) to pull them into R one partition
-    # at a time, and write the data out to the consolidated database
-    fvs_consolidate_output(title, mgmtid, partitions)
-  })
-)
-rm(fvs_output_partition, fvs_output_consolidated, fvs_consolidate_output)
-```
-
-
-```{r FVS_Carbon, cache=TRUE}
-load_result_table <- function(title, mgmtid, table) {
-  filename <- paste0("data/fvs/FVS_", title, "_", mgmtid, "_Results.db")
-  stopifnot(file.exists(filename))
-  fvs_out_db <- DBI::dbConnect(RSQLite::SQLite(), filename)
-  on.exit(dbDisconnect(fvs_out_db), add = TRUE, after = FALSE)
-
-  tbl(fvs_out_db, table) |>
-    collect() |>
-    mutate(
-      Title = title,
-      MgmtId = mgmtid,
-      Timestep = sub("^.*_Y([0-9]+).*$", "\\1", StandID), # Extract timestep
-      RanNSeed = sub("^.*_R([0-9]+).*$", "\\1", StandID), # Extract random seed
-      StandID = sub("^([^_]+)_.*$", "\\1", StandID), # Extract stand ID
-      Partition = (as.numeric(StandID) %% num_partitions) + 1
-    )
-}
-
-print("Loading Carbon results")
-FVS_Carbon <- bind_rows(
-  load_result_table(title, "PRSC", "FVS_Carbon"),
-  load_result_table(title, "SRVY", "FVS_Carbon")
-)
-
-print("Loading result Summary")
-FVS_Summary2_East <- bind_rows(
-  load_result_table(title, "PRSC", "FVS_Summary2_East"),
-  load_result_table(title, "SRVY", "FVS_Summary2_East")
-)
-
-rm(load_result_table)
-```
-Consolidate outputs; average the multiple runs with different random seeds.
-
-```{r FVS_Carbon_PRSC}
-FVS_Carbon_PRSC <- FVS_Carbon |>
-  filter(MgmtId == "PRSC") |>
-  group_by(StandID, Year) |>
+```{targets nrshrv_prsc_carbon, tar_simple = TRUE}
+fvs_read_output(nrs_harvest_prsc, "FVS_Carbon") |>
+  group_by(StandID, Year) |> # Combine results from different random seeds
   summarize(
     Aboveground_Total_Live = mean(Aboveground_Total_Live),
-    Total_Stand_Carbon = mean(Total_Stand_Carbon),
+    .groups = "keep"
+  ) |>
+  ungroup()
+```
+
+Summary
+
+```{targets nrshrv_prsc_summary, tar_simple = TRUE}
+fvs_read_output(nrs_harvest_prsc, "FVS_Summary2_East") |>
+  group_by(StandID, Year) |>
+  summarize(
+    BA = mean(BA),
+    Tpa = mean(Tpa),
     .groups = 'keep'
   ) |>
   ungroup()
-
-# There is no projection for the observed run, so no need to average
-FVS_Carbon_SRVY <- FVS_Carbon |>  
-  filter(MgmtId == "SRVY")
 ```
 
-### Sanity Check
+TreeList
+
+```{targets nrshrv_prsc_treelist, tar_simple = TRUE}
+fvs_read_output(nrs_harvest_prsc, "FVS_TreeList_East")
+```
+
+### NRS Harvest SRVY
+
+Carbon
+
+```{targets nrshrv_srvy_carbon, tar_simple = TRUE}
+fvs_read_output(nrs_harvest_srvy, "FVS_Carbon") |>
+  select(StandID, Year, Aboveground_Total_Live)
+```
+
+Summary
+
+```{targets nrshrv_srvy_summary, tar_simple = TRUE}
+fvs_read_output(nrs_harvest_srvy, "FVS_Summary2_East") |>
+  select(StandID, Year, BA, Tpa)
+```
+
+TreeList
+
+```{targets nrshrv_srvy_treelist, tar_simple = TRUE}
+fvs_read_output(nrs_harvest_srvy, "FVS_TreeList_East")
+```
+
+## Sanity Check
 
 Sanity check: did we get the outputs we requested?
 
-```{r sanity-check-expected-output}
+```{r sanity-check-expected-output, eval = FALSE}
 matched_carbon_tmp <- fvs_stands_prsc |>
   left_join(
     FVS_Carbon_PRSC |>
@@ -1195,9 +905,9 @@ remove(
 )
 ```
 
-### Projected Carbon
+## Carbon
 
-```{r plot aboveground carbon}
+```{r plot aboveground carbon, eval = FALSE}
 ggplot(
     FVS_Carbon_PRSC,
     aes(x = Year, y = Aboveground_Total_Live)
@@ -1222,9 +932,9 @@ ggplot(
 
 ```
 
-### Projected Carbon Flux
+## Carbon Flux
 
-```{r plot carbon flux}
+```{r plot carbon flux, eval = FALSE}
 all_years <- tibble(Year = min(FVS_Carbon_PRSC$Year):max(FVS_Carbon_PRSC$Year))
 num_years <- all_years |> nrow()
 

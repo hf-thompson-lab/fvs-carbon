@@ -2876,7 +2876,9 @@ Load the output from all FVS partitions into a single dataframe
 Consolidate outputs that use multiple random seeds;
 average the multiple runs with different random seeds.
 
-### NRS GrowOnly NONE Carbon
+### NRS GrowOnly NONE
+
+Carbon
 
 ```{targets nrsgrowonly_none_carbon, tar_simple = TRUE}
 fvs_read_output(nrs_growonly_none, "FVS_Carbon") |>
@@ -2888,7 +2890,7 @@ fvs_read_output(nrs_growonly_none, "FVS_Carbon") |>
   ungroup()
 ```
 
-### NRS GrowOnly NONE Summary
+Summary
 
 ```{targets nrsgrowonly_none_summary, tar_simple = TRUE}
 fvs_read_output(nrs_growonly_none, "FVS_Summary2_East") |>
@@ -2901,19 +2903,24 @@ fvs_read_output(nrs_growonly_none, "FVS_Summary2_East") |>
   ungroup()
 ```
 
-### NRS GrowOnly SRVY Carbon
+### NRS GrowOnly SRVY
+
+Carbon
 
 ```{targets nrsgrowonly_srvy_carbon, tar_simple = TRUE}
 fvs_read_output(nrs_growonly_srvy, "FVS_Carbon") |>
   select(StandID, Year, Aboveground_Total_Live)
 ```
 
-### NRS GrowOnly SRVY Summary
+Summary
 
 ```{targets nrsgrowonly_srvy_summary, tar_simple = TRUE}
 fvs_read_output(nrs_growonly_srvy, "FVS_Summary2_East") |>
   select(StandID, Year, BA, Tpa)
 ```
+
+### Sanity Check
+
 Sanity check: did we get the outputs we requested?
 
 ```{r sanity-check-expected-output, eval = FALSE}
