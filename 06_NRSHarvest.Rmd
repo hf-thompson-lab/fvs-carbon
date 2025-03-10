@@ -551,7 +551,7 @@ WHERE t.TREE_CN = p.TREE_CN AND
 So we need to write an entire database with the information FVS needs, which is
 the FVS_StandInit_Plot and FVS_TreeInit_Plot tables.
 
-```{r nrs_harvest_prsc, eval = FALSE}
+```{targets nrs_harvest_prsc}
 tar_target(
   nrs_harvest_prsc,
   {
@@ -718,7 +718,7 @@ keyfile_thin_section <- function(StandCN) {
 
 ## Harvest Keyword File Generation
 
-```{r fvs_stands_prsc}
+```{r fvs_stands_prsc, eval = FALSE}
 fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
 stand_id_mixin <- tbl(fia, 'FVS_StandInit_Plot') |>
   semi_join(
