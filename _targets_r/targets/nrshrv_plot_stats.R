@@ -1,7 +1,7 @@
-tar_target(nrs_plots_prsc_stats, {
-  nrs_plots_prsc_stats_all |>
+tar_target(nrshrv_plot_stats, {
+  nrshrv_plot_stats_all |>
     semi_join(
-      nrs_plots_prsc,
+      nrshrv_plot,
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
     # Renumber INVNUM due to removed inventories

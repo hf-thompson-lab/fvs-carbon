@@ -1,5 +1,5 @@
-tar_target(nrs_trees_ingrowth, {
-  multi_ingrowth <- nrs_trees_ingrowth_all |>
+tar_target(nrsgro_tree_grm, {
+  multi_ingrowth <- nrsgro_tree_grm_all |>
     group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
     arrange(INVYR) |>
     filter(
@@ -7,6 +7,6 @@ tar_target(nrs_trees_ingrowth, {
       row_number() > 1
     ) |>
     select(CN)
-  nrs_trees_ingrowth_all |>
+  nrsgro_tree_grm_all |>
     anti_join(multi_ingrowth, by = join_by(CN))
 })

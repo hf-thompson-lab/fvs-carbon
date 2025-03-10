@@ -1,4 +1,4 @@
-tar_target(nrs_trees_growth, {
+tar_target(nrsgro_tree_growth, {
   # FIA.TREE.CN - sequence number
   # FIA.TREE.TREE - TREE number
   # FIA.TREE.CONDID - condition class; 1 = live tree
@@ -11,7 +11,7 @@ tar_target(nrs_trees_growth, {
   # FIA.TREE.TPA_UNADJ - Trees Per Acre (Unadjusted)
   # We want ingrowth for all the plots in plot_grow_only
   
-  prev_tre_mixin <- nrs_trees_history |>
+  prev_tre_mixin <- nrsgro_tree_history |>
     select(CN, MEASYEAR, DIA, HT) |>
     rename(
       PREV_TRE_CN = CN,
@@ -20,7 +20,7 @@ tar_target(nrs_trees_growth, {
       PREV_HT = HT
     )
   
-  nrs_trees_history |>
+  nrsgro_tree_history |>
     # Self-join to previous tree to get growth increment
     left_join(prev_tre_mixin, by = join_by(PREV_TRE_CN)) |>
     mutate(

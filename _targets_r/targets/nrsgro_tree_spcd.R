@@ -1,6 +1,6 @@
-tar_target(nrs_trees_spcd, {
+tar_target(nrsgro_tree_spcd, {
   # mcs == Most Common Species
-  mcs_plot <- nrs_trees_growth |>
+  mcs_plot <- nrsgro_tree_growth |>
     left_join(species_crosswalk, by = join_by(SPCD)) |>
     filter(!is.na(FVS_SPCD)) |>
     group_by(STATECD, COUNTYCD, PLOT, GENUS, SPCD) |>
@@ -13,7 +13,7 @@ tar_target(nrs_trees_spcd, {
     select(!COUNT) |>
     rename(SPCD_PLOT = SPCD)
   
-  mcs_county <- nrs_trees_growth |>
+  mcs_county <- nrsgro_tree_growth |>
     left_join(species_crosswalk, by = join_by(SPCD)) |>
     filter(!is.na(FVS_SPCD)) |>
     group_by(STATECD, COUNTYCD, GENUS, SPCD) |>
@@ -26,7 +26,7 @@ tar_target(nrs_trees_spcd, {
     select(!COUNT) |>
     rename(SPCD_COUNTY = SPCD)
   
-  mcs_state <- nrs_trees_growth |>
+  mcs_state <- nrsgro_tree_growth |>
     left_join(species_crosswalk, by = join_by(SPCD)) |>
     filter(!is.na(FVS_SPCD)) |>
     group_by(STATECD, GENUS, SPCD) |>
@@ -39,7 +39,7 @@ tar_target(nrs_trees_spcd, {
     select(!COUNT) |>
     rename(SPCD_STATE = SPCD)
   
-  mcs_overall <- nrs_trees_growth |>
+  mcs_overall <- nrsgro_tree_growth |>
     left_join(species_crosswalk, by = join_by(SPCD)) |>
     filter(!is.na(FVS_SPCD)) |>
     group_by(GENUS, SPCD) |>
@@ -54,7 +54,7 @@ tar_target(nrs_trees_spcd, {
   
   # Note that this leaves Crataegus (Hawthorn) as spp. - apparently FIA has
   # passed on trying to identify species in Crataegus.
-  nrs_trees_growth |>
+  nrsgro_tree_growth |>
     left_join(species_crosswalk |> select(SPCD, GENUS), by = join_by(SPCD)) |>
     left_join(mcs_plot, by = join_by(STATECD, COUNTYCD, PLOT, GENUS)) |>
     left_join(mcs_county, by = join_by(STATECD, COUNTYCD, GENUS)) |>

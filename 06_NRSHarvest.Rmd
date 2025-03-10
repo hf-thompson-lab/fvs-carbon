@@ -71,7 +71,7 @@ harvested. To be consistent across all kinds of disturbance, we use the FIA
 definitions for all disturbance, including harvest, and therefore do NOT mark a
 plot as harvested even if there are harvested trees.
 
-```{targets nrs_plots_prsc_all, tar_simple=TRUE}
+```{targets nrshrv_plot_all, tar_simple=TRUE}
 fia_plots_filtered(fiadb, filter = \(.data, con) {
   .data |>
     filter(INVYR >= 1999) |>
@@ -88,8 +88,8 @@ fia_plots_filtered(fiadb, filter = \(.data, con) {
 
 Fetch more info about these stands.
 
-```{targets nrs_plots_prsc_stats_all, tar_simple = TRUE}
-fia_plots_filtered(fiadb, nrs_plots_prsc_all, \(.data, con) {
+```{targets nrshrv_plot_stats_all, tar_simple = TRUE}
+fia_plots_filtered(fiadb, nrshrv_plot_all, \(.data, con) {
     plots <- .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR)
     plots_join_by <- join_by(STATECD, COUNTYCD, PLOT, INVYR)
 
@@ -212,9 +212,9 @@ fia_plots_filtered(fiadb, nrs_plots_prsc_all, \(.data, con) {
 Where are they?
 
 ```{r map_by_ecoregion, eval = FALSE}
-plot_location_tmp <- nrs_plots_prsc_all |>
+plot_location_tmp <- nrshrv_plot_all |>
   left_join(
-    nrs_plots_prsc_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, FOREST_TYPE_GROUP),
+    nrshrv_plot_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, FOREST_TYPE_GROUP),
     by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   ) |>
   group_by(STATECD, COUNTYCD, PLOT) |>
@@ -282,23 +282,23 @@ trees should be removed before the next timestep.
 
 Fetch trees that were standing pre-harvest, that are not standing post-harvest.
 
-```{targets nrs_trees_prsc_removed, tar_simple = TRUE}
+```{targets nrshrv_tree_removed, tar_simple = TRUE}
 tree_in_pre_harvest_plots <- fia_trees_filtered(
     fiadb,
-    nrs_plots_prsc_stats_all |> filter(PRE_HARVEST == 1),
+    nrshrv_plot_stats_all |> filter(PRE_HARVEST == 1),
     filter = \(.data, com) {
       .data |>
         filter(STATUSCD == 1 | STATUSCD == 2) |> # live or dead trees
         select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, MORTYR, STATUSCD)  
   }) |>
   left_join(
-    nrs_plots_prsc_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
+    nrshrv_plot_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
     by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
 
 tree_in_harvested_plots <- fia_trees_filtered(
     fiadb,
-    nrs_plots_prsc_stats_all |> filter(HARVEST == 1),
+    nrshrv_plot_stats_all |> filter(HARVEST == 1),
     filter = \(.data, con) {
       .data |>
         filter(STATUSCD == 1 | STATUSCD == 2) |> # live and dead trees are still there
@@ -306,7 +306,7 @@ tree_in_harvested_plots <- fia_trees_filtered(
     }
   ) |>
   left_join(
-    nrs_plots_prsc_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
+    nrshrv_plot_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
     by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   ) |>
   # Move back a timestep so we can join the future onto the past
@@ -325,10 +325,10 @@ tree_in_pre_harvest_plots |>
 
 Fetch trees that FIA says were harvested.
 
-```{targets nrs_trees_prsc_harvested, tar_simple = TRUE}
+```{targets nrshrv_tree_harvested, tar_simple = TRUE}
 fia_trees_filtered(
     fiadb,
-    nrs_plots_prsc_stats_all |> filter(HARVEST == 1),
+    nrshrv_plot_stats_all |> filter(HARVEST == 1),
     filter = \(.data, con) {
       .data |>
         filter(STATUSCD == 3) |>
@@ -336,7 +336,7 @@ fia_trees_filtered(
     }
   ) |>
   left_join(
-    nrs_plots_prsc_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
+    nrshrv_plot_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
     by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
 ```
@@ -346,13 +346,13 @@ fia_trees_filtered(
 Were all the trees that FIA says were harvested actually removed?
 ```{r tree_harvested_but_not_removed, eval = FALSE}
 tree_harvested_but_not_removed <- tree_fia_harvested |>
-  anti_join(nrs_trees_prsc_removed, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE))
+  anti_join(nrshrv_tree_removed, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE))
 stopifnot(tree_harvested_but_not_removed |> nrow() == 0)
 ```
 
 It is expected that FIA did not mark all removed trees as harvested.
 ```{r tree_removed_but_not_harvested, eval = FALSE}
-tree_removed_but_not_harvested <- nrs_trees_prsc_removed |>
+tree_removed_but_not_harvested <- nrshrv_tree_removed |>
   anti_join(tree_fia_harvested, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE))
 tree_removed_but_not_harvested |> nrow()
 ```
@@ -361,17 +361,17 @@ Make sure all harvested trees exist in the pre-harvest inventory.
 ```{r tree_harvested_but_not_in_pre_harvest, eval = FALSE}
 tree_in_pre_harvest_plots <- fia_trees_filtered(
     fiadb,
-    nrs_plots_prsc_stats_all |> filter(PRE_HARVEST == 1),
+    nrshrv_plot_stats_all |> filter(PRE_HARVEST == 1),
     filter = \(.data, com) {
       .data |>
         select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, STATUSCD)
   }) |>
   left_join(
-    nrs_plots_prsc_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
+    nrshrv_plot_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
     by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
 
-tree_harvested_but_not_in_pre_harvest <- nrs_trees_prsc_harvested |>
+tree_harvested_but_not_in_pre_harvest <- nrshrv_tree_harvested |>
   anti_join(tree_in_pre_harvest_plots, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE))
 stopifnot(tree_harvested_but_not_in_pre_harvest |> nrow() == 0)
 ```
@@ -379,13 +379,13 @@ stopifnot(tree_harvested_but_not_in_pre_harvest |> nrow() == 0)
 All harvested trees should be on harvested plots.
 ```{r stopifnot_tree_removed_from_non_harvested_plots, eval = FALSE}
 stopifnot(
-  nrs_trees_prsc_removed |>
+  nrshrv_tree_removed |>
     distinct(STATECD, COUNTYCD, PLOT, INVNUM) |>
     # INVNUM is the last inventory in which the tree was standing,
     # so it is marked harvested in the next inventory
     mutate(INVNUM = INVNUM + 1) |>
     anti_join(
-      nrs_plots_prsc_stats_all |> filter(HARVEST == 1),
+      nrshrv_plot_stats_all |> filter(HARVEST == 1),
       by = join_by(STATECD, COUNTYCD, PLOT, INVNUM)
     ) |>
     nrow() == 0
@@ -394,9 +394,9 @@ stopifnot(
 
 There are some "harvested" plots that do not have trees removed.
 ```{r plot_harvested_without_tree_removed, eval = FALSE}
-plot_harvested_without_tree_removed <- nrs_plots_prsc_all |>
+plot_harvested_without_tree_removed <- nrshrv_plot_all |>
   anti_join(
-    nrs_trees_prsc_removed |>
+    nrshrv_tree_removed |>
       distinct(STATECD, COUNTYCD, PLOT),
     join_by(STATECD, COUNTYCD, PLOT)
   )
@@ -407,23 +407,23 @@ plot_harvested_without_tree_removed |> nrow()
 
 Remove those plots from consideration.
 
-```{targets nrs_plots_prsc, tar_simple = TRUE}
-nrs_plots_prsc_all |>
+```{targets nrshrv_plot, tar_simple = TRUE}
+nrshrv_plot_all |>
   semi_join(
-    nrs_trees_prsc_removed |> distinct(STATECD, COUNTYCD, PLOT),
+    nrshrv_tree_removed |> distinct(STATECD, COUNTYCD, PLOT),
     by = join_by(STATECD, COUNTYCD, PLOT)
   ) |>
   # Remove inventories prior to the pre-harvest inventory
   semi_join(
-    nrs_plots_prsc_stats_all |> filter(PRE_PRE_HARVEST == FALSE),
+    nrshrv_plot_stats_all |> filter(PRE_PRE_HARVEST == FALSE),
     by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   )
 ```
 
-```{targets nrs_plots_prsc_stats, tar_simple = TRUE}
-nrs_plots_prsc_stats_all |>
+```{targets nrshrv_plot_stats, tar_simple = TRUE}
+nrshrv_plot_stats_all |>
   semi_join(
-    nrs_plots_prsc,
+    nrshrv_plot,
     by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   ) |>
   # Renumber INVNUM due to removed inventories
@@ -435,13 +435,13 @@ nrs_plots_prsc_stats_all |>
 
 What's left?
 ```{r map_by_ecoregion2, eval = FALSE}
-plot_data <- nrs_plots_prsc |>
+plot_data <- nrshrv_plot |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   filter(row_number() == 1) |>
   ungroup() |>
   rename(lat = LAT, long = LON, group = CN) |>
   left_join(
-    nrs_plots_prsc_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, FOREST_TYPE, FOREST_TYPE_GROUP),
+    nrshrv_plot_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, FOREST_TYPE, FOREST_TYPE_GROUP),
     by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
   ) |>
   group_by(FOREST_TYPE_GROUP) |>
@@ -553,9 +553,9 @@ the FVS_StandInit_Plot and FVS_TreeInit_Plot tables.
 
 ## Run FVS: Harvest
 
-```{targets nrs_harvest_prsc}
+```{targets nrshrv_prsc}
 tar_target(
-  nrs_harvest_prsc,
+  nrshrv_prsc,
   {
     # fvs_run wants a table of the form:
     # STAND_ID - arbitrary identifier for a stand
@@ -566,7 +566,7 @@ tar_target(
     # LAST_YEAR - end of the projection
     timestep <- 10 # years; determined by FVSne variant
     
-    plots_for_fvs <- nrs_plots_prsc |>
+    plots_for_fvs <- nrshrv_plot |>
       group_by(STATECD, COUNTYCD, PLOT) |>
       arrange(INVYR) |>
       mutate(
@@ -588,26 +588,26 @@ tar_target(
     # filtered to those trees that end up being harvested.
     harvest_for_fvs <- fia_trees_filtered(
         fiadb,
-        nrs_plots_prsc_stats |> filter(PRE_HARVEST == 1),
+        nrshrv_plot_stats |> filter(PRE_HARVEST == 1),
         filter = \(.data, com) {
           .data |>
             select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
             rename(TREE_CN = CN)
       }) |>
       inner_join(
-        nrs_trees_prsc_harvested |>
+        nrshrv_tree_harvested |>
           select(PREV_TRE_CN, STATECD, COUNTYCD, PLOT, SUBP, TREE),
         by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)
       ) |>
       left_join(
-        nrs_plots_prsc_stats |>
+        nrshrv_plot_stats |>
           filter(HARVEST == 1) |>
           select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM, HRVYR) |>
           rename(PRESCRIPTION = INVNUM),
         by = join_by(STATECD, COUNTYCD, PLOT)
       ) |>
       left_join(
-        nrs_plots_prsc |>
+        nrshrv_plot |>
           select(STATECD, COUNTYCD, PLOT, INVYR, CN) |>
           rename(STAND_CN = CN),
         by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
@@ -695,9 +695,9 @@ tar_target(
 We also do 0-year projections of the same stands in every measurement year
 to provide a comparison.
 
-```{targets nrs_harvest_srvy}
+```{targets nrshrv_srvy}
 tar_target(
-  nrs_harvest_srvy,
+  nrshrv_srvy,
   {
     # fvs_run wants a table of the form:
     # STAND_ID - arbitrary identifier for a stand
@@ -708,7 +708,7 @@ tar_target(
     # LAST_YEAR - end of the projection
     timestep <- 10 # years; determined by FVSne variant
     
-    plots_for_fvs <- nrs_plots_prsc |>
+    plots_for_fvs <- nrshrv_plot |>
       rename(
         STAND_CN = CN,
         FIRST_YEAR = MEASYEAR
@@ -811,7 +811,7 @@ average the multiple runs with different random seeds.
 Carbon
 
 ```{targets nrshrv_prsc_carbon, tar_simple = TRUE}
-fvs_read_output(nrs_harvest_prsc, "FVS_Carbon") |>
+fvs_read_output(nrshrv_prsc, "FVS_Carbon") |>
   group_by(StandID, Year) |> # Combine results from different random seeds
   summarize(
     Aboveground_Total_Live = mean(Aboveground_Total_Live),
@@ -823,7 +823,7 @@ fvs_read_output(nrs_harvest_prsc, "FVS_Carbon") |>
 Summary
 
 ```{targets nrshrv_prsc_summary, tar_simple = TRUE}
-fvs_read_output(nrs_harvest_prsc, "FVS_Summary2_East") |>
+fvs_read_output(nrshrv_prsc, "FVS_Summary2_East") |>
   group_by(StandID, Year) |>
   summarize(
     BA = mean(BA),
@@ -835,8 +835,8 @@ fvs_read_output(nrs_harvest_prsc, "FVS_Summary2_East") |>
 
 TreeList
 
-```{targets nrshrv_prsc_treelist, tar_simple = TRUE}
-fvs_read_output(nrs_harvest_prsc, "FVS_TreeList_East")
+```{targets nrshrv_treelist, tar_simple = TRUE}
+fvs_read_output(nrshrv_prsc, "FVS_TreeList_East")
 ```
 
 ### NRS Harvest SRVY
@@ -844,21 +844,21 @@ fvs_read_output(nrs_harvest_prsc, "FVS_TreeList_East")
 Carbon
 
 ```{targets nrshrv_srvy_carbon, tar_simple = TRUE}
-fvs_read_output(nrs_harvest_srvy, "FVS_Carbon") |>
+fvs_read_output(nrshrv_srvy, "FVS_Carbon") |>
   select(StandID, Year, Aboveground_Total_Live)
 ```
 
 Summary
 
 ```{targets nrshrv_srvy_summary, tar_simple = TRUE}
-fvs_read_output(nrs_harvest_srvy, "FVS_Summary2_East") |>
+fvs_read_output(nrshrv_srvy, "FVS_Summary2_East") |>
   select(StandID, Year, BA, Tpa)
 ```
 
 TreeList
 
 ```{targets nrshrv_srvy_treelist, tar_simple = TRUE}
-fvs_read_output(nrs_harvest_srvy, "FVS_TreeList_East")
+fvs_read_output(nrshrv_srvy, "FVS_TreeList_East")
 ```
 
 ## Sanity Check

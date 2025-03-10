@@ -1,4 +1,4 @@
-tar_target(nrs_plots_prsc_all, {
+tar_target(nrshrv_plot_all, {
   fia_plots_filtered(fiadb, filter = \(.data, con) {
     .data |>
       filter(INVYR >= 1999) |>

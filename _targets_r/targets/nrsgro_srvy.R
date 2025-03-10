@@ -1,14 +1,14 @@
 tar_target(
-  nrs_growonly_srvy,
+  nrsgro_srvy,
   {
-    plots_for_fvs <- nrs_plots_grown |>
+    plots_for_fvs <- nrsgro_plot |>
       rename(
         STAND_CN = CN,
         FIRST_YEAR = MEASYEAR
       ) |>
       mutate(
         LAST_YEAR = FIRST_YEAR,
-        # STAND_ID matches STAND_ID for NRSGrowOnly GROW, but this isn't
+        # STAND_ID matches STAND_ID for nrsgro GROW, but this isn't
         # actually necessary. We'll line things up later using CN.
         STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
       )

@@ -1,17 +1,17 @@
-tar_target(nrs_trees_history, {
+tar_target(nrsgro_tree_history, {
   # Get trees with CN, PREV_TRE_CN and  NEXT_TRE_CN to make it easy to traverse
   # tree lineage in either direction
-  tree_prev_next <- nrs_trees_grown |>
+  tree_prev_next <- nrsgro_tree |>
     select(CN, PREV_TRE_CN) |>
     left_join(
-      nrs_trees_grown |>
+      nrsgro_tree |>
         select(CN, PREV_TRE_CN) |>
         rename(NEXT_TRE_CN = CN, CN = PREV_TRE_CN),
       by = join_by(CN)
     ) |>
     # Null out PREV_TRE_CN if it points to a tree we don't have access to.
     left_join(
-      nrs_trees_grown |> select(CN) |> mutate(PREV_TRE_EXISTS = TRUE),
+      nrsgro_tree |> select(CN) |> mutate(PREV_TRE_EXISTS = TRUE),
       by = join_by(PREV_TRE_CN == CN)
     ) |>
     mutate(
@@ -85,27 +85,27 @@ tar_target(nrs_trees_history, {
   }
   
   # tree_history should have a record for every live tree.
-  stopifnot(nrs_trees_grown |> anti_join(tree_history, by = join_by(CN)) |> nrow() == 0)
+  stopifnot(nrsgro_tree |> anti_join(tree_history, by = join_by(CN)) |> nrow() == 0)
   
   # Paste metadata on to history records to be friendly
-  nrs_trees_history <- tree_history |>
+  nrsgro_tree_history <- tree_history |>
     left_join(
       tree_prev_next, by = join_by(CN)
     ) |>
     left_join(
-      nrs_trees_grown |>
+      nrsgro_tree |>
         select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD, DIA, HT, CCLCD),
       by = join_by(CN)
     ) |>
     left_join(
-      nrs_plots_grown |>
+      nrsgro_plot |>
         select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
     # Add a flag to indicate that a particular tree is marked as ingrowth in a
     # particular year
     left_join(
-      nrs_grm_ingrowth |> select(TRE_CN) |> rename(CN = TRE_CN) |> mutate(ESTAB = TRUE),
+      nrsgro_grm |> select(TRE_CN) |> rename(CN = TRE_CN) |> mutate(ESTAB = TRUE),
       by = join_by(CN)
     ) |>
     mutate(

@@ -1,7 +1,7 @@
-tar_target(nrs_trees_prsc_harvested, {
+tar_target(nrshrv_tree_harvested, {
   fia_trees_filtered(
       fiadb,
-      nrs_plots_prsc_stats_all |> filter(HARVEST == 1),
+      nrshrv_plot_stats_all |> filter(HARVEST == 1),
       filter = \(.data, con) {
         .data |>
           filter(STATUSCD == 3) |>
@@ -9,7 +9,7 @@ tar_target(nrs_trees_prsc_harvested, {
       }
     ) |>
     left_join(
-      nrs_plots_prsc_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
+      nrshrv_plot_stats_all |> select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     )
 })

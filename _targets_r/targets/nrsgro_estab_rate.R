@@ -1,5 +1,5 @@
-tar_target(nrs_estab_rate, {
-  time_mixin <- nrs_plots_stats |>
+tar_target(nrsgro_estab_rate, {
+  time_mixin <- nrsgro_plot_stats |>
     distinct(STATECD, COUNTYCD, PLOT, MEASYEAR) |>
     group_by(STATECD, COUNTYCD, PLOT) |>
     summarize(
@@ -9,8 +9,8 @@ tar_target(nrs_estab_rate, {
     ) |>
     ungroup()
   
-  nrs_trees_spcd |>
-    semi_join(nrs_trees_ingrowth, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR)) |>
+  nrsgro_tree_spcd |>
+    semi_join(nrsgro_tree_grm, by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR)) |>
     left_join(time_mixin, by = join_by(STATECD, COUNTYCD, PLOT)) |>
     group_by(STATECD, COUNTYCD, PLOT, SPCD, FIRST_YEAR, LAST_YEAR) |>
     summarize(

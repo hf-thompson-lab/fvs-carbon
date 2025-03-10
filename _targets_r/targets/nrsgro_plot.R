@@ -1,4 +1,4 @@
-tar_target(nrs_plots_grown, {
+tar_target(nrsgro_plot, {
   # fvs_spcds: FIA SPCD if the species is supported by FVS
   fvs_spcds <- species_crosswalk |>
     filter(!is.na(FVS_SPCD)) |>

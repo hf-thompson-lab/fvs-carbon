@@ -1,5 +1,5 @@
-tar_target(nrs_plots_prsc_stats_all, {
-  fia_plots_filtered(fiadb, nrs_plots_prsc_all, \(.data, con) {
+tar_target(nrshrv_plot_stats_all, {
+  fia_plots_filtered(fiadb, nrshrv_plot_all, \(.data, con) {
       plots <- .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR)
       plots_join_by <- join_by(STATECD, COUNTYCD, PLOT, INVYR)
   

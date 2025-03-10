@@ -1,9 +1,9 @@
-tar_target(nrsgrowonly_projected_vs_measured, {
-  projected_carbon_tmp <- nrsgrowonly_none_carbon |>
+tar_target(nrsgro_projected_vs_measured, {
+  projected_carbon_tmp <- nrsgro_none_carbon |>
     select(StandID, Year, Aboveground_Total_Live) |>
     rename(Projected_Carbon = Aboveground_Total_Live)
   
-  projected_ba_tmp <- nrsgrowonly_none_summary |>
+  projected_ba_tmp <- nrsgro_none_summary |>
     select(StandID, Year, BA, Tpa) |>
     mutate(Projected_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
     rename(Projected_Tpa = Tpa)
@@ -12,11 +12,11 @@ tar_target(nrsgrowonly_projected_vs_measured, {
     full_join(projected_ba_tmp, by = join_by(StandID, Year)) |>
     select(StandID, Year, Projected_Carbon, Projected_BA, Projected_Tpa)
   
-  surveyed_carbon_tmp <- nrsgrowonly_srvy_carbon |>
+  surveyed_carbon_tmp <- nrsgro_srvy_carbon |>
     select(StandID, Year, Aboveground_Total_Live) |>
     rename(Measured_Carbon = Aboveground_Total_Live)
   
-  surveyed_ba_tmp <- nrsgrowonly_srvy_summary |>
+  surveyed_ba_tmp <- nrsgro_srvy_summary |>
     select(StandID, Year, BA, Tpa) |>
     mutate(Measured_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
     rename(Measured_Tpa = Tpa)
@@ -26,13 +26,13 @@ tar_target(nrsgrowonly_projected_vs_measured, {
     filter(!is.na(Measured_Carbon)) |> # other metrics get an extra year
     select(StandID, Year, Measured_Carbon, Measured_BA, Measured_Tpa)
   
-  nrs_plots_grown |>
+  nrsgro_plot |>
     mutate(StandID = sprintf(paste0(
       '%04d',  '%03d',   '%05d'),
       STATECD, COUNTYCD, PLOT
     )) |>
     rename(Year = MEASYEAR) |>
-    left_join(nrs_plots_stats, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+    left_join(nrsgro_plot_stats, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
     select(
       StandID, Year,
       STDAGE, FOREST_TYPE, FOREST_TYPE_GROUP, ECOSUBCD,

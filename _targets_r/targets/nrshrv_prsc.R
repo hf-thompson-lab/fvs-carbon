@@ -1,5 +1,5 @@
 tar_target(
-  nrs_harvest_srvy,
+  nrshrv_prsc,
   {
     # fvs_run wants a table of the form:
     # STAND_ID - arbitrary identifier for a stand
@@ -10,16 +10,57 @@ tar_target(
     # LAST_YEAR - end of the projection
     timestep <- 10 # years; determined by FVSne variant
     
-    plots_for_fvs <- nrs_plots_prsc |>
-      rename(
-        STAND_CN = CN,
-        FIRST_YEAR = MEASYEAR
-      ) |>
+    plots_for_fvs <- nrshrv_plot |>
+      group_by(STATECD, COUNTYCD, PLOT) |>
+      arrange(INVYR) |>
       mutate(
-        LAST_YEAR = FIRST_YEAR,
+        STAND_CN = if_else(row_number() == 1, CN, NA)
+      ) |>
+      summarize(
+        STAND_CN = min(STAND_CN, na.rm = TRUE), # only one will not be NA
+        FIRST_YEAR = min(MEASYEAR, na.rm = TRUE),
+        LAST_YEAR = max(MEASYEAR, na.rm = TRUE),
+        .groups = "keep"
+      ) |>
+      ungroup() |>
+      mutate(
         # STAND_ID won't match FVS_PLOTINIT_PLOT.STAND_ID; that's OK
         STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
       )
+
+    # Harvest is all the trees on the pre-harvest plots,
+    # filtered to those trees that end up being harvested.
+    harvest_for_fvs <- fia_trees_filtered(
+        fiadb,
+        nrshrv_plot_stats |> filter(PRE_HARVEST == 1),
+        filter = \(.data, com) {
+          .data |>
+            select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
+            rename(TREE_CN = CN)
+      }) |>
+      inner_join(
+        nrshrv_tree_harvested |>
+          select(PREV_TRE_CN, STATECD, COUNTYCD, PLOT, SUBP, TREE),
+        by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)
+      ) |>
+      left_join(
+        nrshrv_plot_stats |>
+          filter(HARVEST == 1) |>
+          select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM, HRVYR) |>
+          rename(PRESCRIPTION = INVNUM),
+        by = join_by(STATECD, COUNTYCD, PLOT)
+      ) |>
+      left_join(
+        nrshrv_plot |>
+          select(STATECD, COUNTYCD, PLOT, INVYR, CN) |>
+          rename(STAND_CN = CN),
+        by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+      ) |>
+      select(STAND_CN, TREE_CN, PREV_TRE_CN, HRVYR, PRESCRIPTION)
+
+    # Verify that, in all cases where PREV_TRE_CN is not NULL, we lined
+    # up the harvested tree with the correct pre-harvest tree.
+    stopifnot(harvest_for_fvs |> filter(TREE_CN != PREV_TRE_CN) |> nrow() == 0)
 
     # fvs_run wants establishment in the form:
     # STAND_CN
@@ -57,7 +98,7 @@ tar_target(
     fvs_variant <- "fvsne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
     title <- "NRSHarvest"
-    mgmt_id <- "SRVY"
+    mgmt_id <- "PRSC"
     
     # We communicate with FVS through files. FVSOnline shows a model in which
     # a "project" (the inputs and outputs of a single FVS run) live in a
@@ -76,7 +117,7 @@ tar_target(
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
       #regen = estab_for_fvs,
-      #harvest = harvest_for_fvs,
+      harvest = harvest_for_fvs,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
       random_seed = fvs_randseed

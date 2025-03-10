@@ -1,5 +1,5 @@
 tar_target(
-  nrs_growonly_none,
+  nrsgro_none,
   {
     # fvs_run wants a table of the form:
     # STAND_ID - arbitrary identifier for a stand
@@ -10,7 +10,7 @@ tar_target(
     # LAST_YEAR - end of the projection
     timestep <- 10 # years; determined by FVSne variant
     
-    plots_for_fvs <- nrs_plots_grown |>
+    plots_for_fvs <- nrsgro_plot |>
       group_by(STATECD, COUNTYCD, PLOT) |>
       arrange(INVYR) |>
       mutate(
@@ -33,7 +33,7 @@ tar_target(
     # SPECIES (FVS_SPCD)
     # DENSITY (TPA)
     # HEIGHT (FT)
-    estab_for_fvs <- nrs_estab_rate |>
+    estab_for_fvs <- nrsgro_estab_rate |>
       mutate(
         STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
       ) |>
@@ -45,7 +45,7 @@ tar_target(
       mutate(RATE_PER_ACRE = floor(RATE_PER_ACRE * timestep)) |>
       rename(DENSITY = RATE_PER_ACRE) |>
       left_join(
-        nrs_estab_height |>
+        nrsgro_estab_height |>
           select(STATECD, COUNTYCD, PLOT, SPCD, HT),
         by = join_by(STATECD, COUNTYCD, PLOT, SPCD)
       ) |>
