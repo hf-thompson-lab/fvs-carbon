@@ -774,7 +774,7 @@ tar_target(
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
       #regen = estab_for_fvs,
-      harvest = harvest_for_fvs,
+      #harvest = harvest_for_fvs,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
       random_seed = fvs_randseed
