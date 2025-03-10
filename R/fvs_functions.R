@@ -177,8 +177,9 @@ fvs_fia_input <- function(fiadb, stands, harvest, filename) {
         collect() |>
         select(!PRESCRIPTION) |>
         left_join(
-          table |> select(TREE_CN, PRESCRIPTION),
-          by = join_by(TREE_CN)
+          harvest |> select(TREE_CN, PRESCRIPTION),
+          by = join_by(TREE_CN),
+          copy = TRUE
         ),
       overwrite = TRUE
     )
