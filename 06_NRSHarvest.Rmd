@@ -750,8 +750,7 @@ tar_target(
       regen = NULL, # No regen for survey
       harvest = NULL, # No harvest for survey
       num_partitions = fvs_num_partitions,
-      partition = fvs_partition,
-      random_seed = fvs_randseed
+      partition = fvs_partition
     )
   },
   # iteration = "vector" branches execution for each partition value (see below)
@@ -761,7 +760,7 @@ tar_target(
   # map() distributes each value of its argument to a separate sub-target (branch)
   # so cross(randseed, map(partition)) will run each partition in a separate branch,
   # and each branch will run with each value of randseed
-  pattern = cross(fvs_randseed, map(fvs_partition))
+  pattern = map(fvs_partition)
 )
 ```
 
