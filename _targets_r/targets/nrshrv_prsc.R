@@ -43,20 +43,26 @@ tar_target(
           select(PREV_TRE_CN, STATECD, COUNTYCD, PLOT, SUBP, TREE),
         by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)
       ) |>
+      # Find the harvest year
       left_join(
         nrshrv_plot_stats |>
           filter(HARVEST == 1) |>
-          select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM, HRVYR) |>
-          rename(PRESCRIPTION = INVNUM),
+          select(STATECD, COUNTYCD, PLOT, INVNUM, HRVYR) |>
+          rename(
+            PRESCRIPTION = INVNUM,
+            YEAR = HRVYR
+          ),
         by = join_by(STATECD, COUNTYCD, PLOT)
       ) |>
+      # Find the pre-harvest stand CN
       left_join(
-        nrshrv_plot |>
-          select(STATECD, COUNTYCD, PLOT, INVYR, CN) |>
+        nrshrv_plot_stats |>
+          filter(PRE_HARVEST == 1) |>
+          select(CN, STATECD, COUNTYCD, PLOT) |>
           rename(STAND_CN = CN),
-        by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+        by = join_by(STATECD, COUNTYCD, PLOT)
       ) |>
-      select(STAND_CN, TREE_CN, PREV_TRE_CN, HRVYR, PRESCRIPTION)
+      select(STAND_CN, TREE_CN, PREV_TRE_CN, YEAR, PRESCRIPTION)
 
     # Verify that, in all cases where PREV_TRE_CN is not NULL, we lined
     # up the harvested tree with the correct pre-harvest tree.

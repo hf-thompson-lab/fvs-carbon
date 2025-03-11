@@ -94,17 +94,21 @@ fvs_Estab <- function(rows) {
 }
 
 fvs_ThinPRSC <- function(rows) {
-  thinprsc <- function(row) {
-    year <- row["YEAR"]
-    if ("PERCENT" %in% names(row) & !is.na(row["PERCENT"])) {
-      percent <- row["PERCENT"] # CUTEFF - Efficiency, 0 - 1
-    } else {
-      percent <- 1
+  if (!is.null(rows)) {
+    thinprsc <- function(row) {
+      year <- row["YEAR"]
+      if ("PERCENT" %in% names(row) & !is.na(row["PERCENT"])) {
+        percent <- row["PERCENT"] # CUTEFF - Efficiency, 0 - 1
+      } else {
+        percent <- 1
+      }
+      prsc <- row["PRESCRIPTION"]
+      fvs_kwd("ThinPRSC", year, percent, prsc)
     }
-    prsc <- row["PRESCRIPTION"]
-    fvs_kwd("ThinPRSC", year, percent, prsc)
+    apply(rows |> distinct(PRESCRIPTION, YEAR, .keep_all = TRUE), 1, thinprsc)
+  } else {
+    c()
   }
-  apply(rows, 1, thinprsc)
 }
 
 # Given a dataframe with column STAND_CN, create a SQLite database

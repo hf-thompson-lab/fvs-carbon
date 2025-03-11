@@ -80,7 +80,7 @@ tar_target(nrshrv_plot_stats_all, {
         select(STATECD, COUNTYCD, PLOT, INVNUM, PRE_HARVEST)
       
       .data |>
-        select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR) |>
+        select(CN, STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR) |>
         left_join(cond_stats, by = plots_join_by) |>
         left_join(tree_stats, by = plots_join_by) |>
         left_join(harvest_mixin, by = plots_join_by) |>

@@ -20,39 +20,7 @@ tar_target(
         # STAND_ID won't match FVS_PLOTINIT_PLOT.STAND_ID; that's OK
         STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
       )
-
-    # fvs_run wants establishment in the form:
-    # STAND_CN
-    # SPECIES (FVS_SPCD)
-    # DENSITY (TPA)
-    # HEIGHT (FT)
-    #estab_for_fvs <- nrs_estab_rate |>
-    #  mutate(
-    #    STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
-    #  ) |>
-    #  left_join(
-    #    plots_for_fvs |> select(STAND_ID, STAND_CN),
-    #    by = join_by(STAND_ID)
-    #  ) |>
-    #  select(STAND_CN, STATECD, COUNTYCD, PLOT, SPCD, RATE_PER_ACRE) |>
-    #  mutate(RATE_PER_ACRE = floor(RATE_PER_ACRE * timestep)) |>
-    #  rename(DENSITY = RATE_PER_ACRE) |>
-    #  left_join(
-    #    nrs_estab_height |>
-    #      select(STATECD, COUNTYCD, PLOT, SPCD, HT),
-    #    by = join_by(STATECD, COUNTYCD, PLOT, SPCD)
-    #  ) |>
-    #  mutate(HT = floor(HT)) |>
-    #  rename(HEIGHT = HT) |>
-    #  left_join(
-    #    species_crosswalk |>
-    #      select(SPCD, FVS_SPCD),
-    #    by = join_by(SPCD)
-    #  ) |>
-    #  rename(SPECIES = FVS_SPCD) |>
-    #  filter(!is.na(SPECIES) & !is.na(DENSITY) & !is.na(HEIGHT)) |>
-    #  select(STAND_CN, SPECIES, DENSITY, HEIGHT)
-      
+    
     fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
     fvs_variant <- "fvsne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
@@ -75,8 +43,8 @@ tar_target(
       title = title,
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
-      #regen = estab_for_fvs,
-      #harvest = harvest_for_fvs,
+      regen = NULL, # No regen for survey
+      harvest = NULL, # No harvest for survey
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
       random_seed = fvs_randseed

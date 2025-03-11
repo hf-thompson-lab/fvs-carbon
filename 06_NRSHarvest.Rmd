@@ -170,7 +170,7 @@ fia_plots_filtered(fiadb, nrshrv_plot_all, \(.data, con) {
       select(STATECD, COUNTYCD, PLOT, INVNUM, PRE_HARVEST)
     
     .data |>
-      select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR) |>
+      select(CN, STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR) |>
       left_join(cond_stats, by = plots_join_by) |>
       left_join(tree_stats, by = plots_join_by) |>
       left_join(harvest_mixin, by = plots_join_by) |>
@@ -599,20 +599,26 @@ tar_target(
           select(PREV_TRE_CN, STATECD, COUNTYCD, PLOT, SUBP, TREE),
         by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)
       ) |>
+      # Find the harvest year
       left_join(
         nrshrv_plot_stats |>
           filter(HARVEST == 1) |>
-          select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM, HRVYR) |>
-          rename(PRESCRIPTION = INVNUM),
+          select(STATECD, COUNTYCD, PLOT, INVNUM, HRVYR) |>
+          rename(
+            PRESCRIPTION = INVNUM,
+            YEAR = HRVYR
+          ),
         by = join_by(STATECD, COUNTYCD, PLOT)
       ) |>
+      # Find the pre-harvest stand CN
       left_join(
-        nrshrv_plot |>
-          select(STATECD, COUNTYCD, PLOT, INVYR, CN) |>
+        nrshrv_plot_stats |>
+          filter(PRE_HARVEST == 1) |>
+          select(CN, STATECD, COUNTYCD, PLOT) |>
           rename(STAND_CN = CN),
-        by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+        by = join_by(STATECD, COUNTYCD, PLOT)
       ) |>
-      select(STAND_CN, TREE_CN, PREV_TRE_CN, HRVYR, PRESCRIPTION)
+      select(STAND_CN, TREE_CN, PREV_TRE_CN, YEAR, PRESCRIPTION)
 
     # Verify that, in all cases where PREV_TRE_CN is not NULL, we lined
     # up the harvested tree with the correct pre-harvest tree.
@@ -718,39 +724,7 @@ tar_target(
         # STAND_ID won't match FVS_PLOTINIT_PLOT.STAND_ID; that's OK
         STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
       )
-
-    # fvs_run wants establishment in the form:
-    # STAND_CN
-    # SPECIES (FVS_SPCD)
-    # DENSITY (TPA)
-    # HEIGHT (FT)
-    #estab_for_fvs <- nrs_estab_rate |>
-    #  mutate(
-    #    STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
-    #  ) |>
-    #  left_join(
-    #    plots_for_fvs |> select(STAND_ID, STAND_CN),
-    #    by = join_by(STAND_ID)
-    #  ) |>
-    #  select(STAND_CN, STATECD, COUNTYCD, PLOT, SPCD, RATE_PER_ACRE) |>
-    #  mutate(RATE_PER_ACRE = floor(RATE_PER_ACRE * timestep)) |>
-    #  rename(DENSITY = RATE_PER_ACRE) |>
-    #  left_join(
-    #    nrs_estab_height |>
-    #      select(STATECD, COUNTYCD, PLOT, SPCD, HT),
-    #    by = join_by(STATECD, COUNTYCD, PLOT, SPCD)
-    #  ) |>
-    #  mutate(HT = floor(HT)) |>
-    #  rename(HEIGHT = HT) |>
-    #  left_join(
-    #    species_crosswalk |>
-    #      select(SPCD, FVS_SPCD),
-    #    by = join_by(SPCD)
-    #  ) |>
-    #  rename(SPECIES = FVS_SPCD) |>
-    #  filter(!is.na(SPECIES) & !is.na(DENSITY) & !is.na(HEIGHT)) |>
-    #  select(STAND_CN, SPECIES, DENSITY, HEIGHT)
-      
+    
     fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
     fvs_variant <- "fvsne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
@@ -773,8 +747,8 @@ tar_target(
       title = title,
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
-      #regen = estab_for_fvs,
-      #harvest = harvest_for_fvs,
+      regen = NULL, # No regen for survey
+      harvest = NULL, # No harvest for survey
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
       random_seed = fvs_randseed
