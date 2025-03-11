@@ -96,7 +96,7 @@ fvs_Estab <- function(rows) {
 fvs_ThinPRSC <- function(rows) {
   thinprsc <- function(row) {
     year <- row["YEAR"]
-    if ("PERCENT" %in% names(row)) {
+    if ("PERCENT" %in% names(row) & !is.na(row["PERCENT"])) {
       percent <- row["PERCENT"] # CUTEFF - Efficiency, 0 - 1
     } else {
       percent <- 1
@@ -199,6 +199,7 @@ fvs_keywordfile_section <- function(
     first_year,
     last_year,
     regen,
+    harvest,
     carb_calc,
     random_seed
 ) {
@@ -222,6 +223,14 @@ fvs_keywordfile_section <- function(
     regen <- bind_rows(
       regen |> filter(STAND_CN == stand_cn), # regen for this stand
       regen |> filter(is.na(STAND_CN)) # regen for all stands
+    )
+  }
+  
+  # Set up thinning
+  if (!is.null(harvest) & ("STAND_CN" %in% names(harvest))) {
+    harvest <- bind_rows(
+      harvest |> filter(STAND_CN == stand_cn), # harvest for this stand
+      harvest |> filter(is.na(STAND_CN)) # harvest for all stands
     )
   }
   
@@ -271,6 +280,7 @@ fvs_keywordfile_section <- function(
     fvs_kwd("FuelsOut", 2),
     fvs_kwd("TreeLiDB", 2),
     fvs_kwd("End"), # Database
+    fvs_ThinPRSC(harvest),
     fvs_Estab(regen),
     fvs_kwd("Process")
   )
@@ -286,6 +296,7 @@ fvs_write_keyword_file <- function(
   mgmt_id,
   stands,
   regen,
+  harvest,
   carb_calc,
   random_seed
 ) {
@@ -302,6 +313,7 @@ fvs_write_keyword_file <- function(
         first_year = row["FIRST_YEAR"],
         last_year = row["LAST_YEAR"],
         regen = regen,
+        harvest = harvest,
         carb_calc = carb_calc,
         random_seed = random_seed
       ),
@@ -386,6 +398,7 @@ fvs_run <- function(
     mgmt_id = mgmt_id,
     stands = stands,
     regen = regen,
+    harvest = harvest,
     carb_calc = carb_calc,
     random_seed = random_seed
   )
