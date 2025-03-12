@@ -193,6 +193,7 @@ fia_plots_filtered(fiadb, nrshrv_plot_all, \(.data, con) {
   }) |>
   filter_decode_forest_type_group() |>
   mutate(
+    STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT),
     BALIVE_METRIC = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare"),
     QMD = sqrt(BALIVE / (BA_TREES * (pi / 576))),
     QMD_METRIC = sqrt(BALIVE_METRIC / (BA_TREES * (pi / 40000))),
@@ -579,9 +580,9 @@ tar_target(
         .groups = "keep"
       ) |>
       ungroup() |>
-      mutate(
-        # STAND_ID won't match FVS_PLOTINIT_PLOT.STAND_ID; that's OK
-        STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
+      left_join(
+        nrshrv_plot_stats |> distinct(STATECD, COUNTYCD, PLOT, STAND_ID),
+        by = join_by(STATECD, COUNTYCD, PLOT)
       )
 
     # Harvest is all the trees on the pre-harvest plots,
@@ -715,14 +716,16 @@ tar_target(
     timestep <- 10 # years; determined by FVSne variant
     
     plots_for_fvs <- nrshrv_plot |>
+      left_join(
+        nrshrv_plot_stats |> distinct(STATECD, COUNTYCD, PLOT, STAND_ID),
+        by = join_by(STATECD, COUNTYCD, PLOT)
+      ) |>
       rename(
         STAND_CN = CN,
         FIRST_YEAR = MEASYEAR
       ) |>
       mutate(
-        LAST_YEAR = FIRST_YEAR,
-        # STAND_ID won't match FVS_PLOTINIT_PLOT.STAND_ID; that's OK
-        STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
+        LAST_YEAR = FIRST_YEAR
       )
     
     fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
@@ -781,6 +784,80 @@ average the multiple runs with different random seeds.
 
 ### NRS Harvest PRSC
 
+Did we harvest the right trees?
+
+FVS produces three tree tables:
+
+ - FVS_ATRTList_East: After Treatement Tree List - live trees after treatment
+ - FVS_CutList_East: Trees removed in treatment
+ - FVS_TreeList_East: All trees on the plot
+ 
+ FVS_TreeList_East includes trees from cycle (timestep) 0, which shows the
+ trees as loaded. This precedes any tree records splitting that will confuse
+ the connection between FVS and FIA trees.
+ 
+ Note that a tree in TreeList may be in neither ATRTList nor CutList, e.g.
+ if it died but was not cut during the cycle.
+
+```{r nrshrv_prsc_treelist, eval = FALSE}
+nrshrv_prsc_treelist <- fvs_read_output(nrshrv_prsc, "FVS_TreeList_East") |>
+  group_by(StandID) |>
+  filter(
+    Year == min(Year, na.rm = TRUE),
+    random_seed == min(random_seed, na.rm = TRUE)
+  ) |>
+  ungroup() |>
+  arrange(StandID, Year, PtIndex, TreeIndex)
+
+nrshrv_prsc_atrtlist <- fvs_read_output(nrshrv_prsc, "FVS_ATRTList_East") |>
+  group_by(StandID) |>
+  filter(
+    Year == min(Year, na.rm = TRUE),
+    random_seed == min(random_seed, na.rm = TRUE)
+  ) |>
+  ungroup() |>
+  arrange(StandID, Year, PtIndex, TreeIndex)
+
+nrshrv_prsc_cutlist  <- fvs_read_output(nrshrv_prsc, "FVS_CutList_East") |>
+  group_by(StandID) |>
+  filter(
+    Year == min(Year, na.rm = TRUE),
+    random_seed == min(random_seed, na.rm = TRUE)
+  ) |>
+  ungroup() |>
+  arrange(StandID, Year, PtIndex, TreeIndex)
+```
+
+How many of nrshrv_tree_harvested are in nrshrv_prsc_cutlist?
+
+```{r harvested trees cut, eval = FALSE}
+cut_trees <- nrshrv_prsc_cutlist |>
+  select(StandID, PtIndex, TreeId) |>
+  rename(
+    STAND_ID = StandID,
+    SUBP = PtIndex,
+    TREE = TreeId
+  ) |>
+  mutate(CUT = 1)
+
+stand_id <- nrshrv_plot_stats |>
+  distinct(STATECD, COUNTYCD, PLOT, STAND_ID)
+
+harvested_and_cut <- nrshrv_tree_harvested |>
+  select(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
+  left_join(
+    stand_id,
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
+  mutate(
+    TREE = as.character(TREE)
+  ) |>
+  left_join(
+    cut_trees,
+    by = join_by(STAND_ID, SUBP, TREE)
+  )
+```
+
 Carbon
 
 ```{targets nrshrv_prsc_carbon, tar_simple = TRUE}
@@ -804,12 +881,6 @@ fvs_read_output(nrshrv_prsc, "FVS_Summary2_East") |>
     .groups = 'keep'
   ) |>
   ungroup()
-```
-
-TreeList
-
-```{targets nrshrv_prsc_treelist, tar_simple = TRUE}
-fvs_read_output(nrshrv_prsc, "FVS_TreeList_East")
 ```
 
 ### NRS Harvest SRVY

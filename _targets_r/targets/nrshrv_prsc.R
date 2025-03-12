@@ -23,9 +23,9 @@ tar_target(
         .groups = "keep"
       ) |>
       ungroup() |>
-      mutate(
-        # STAND_ID won't match FVS_PLOTINIT_PLOT.STAND_ID; that's OK
-        STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
+      left_join(
+        nrshrv_plot_stats |> distinct(STATECD, COUNTYCD, PLOT, STAND_ID),
+        by = join_by(STATECD, COUNTYCD, PLOT)
       )
 
     # Harvest is all the trees on the pre-harvest plots,

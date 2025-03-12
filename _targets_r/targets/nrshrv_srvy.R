@@ -11,14 +11,16 @@ tar_target(
     timestep <- 10 # years; determined by FVSne variant
     
     plots_for_fvs <- nrshrv_plot |>
+      left_join(
+        nrshrv_plot_stats |> distinct(STATECD, COUNTYCD, PLOT, STAND_ID),
+        by = join_by(STATECD, COUNTYCD, PLOT)
+      ) |>
       rename(
         STAND_CN = CN,
         FIRST_YEAR = MEASYEAR
       ) |>
       mutate(
-        LAST_YEAR = FIRST_YEAR,
-        # STAND_ID won't match FVS_PLOTINIT_PLOT.STAND_ID; that's OK
-        STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
+        LAST_YEAR = FIRST_YEAR
       )
     
     fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file

@@ -103,6 +103,7 @@ tar_target(nrshrv_plot_stats_all, {
     }) |>
     filter_decode_forest_type_group() |>
     mutate(
+      STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT),
       BALIVE_METRIC = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare"),
       QMD = sqrt(BALIVE / (BA_TREES * (pi / 576))),
       QMD_METRIC = sqrt(BALIVE_METRIC / (BA_TREES * (pi / 40000))),
