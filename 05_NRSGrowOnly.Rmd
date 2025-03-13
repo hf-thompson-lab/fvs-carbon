@@ -147,7 +147,7 @@ fvsne_states_map <- fvsne_states |>
   distinct(STATE_NAME) |>
   rename(region = STATE_NAME) |>
   _$region |>
-  map_data('state', region = _)
+  map_data("state", region = _)
 
 plot_locations <- nrsgro_plot |>
   filter(!is.na(LAT) & !is.na(LON)) |>
@@ -155,14 +155,15 @@ plot_locations <- nrsgro_plot |>
   filter(row_number() == 1) |>
   ungroup() |>
   rename(lat = LAT, long = LON) |>
-  mutate(group = sprintf('%02d%03d%05d', STATECD, COUNTYCD, PLOT))
+  mutate(group = sprintf("%02d%03d%05d", STATECD, COUNTYCD, PLOT))
 
 ggplot(fvsne_states_map, aes(long, lat, group = group)) +
-  geom_polygon(fill = "white", color = "black") + 
+  geom_polygon(fill = "white", color = "black") +
   geom_point(data = plot_locations, color = alpha("blue", alpha = 0.5)) +
   coord_sf(crs = 4326) +
   annotation_scale(location = "br") +
-  annotation_north_arrow(location = "tl",
+  annotation_north_arrow(
+    location = "tl",
     width = unit(1, "cm"),
     pad_x = unit(0.75, "cm"),
     pad_y = unit(0.5, "cm")
@@ -273,14 +274,15 @@ plot_location_tmp <- nrsgro_plot |>
   ungroup()
 
 ggplot(fvsne_states_map, aes(long, lat, group = group)) +
-  geom_polygon(fill = "white", color = "black") + 
+  geom_polygon(fill = "white", color = "black") +
   geom_point(
     plot_location_tmp,
     mapping = aes(long, lat, group = group, color = fct_reorder(group_name, desc(n)))
   ) +
   coord_sf(crs = 4326) +
   annotation_scale(location = "br") +
-  annotation_north_arrow(location = "tl",
+  annotation_north_arrow(
+    location = "tl",
     width = unit(1, "cm"),
     pad_x = unit(0.75, "cm"),
     pad_y = unit(0.5, "cm")
@@ -297,12 +299,12 @@ Look at BA over time; first, by stand age, then as change over calendar time.
 
 ```{r balive_vs_stdage, eval = FALSE}
 ggplot(
-    data = nrsgro_plot_stats |>
-      filter(!is.na(STDAGE)),
-    mapping = aes(x = STDAGE, y = BALIVE_METRIC)
-  ) +
+  data = nrsgro_plot_stats |>
+    filter(!is.na(STDAGE)),
+  mapping = aes(x = STDAGE, y = BALIVE_METRIC)
+) +
   geom_bin2d() +
-#  facet_wrap(~FOREST_TYPE_GROUP) +
+  #  facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   ylab(bquote("Measured BA " ~ (m^2 %.% ha^-1))) +
   xlab(bquote("Stand Age (years)")) +
@@ -313,17 +315,17 @@ Look at change in BA (BAI) by stand age
 
 ```{r balive_delta_vs_years, eval = FALSE}
 ggplot(
-    nrsgro_plot_stats |>
-      group_by(STATECD, COUNTYCD, PLOT) |>
-      filter(MEASYEAR == max(MEASYEAR)) |>
-      ungroup(),
-    aes(x = YEARS, y = BALIVE_DELTA)
-  ) +
+  nrsgro_plot_stats |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    filter(MEASYEAR == max(MEASYEAR)) |>
+    ungroup(),
+  aes(x = YEARS, y = BALIVE_DELTA)
+) +
   geom_bin2d() +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  #scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
-  #facet_wrap(~FOREST_TYPE_GROUP) +
-  ylab(bquote("Measured BA Delta " ~(m^2 %.% ha^-1))) +
+  # scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
+  # facet_wrap(~FOREST_TYPE_GROUP) +
+  ylab(bquote("Measured BA Delta " ~ (m^2 %.% ha^-1))) +
   xlab("Projection Years") +
   ggtitle("Grow-Only Stands Measured BA Delta vs. Projection Years")
 ```
@@ -349,7 +351,7 @@ seen_types |>
   geom_col() +
   ggtitle("Total Carbon by Forest Type Group") +
   ylab("Forest Type") +
-  xlab(bquote("Carbon " ~(`Mg C`)))
+  xlab(bquote("Carbon " ~ (`Mg C`)))
 ```
 
 ## Regeneration, Ingrowth, and Establishment
@@ -439,7 +441,8 @@ print(paste0(
   nrow(nrsgro_grm) /
     nrow(nrsgro_plot) /
     (max(nrsgro_grm_with_measyear$MEASYEAR) - min(nrsgro_grm_with_measyear$MEASYEAR)),
-  " ingrown trees / plot / year"))
+  " ingrown trees / plot / year"
+))
 print(paste0("Ingrown trees over 3\" DBH: ", nrsgro_grm |> filter(DIA_END > 3) |> nrow()))
 ```
 
@@ -470,18 +473,18 @@ nrsgro_grm_with_measyear |>
   ) |>
   select(TRE_CN, `> 3" DBH`, `≤ 3" DBH`) |>
   melt(
-    id.vars = c('TRE_CN'),
-    variable.name = 'Diameter at Ingrowth',
-    value.name = 'Year'
+    id.vars = c("TRE_CN"),
+    variable.name = "Diameter at Ingrowth",
+    value.name = "Year"
   ) |>
   filter(!is.na(Year)) |>
   ggplot(aes(Year, fill = `Diameter at Ingrowth`)) +
   geom_histogram(binwidth = 1) +
   scale_fill_manual(values = c("red", "blue")) +
   theme_bw() +
-  ggtitle('Ingrown trees on NRS grow-only plots') +
-  xlab('Year') +
-  ylab('Count')
+  ggtitle("Ingrown trees on NRS grow-only plots") +
+  xlab("Year") +
+  ylab("Count")
 ```
 
 ```{r nrsgro_grm_boxplot, eval = FALSE}
@@ -491,8 +494,8 @@ nrsgro_grm_with_measyear |>
   geom_histogram(binwidth = 1) +
   scale_y_continuous(transform = "log10") +
   theme_bw() +
-  xlab('Diameter at Ingrowth (inches)') +
-  geom_vline(xintercept = 3, color = 'red')
+  xlab("Diameter at Ingrowth (inches)") +
+  geom_vline(xintercept = 3, color = "red")
 ```
 
 There are ~50,000 trees that ingrow over the 25 years, so about 2 trees per
@@ -644,7 +647,9 @@ Walk the tree history to see what diameter we can get to.
 
 How many trees ingrow with DBH>3?
 ```{r dbh_gt_3, eval = FALSE}
-nrsgro_tree_grm |> filter(DIA > 3) |> nrow()
+nrsgro_tree_grm |>
+  filter(DIA > 3) |>
+  nrow()
 ```
 
 How many of those are traceable back to when they had DBH <= 3?
@@ -816,9 +821,8 @@ nrsgro_tree_growth |>
   theme_bw() +
   scale_fill_discrete(breaks = c("2.5%", "1%", "0%")) +
   ggtitle("Measured Annual Growth by Species Group") +
-  xlab(bquote("Annual Growth " ~(inch %.% yr^-1))) +
+  xlab(bquote("Annual Growth " ~ (inch %.% yr^-1))) +
   ylab("Species Group")
-
 ```
 
 #### Estimated Growth Rate
@@ -865,7 +869,7 @@ tree_growth_dom <- tree_growth_with_outliers |>
     DIA_DELTA_DOM = mean(DIA_DELTA, na.rm = TRUE),
     DIA_DELTA_DOM_ONE = mean(DIA_DELTA_ONE, na.rm = TRUE),
     DIA_DELTA_DOM_TWO = mean(DIA_DELTA_TWO, na.rm = TRUE),
-    .groups = 'keep'
+    .groups = "keep"
   ) |>
   ungroup() |>
   mutate(
@@ -876,7 +880,7 @@ tree_growth_dom <- tree_growth_with_outliers |>
   select(
     STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD,
     DIA_DELTA_DOM, DIA_DELTA_DOM_ONE, DIA_DELTA_DOM_TWO
-    )
+  )
 
 tree_growth_spcd <- tree_growth_with_outliers |>
   group_by(STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD) |>
@@ -888,7 +892,7 @@ tree_growth_spcd <- tree_growth_with_outliers |>
     DIA_DELTA_SPCD = mean(DIA_DELTA, na.rm = TRUE),
     DIA_DELTA_SPCD_ONE = mean(DIA_DELTA_ONE, na.rm = TRUE),
     DIA_DELTA_SPCD_TWO = mean(DIA_DELTA_TWO, na.rm = TRUE),
-    .groups = 'keep'
+    .groups = "keep"
   ) |>
   ungroup() |>
   mutate(
@@ -911,7 +915,7 @@ tree_growth_spgrpcd <- tree_growth_with_outliers |>
     DIA_DELTA_SPGRPCD = mean(DIA_DELTA, na.rm = TRUE),
     DIA_DELTA_SPGRPCD_ONE = mean(DIA_DELTA_ONE, na.rm = TRUE),
     DIA_DELTA_SPGRPCD_TWO = mean(DIA_DELTA_TWO, na.rm = TRUE),
-    .groups = 'keep'
+    .groups = "keep"
   ) |>
   ungroup() |>
   mutate(
@@ -938,7 +942,7 @@ tree_growth_multiyear <- tree_growth_with_outliers |>
     ANN_DIA_DELTA_MULTIYEAR = mean(ANN_DIA_DELTA, na.rm = TRUE),
     ANN_DIA_DELTA_MULTIYEAR_ONE = mean(ANN_DIA_DELTA_ONE, na.rm = TRUE),
     ANN_DIA_DELTA_MULTIYEAR_TWO = mean(ANN_DIA_DELTA_TWO, na.rm = TRUE),
-    .groups = 'keep'
+    .groups = "keep"
   ) |>
   ungroup() |>
   mutate(
@@ -1001,17 +1005,16 @@ tree_growth_rate |>
   melt(id.vars = c("GROUP_NAME"), value.name = "ANN_DIA_DELTA", variable.name = "Outliers Removed") |>
   filter(!is.na(ANN_DIA_DELTA)) |>
   ggplot(
-      aes(ANN_DIA_DELTA, fct_rev(fct_infreq(GROUP_NAME)), fill = `Outliers Removed`)
-    ) +
-    geom_boxplot() +
-    geom_vline(xintercept = 0, linetype = "dashed") +
-    scale_fill_discrete(breaks = c("2.5%", "1%", "0%")) +
-    coord_cartesian(xlim = c(-1, 1)) +
-    theme_bw() +
-    ggtitle("Measured Annual Diameter Growth of Ingrown Trees") +
-    xlab(bquote("Annual Diameter Growth " ~(inch %.% yr^-1))) +
-    ylab("Species Group")
-
+    aes(ANN_DIA_DELTA, fct_rev(fct_infreq(GROUP_NAME)), fill = `Outliers Removed`)
+  ) +
+  geom_boxplot() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  scale_fill_discrete(breaks = c("2.5%", "1%", "0%")) +
+  coord_cartesian(xlim = c(-1, 1)) +
+  theme_bw() +
+  ggtitle("Measured Annual Diameter Growth of Ingrown Trees") +
+  xlab(bquote("Annual Diameter Growth " ~ (inch %.% yr^-1))) +
+  ylab("Species Group")
 ```
 
 ```{r tree_growth_rate_boxplot_metric, eval = FALSE}
@@ -1027,17 +1030,16 @@ tree_growth_rate |>
   filter(!is.na(ANN_DIA_DELTA)) |>
   mutate(ANN_DIA_DELTA = conv_unit(ANN_DIA_DELTA, "inch", "meter") * pi * 2) |>
   ggplot(
-      aes(ANN_DIA_DELTA, fct_rev(fct_infreq(GROUP_NAME)), fill = `Outliers Removed`)
-    ) +
-    geom_boxplot() +
-    geom_vline(xintercept = 0, linetype = "dashed") +
-    scale_fill_discrete(breaks = c("2.5%", "1%", "0%")) +
-    coord_cartesian(xlim = c(-0.2, 0.2)) +
-    theme_bw() +
-    ggtitle("Measured Basal Area Increment of Ingrown Trees") +
-    xlab(bquote("Basal Area Increment " ~(m^2 %.% yr^-1))) +
-    ylab("Species Group")
-
+    aes(ANN_DIA_DELTA, fct_rev(fct_infreq(GROUP_NAME)), fill = `Outliers Removed`)
+  ) +
+  geom_boxplot() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  scale_fill_discrete(breaks = c("2.5%", "1%", "0%")) +
+  coord_cartesian(xlim = c(-0.2, 0.2)) +
+  theme_bw() +
+  ggtitle("Measured Basal Area Increment of Ingrown Trees") +
+  xlab(bquote("Basal Area Increment " ~ (m^2 %.% yr^-1))) +
+  ylab("Species Group")
 ```
 
 #### One-Shot Back-Projection
@@ -1076,7 +1078,7 @@ nrsgro_tree_growth |>
     HIT = sum(abs(DIA_ERR) < 0.1, na.rm = TRUE) / COUNT,
     HIT_ONE = sum(abs(DIA_ERR_ONE) < 0.1, na.rm = TRUE) / COUNT,
     HIT_TWO = sum(abs(DIA_ERR_TWO) < 0.1, na.rm = TRUE) / COUNT,
-    .groups = 'keep'
+    .groups = "keep"
   ) |>
   ungroup() |>
   pivot_longer(everything()) |>
@@ -1147,7 +1149,7 @@ while (nrow(prev_tre_cns) > 0) {
   tmp_trees <- nrsgro_tree_growth |>
     semi_join(prev_tre_cns, by = join_by(CN == PREV_TRE_CN)) |>
     select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR, SPCD, PREV_TRE_CN, DIA) |>
-        # Join on growth rates
+    # Join on growth rates
     left_join(
       tree_growth_rate |>
         select(
@@ -1189,7 +1191,8 @@ while (nrow(prev_tre_cns) > 0) {
   num_duplicate_cns <- manual_back_projection |>
     group_by(CN) |>
     filter(n() > 1) |>
-    ungroup() |> nrow()
+    ungroup() |>
+    nrow()
   stopifnot(num_duplicate_cns == 0)
   # The next set of prev_tre_cns is:
   prev_tre_cns <- manual_back_projection |>
@@ -1216,12 +1219,11 @@ manual_back_projection |>
     HIT = sum(abs(DIA_ERR) < 0.1, na.rm = TRUE) / COUNT,
     HIT_ONE = sum(abs(DIA_ERR_ONE) < 0.1, na.rm = TRUE) / COUNT,
     HIT_TWO = sum(abs(DIA_ERR_TWO) < 0.1, na.rm = TRUE) / COUNT,
-    .groups = 'keep'
+    .groups = "keep"
   ) |>
   ungroup() |>
   pivot_longer(everything()) |>
   knitr::kable()
-
 ```
 
 Apply Back-Projection
@@ -1243,7 +1245,6 @@ projected_annual_growth <- nrsgro_tree_growth |>
       select(CN, DIA_EST, DIA_EST_ONE, DIA_EST_TWO),
     by = join_by(FIRST_TRE_CN == CN)
   ) |>
-
   # Be metric
   mutate(
     DIA = conv_unit(DIA, "in", "cm"),
@@ -1252,7 +1253,6 @@ projected_annual_growth <- nrsgro_tree_growth |>
     DIA_EST_ONE = conv_unit(DIA_EST_ONE, "in", "cm"),
     DIA_EST_TWO = conv_unit(DIA_EST_TWO, "in", "cm"),
   ) |>
-
   mutate(
     ANN_DIA = (DIA - FIRST_DIA) / (MEASYEAR - FIRST_MEASYEAR),
     DIA_ERR = (FIRST_DIA - DIA_EST),
@@ -1291,10 +1291,10 @@ ggplot(
   geom_boxplot(outlier.size = 0.1) +
   geom_vline(xintercept = 0, linetype = "dashed") +
   scale_fill_discrete(breaks = rev(levels(projected_annual_growth$Series))) +
-  #coord_cartesian(xlim = c(-0.2, 0.2)) +
+  # coord_cartesian(xlim = c(-0.2, 0.2)) +
   theme_bw() +
   ggtitle("Projected vs. Measured BAI of Ingrown Trees") +
-  xlab(bquote("Basal Area Increment " ~(m^2 %.% yr^-1))) +
+  xlab(bquote("Basal Area Increment " ~ (m^2 %.% yr^-1))) +
   ylab("Species Group")
 ```
 
@@ -1409,7 +1409,7 @@ tree_ingrown_three |>
     HIT = sum(FIRST_DIA_EST <= 3, na.rm = TRUE) / COUNT,
     HIT_ONE = sum(FIRST_DIA_EST_ONE <= 3, na.rm = TRUE) / COUNT,
     HIT_TWO = sum(FIRST_DIA_EST_TWO <= 3, na.rm = TRUE) / COUNT,
-    .groups = 'keep'
+    .groups = "keep"
   ) |>
   ungroup() |>
   pivot_longer(everything()) |>
@@ -1420,21 +1420,23 @@ How'd we do?
 
 ```{r plot_tree_ingrown_three, eval = FALSE}
 tree_ingrown_three_validation <- tree_ingrown_three |>
-  select(CN, MEASYEAR, SPCD, # STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR, SPCD,
-         FIRST_MEASYEAR, FIRST_DIA_EST, FIRST_DIA_EST_ONE, FIRST_DIA_EST_TWO) |>
+  select(
+    CN, MEASYEAR, SPCD, # STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR, SPCD,
+    FIRST_MEASYEAR, FIRST_DIA_EST, FIRST_DIA_EST_ONE, FIRST_DIA_EST_TWO
+  ) |>
   filter(FIRST_MEASYEAR != MEASYEAR) |>
-  #head(1000) |>
-#  left_join(
-#    tree_ingrown |> select(STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR, DIA),
-#    by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, FIRST_MEASYEAR == MEASYEAR)
-#  ) |>
+  # head(1000) |>
+  #  left_join(
+  #    tree_ingrown |> select(STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR, DIA),
+  #    by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE, FIRST_MEASYEAR == MEASYEAR)
+  #  ) |>
   left_join(species_crosswalk, by = join_by(SPCD)) |>
   group_by(JENKINS_SPGRP_NAME) |>
   mutate(GROUP_NAME = paste0(JENKINS_SPGRP_NAME, ", n=", n())) |>
   ungroup() |>
   select(CN, GROUP_NAME, FIRST_DIA_EST, FIRST_DIA_EST_ONE, FIRST_DIA_EST_TWO) |>
   rename(
-#    `Measured` = DIA,
+    #    `Measured` = DIA,
     `Estimated` = FIRST_DIA_EST,
     `Est - 1%` = FIRST_DIA_EST_ONE,
     `Est - 2.5%` = FIRST_DIA_EST_TWO
@@ -1455,7 +1457,7 @@ ggplot(
   scale_fill_discrete(breaks = rev(levels(tree_ingrown_three_validation$Series))) +
   theme_bw() +
   ggtitle("Smallest Projected Diameter in Simulation Window") +
-  xlab(bquote("Diameter " ~(inch))) +
+  xlab(bquote("Diameter " ~ (inch))) +
   ylab("Species Group")
 ```
 
@@ -1639,7 +1641,7 @@ fvsne_unhandled_trees <- nrsgro_tree_spcd |>
   arrange(desc(MEASYEAR)) |>
   filter(row_number() == 1) |>
   ungroup() |>
-  mutate(BA = conv_multiunit(6 * pi * DIA ^ 2, "ft2 / acre", "m2 / hectare")) |>
+  mutate(BA = conv_multiunit(6 * pi * DIA^2, "ft2 / acre", "m2 / hectare")) |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   mutate(TOTAL_STAND_BA = sum(BA, na.rm = TRUE)) |>
   ungroup() |>
@@ -1650,15 +1652,15 @@ fvsne_unhandled_trees <- nrsgro_tree_spcd |>
     BA = sum(BA, na.rm = TRUE),
     TOTAL_STAND_BA = max(TOTAL_STAND_BA, na.rm = TRUE),
     BA_FRAC = sum(BA_FRAC, na.rm = TRUE),
-    .groups = 'keep'
+    .groups = "keep"
   ) |>
   ungroup() |>
-#  group_by(SPCD) |>
-#  summarize(
-#    TREE_COUNT = n(),
-#    BA_FRAC = max(BA_FRAC, na.rm = TRUE)
-#  ) |>
-#  ungroup() |>
+  #  group_by(SPCD) |>
+  #  summarize(
+  #    TREE_COUNT = n(),
+  #    BA_FRAC = max(BA_FRAC, na.rm = TRUE)
+  #  ) |>
+  #  ungroup() |>
   filter(BA_FRAC > 0) |>
   left_join(plot_count_mixin, by = join_by(SPCD)) |>
   left_join(species_crosswalk, by = join_by(SPCD)) |>
@@ -1688,8 +1690,6 @@ fvsne_unhandled_trees |>
   ggtitle("Fraction of plot BA in species not handled by FVSne") +
   xlab("Species") +
   ylab("Fraction of plot BA")
-  
-  
 ```
 
 Let's find out how many stems of each (corrected) species ingrow per year.
@@ -1748,11 +1748,11 @@ nrsgro_estab_rate |>
   ggplot(aes(x = QMD, y = RATE_PER_HECTARE)) +
   geom_bin2d(bins = 50) +
   scale_fill_continuous(name = "Number of Plots", transform = "log10", limits = c(1, 1000)) +
-  #facet_wrap(~GROUP_NAME) +
+  # facet_wrap(~GROUP_NAME) +
   theme_bw() +
-  #xlab(bquote("Basal Area" ~(m^2 %.% ha^-1))) +
+  # xlab(bquote("Basal Area" ~(m^2 %.% ha^-1))) +
   xlab(bquote("QMD (cm)")) +
-  ylab(bquote("Ingrowth Rate" ~(stems %.% ha^-1 %.% yr^-1))) +
+  ylab(bquote("Ingrowth Rate" ~ (stems %.% ha^-1 %.% yr^-1))) +
   ggtitle("Per-Plot Ingrowth Stem Rate")
 ```
 
@@ -1765,20 +1765,19 @@ nrsgro_estab_rate |>
   scale_fill_continuous(name = "Number of Plots", transform = "log10", limits = c(1, 1000)) +
   facet_wrap(~GROUP_NAME) +
   theme_bw() +
-  #xlab(bquote("Basal Area" ~(m^2 %.% ha^-1))) +
+  # xlab(bquote("Basal Area" ~(m^2 %.% ha^-1))) +
   xlab(bquote("QMD (cm)")) +
-  ylab(bquote("Ingrowth Rate" ~(stems %.% ha^-1 %.% yr^-1))) +
+  ylab(bquote("Ingrowth Rate" ~ (stems %.% ha^-1 %.% yr^-1))) +
   ggtitle("Per-Plot Ingrowth Stem Rate")
-
 ```
 
 Ok, who are these outliers?
 ```{r stem rate outliers, eval = FALSE}
 knitr::kable(
   nrsgro_estab_rate |>
-  arrange(desc(RATE)) |>
-  head(10) |>
-  left_join(stand_stats_mixin, by = join_by(STATECD, COUNTYCD, PLOT)) 
+    arrange(desc(RATE)) |>
+    head(10) |>
+    left_join(stand_stats_mixin, by = join_by(STATECD, COUNTYCD, PLOT))
 )
 ```
 
@@ -1921,10 +1920,10 @@ nrsgro_estab_height |>
   mutate(N = n()) |>
   ungroup() |>
   ggplot(aes(x = reorder(JENKINS_SPGRP_NAME, desc(N)), fill = HT_ORIGIN)) +
-  geom_bar(width = 1) + 
+  geom_bar(width = 1) +
   ylab(NULL) +
   xlab(NULL) +
-#  scale_x_discrete(labels = NULL) +
+  #  scale_x_discrete(labels = NULL) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = -15, hjust = 0, vjust = 1)) +
   scale_fill_brewer(name = "Origin", palette = "Set1") +
@@ -1974,7 +1973,7 @@ ht_ne_mixin <- trees_for_ht_estimation |>
 ht_min_mixin <- trees_for_ht_estimation |>
   group_by(SPCD) |>
   arrange(abs(DIA - 3)) |> # closest to 3" first
-  filter(row_number() <= 9) |> 
+  filter(row_number() <= 9) |>
   mutate(HT_MIN = HT * 3 / DIA) |>
   ungroup() |>
   select(STATECD, COUNTYCD, PLOT, SUBP, TREE, HT_MIN)
@@ -2005,16 +2004,16 @@ nrsgro_estab_height_whence |>
 ```
 
 ```{r plot estab ht vs dia, eval = FALSE}
-bins = (max(nrsgro_estab_height_whence$DIA) - min(nrsgro_estab_height_whence$DIA)) * 10
+bins <- (max(nrsgro_estab_height_whence$DIA) - min(nrsgro_estab_height_whence$DIA)) * 10
 nrsgro_estab_height_whence |>
   ggplot(aes(x = DIA, y = HT)) +
   geom_bin_2d(bins = bins) +
   geom_vline(xintercept = 3, color = "red", linetype = "dashed") +
   scale_fill_continuous(name = "Number of Trees", transform = "log10") +
   facet_wrap(~JENKINS_SPGRP_NAME) +
-  #scale_color_discrete(
+  # scale_color_discrete(
   #  name = "Species Group"
-  #) +
+  # ) +
   theme_bw() +
   xlab("Measured Diameter (inches)") +
   ylab("Estimated Height at 3\" DBH (feet)") +
@@ -2025,7 +2024,7 @@ Are we missing height for any ingrowth?
 ```{r validate height projection, eval = FALSE}
 stopifnot(
   nrsgro_estab_rate |>
-    distinct(STATECD, COUNTYCD, PLOT, SPCD) |> 
+    distinct(STATECD, COUNTYCD, PLOT, SPCD) |>
     left_join(nrsgro_estab_height, by = join_by(STATECD, COUNTYCD, PLOT, SPCD)) |>
     # Remove the one shellbark hickory tree that doesn't get a height
     filter(SPCD != 405) |>
@@ -2589,7 +2588,7 @@ for (partition in 1:num_partitions) {
   fvs_warnings <- bind_rows(
     fvs_warnings,
     read_lines(filename) |>
-      as.data.frame(nm="text") |>
+      as.data.frame(nm = "text") |>
       # Filter to just initial STAND ID and WARNING lines
       filter(
         grepl("^ +STAND ID=", text) |
@@ -2648,7 +2647,7 @@ RECORDS READ=4884 likely means the number of lines in the keyword file
 
 Which partition is it in?
 ```{r keyword context partition, eval = FALSE}
-as.numeric(sub("^([^_]+)_.*$", "\\1",debug_stand_id)) %% num_partitions
+as.numeric(sub("^([^_]+)_.*$", "\\1", debug_stand_id)) %% num_partitions
 ```
 
 so the 26th partition, which is partition 27.
@@ -2733,7 +2732,7 @@ fvs_warnings |>
 ```
 
 ```{r keyword ignored partition, eval = FALSE}
-as.numeric(sub("^([^_]+)_.*$", "\\1",debug_stand_id)) %% num_partitions
+as.numeric(sub("^([^_]+)_.*$", "\\1", debug_stand_id)) %% num_partitions
 ```
 
 The relevant section of the output is:
@@ -2825,7 +2824,7 @@ plot <- debug_stand[["PLOT"]]
 invyr <- debug_stand[["FIRSTYEAR"]]
 spcd <- debug_species[["SPCD"]]
 
-fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
+fia <- DBI::dbConnect(RSQLite::SQLite(), "data/raw/SQLite_FIADB_ENTIRE.db")
 debug_trees <- tbl(fia, "FVS_TreeInit_Plot") |>
   filter(
     STAND_CN == standcn &
@@ -2940,7 +2939,7 @@ matched_carbon_tmp <- nrsgro_plot |>
   ) |>
   left_join(
     nrsgro_none_carbon |>
-      select(StandID, Year, Aboveground_Total_Live) |> 
+      select(StandID, Year, Aboveground_Total_Live) |>
       rename(
         STAND_ID = StandID,
         FIRST_YEAR = Year,
@@ -2955,15 +2954,15 @@ matched_carbon_tmp <- nrsgro_plot |>
         STAND_ID = StandID,
         LAST_YEAR = Year,
         Ending_Carbon = Aboveground_Total_Live
-        ),
+      ),
     by = join_by(STAND_ID, LAST_YEAR)
   )
 missing_start <- matched_carbon_tmp |>
-  filter(is.na(Starting_Carbon)) |> 
+  filter(is.na(Starting_Carbon)) |>
   nrow()
 print(missing_start)
 missing_end <- matched_carbon_tmp |>
-  filter(is.na(Ending_Carbon)) |> 
+  filter(is.na(Ending_Carbon)) |>
   nrow()
 print(missing_end)
 stopifnot(missing_start == 0)
@@ -2983,23 +2982,25 @@ TODO: bring back annual, it's not currently processed
 decadal_carbon_tmp <- nrsgro_none_carbon |>
   rename(Decadal_Carbon = Aboveground_Total_Live) |>
   mutate(STAND_ID = paste0(
-     substring(StandID, 1, 2),
-     substring(StandID, 5, 12)
+    substring(StandID, 1, 2),
+    substring(StandID, 5, 12)
   )) |>
   select(STAND_ID, Year, Decadal_Carbon)
 
 annual_carbon_tmp <- FVS_Carbon_ANNL |>
   rename(Annual_Carbon = Aboveground_Total_Live) |>
   mutate(STAND_ID = paste0(
-     substring(StandID, 1, 2),
-     substring(StandID, 5, 12)
+    substring(StandID, 1, 2),
+    substring(StandID, 5, 12)
   )) |>
   select(STAND_ID, Year, Annual_Carbon)
 
 annual_vs_decadal <- stand_stats |>
   filter(DESIGNCD == 1) |>
-  mutate(STAND_ID = sprintf(paste0(
-    '%02d',  '%03d',   '%05d'),
+  mutate(STAND_ID = sprintf(
+    paste0(
+      "%02d", "%03d", "%05d"
+    ),
     STATECD, COUNTYCD, PLOT
   )) |>
   rename(Year = MEASYEAR) |>
@@ -3041,14 +3042,14 @@ remove(
 
 ```{r plot_decadal_vs_annual, eval = FALSE}
 ggplot(
-    annual_vs_decadal |>
-      filter(Projection_Years > 0),
-    aes(x = Decadal_Carbon_Flux, y = Annual_Carbon_Flux)
-  ) +
+  annual_vs_decadal |>
+    filter(Projection_Years > 0),
+  aes(x = Decadal_Carbon_Flux, y = Annual_Carbon_Flux)
+) +
   geom_bin2d(binwidth = 0.25) +
   scale_fill_continuous(name = "Number of Plots", transform = "log10") +
   geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") +
-  #facet_wrap(~FOREST_TYPE_GROUP) +
+  # facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   ggtitle(bquote("Annual Carbon Flux for 1- vs. 10-year Timestep")) +
   coord_cartesian(xlim = c(-1, 8), ylim = c(-1, 8)) +
@@ -3064,16 +3065,15 @@ annual_vs_decadal |>
   geom_histogram(bins = 50) +
   geom_vline(xintercept = 1, linetype = "dashed", color = "red") +
   scale_x_continuous(transform = "log10", breaks = c(1, 2, 3, 5, 10, 20, 30, 50)) +
-#  facet_wrap(~FOREST_TYPE_GROUP) +
+  #  facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   ggtitle("Ratio of Projected Carbon using 10 vs. 1 year timestep") +
   ylab("Number of Plots") +
   xlab("Ratio (10-Year / 1-Year)")
-
 ```
 
 ```{r carbon_flux_stats, eval = FALSE}
-summary(annual_vs_decadal[,c("Annual_Carbon_Flux", "Decadal_Carbon_Flux")])
+summary(annual_vs_decadal[, c("Annual_Carbon_Flux", "Decadal_Carbon_Flux")])
 ```
 
 ## Projected vs. Measured
@@ -3161,15 +3161,15 @@ rather than shrank.
 
 ```{r sanity-check-plots-grew, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
-    aes(x = Projection_Years, y = Measured_BA_Delta)
-  ) +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  aes(x = Projection_Years, y = Measured_BA_Delta)
+) +
   geom_bin2d(bins = 30) +
   geom_abline(intercept = 0, slope = 0, linetype = "dashed", color = "red") +
   scale_fill_continuous(name = "Number of Plots") +
   theme_bw() +
-  #scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
-  #facet_wrap(~FOREST_TYPE_GROUP) +
+  # scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
+  # facet_wrap(~FOREST_TYPE_GROUP) +
   ggtitle("Grow-Only Stands\nChange in FVS Measured BA (m² / ha) vs. Projection Years")
 ```
 
@@ -3197,32 +3197,32 @@ nrsgro_projected_vs_measured |>
 
 ```{r projected_carbon_vs_measured_carbon_with_trendline, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
-    aes(x = Measured_Carbon, y = Projected_Carbon)
-  ) +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  aes(x = Measured_Carbon, y = Projected_Carbon)
+) +
   geom_bin2d(bins = 50) +
   geom_abline(intercept = 0, slope = 1, linewidth = 0.5, linetype = "dashed", color = "lightgray") +
   geom_smooth(
     method = lm,
-    formula = 'y ~ x',
-    color = 'darkblue',
-    linetype = 'dashed',
+    formula = "y ~ x",
+    color = "darkblue",
+    linetype = "dashed",
     linewidth = 0.5,
     fullrange = TRUE,
     se = FALSE
   ) +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
-#  facet_wrap(~FOREST_TYPE_GROUP) +
+  #  facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   theme(aspect.ratio = 1) +
   ggtitle("FVS Projected vs. Measured Carbon") +
-  xlab(bquote("Projected Stand AGL Carbon" ~(`Mg C` %.% ha^-1))) +
-  ylab(bquote("Measured Stand AGL Carbon" ~(`Mg C` %.% ha^-1))) +
+  xlab(bquote("Projected Stand AGL Carbon" ~ (`Mg C` %.% ha^-1))) +
+  ylab(bquote("Measured Stand AGL Carbon" ~ (`Mg C` %.% ha^-1))) +
   coord_cartesian(xlim = c(0, 300), ylim = c(0, 300))
 ```
 
@@ -3270,14 +3270,13 @@ nrsgro_none_carbon |>
   geom_hline(yintercept = 0, linetype = "dashed") +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
   theme_bw() +
   ggtitle("FVS Projected Annual Carbon Flux for Grow-Only Plots") +
-  ylab(bquote("Projected Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) #+;
-
+  ylab(bquote("Projected Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) #+;
 ```
 
 ```{r plot_surveyed_annual_carbon_flux, eval = FALSE}
@@ -3319,36 +3318,35 @@ nrsgro_srvy_carbon |>
   geom_hline(yintercept = 0, linetype = "dashed") +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
   theme_bw() +
   ggtitle("Observed Annual Carbon Flux for Grow-Only Plots") +
-  ylab(bquote("Observed Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) #+;
-
+  ylab(bquote("Observed Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) #+;
 ```
 
 ```{r measured_vs_projected_carbon_change, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0) |> arrange(Projection_Years),
-    aes(x = Measured_Carbon_Delta, y = Projected_Carbon_Delta)
-  ) +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0) |> arrange(Projection_Years),
+  aes(x = Measured_Carbon_Delta, y = Projected_Carbon_Delta)
+) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_vline(xintercept = 0, linewidth = 0.25, color = "black") +
   geom_abline(intercept = 0, slope = 1, linewidth = 0.5, linetype = "dashed", color = "lightgray") +
   geom_bin2d(bins = 20) +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
   geom_smooth(
     method = lm,
-    formula = 'y ~ x',
-    color = 'darkblue',
-    linetype = 'dashed',
+    formula = "y ~ x",
+    color = "darkblue",
+    linetype = "dashed",
     linewidth = 0.5,
     fullrange = TRUE,
     se = FALSE
@@ -3357,8 +3355,8 @@ ggplot(
   theme(aspect.ratio = 1) +
   theme_bw() +
   ggtitle(scales::label_wrap(50)("FVS Projected vs. FIA Measured AGL Carbon Change in Grow-Only Stands")) +
-  ylab(bquote("Projected AGL Carbon Delta" ~(`Mg C` %.% ha^-1))) +
-  xlab(bquote("Measured AGL Carbon Delta" ~(`Mg C` %.% ha^-1))) +
+  ylab(bquote("Projected AGL Carbon Delta" ~ (`Mg C` %.% ha^-1))) +
+  xlab(bquote("Measured AGL Carbon Delta" ~ (`Mg C` %.% ha^-1))) +
   coord_cartesian(xlim = c(-100, 100), ylim = c(-100, 100))
 ```
 
@@ -3368,16 +3366,16 @@ lr <- lm(
   data = nrsgro_projected_vs_measured |> filter(Projection_Years > 0)
 )
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
-    aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux)
-  ) +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux)
+) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_vline(xintercept = 0, linewidth = 0.25, color = "black") +
   geom_abline(intercept = 0, slope = 1, linewidth = 0.25, linetype = "dashed", color = "lightgray") +
   geom_bin2d(bins = 50) +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
@@ -3387,20 +3385,20 @@ ggplot(
     linetype = "dashed",
     color = "darkblue"
   ) +
-#  geom_smooth(
-#    method = lm,
-#    formula = 'y ~ x',
-#    color = 'darkblue',
-#    linetype = 'dashed',
-#    linewidth = 0.5,
-#    # fullrange = TRUE,
-#    se = FALSE
-#  ) +
+  #  geom_smooth(
+  #    method = lm,
+  #    formula = 'y ~ x',
+  #    color = 'darkblue',
+  #    linetype = 'dashed',
+  #    linewidth = 0.5,
+  #    # fullrange = TRUE,
+  #    se = FALSE
+  #  ) +
   theme_bw() +
   theme(aspect.ratio = 1) +
   ggtitle(scales::label_wrap(35)("FVS Projected vs. FIA Measured AGL Carbon Flux in Grow-Only Stands")) +
-  xlab(bquote("Measured Annual Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) +
-  ylab(bquote("Projected Annual Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) +
+  xlab(bquote("Measured Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  ylab(bquote("Projected Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
   coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
 ```
 
@@ -3417,7 +3415,6 @@ nrsgro_projected_vs_measured |>
   ggtitle("Annual Carbon Flux Ratio") +
   ylab("Number of Plots") +
   xlab("Ratio (Projected / Measured)")
-
 ```
 
 
@@ -3435,33 +3432,32 @@ projected_vs_measured_with_n <- nrsgro_projected_vs_measured |>
   group_by(FOREST_TYPE_GROUP) |>
   mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
   ungroup()
-  
+
 ggplot(
-    projected_vs_measured_with_n,
-    aes(Projected_Carbon_Flux, fct_reorder(FOREST_TYPE_GROUP, Measured_Carbon, .fun = sum))
-  ) +
-  geom_vline(xintercept = 0, color = 'red') +
+  projected_vs_measured_with_n,
+  aes(Projected_Carbon_Flux, fct_reorder(FOREST_TYPE_GROUP, Measured_Carbon, .fun = sum))
+) +
+  geom_vline(xintercept = 0, color = "red") +
   geom_boxplot(varwidth = TRUE) +
   # scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
   geom_point(
     data = projected_vs_measured_with_n |>
-      group_by(FOREST_TYPE_GROUP) |> 
+      group_by(FOREST_TYPE_GROUP) |>
       summarize(
         Measured_Carbon_Flux = mean(Measured_Carbon_Flux),
         Measured_Carbon = sum(Measured_Carbon),
-        .groups = 'keep'
-      ) |> 
+        .groups = "keep"
+      ) |>
       ungroup(),
     aes(Measured_Carbon_Flux),
-    color = 'blue',
+    color = "blue",
     shape = 4,
     size = 3
   ) +
   theme_bw() +
   ggtitle(bquote("Projected vs. Measured Annual Carbon Flux")) +
-  xlab(bquote("Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) +
+  xlab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
   ylab("Forest Type Group")
-
 ```
 
 
@@ -3472,24 +3468,24 @@ This is Mg of carbon per hectare per year.
 
 ```{r carbon-flux-by-forest-type, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
-    aes(Carbon_Flux_Residual, fct_reorder(FOREST_TYPE_GROUP, Measured_Carbon, .fun = sum))
-  ) +
-  geom_vline(xintercept = 0, color = 'red') +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  aes(Carbon_Flux_Residual, fct_reorder(FOREST_TYPE_GROUP, Measured_Carbon, .fun = sum))
+) +
+  geom_vline(xintercept = 0, color = "red") +
   geom_boxplot(varwidth = TRUE, outlier.size = 0.1) +
   # scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
   geom_point(
     data = nrsgro_projected_vs_measured |>
-      filter(Projection_Years > 0) |> 
-      group_by(FOREST_TYPE_GROUP) |> 
+      filter(Projection_Years > 0) |>
+      group_by(FOREST_TYPE_GROUP) |>
       summarize(
         Measured_Carbon_Flux = mean(Measured_Carbon_Flux),
         Measured_Carbon = sum(Measured_Carbon),
-        .groups = 'keep'
-      ) |> 
+        .groups = "keep"
+      ) |>
       ungroup(),
     aes(Measured_Carbon_Flux),
-    color = 'blue',
+    color = "blue",
     shape = 4,
     size = 3
   ) +
@@ -3499,61 +3495,60 @@ ggplot(
     "\n",
     "for Grow-Only FIA Plots in the Northeast"
   )) +
-  xlab(bquote("Carbon Flux Residual " ~(`Mg C` %.% ha^-1 %.% year^-1))) +
+  xlab(bquote("Carbon Flux Residual " ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
   labs(caption = bquote("X = Mean Measured Carbon Flux " ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
   ylab("Forest Type Group")
-
 ```
 
 ```{r carbon-flux-by-forest-type-detail, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
-    aes(Carbon_Flux_Residual, fct_reorder(FOREST_TYPE_GROUP, Measured_Carbon, .fun = sum))
-  ) +
-  geom_vline(xintercept = 0, color = 'red') +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  aes(Carbon_Flux_Residual, fct_reorder(FOREST_TYPE_GROUP, Measured_Carbon, .fun = sum))
+) +
+  geom_vline(xintercept = 0, color = "red") +
   geom_boxplot(varwidth = TRUE, outlier.size = 0.1) +
   geom_point(
     data = nrsgro_projected_vs_measured |>
-      filter(Projection_Years > 0) |> 
-      group_by(FOREST_TYPE_GROUP) |> 
+      filter(Projection_Years > 0) |>
+      group_by(FOREST_TYPE_GROUP) |>
       summarize(
         Measured_Carbon_Flux = mean(Measured_Carbon_Flux),
         Measured_Carbon = sum(Measured_Carbon),
-        .groups = 'keep'
-      ) |> 
+        .groups = "keep"
+      ) |>
       ungroup(),
     aes(Measured_Carbon_Flux),
-    color = 'blue',
+    color = "blue",
     shape = 4,
     size = 3
   ) +
-#  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  #  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
   coord_cartesian(xlim = c(-5, 0)) +
   theme_bw() +
-  #scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5)) +
+  # scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5)) +
   ggtitle(paste0(
     "FVS Projected Carbon Flux Residual by Forest Type Group",
     "\n",
     "for Grow-Only FIA Plots in the Northeast"
   )) +
-  xlab(bquote("Carbon Flux Residual " ~(`Mg C` %.% ha^-1 %.% year^-1))) +
+  xlab(bquote("Carbon Flux Residual " ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
   labs(caption = bquote("X = Mean Measured Carbon Flux " ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
   ylab("Forest Type Group")
 ```
 
 ```{r carbon-flux-by-ecoregion, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
-    aes(Carbon_Flux_Residual, fct_reorder(ECOCD, Measured_Carbon, .fun = sum))
-  ) +
-  geom_vline(xintercept = 0, color = 'red') +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  aes(Carbon_Flux_Residual, fct_reorder(ECOCD, Measured_Carbon, .fun = sum))
+) +
+  geom_vline(xintercept = 0, color = "red") +
   geom_boxplot(varwidth = TRUE, outlier.size = 0.1) +
-#  scale_y_discrete(guide = guide_axis(n.dodge = 2)) +
+  #  scale_y_discrete(guide = guide_axis(n.dodge = 2)) +
   coord_cartesian(xlim = c(-10, 10)) +
-#  scale_x_continuous(breaks = c(-10, -2.5, 0, 2.5, 5)) +
+  #  scale_x_continuous(breaks = c(-10, -2.5, 0, 2.5, 5)) +
   theme_bw() +
   ggtitle("Grow-Only Stands\nCarbon Flux Residual by Ecoregion") +
-  xlab(bquote("Carbon Flux Residual" ~(`Mg C` %.% ha^-1 %.% yr^-1))) +
+  xlab(bquote("Carbon Flux Residual" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
   ylab("Ecosubregion")
 ```
 
@@ -3561,82 +3556,81 @@ ggplot(
 
 ```{r carbon_residual_vs_projection_years, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured|> filter(Projection_Years > 0),
-    aes(x = Projection_Years, y = Carbon_Residual)
-  ) +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  aes(x = Projection_Years, y = Carbon_Residual)
+) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
-    formula = 'y ~ x',
+    formula = "y ~ x",
     fullrange = TRUE,
     se = FALSE,
     linetype = "dashed",
     linewidth = 0.5,
-    color = 'darkblue'
+    color = "darkblue"
   ) +
   facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
   ggtitle("Carbon Projection Residual vs. Projection Years\nin Grow-Only Stands") +
   xlab("Projection Years") +
-  ylab(bquote("Carbon Residual" ~(`Mg C` %.% ha^-1)))
+  ylab(bquote("Carbon Residual" ~ (`Mg C` %.% ha^-1)))
 ```
 
 
 ```{r carbon_error_vs_projection_yearsm, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
-    aes(x = Projection_Years, y = Carbon_Error)
-  ) +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  aes(x = Projection_Years, y = Carbon_Error)
+) +
   geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
-    formula = 'y ~ x',
+    formula = "y ~ x",
     fullrange = TRUE,
     se = FALSE,
-    color = 'darkblue',
+    color = "darkblue",
     linetype = "dashed",
     linewidth = 0.5
   ) +
   facet_wrap(~FOREST_TYPE_GROUP) +
-#  coord_cartesian(xlim = c(10, 20), ylim = c(0, 1)) +
-#  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20)) +
+  #  coord_cartesian(xlim = c(10, 20), ylim = c(0, 1)) +
+  #  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20)) +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
   theme_bw() +
   ggtitle("Grow-Only Stands\nCarbon Projection Error (fraction) vs. Projection years")
-  
 ```
 
 ```{r carbon_flux_residual_vs_projection_years, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured|> filter(Projection_Years > 0),
-    aes(x = Projection_Years, y = Carbon_Flux_Residual)
-  ) +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  aes(x = Projection_Years, y = Carbon_Flux_Residual)
+) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
-    formula = 'y ~ x',
+    formula = "y ~ x",
     fullrange = TRUE,
     se = FALSE,
-    color = 'darkblue',
+    color = "darkblue",
     linetype = "dashed",
     linewidth = 0.5
   ) +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
@@ -3644,30 +3638,30 @@ ggplot(
   theme_bw() +
   ggtitle("Grow-Only Stands\nCarbon Projection Flux Residual vs. Projection Years") +
   xlab("Projection Years") +
-  ylab(bquote("Carbon Flux Residual" ~(`Mg C` %.% ha^-1 %.% yr^-1)))
+  ylab(bquote("Carbon Flux Residual" ~ (`Mg C` %.% ha^-1 %.% yr^-1)))
 ```
 
 ### Residuals vs. BA
 
 ```{r carbon_residual_vs_measured_ba, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
-    mapping = aes(x = Measured_BA, y = Carbon_Residual)
-  ) +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  mapping = aes(x = Measured_BA, y = Carbon_Residual)
+) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
-    formula = 'y ~ x',
+    formula = "y ~ x",
     fullrange = TRUE,
     se = FALSE,
-    color = 'darkblue',
-    linetype = 'dashed',
+    color = "darkblue",
+    linetype = "dashed",
     linewidth = 0.5
   ) +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
@@ -3676,31 +3670,30 @@ ggplot(
   ggtitle("Carbon Projection Residuals vs. Measured BA\n in Grow-Only Stands") +
   xlab(bquote("Measured BA" ~ (m^2 %.% ha^-1))) +
   ylab(bquote("Carbon Residual" ~ (`Mg C` %.% ha^-1)))
-  
 ```
 
 
 ```{r carbon_error_vs_measured_ba, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |>
-      filter(Projection_Years > 0) |>
-      filter(Carbon_Error < 1),
-    aes(x = Measured_BA, y = Carbon_Error)
-  ) +
+  nrsgro_projected_vs_measured |>
+    filter(Projection_Years > 0) |>
+    filter(Carbon_Error < 1),
+  aes(x = Measured_BA, y = Carbon_Error)
+) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
-    formula = 'y ~ x',
+    formula = "y ~ x",
     fullrange = TRUE,
     se = FALSE,
-    color = 'darkblue',
-    linetype = 'dashed',
+    color = "darkblue",
+    linetype = "dashed",
     linewidth = 0.5
   ) +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
@@ -3715,11 +3708,11 @@ This omits outliers; looking just at the outliers (error >= 2x value):
 
 ```{r carbon_error_vs_measured_ba_outliers, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |>
-      filter(Projection_Years > 0) |>
-      filter(Carbon_Error >= 1),
-    aes(x = Measured_BA, y = Carbon_Error)
-  ) +
+  nrsgro_projected_vs_measured |>
+    filter(Projection_Years > 0) |>
+    filter(Carbon_Error >= 1),
+  aes(x = Measured_BA, y = Carbon_Error)
+) +
   geom_point() +
   coord_cartesian(ylim = c(0, NA)) +
   facet_wrap(~FOREST_TYPE_GROUP) +
@@ -3731,23 +3724,23 @@ ggplot(
 
 ```{r carbon_flux_residual_vs_measured_ba, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
-    mapping = aes(x = Measured_BA, y = Carbon_Flux_Residual)
-  ) +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  mapping = aes(x = Measured_BA, y = Carbon_Flux_Residual)
+) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
-    formula = 'y ~ x',
+    formula = "y ~ x",
     fullrange = TRUE,
     se = FALSE,
-    color = 'darkblue',
+    color = "darkblue",
     linetype = "dashed",
     linewidth = 0.5
   ) +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
@@ -3755,31 +3748,30 @@ ggplot(
   theme_bw() +
   ggtitle("Carbon Flux Residual vs. Measured BA\nin Grow-Only Stands") +
   xlab(bquote("Measured BA" ~ (m^2 %.% ha^-1))) +
-  ylab(bquote("Carbon Flux Residual" ~(`Mg C` %.% ha^-1 %.% yr^-1)))
-  
+  ylab(bquote("Carbon Flux Residual" ~ (`Mg C` %.% ha^-1 %.% yr^-1)))
 ```
 
 ### Residuals vs. QMD
 
 ```{r carbon_residuals_vs_qmd, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
-    aes(x = QMD_METRIC, y = Carbon_Residual)
-  ) +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
+  aes(x = QMD_METRIC, y = Carbon_Residual)
+) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
   geom_smooth(
     method = lm,
-    formula = 'y ~ x',
+    formula = "y ~ x",
     fullrange = TRUE,
     se = FALSE,
-    color = 'darkblue',
+    color = "darkblue",
     linetype = "dashed",
     linewidth = 0.5
   ) +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10"
+    # transform = "log10"
     low = "lightblue",
     high = "darkblue"
   ) +
@@ -3788,29 +3780,28 @@ ggplot(
   ggtitle("Carbon Projection Error vs. Measured QMD\nin Grow-Only Stands") +
   xlab(bquote("Measured QMD" ~ (cm))) +
   ylab(bquote("Carbon Residual" ~ (`Mg C` %.% ha^-1)))
-  
 ```
 
 ```{r carbon_flux_residuals_vs_qmd, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
-    aes(x = QMD_METRIC, y = Carbon_Flux_Residual)
-  ) +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
+  aes(x = QMD_METRIC, y = Carbon_Flux_Residual)
+) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
   scale_x_log10() +
   geom_smooth(
     method = lm,
-    formula = 'y ~ x',
+    formula = "y ~ x",
     fullrange = TRUE,
     se = FALSE,
-    color = 'darkblue',
+    color = "darkblue",
     linetype = "dashed",
     linewidth = 0.5
   ) +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
@@ -3825,85 +3816,83 @@ ggplot(
 
 ```{r projected_ba_vs_measured_ba, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
-    aes(x = Measured_BA, y = Projected_BA)
-  ) +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  aes(x = Measured_BA, y = Projected_BA)
+) +
   geom_abline(intercept = 0, slope = 1, linetype = "dashed", linewidth = 0.25, color = "lightgray") +
   geom_bin2d(binwidth = 2.5) +
   geom_smooth(
     method = lm,
-    formula = 'y ~ x',
+    formula = "y ~ x",
     fullrange = TRUE,
     se = FALSE,
-    color = 'darkblue',
-    linetype = 'dashed',
+    color = "darkblue",
+    linetype = "dashed",
     linewidth = 0.5
   ) +
   theme_bw() +
   theme(aspect.ratio = 1) +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
-  #facet_wrap(~FOREST_TYPE_GROUP) +
+  # facet_wrap(~FOREST_TYPE_GROUP) +
   ggtitle("Projected vs. Measured Basal Area\nin Grow-Only Stands") +
-  xlab(bquote("Measured Basal Area" ~(m^2 %.% ha^-1))) +
-  ylab(bquote("Projected Basal Area" ~(m^2 %.% ha^-1)))
+  xlab(bquote("Measured Basal Area" ~ (m^2 %.% ha^-1))) +
+  ylab(bquote("Projected Basal Area" ~ (m^2 %.% ha^-1)))
 ```
 
 ```{r basal_area_trend, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |>
-      filter(Projection_Years > 0) |>
-      mutate(
-        BA_Range = cut(Measured_BA, 0:19 * 5)
-      ) |>
-      group_by(FOREST_TYPE_GROUP) |>
-      mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
-      ungroup()
-    ,
-    aes(x = BA_Range, y = BA_Flux_Residual)
-  ) +
+  nrsgro_projected_vs_measured |>
+    filter(Projection_Years > 0) |>
+    mutate(
+      BA_Range = cut(Measured_BA, 0:19 * 5)
+    ) |>
+    group_by(FOREST_TYPE_GROUP) |>
+    mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
+    ungroup(),
+  aes(x = BA_Range, y = BA_Flux_Residual)
+) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
   scale_fill_discrete(name = "Forest Type Group") +
   ggtitle("BA Residual vs. Measured BA") +
-  ylab(bquote("BA Residual " (m^2 %.% ha^-1 %.% yr^-1))) +
-  xlab(bquote("Measured Stand BA " (m^2 %.% ha^-1))) +
+  ylab(bquote("BA Residual "(m^2 %.% ha^-1 %.% yr^-1))) +
+  xlab(bquote("Measured Stand BA "(m^2 %.% ha^-1))) +
   theme_bw() +
   coord_cartesian(ylim = c(-2, 3))
-
 ```
 
 ```{r p_vs_m_bai, eval=FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
-    aes(x = Measured_BAI, y = Projected_BAI)
-  ) +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  aes(x = Measured_BAI, y = Projected_BAI)
+) +
   geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.25, color = "black") +
   geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.25, color = "black") +
   geom_abline(intercept = 0, slope = 1, linetype = "dashed", linewidth = 0.25, color = "lightgray") +
   geom_bin2d(binwidth = 0.1) +
-#  geom_smooth(
-#    method = lm,
-#    formula = 'y ~ x',
-#    fullrange = TRUE,
-#    se = FALSE,
-#    color = 'brown'
-#  ) +
+  #  geom_smooth(
+  #    method = lm,
+  #    formula = 'y ~ x',
+  #    fullrange = TRUE,
+  #    se = FALSE,
+  #    color = 'brown'
+  #  ) +
   theme_bw() +
   theme(aspect.ratio = 1) +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
   ggtitle("Projected vs. Measured Basal Area Increment\nin Grow-Only Stands") +
-  xlab(bquote("Measured Basal Area Increment " ~(m^2 %.% ha^-1 %.% year^-1))) +
-  ylab(bquote("Projected Basal Area Increment " ~(m^2 %.% ha^-1 %.% year^-1)))
+  xlab(bquote("Measured Basal Area Increment " ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab(bquote("Projected Basal Area Increment " ~ (m^2 %.% ha^-1 %.% year^-1)))
 ```
 
 Can we plot plot location with size proportional to BA?
@@ -3929,10 +3918,10 @@ plot_location_type <- stand_stats |>
   group_by(FOREST_TYPE) |>
   mutate(n = n()) |>
   ungroup() |>
-  mutate(FOREST_TYPE = if_else(n < 144, 'Other', FOREST_TYPE))
+  mutate(FOREST_TYPE = if_else(n < 144, "Other", FOREST_TYPE))
 
 ggplot(map_states, aes(long, lat, group = group)) +
-  geom_polygon(fill = "white", color = "black") + 
+  geom_polygon(fill = "white", color = "black") +
   geom_point(
     plot_location_type,
     mapping = aes(long, lat, group = group, color = fct_infreq(FOREST_TYPE), size = `Stand Carbon`)
@@ -3940,25 +3929,26 @@ ggplot(map_states, aes(long, lat, group = group)) +
   scale_size_binned_area(max_size = 3) +
   coord_sf(crs = 4326) +
   annotation_scale(location = "br") +
-  annotation_north_arrow(location = "tl",
+  annotation_north_arrow(
+    location = "tl",
     width = unit(1, "cm"),
     pad_x = unit(0.75, "cm"),
     pad_y = unit(0.5, "cm")
   ) +
   ggtitle("FIA Grow-Only Plots in the Northeast Region") +
   scale_color_hue(name = "Forest Type", breaks = c(
-    'Maple / beech / birch',
-    'Elm / ash / cottonwood',
-    'Aspen / birch',
-    'Oak / hickory',
-    'Scarlet oak',
-    'Spruce / fir',
-    'White / red / jack pine',
-    'Other'
+    "Maple / beech / birch",
+    "Elm / ash / cottonwood",
+    "Aspen / birch",
+    "Oak / hickory",
+    "Scarlet oak",
+    "Spruce / fir",
+    "White / red / jack pine",
+    "Other"
   )) +
   theme_bw()
 
-  #scale_fill_discrete(breaks = rev(levels(projected_annual_growth$Series)))
+# scale_fill_discrete(breaks = rev(levels(projected_annual_growth$Series)))
 
 remove(plot_location_tmp)
 ```
@@ -3968,54 +3958,53 @@ remove(plot_location_tmp)
 
 ```{r ba_residual_vs_projection_years, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
-    aes(x = Projection_Years, y = BA_Residual)
-  ) +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  aes(x = Projection_Years, y = BA_Residual)
+) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
   geom_smooth(
     method = lm,
-    formula = 'y ~ x',
+    formula = "y ~ x",
     fullrange = TRUE,
     se = FALSE,
-    color = 'darkblue',
-    linetype = 'dashed',
+    color = "darkblue",
+    linetype = "dashed",
     linewidth = 0.5
   ) +
-#  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
+  #  scale_x_continuous(breaks = c(10, 12, 14, 16, 18, 20, 22)) +
   facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   ggtitle("BA Residual vs. Projection Years\nin Grow-Only Stands") +
   xlab(bquote("Projection Years")) +
-  ylab(bquote("BA Residual" ~(m^2 %.% ha^-1)))
-  
+  ylab(bquote("BA Residual" ~ (m^2 %.% ha^-1)))
 ```
 
 ```{r ba_error_vs_projection_years, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(BA_Error < 1),
-    aes(x = Projection_Years, y = BA_Error)
-  ) +
+  nrsgro_projected_vs_measured |> filter(BA_Error < 1),
+  aes(x = Projection_Years, y = BA_Error)
+) +
   geom_bin2d(bins = 20) +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
   geom_smooth(
     method = lm,
-    formula = 'y ~ x',
+    formula = "y ~ x",
     fullrange = TRUE,
     se = FALSE,
-    color = 'darkblue',
-    linetype = 'dashed',
+    color = "darkblue",
+    linetype = "dashed",
     linewidth = 0.5
   ) +
   facet_wrap(~FOREST_TYPE_GROUP) +
@@ -4023,120 +4012,115 @@ ggplot(
   ggtitle("BA Projection Error vs. Projection years\nin Grow-Only Stands") +
   xlab("Projection Years") +
   ylab("BA Projection Error (fraction)")
-  
 ```
 
 ### Residuals vs. QMD
 
 ```{r ba_residual_vs_qmd, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
-    aes(x = QMD_METRIC, y = BA_Residual)
-  ) +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
+  aes(x = QMD_METRIC, y = BA_Residual)
+) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_bin2d(bins = 20) +
   scale_fill_gradient(
     name = "Number of Plots",
-    #transform = "log10",
+    # transform = "log10",
     low = "lightblue",
     high = "darkblue"
   ) +
   geom_smooth(
     method = lm,
-    formula = 'y ~ x',
+    formula = "y ~ x",
     fullrange = TRUE,
     se = FALSE,
-    color = 'darkblue',
+    color = "darkblue",
     linetype = "dashed",
     linewidth = 0.5
   ) +
   facet_wrap(~FOREST_TYPE_GROUP) +
   theme_bw() +
   ggtitle("BA Projection Residual vs. Measured QMD\nin Grow-Only Stands") +
-  xlab(bquote("QMD" ~(cm))) +
-  ylab(bquote("BA Residual" ~(m^2 %.% ha^-1)))
+  xlab(bquote("QMD" ~ (cm))) +
+  ylab(bquote("BA Residual" ~ (m^2 %.% ha^-1)))
 ```
 
 ```{r qmd_trend2, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |>
-      filter(Projection_Years > 0) |>
-      mutate(
-        QMD_Range = cut(QMD_METRIC, 0:19 * 5)
-      ) |>
-      group_by(FOREST_TYPE_GROUP) |>
-      mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
-      ungroup()
-    ,
-    aes(x = QMD_Range, y = BA_Flux_Residual)
-  ) +
+  nrsgro_projected_vs_measured |>
+    filter(Projection_Years > 0) |>
+    mutate(
+      QMD_Range = cut(QMD_METRIC, 0:19 * 5)
+    ) |>
+    group_by(FOREST_TYPE_GROUP) |>
+    mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
+    ungroup(),
+  aes(x = QMD_Range, y = BA_Flux_Residual)
+) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
   scale_fill_discrete(name = "Forest Type Group") +
   theme_bw() +
   ggtitle("Measured QMD vs. BA Residual for Grow-Only Stands") +
-  ylab(bquote("BA Residual " ~(m^2 %.% ha^-1 %.% yr^-1))) +
-  xlab(bquote("Measured Stand QMD " ~(cm)))
-
+  ylab(bquote("BA Residual " ~ (m^2 %.% ha^-1 %.% yr^-1))) +
+  xlab(bquote("Measured Stand QMD " ~ (cm)))
 ```
 ### Residuals vs. TPA
 
 ```{r ba_residual_vs_qmd2, eval = FALSE}
 ggplot(
-    nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
-    aes(x = Measured_Tpa, y = Projected_Tpa)
-  ) +
+  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  aes(x = Measured_Tpa, y = Projected_Tpa)
+) +
   geom_abline(intercept = c(0, 0), slope = 1, linetype = "dashed", linewidth = 0.25, color = "lightgray") +
   geom_bin_2d(
     binwidth = 500
-    #alpha = 0.25
+    # alpha = 0.25
   ) +
   scale_fill_gradient(
     name = "Number of Plots",
-    #trans = "log",
+    # trans = "log",
     low = "lightblue",
     high = "darkblue"
   ) +
   geom_smooth(
     method = lm,
-    formula = 'y ~ x',
+    formula = "y ~ x",
     fullrange = TRUE,
     se = FALSE,
-    color = 'darkblue',
-    linetype = 'dashed',
+    color = "darkblue",
+    linetype = "dashed",
     linewidth = 0.5
   ) +
   # coord_cartesian( xlim = c(0, 40000), ylim = c(0, 25000)) +
   theme_bw() +
-  #theme(aspect.ratio = 1) +
-  #facet_wrap(~FOREST_TYPE_GROUP) +
+  # theme(aspect.ratio = 1) +
+  # facet_wrap(~FOREST_TYPE_GROUP) +
   ggtitle("Projected vs. Measured TPA\nin Grow-Only Stands") +
-  xlab(bquote("Measured" ~(trees %.% acre^-1))) +
-  ylab(bquote("Projected" ~(trees %.% acre^-1)))
+  xlab(bquote("Measured" ~ (trees %.% acre^-1))) +
+  ylab(bquote("Projected" ~ (trees %.% acre^-1)))
 ```
 
 ```{r qmd_trend, eval = FALSE}
 options(scipen = 9)
 ggplot(
-    nrsgro_projected_vs_measured |>
-      filter(Projection_Years > 0) |>
-      mutate(
-        Tpa_Range = cut(Measured_Tpa, 0:10 * 2000, labels = (1:10 * 2000))
-      ) |>
-      group_by(FOREST_TYPE_GROUP) |>
-      mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
-      ungroup()
-    ,
-    aes(x = Tpa_Range, y = BA_Flux_Residual)
-  ) +
+  nrsgro_projected_vs_measured |>
+    filter(Projection_Years > 0) |>
+    mutate(
+      Tpa_Range = cut(Measured_Tpa, 0:10 * 2000, labels = (1:10 * 2000))
+    ) |>
+    group_by(FOREST_TYPE_GROUP) |>
+    mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
+    ungroup(),
+  aes(x = Tpa_Range, y = BA_Flux_Residual)
+) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_boxplot(outlier.size = 0.1, varwidth = TRUE, position = position_nudge(x = -0.5)) +
   scale_fill_discrete(name = "Forest Type Group") +
   theme_bw() +
   ggtitle("Measured TPA vs. BA Residual for Grow-Only Stands") +
-  ylab(bquote("BA Residual" (m^2 %.% ha^-1 %.% yr^-1))) +
-  xlab(bquote("Measured Stand TPA" (trees %.% acre^-1)))
-
+  ylab(bquote("BA Residual"(m^2 %.% ha^-1 %.% yr^-1))) +
+  xlab(bquote("Measured Stand TPA"(trees %.% acre^-1)))
 ```
 
 
@@ -4146,7 +4130,7 @@ ggplot(
 
 
 ```{r eastern_hemlock, eval = FALSE}
-rds_file <- 'data/intermediate/eastern_hemlock.rds'
+rds_file <- "data/intermediate/eastern_hemlock.rds"
 if (USE_CACHE & file.exists(rds_file)) {
   eastern_hemlock <- read_rds(rds_file)
 } else {
@@ -4154,7 +4138,7 @@ if (USE_CACHE & file.exists(rds_file)) {
     filter(GENUS == "Tsuga" & SPECIES == "canadensis") |>
     select(SPCD) |>
     pull()
-  
+
   # FIA.TREE.CN - sequence number - 0 NA
   # FIA.TREE.TREE - TREE number
   # FIA.TREE.CONDID - condition class; 1 = live tree
@@ -4174,12 +4158,12 @@ if (USE_CACHE & file.exists(rds_file)) {
   #     0 - 5, # of sides and top receiving light
   # FIA.TREE.CDENCD - Crown Density Code, % - 29820 NA
 
-  fia <- DBI::dbConnect(RSQLite::SQLite(), 'data/raw/SQLite_FIADB_ENTIRE.db')
-  measyear_mixin <- tbl(fia, 'PLOT') |>
+  fia <- DBI::dbConnect(RSQLite::SQLite(), "data/raw/SQLite_FIADB_ENTIRE.db")
+  measyear_mixin <- tbl(fia, "PLOT") |>
     select(CN, MEASYEAR) |>
     rename(PLT_CN = CN)
-  
-  canopy_height_mixin <- tbl(fia, 'TREE') |>
+
+  canopy_height_mixin <- tbl(fia, "TREE") |>
     semi_join(
       plot_grow_only |> arrange(STATECD, COUNTYCD, PLOT),
       by = join_by(STATECD, COUNTYCD, PLOT),
@@ -4192,8 +4176,8 @@ if (USE_CACHE & file.exists(rds_file)) {
     group_by(PLT_CN) |>
     summarize(CANOPY_HT = mean(HT, na.rm = TRUE)) |>
     ungroup()
-  
-  eastern_hemlock <- tbl(fia, 'TREE') |>
+
+  eastern_hemlock <- tbl(fia, "TREE") |>
     semi_join(
       plot_grow_only |> arrange(STATECD, COUNTYCD, PLOT),
       by = join_by(STATECD, COUNTYCD, PLOT),
@@ -4215,7 +4199,7 @@ if (USE_CACHE & file.exists(rds_file)) {
     ) |>
     arrange(STATECD, COUNTYCD, PLOT, SUBP, TREE, MEASYEAR) |>
     collect()
-  
+
   dbDisconnect(fia)
 
   eastern_hemlock <- eastern_hemlock |>
@@ -4242,7 +4226,6 @@ eastern_hemlock |>
   ylab("Crown Ratio (%)") +
   xlab("Crown Class") +
   ggtitle("Eastern Hemlock Crown Ratio vs. Crown Class")
-  
 ```
 
 > TODO: Danelle points out that e.g. for two trees that are 40' tall, the
@@ -4262,7 +4245,8 @@ plot_eastern_hemlock <- eastern_hemlock |>
   # filter(CANOPY_HT > 30 & CANOPY_HT < 100) |>
   mutate(CCL = factor(CCL, levels = rev(c("Open grown", "Dominant", "Codominant", "Intermediate", "Overtopped")))) |>
   mutate(HT_GROUP = factor(as.integer(CANOPY_HT / 10) * 10))
-missing_classes <- plot_eastern_hemlock |> distinct(CCL) |>
+missing_classes <- plot_eastern_hemlock |>
+  distinct(CCL) |>
   cross_join(plot_eastern_hemlock |> distinct(HT_GROUP)) |>
   anti_join(plot_eastern_hemlock |> distinct(HT_GROUP, CCL), by = join_by(HT_GROUP, CCL)) |>
   mutate(CR = -10) # Give missing classes a negative crown ratio so it can be cropped out
@@ -4276,7 +4260,6 @@ plot_eastern_hemlock_counts <- plot_eastern_hemlock |>
 ```
 
 ```{r, eval = FALSE}
-
 plot_eastern_hemlock |>
   ggplot(aes(CR, HT_GROUP, fill = CCL)) +
   theme_bw() +
@@ -4285,14 +4268,13 @@ plot_eastern_hemlock |>
     data = plot_eastern_hemlock_counts,
     mapping = aes(label = COUNT),
     position = position_dodge(width = .75),
-    color = 'white'
+    color = "white"
   ) +
   scale_fill_discrete(name = "Crown Class", breaks = rev(levels(plot_eastern_hemlock$CCL))) +
   coord_cartesian(xlim = c(0, 100)) + # crop out "trees" with a negative crown ratio
   xlab("Crown Ratio (%)") +
   ylab("Canopy Height (feet)") +
   ggtitle("Eastern Hemlock Crown Ratio vs. Canopy Height by Crown Class")
-  
 ```
 
 ```{r, eval = FALSE}
@@ -4300,7 +4282,8 @@ plot_eastern_hemlock <- eastern_hemlock |>
   filter(!is.na(CCL) & !is.na(CANOPY_HT) & !is.na(CDENCD)) |>
   # filter(CANOPY_HT > 30 & CANOPY_HT < 100) |>
   mutate(HT_GROUP = factor(as.integer(CANOPY_HT / 10) * 10))
-missing_classes <- eastern_hemlock |> distinct(CCL) |>
+missing_classes <- eastern_hemlock |>
+  distinct(CCL) |>
   cross_join(plot_eastern_hemlock |> distinct(HT_GROUP)) |>
   anti_join(plot_eastern_hemlock |> distinct(HT_GROUP, CCL), by = join_by(HT_GROUP, CCL)) |>
   mutate(CDENCD = -10) # Give missing classes a negative crown ratio so it can be cropped out
@@ -4322,12 +4305,11 @@ plot_eastern_hemlock |>
     data = plot_eastern_hemlock_counts,
     mapping = aes(label = COUNT),
     position = position_dodge(width = .75),
-    color = 'white'
+    color = "white"
   ) +
   scale_fill_discrete(name = "Crown Density", breaks = rev(levels(plot_eastern_hemlock$CCL))) +
   coord_cartesian(xlim = c(0, 100)) + # crop out "trees" with a negative crown ratio
   xlab("Crown Density (%)") +
   ylab("Canopy Height (feet)") +
   ggtitle("Eastern Hemlock Crown Density vs. Canopy Height by Crown Class")
-  
 ```
