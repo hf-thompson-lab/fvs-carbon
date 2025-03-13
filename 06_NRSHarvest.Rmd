@@ -776,13 +776,97 @@ Skipped for now.
 
 ## Load Results
 
-
 Load the output from all FVS partitions into a single dataframe
 
 Consolidate outputs that use multiple random seeds;
 average the multiple runs with different random seeds.
 
 ### NRS Harvest PRSC
+
+Carbon
+
+```{targets nrshrv_prsc_carbon, tar_simple = TRUE}
+fvs_read_output(nrshrv_prsc, "FVS_Carbon") |>
+  group_by(StandID, Year) |> # Combine results from different random seeds
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  left_join(
+    nrshrv_plot_stats |>
+      filter(!is.na(HRVYR)) |>
+      distinct(STAND_ID, HRVYR) |>
+      rename(StandID = STAND_ID, HarvestYear = HRVYR),
+    by = join_by(StandID)
+  ) |>
+  mutate(
+    YearsSinceHarvest = Year - HarvestYear
+  )
+```
+
+Summary
+
+```{targets nrshrv_prsc_summary, tar_simple = TRUE}
+fvs_read_output(nrshrv_prsc, "FVS_Summary2_East") |>
+  group_by(StandID, Year) |>
+  summarize(
+    BA = mean(BA),
+    Tpa = mean(Tpa),
+    .groups = 'keep'
+  ) |>
+  ungroup() |>
+  left_join(
+    nrshrv_plot_stats |>
+      filter(!is.na(HRVYR)) |>
+      distinct(STAND_ID, HRVYR) |>
+      rename(StandID = STAND_ID, HarvestYear = HRVYR),
+    by = join_by(StandID)
+  ) |>
+  mutate(
+    YearsSinceHarvest = Year - HarvestYear
+  )
+```
+
+### NRS Harvest SRVY
+
+Carbon
+
+```{targets nrshrv_srvy_carbon, tar_simple = TRUE}
+fvs_read_output(nrshrv_srvy, "FVS_Carbon") |>
+  select(StandID, Year, Aboveground_Total_Live) |>
+  left_join(
+    nrshrv_plot_stats |>
+      filter(!is.na(HRVYR)) |>
+      distinct(STAND_ID, HRVYR) |>
+      rename(StandID = STAND_ID, HarvestYear = HRVYR),
+    by = join_by(StandID)
+  ) |>
+  mutate(
+    YearsSinceHarvest = Year - HarvestYear
+  )
+```
+
+Summary
+
+```{targets nrshrv_srvy_summary, tar_simple = TRUE}
+fvs_read_output(nrshrv_srvy, "FVS_Summary2_East") |>
+  select(StandID, Year, BA, Tpa) |>
+  left_join(
+    nrshrv_plot_stats |>
+      filter(!is.na(HRVYR)) |>
+      distinct(STAND_ID, HRVYR) |>
+      rename(StandID = STAND_ID, HarvestYear = HRVYR),
+    by = join_by(StandID)
+  ) |>
+  mutate(
+    YearsSinceHarvest = Year - HarvestYear
+  )
+```
+
+## Sanity Check
+
+### Harvested Trees are Cut
 
 Did we harvest the right trees?
 
@@ -798,12 +882,20 @@ FVS produces three tree tables:
  
  Note that a tree in TreeList may be in neither ATRTList nor CutList, e.g.
  if it died but was not cut during the cycle.
+ 
+ Gather the tree lists from the FVS runs; the harvested trees are by
+ necessity inventory trees, so there is no randomization and we can take
+ only one of the random branches.
+ 
+ After the first cycle, the trees get split and divided by FVS to represent
+ differences in growth rate, but we can pick one series arbitrarily to inspect
+ the behavior of the system. Metrics such as stand carbon etc. are aggregated
+ from all random seeds in other datasets.
 
-```{r nrshrv_prsc_treelist, eval = FALSE}
+```{r fvs tree lists, eval = FALSE}
 nrshrv_prsc_treelist <- fvs_read_output(nrshrv_prsc, "FVS_TreeList_East") |>
   group_by(StandID) |>
   filter(
-    Year == min(Year, na.rm = TRUE),
     random_seed == min(random_seed, na.rm = TRUE)
   ) |>
   ungroup() |>
@@ -830,21 +922,41 @@ nrshrv_prsc_cutlist  <- fvs_read_output(nrshrv_prsc, "FVS_CutList_East") |>
 
 How many of nrshrv_tree_harvested are in nrshrv_prsc_cutlist?
 
-```{r harvested trees cut, eval = FALSE}
+```{r harvested vs cut trees, eval = FALSE}
 cut_trees <- nrshrv_prsc_cutlist |>
-  select(StandID, PtIndex, TreeId) |>
+  select(StandID, PtIndex, TreeId, DBH) |>
   rename(
     STAND_ID = StandID,
     SUBP = PtIndex,
-    TREE = TreeId
+    TREE = TreeId,
+    DIA = DBH
   ) |>
-  mutate(CUT = 1)
+  mutate(
+    DIA = as.integer(0.5 + DIA * 10), # DIA is now tenths of an inch
+    CUT = 1
+  )
 
 stand_id <- nrshrv_plot_stats |>
   distinct(STATECD, COUNTYCD, PLOT, STAND_ID)
 
-harvested_and_cut <- nrshrv_tree_harvested |>
-  select(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
+# All the trees...
+harvested_trees <- fia_trees_filtered(
+    fiadb,
+    nrshrv_plot_stats |> filter(PRE_HARVEST == 1),
+    filter = \(.data, com) {
+      .data |>
+        select(STATECD, COUNTYCD, PLOT, SUBP, TREE, DIA)
+  }) |>
+  inner_join(
+    nrshrv_tree_harvested |>
+      select(STATECD, COUNTYCD, PLOT, SUBP, TREE),
+    by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)
+  ) |>
+  mutate(
+    DIA = trunc(0.5 + DIA * 10) # DIA is now tenths of an inch
+  )
+
+harvested_and_cut <- harvested_trees |>
   left_join(
     stand_id,
     by = join_by(STATECD, COUNTYCD, PLOT)
@@ -852,128 +964,88 @@ harvested_and_cut <- nrshrv_tree_harvested |>
   mutate(
     TREE = as.character(TREE)
   ) |>
-  left_join(
+  full_join(
     cut_trees,
-    by = join_by(STAND_ID, SUBP, TREE)
+    by = join_by(STAND_ID, TREE, DIA)
   )
 ```
 
-Carbon
-
-```{targets nrshrv_prsc_carbon, tar_simple = TRUE}
-fvs_read_output(nrshrv_prsc, "FVS_Carbon") |>
-  group_by(StandID, Year) |> # Combine results from different random seeds
-  summarize(
-    Aboveground_Total_Live = mean(Aboveground_Total_Live),
-    .groups = "keep"
-  ) |>
-  ungroup()
+```{r harvested but not cut}
+harvested_and_cut |> filter(is.na(SUBP.y)) |> nrow()
 ```
 
-Summary
-
-```{targets nrshrv_prsc_summary, tar_simple = TRUE}
-fvs_read_output(nrshrv_prsc, "FVS_Summary2_East") |>
-  group_by(StandID, Year) |>
-  summarize(
-    BA = mean(BA),
-    Tpa = mean(Tpa),
-    .groups = 'keep'
-  ) |>
-  ungroup()
+```{r cut but not harvested}
+harvested_and_cut |> filter(is.na(SUBP.x)) |> nrow()
 ```
 
-### NRS Harvest SRVY
+This is imperfect, but >5000 of 5213 trees line up, and visual inspection shows
+that the rest are probably the same trees, the diameters are off by ~0.2 inch.
 
-Carbon
+### Projected Stands are Surveyed
 
-```{targets nrshrv_srvy_carbon, tar_simple = TRUE}
-fvs_read_output(nrshrv_srvy, "FVS_Carbon") |>
-  select(StandID, Year, Aboveground_Total_Live)
-```
+Sanity check: do the projections line up with the surveys?
 
-Summary
+```{r projected matches measured, eval = FALSE}
+projected <- nrshrv_prsc_summary |>
+  group_by(StandID) |>
+  filter(Year == max(Year) | Year == min(Year)) |>
+  ungroup() |>
+  select(StandID, Year) |>
+  mutate(PROJECTED = 1)
 
-```{targets nrshrv_srvy_summary, tar_simple = TRUE}
-fvs_read_output(nrshrv_srvy, "FVS_Summary2_East") |>
-  select(StandID, Year, BA, Tpa)
-```
+measured <- nrshrv_srvy_summary |>
+  group_by(StandID) |>
+  filter(Year == max(Year) | Year == min(Year)) |>
+  ungroup() |>
+  select(StandID, Year) |>
+  mutate(MEASURED = 1)
 
-TreeList
-
-```{targets nrshrv_srvy_treelist, tar_simple = TRUE}
-fvs_read_output(nrshrv_srvy, "FVS_TreeList_East")
-```
-
-## Sanity Check
-
-Sanity check: did we get the outputs we requested?
-
-```{r sanity-check-expected-output, eval = FALSE}
-matched_carbon_tmp <- fvs_stands_prsc |>
-  left_join(
-    FVS_Carbon_PRSC |>
-      select(StandID, Year, Aboveground_Total_Live) |> 
-      rename(
-        STAND_ID = StandID,
-        MIN_MEASYEAR = Year,
-        Starting_Carbon = Aboveground_Total_Live
-      ),
-    by = join_by(STAND_ID, MIN_MEASYEAR)
-  ) |>
-  left_join(
-    FVS_Carbon_PRSC |>
-      select(StandID, Year, Aboveground_Total_Live) |>
-      rename(
-        STAND_ID = StandID,
-        MAX_MEASYEAR = Year,
-        Ending_Carbon = Aboveground_Total_Live
-        ),
-    by = join_by(STAND_ID, MAX_MEASYEAR)
-  ) |>
-  mutate(partition = (as.numeric(STAND_ID) %% num_partitions) + 1)
-missing_start <- matched_carbon_tmp |>
-  filter(is.na(Starting_Carbon)) |> 
-  nrow()
-print(missing_start)
-missing_end <- matched_carbon_tmp |>
-  filter(is.na(Ending_Carbon)) |> 
-  nrow()
-print(missing_end)
-stopifnot(missing_start == 0)
-stopifnot(missing_end == 0)
-remove(
-  matched_carbon_tmp,
-  missing_start,
-  missing_end
+stopifnot(
+  projected |>
+    full_join(measured, by = join_by(StandID, Year)) |>
+    filter(is.na(PROJECTED) | is.na(MEASURED)) |>
+    nrow()
+  == 0
 )
 ```
 
 ## Carbon
 
-```{r plot aboveground carbon, eval = FALSE}
+```{r plot projected carbon, eval = FALSE}
 ggplot(
-    FVS_Carbon_PRSC,
-    aes(x = Year, y = Aboveground_Total_Live)
+    nrshrv_prsc_carbon,
+    aes(x = YearsSinceHarvest, y = Aboveground_Total_Live)
   ) +
+  geom_vline(xintercept = 0, color = "black", linetype  = "dashed", linewidth = 0.5) +
   geom_bin2d(bins = 25) +
-  #geom_abline(intercept = 0, slope = 1) +
-  #geom_smooth(
-  #  method = lm,
-  #  formula = 'y ~ x',
-  #  color = 'brown',
-  #  linetype = 'dashed',
-  #  fullrange = TRUE,
-  #  se = FALSE
-  #) +
-  scale_fill_continuous(name = "Number of Plots", transform = "log10") +
-  #facet_wrap(~FOREST_TYPE_GROUP) +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    low = "gray95",
+    high = "darkgreen"
+  ) +
   theme_bw() +
-  #theme(aspect.ratio = 1) +
-  ggtitle("FVS Projected Aboveground Carbon") +
-  #xlab(bquote("Measured Annual Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) +
-  ylab(bquote("Projected Carbon" ~(`Mg C` %.% ha^-1))) #+
+  ggtitle("FVS Projected Carbon in Harvested Stands") +
+  ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1))) +
+  xlab("Years since Harvest")
+```
 
+```{r plot measured carbon, eval = FALSE}
+ggplot(
+    nrshrv_srvy_carbon,
+    aes(x = YearsSinceHarvest, y = Aboveground_Total_Live)
+  ) +
+  geom_vline(xintercept = 0, color = "black", linetype  = "dashed", linewidth = 0.5) +
+  geom_bin2d(bins = 25) +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    # transform = "log10",
+    low = "gray95",
+    high = "darkgreen"
+  ) +
+  theme_bw() +
+  ggtitle("FIA Measured Carbon in Harvested Stands") +
+  ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1))) +
+  xlab("Years since Harvest")
 ```
 
 ## Carbon Flux
