@@ -94,20 +94,21 @@ fvs_Estab <- function(rows) {
 }
 
 fvs_ThinPRSC <- function(rows) {
-  if (!is.null(rows)) {
-    thinprsc <- function(row) {
-      year <- row["YEAR"]
-      if ("PERCENT" %in% names(row) & !is.na(row["PERCENT"])) {
-        percent <- row["PERCENT"] # CUTEFF - Efficiency, 0 - 1
-      } else {
-        percent <- 1
-      }
-      prsc <- row["PRESCRIPTION"]
-      c(
-        fvs_kwd("CycleAt", year - 1), # harvest is done in the first cycle year
-        fvs_kwd("ThinPRSC", year, percent, prsc)
-      )
+  thinprsc <- function(row) {
+    year <- row["YEAR"]
+    if ("PERCENT" %in% names(row) & !is.na(row["PERCENT"])) {
+      percent <- row["PERCENT"] # CUTEFF - Efficiency, 0 - 1
+    } else {
+      percent <- 1
     }
+    prsc <- row["PRESCRIPTION"]
+    c(
+      fvs_kwd("CycleAt", as.numeric(year) - 1), # harvest is done in the first cycle year
+      fvs_kwd("ThinPRSC", year, percent, prsc)
+    )
+  }
+
+  if (!is.null(rows)) {
     apply(rows |> distinct(PRESCRIPTION, YEAR, .keep_all = TRUE), 1, thinprsc)
   } else {
     c()
@@ -187,8 +188,7 @@ fvs_fia_input <- function(fiadb, stands, harvest, filename) {
           harvest |> select(TREE_CN, PRESCRIPTION),
           by = join_by(TREE_CN),
           copy = TRUE
-        ) |>
-        arrange(STATECD, COUNTYCD, PLOT, SUBP, TREE),
+        ),
       overwrite = TRUE
     )
   })
