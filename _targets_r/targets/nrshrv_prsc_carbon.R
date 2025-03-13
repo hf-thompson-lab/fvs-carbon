@@ -5,5 +5,15 @@ tar_target(nrshrv_prsc_carbon, {
       Aboveground_Total_Live = mean(Aboveground_Total_Live),
       .groups = "keep"
     ) |>
-    ungroup()
+    ungroup() |>
+    left_join(
+      nrshrv_plot_stats |>
+        filter(!is.na(HRVYR)) |>
+        distinct(STAND_ID, HRVYR) |>
+        rename(StandID = STAND_ID, HarvestYear = HRVYR),
+      by = join_by(StandID)
+    ) |>
+    mutate(
+      YearsSinceHarvest = Year - HarvestYear
+    )
 })

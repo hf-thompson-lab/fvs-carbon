@@ -970,11 +970,11 @@ harvested_and_cut <- harvested_trees |>
   )
 ```
 
-```{r harvested but not cut}
+```{r harvested but not cut, eval = FALSE}
 harvested_and_cut |> filter(is.na(SUBP.y)) |> nrow()
 ```
 
-```{r cut but not harvested}
+```{r cut but not harvested, eval = FALSE}
 harvested_and_cut |> filter(is.na(SUBP.x)) |> nrow()
 ```
 

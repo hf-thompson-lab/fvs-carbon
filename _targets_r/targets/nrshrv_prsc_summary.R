@@ -6,5 +6,15 @@ tar_target(nrshrv_prsc_summary, {
       Tpa = mean(Tpa),
       .groups = 'keep'
     ) |>
-    ungroup()
+    ungroup() |>
+    left_join(
+      nrshrv_plot_stats |>
+        filter(!is.na(HRVYR)) |>
+        distinct(STAND_ID, HRVYR) |>
+        rename(StandID = STAND_ID, HarvestYear = HRVYR),
+      by = join_by(StandID)
+    ) |>
+    mutate(
+      YearsSinceHarvest = Year - HarvestYear
+    )
 })
