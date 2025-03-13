@@ -103,7 +103,7 @@ fvs_ThinPRSC <- function(rows) {
     }
     prsc <- row["PRESCRIPTION"]
     c(
-      fvs_kwd("CycleAt", as.numeric(year) - 1), # harvest is done in the first cycle year
+      fvs_kwd("CycleAt", year),
       fvs_kwd("ThinPRSC", year, percent, prsc)
     )
   }
