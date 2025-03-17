@@ -472,6 +472,103 @@ map_data('state', fvsne_states$STATE_NAME) |>
   scale_color_discrete(name = "Forest Type")
 ```
 
+# Regeneration
+
+Pick a sample of plots to work with:
+```{r sample plot, eval = FALSE}
+sample_plot <- nrshrv_plot |> slice_sample(n = 1)
+```
+
+## FIA Regen
+
+We want actual regeneration. See what we can get from FIA:
+```{r rfia growmort regen, eval = FALSE}
+con <- DBI::dbConnect(RSQLite::SQLite(), fiadb)
+
+state_cd <- sample_plot |> pull(STATECD)
+county_cd <- sample_plot |> pull(COUNTYCD)
+plot_cd <- sample_plot |> pull(PLOT)
+
+fia <- rFIA::readFIA(
+  con = con,
+  schema = "main",
+  states = fvsne_states |> filter(STATECD == state_cd) |> pull(STATE_ABBR),
+  inMemory = FALSE
+)
+fia_grow_mort <- rFIA::growMort(
+  fia,
+  method = "TI", # "TI", "annual", "SMA", "LMA", "EMA"
+  stateVar = "TPA",
+  areaDomain = COUNTYCD == county_cd & PLOT == plot_cd,
+  byPlot = TRUE,
+  bySpecies = TRUE,
+  bySizeClass = TRUE
+) |>
+  filter(RECR_TPA > 0 | MORT_TPA > 0 | REMV_TPA > 0 | GROW_TPA > 0)
+
+DBI::dbDisconnect(con)
+
+fia_grow_mort |> distinct(sizeClass)
+```
+
+Note that this only gives sizeClass == 5, so ingrowth of trees >= 5" DBH.
+We will need a lot of saplings, 1" < DBH < 5", so let's look at other methods.
+
+## FIA GRM
+
+```{r fia grm regen, eval = FALSE}
+sample_plots <- nrshrv_plot |>
+  semi_join(sample_plot, by = join_by(STATECD, COUNTYCD, PLOT))
+fia_grm <- fia_grm_ingrowth(fiadb, sample_plots) |>
+  mutate(HT = (DIA_END / ANN_DIA_GROWTH) * ANN_HT_GROWTH) |>
+  left_join(
+    nrshrv_plot |>
+      select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR),
+    by = join_by(PLT_CN == CN)
+  ) |>
+  left_join(
+    nrshrv_plot_stats |> filter(!is.na(HRVYR)) |> select(STATECD, COUNTYCD, PLOT, HRVYR),
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
+  mutate(
+    TPA = coalesce(MICR_TPAGROW_UNADJ_AL_FOREST, SUBP_TPAGROW_UNADJ_AL_FOREST),
+    YearsSinceHarvest = MEASYEAR - HRVYR
+  ) |>
+  select(!starts_with("MICR_") & !starts_with("SUBP_"))
+
+fia_grm <- fia_grm |>
+  left_join(
+    fia_trees_by_cn(
+      fiadb,
+      fia_grm |>
+        select(TRE_CN) |>
+        rename(CN = TRE_CN)
+    ) |>
+      select(CN, SPCD),
+    by = join_by(TRE_CN == CN)
+  ) |>
+  left_join(
+    species_crosswalk,
+    by = join_by(SPCD)
+  )
+ggplot(fia_grm, aes(DIA_END, HT)) + geom_point()
+```
+
+```{r plot fia grm rate, eval = FALSE}
+fia_grm |>
+  mutate(TREE_GROUP = paste0(SCIENTIFIC_NAME, " ", if_else(DIA_END < 4, "(sapling)", "(tree)"))) |>
+  group_by(YearsSinceHarvest, TREE_GROUP) |>
+  summarize(TPA = sum(TPA, na.rm = TRUE), .groups = "keep") |>
+  ungroup() |>
+  ggplot(aes(YearsSinceHarvest, TPA, fill = TREE_GROUP)) +
+  geom_col() +
+  theme_bw() +
+  ggtitle("Post-Harvest Ingrowth")
+```
+
+Which gets us a bunch of 1" trees, so much better visibility earlier in the
+growth timeline.
+
 # Run FVS
 
 We will use prescription harvest to tell FVS which trees to harvest, when.
