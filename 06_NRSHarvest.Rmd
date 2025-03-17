@@ -20,6 +20,8 @@ library(measurements) # conv_unit and conv_multiunit
 library(maps)
 library(ggspatial)
 library(pbapply) # Progress bar for long operations
+# Color palette to use in charts, for consistency
+color_palette <- RColorBrewer::brewer.pal(9, "Greens")
 options(scipen = 9) # Use integer notation for numbers under 9 digits
 tar_source()
 ```
@@ -922,64 +924,186 @@ nrshrv_prsc_cutlist  <- fvs_read_output(nrshrv_prsc, "FVS_CutList_East") |>
 
 How many of nrshrv_tree_harvested are in nrshrv_prsc_cutlist?
 
-```{r harvested vs cut trees, eval = FALSE}
-cut_trees <- nrshrv_prsc_cutlist |>
-  select(StandID, PtIndex, TreeId, DBH) |>
+```{r fia vs fvs harvested trees, eval = FALSE}
+fvs_harvested_trees <- nrshrv_prsc_cutlist |>
+  select(StandID, PtIndex, TreeId, SpeciesFIA, TPA, DBH) |>
   rename(
     STAND_ID = StandID,
     SUBP = PtIndex,
     TREE = TreeId,
+    SPCD = SpeciesFIA,
     DIA = DBH
   ) |>
   mutate(
-    DIA = as.integer(0.5 + DIA * 10), # DIA is now tenths of an inch
-    CUT = 1
+    SPCD = as.integer(SPCD),
+    BA = TPA * pi * (DIA / 2) ^ 2,
+    DIA_TENTHS = as.integer(0.5 + DIA * 10), # DIA_TENTHS is tenths of an inch
+    FVS_HARVEST = 1
   )
 
-stand_id <- nrshrv_plot_stats |>
+stand_id_mixin <- nrshrv_plot_stats |>
   distinct(STATECD, COUNTYCD, PLOT, STAND_ID)
 
-# All the trees...
-harvested_trees <- fia_trees_filtered(
+fia_harvested_trees <- fia_trees_filtered(
     fiadb,
     nrshrv_plot_stats |> filter(PRE_HARVEST == 1),
     filter = \(.data, com) {
       .data |>
-        select(STATECD, COUNTYCD, PLOT, SUBP, TREE, DIA)
+        select(STATECD, COUNTYCD, PLOT, SUBP, TREE, SPCD, TPA_UNADJ, DIA) |>
+        rename(TPA = TPA_UNADJ)
   }) |>
   inner_join(
     nrshrv_tree_harvested |>
       select(STATECD, COUNTYCD, PLOT, SUBP, TREE),
     by = join_by(STATECD, COUNTYCD, PLOT, SUBP, TREE)
   ) |>
-  mutate(
-    DIA = trunc(0.5 + DIA * 10) # DIA is now tenths of an inch
-  )
-
-harvested_and_cut <- harvested_trees |>
   left_join(
-    stand_id,
+    stand_id_mixin,
     by = join_by(STATECD, COUNTYCD, PLOT)
   ) |>
+  select(STAND_ID, SUBP, TREE, SPCD, TPA, DIA) |>
   mutate(
-    TREE = as.character(TREE)
-  ) |>
-  full_join(
-    cut_trees,
-    by = join_by(STAND_ID, TREE, DIA)
+    TREE = as.character(TREE), # FVS TREE uses letters
+    BA = TPA * pi * (DIA / 2) ^ 2,
+    DIA_TENTHS = trunc(0.5 + DIA * 10), # DIA is now tenths of an inch
+    FIA_HARVEST = 1
   )
 ```
 
-```{r harvested but not cut, eval = FALSE}
-harvested_and_cut |> filter(is.na(SUBP.y)) |> nrow()
+```{r align harvest by tree, eval = FALSE}
+align_by_tree <- fia_harvested_trees |>
+  full_join(
+    fvs_harvested_trees,
+    by = join_by(STAND_ID, SUBP, TREE)
+  )
+align_by_tree |>
+  filter(!is.na(FVS_HARVEST) & !is.na(FIA_HARVEST)) |>
+  nrow() /
+  align_by_tree |> nrow()
 ```
 
-```{r cut but not harvested, eval = FALSE}
-harvested_and_cut |> filter(is.na(SUBP.x)) |> nrow()
+We were able to line up less than half the trees by identity.
+
+What about lining up by diameter?
+
+```{r align harvest by diameter, eval = FALSE}
+align_by_dia <- fia_harvested_trees |>
+  full_join(
+    fvs_harvested_trees,
+    by = join_by(STAND_ID, TREE, DIA_TENTHS)
+  )
+
+align_by_dia |>
+  filter(!is.na(FVS_HARVEST) & !is.na(FIA_HARVEST)) |>
+  nrow() /
+  align_by_dia |> nrow()
 ```
 
-This is imperfect, but >5000 of 5213 trees line up, and visual inspection shows
-that the rest are probably the same trees, the diameters are off by ~0.2 inch.
+Better; we were able to line up 97%, but diameter is not unique so the join
+ended up being many-to-many, so the results are incorrect.
+
+Instead of lining up trees, we can also look to see if approximately the
+correct BA was harvested of each species on each plot.
+
+```{r align harvest by basal area, eval = FALSE}
+fia_harvested_ba <- fia_harvested_trees |>
+  group_by(STAND_ID, SPCD) |>
+  summarize(FIA_BA = sum(BA / 12), .groups = "keep") |>
+  ungroup()
+
+fvs_harvested_ba <- fvs_harvested_trees |>
+  group_by(STAND_ID, SPCD) |>
+  summarize(FVS_BA = sum(BA / 12), .groups = "keep") |>
+  ungroup()
+
+align_by_ba <- fia_harvested_ba |>
+  full_join(
+    fvs_harvested_ba,
+    by = join_by(STAND_ID, SPCD)
+  ) |>
+  mutate(
+    FIA_BA = coalesce(FIA_BA, 0),
+    FVS_BA = coalesce(FVS_BA, 0),
+    DELTA = abs(FIA_BA - FVS_BA),
+    PROPORTION = FVS_BA / ((FVS_BA + FIA_BA) / 2),
+    ERROR = abs(FIA_BA - FVS_BA) / ((FVS_BA + FIA_BA) / 2)
+  ) |>
+  left_join(species_crosswalk, by = join_by(SPCD))
+
+summary(align_by_ba$ERROR)
+```
+
+```{r harvest 99%ile error, eval = FALSE}
+align_by_ba |>
+  mutate(RANK = percent_rank(ERROR)) |>
+  filter(ERROR < 0.01) |>
+  filter(RANK == max(RANK))
+```
+
+so >97.5% of plot/species are within 1% of requested
+
+What are the outliers?
+
+```{r fvs vs via harvest outliers, eval = FALSE}
+outliers <- align_by_ba |>
+  filter(ERROR > 0.02)
+```
+
+Some of these will be because FVS doesn't handle the species:
+```{r fvs harvest unhandled species, eval = FALSE}
+outliers |> filter(FVS_BA == 0) |> nrow()
+```
+
+7 out of 29.
+
+Interestingly, there are 5 cases where FVS harvested species not requested:
+```{r fia harvest unhandled species, eval = FALSE}
+outliers |> filter(FIA_BA == 0) |> nrow()
+```
+
+Ten of these line up at the genus level:
+```{r align harvest by genus, eval = FALSE}
+missing_fvs_ba <- align_by_ba |>
+  filter(FVS_BA == 0) |>
+  select(!FVS_BA)
+missing_fia_ba <- align_by_ba |>
+  filter(FIA_BA == 0)
+has_both_fia_and_fvs_ba <- align_by_ba |>
+  filter(FIA_BA > 0 & FVS_BA > 0)
+aligned_at_genus <- missing_fvs_ba |>
+  left_join(
+    missing_fia_ba |> select(STAND_ID, GENUS, FVS_BA),
+    by = join_by(STAND_ID, GENUS)
+  ) |>
+  filter(!is.na(FIA_BA) & !is.na(FVS_BA)) |>
+  mutate(
+    DELTA = abs(FIA_BA - FVS_BA),
+    PROPORTION = FVS_BA / ((FVS_BA + FIA_BA) / 2),
+    ERROR = abs(FIA_BA - FVS_BA) / ((FVS_BA + FIA_BA) / 2)
+  )
+still_unaligned <- missing_fia_ba |>
+  anti_join(
+    aligned_at_genus,
+    by = join_by(STAND_ID, GENUS)
+  )
+
+align_by_ba_2 <- bind_rows(
+  has_both_fia_and_fvs_ba,
+  aligned_at_genus,
+  still_unaligned
+)
+```
+
+```{r plot harvest ba error, eval = FALSE}
+ggplot(align_by_ba_2, aes(PROPORTION)) +
+  geom_histogram(binwidth = 0.05) +
+  theme_bw() +
+  ggtitle("Proportion of BA specified for harvested that was actually harvested") +
+  ylab("Species/Plot Combinations") +
+  xlab("Harvested Proportion")
+```
+
+
 
 ### Projected Stands are Surveyed
 
@@ -1020,11 +1144,12 @@ ggplot(
   geom_bin2d(bins = 25) +
   scale_fill_gradient(
     name = "Number of Plots",
-    low = "gray95",
-    high = "darkgreen"
+    low = color_palette[1],
+    high = color_palette[8],
+    limits = c(0, 50)
   ) +
   theme_bw() +
-  ggtitle("FVS Projected Carbon in Harvested Stands") +
+  ggtitle("FVS Projected Carbon in Harvested Stands (no regen)") +
   ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1))) +
   xlab("Years since Harvest")
 ```
@@ -1039,8 +1164,9 @@ ggplot(
   scale_fill_gradient(
     name = "Number of Plots",
     # transform = "log10",
-    low = "gray95",
-    high = "darkgreen"
+    low = color_palette[1],
+    high = color_palette[8],
+    limits = c(0, 50)
   ) +
   theme_bw() +
   ggtitle("FIA Measured Carbon in Harvested Stands") +
@@ -1050,38 +1176,86 @@ ggplot(
 
 ## Carbon Flux
 
-```{r plot carbon flux, eval = FALSE}
-all_years <- tibble(Year = min(FVS_Carbon_PRSC$Year):max(FVS_Carbon_PRSC$Year))
+
+```{r plot measured flux, eval = FALSE}
+all_years <- tibble(YearsSinceHarvest = min(nrshrv_srvy_carbon$YearsSinceHarvest):max(nrshrv_srvy_carbon$YearsSinceHarvest))
 num_years <- all_years |> nrow()
 
-FVS_Carbon_PRSC |>
+nrshrv_srvy_carbon |>
   group_by(StandID) |>
-  arrange(Year) |>
+  arrange(YearsSinceHarvest) |>
   mutate(
-    C_Flux = Aboveground_Total_Live - lag(Aboveground_Total_Live),
-    Prev_Year = lag(Year),
-    Annual_C_Flux = C_Flux / (Year - Prev_Year),
-    Min_Year = min(Year),
-    Max_Year = max(Year)
+    C_Flux = -(Aboveground_Total_Live - lag(Aboveground_Total_Live)),
+    Prev_Years = lag(YearsSinceHarvest),
+    Annual_C_Flux = C_Flux / (YearsSinceHarvest - Prev_Years),
+    Min_Years = min(YearsSinceHarvest),
+    Max_Years = max(YearsSinceHarvest)
   ) |>
   ungroup() |>
   full_join(
     expand.grid(
-      StandID = unique(FVS_Carbon_PRSC$StandID),
-      Year = all_years$Year
+      StandID = unique(nrshrv_srvy_carbon$StandID),
+      YearsSinceHarvest = all_years$YearsSinceHarvest
     ),
-    by = join_by(StandID, Year)
+    by = join_by(StandID, YearsSinceHarvest)
   ) |>
-  arrange(StandID, Year) |>
+  arrange(StandID, YearsSinceHarvest) |>
   fill(StandID, Annual_C_Flux, .direction = "up") |>
-  fill(Min_Year, Max_Year, .direction = "updown") |>
-  filter(Year >= Min_Year & Year <= Max_Year) |>
+  fill(Min_Years, Max_Years, .direction = "updown") |>
+  filter(YearsSinceHarvest >= Min_Years & YearsSinceHarvest <= Max_Years) |>
   ggplot(
-    aes(x = Year, y = Annual_C_Flux)
+    aes(x = YearsSinceHarvest, y = Annual_C_Flux)
+  ) +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.25) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  geom_bin2d(binwidth = c(1, 1)) +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    low = color_palette[2],
+    high = color_palette[9]
+  ) +
+  theme_bw() +
+  ggtitle("FIA Measured Annual Carbon Flux for Harvested Plots") +
+  ylab(bquote("Projected Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) #+;
+
+```
+
+```{r plot projected flux, eval = FALSE}
+all_years <- tibble(YearsSinceHarvest = min(nrshrv_prsc_carbon$YearsSinceHarvest):max(nrshrv_prsc_carbon$YearsSinceHarvest))
+num_years <- all_years |> nrow()
+
+nrshrv_prsc_carbon |>
+  group_by(StandID) |>
+  arrange(YearsSinceHarvest) |>
+  mutate(
+    C_Flux = -(Aboveground_Total_Live - lag(Aboveground_Total_Live)),
+    Prev_Years = lag(YearsSinceHarvest),
+    Annual_C_Flux = C_Flux / (YearsSinceHarvest - Prev_Years),
+    Min_Years = min(YearsSinceHarvest),
+    Max_Years = max(YearsSinceHarvest)
+  ) |>
+  ungroup() |>
+  full_join(
+    expand.grid(
+      StandID = unique(nrshrv_prsc_carbon$StandID),
+      YearsSinceHarvest = all_years$YearsSinceHarvest
+    ),
+    by = join_by(StandID, YearsSinceHarvest)
+  ) |>
+  arrange(StandID, YearsSinceHarvest) |>
+  fill(StandID, Annual_C_Flux, .direction = "up") |>
+  fill(Min_Years, Max_Years, .direction = "updown") |>
+  filter(YearsSinceHarvest >= Min_Years & YearsSinceHarvest <= Max_Years) |>
+  ggplot(
+    aes(x = YearsSinceHarvest, y = Annual_C_Flux)
   ) +
   geom_bin2d(binwidth = c(1, 1)) +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  scale_fill_continuous(name = "Number of Plots", transform = "log10") +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    low = color_palette[2],
+    high = color_palette[9]
+  ) +
   theme_bw() +
   ggtitle("FVS Projected Annual Carbon Flux for Harvested Plots") +
   ylab(bquote("Projected Carbon Flux" ~(`Mg C` %.% ha^-1 %.% yr^-1))) #+;

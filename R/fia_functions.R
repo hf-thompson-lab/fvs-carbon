@@ -220,3 +220,17 @@ fia_grm_ingrowth <- function(fiadb, plots) {
     ) |>
     collect()
 }
+
+fia_grm_estn <- function(fiadb, trees) {
+  con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
+  on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
+  
+  tbl(con, "TREE_GRM_ESTN") |>
+    inner_join(
+      trees |>
+        select(CN),
+      by = join_by(TRE_CN == CN),
+      copy = TRUE
+    ) |>
+    collect()
+}

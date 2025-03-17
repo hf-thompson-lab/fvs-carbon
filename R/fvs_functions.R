@@ -451,3 +451,18 @@ fvs_read_output <- function(fvs_output, table) {
     })
   )
 }
+
+fvs_read_input <- function(fvs_output, table) {
+  bind_rows(
+    lapply(1:nrow(fvs_output), \(n) {
+      row <- fvs_output[n,]
+      input_db <- row[["input_db"]]
+      con <- DBI::dbConnect(RSQLite::SQLite(), input_db, flags = RSQLite::SQLITE_RO)
+      on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
+      
+      tbl(con, table) |>
+        collect() |>
+        cross_join(row)
+    })
+  )
+}
