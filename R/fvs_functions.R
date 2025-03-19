@@ -235,7 +235,7 @@ fvs_fia_input <- function(fiadb, stands, harvest, filename) {
         # more than 10 replicates)
         TREE_ID = case_when(
           (REPLICATES > 1) & (TREE_ID > 1000000) ~ (TREE_ID * 10) + row_number(),
-          (REPLICATED > 1) ~ 10000 + (TREE_ID * 10) + row_number(),
+          (REPLICATES > 1) ~ 10000 + (TREE_ID * 10) + row_number(),
           .default = TREE_ID
         )
         # TREE_CN is a foreign key to additional information about the tree,
