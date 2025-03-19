@@ -178,7 +178,7 @@ fvs_fia_input <- function(fiadb, stands, harvest, filename) {
   
   DBI::dbWriteTable(
     out,
-    "TreeInit_Plot",
+    "FVS_TreeInit_Plot",
     # Read the FIA trees
     tbl(fia, "FVS_TreeInit_Plot") |>
       inner_join(
