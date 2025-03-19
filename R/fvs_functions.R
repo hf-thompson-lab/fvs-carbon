@@ -64,18 +64,26 @@ fvs_Estab <- function(rows) {
       height <- ''
     }
     shade <- 0
-    #    result <- c()
-    # FVS has a limit of 1000 trees per tree record. Each establishment
-    # keyword creates one tree record, so if there are more than 1000 trees
-    # split it into multiple records.
-#    while (density > 1000) {
-#      result <- append(result, fvs_kwd("Natural", year, species, 1000, survival, age, height, shade))
-#      density <- density - 1000
-#    }
-#    append(result, fvs_kwd("Natural", year, species, density, survival, age, height, shade))
     fvs_kwd("Natural", year, species, density, survival, age, height, shade)
   }
   if (!is.null(rows)) {
+    # FVS has a limit of 1000 trees per tree record. Each establishment
+    # keyword creates one tree record, so if there are more than 1000 trees
+    # split it into multiple records.
+    rows <- rows |>
+      group_by() |>
+      mutate(ROW_NUMBER = row_number()) |>
+      ungroup() |>
+      mutate(REPLICATES = trunc(DENSITY / 1000) + 1) |>
+      uncount(REPLICATES, .remove = FALSE) |>
+      group_by(ROW_NUMBER) |>
+      mutate(DENSITY = case_when(
+        REPLICATES == 1 ~ DENSITY,
+        (REPLICATES > 1) & (row_number() == 1) ~ DENSITY %% 1000,
+        (REPLICATES > 1) & (row_number() > 1) ~ 1000
+      )) |>
+      ungroup() |>
+      select(-any_of(c("ROW_NUMBER", "REPLICATES")))
     c(
       fvs_kwd("If", 0),
       fvs_kwd("mod(cycle,1) eq 0"),
@@ -128,71 +136,116 @@ fvs_fia_input <- function(fiadb, stands, harvest, filename) {
   on.exit(DBI::dbDisconnect(out), add = TRUE, after = FALSE)
   
   stand_cns <- stands |> distinct(STAND_CN)
+  
+  # Right now, only Plot is supported.
   # StandInit_Plot / TreeInit_Plot - Used when a stand is a plot.
   # StandInit_Cond / TreeInit_Cond - Used when a stand is a condition.
   # PlotInit_Plot / TreeInit_Plot - Used when a stand is a subplot.
-  # 
-  # These tables are described in the FIA Data Quick Start guide.
-  if (is.null(harvest)) {
-    tables <- c(
-      "FVS_PlotInit_Plot",
-      "FVS_StandInit_Cond",
-      "FVS_StandInit_Plot",
-      "FVS_TreeInit_Cond",
-      "FVS_TreeInit_Plot"
-    )
-    tree_tables <- c()
-  } else {
-    tables <- c(
-      "FVS_PlotInit_Plot",
-      "FVS_StandInit_Cond",
-      "FVS_StandInit_Plot"
-    )
-    tree_tables <- c(
-      "FVS_TreeInit_Cond",
-      "FVS_TreeInit_Plot"
-    )
-  }
-  
   # In theory, we could ATTACH the output database and do this copy
   # internal to SQLite, but that is a bit tricky to manage so we
   # pull it into R and write it back out.
-  lapply(tables, \(table){
-    DBI::dbWriteTable(
-      out,
-      table,
-      tbl(fia, table) |>
-        inner_join(
-          stand_cns |> select(STAND_CN),
-          by = join_by(STAND_CN),
-          copy = TRUE
-        ) |>
-        collect(),
-      overwrite = TRUE
-    )
-  })
-  
-  lapply(tree_tables, \(table){
-    DBI::dbWriteTable(
-      out,
-      table,
-      tbl(fia, table) |>
-        inner_join(
-          stand_cns |> select(STAND_CN),
-          by = join_by(STAND_CN),
-          copy = TRUE
-        ) |>
-        collect() |>
+  DBI::dbWriteTable(
+    out,
+    "FVS_StandInit_Plot",
+    tbl(fia, "FVS_StandInit_Plot") |>
+      inner_join(
+        stand_cns |> select(STAND_CN),
+        by = join_by(STAND_CN),
+        copy = TRUE
+      ) |>
+      collect(),
+    overwrite = TRUE
+  )
+
+  append_prescription <- if (is.null(harvest)) {
+    function(.data) { .data }
+  } else {
+    function(.data) {
+      .data |>
         select(!PRESCRIPTION) |>
         left_join(
           harvest |> select(TREE_CN, PRESCRIPTION),
           by = join_by(TREE_CN),
           copy = TRUE
+        )
+    }
+  }
+  
+  check_baf <- function(.data) {
+    stopifnot(!any(.data$BASAL_AREA_FACTOR > 0, na.rm = TRUE))
+    .data
+  }
+  
+  DBI::dbWriteTable(
+    out,
+    "TreeInit_Plot",
+    # Read the FIA trees
+    tbl(fia, "FVS_TreeInit_Plot") |>
+      inner_join(
+        stand_cns |> select(STAND_CN),
+        by = join_by(STAND_CN),
+        copy = TRUE
+      ) |>
+      # Graft on TPA information
+      left_join(
+        tbl(fia, "FVS_StandInit_Plot") |>
+          select(STAND_CN, BRK_DBH, BASAL_AREA_FACTOR, INV_PLOT_SIZE),
+        by = join_by(STAND_CN)
+      ) |>
+      collect() |>
+      # Append the prescription column
+      append_prescription() |>
+      # Break up records representing more than 1000 trees
+      # This is generally only an issue for trees on the microplot
+      # where trees with DIAMETER < BRK_DBH have their TREE_COUNT
+      # multiplied by INV_PLOT_SIZE to get TPA. INV_PLOT_SIZE
+      # is 1/acre, which is 300 for a standard microplot, so any record
+      # representing more than 3 1/3 trees will expand to more than 1000 TPA.
+      # For non-microplot trees, BASAL_AREA_FACTOR is the multiplier to get
+      # TPA; if BASAL_AREA_FACTOR < 0, then it is the negative of 1/acre for
+      # a large-tree fixed area plot; if BASAL_AREA_FACTOR > 0 then it is
+      # basal area factor for horizontal angle guage in ft2/acre/tree.
+      # This code does not currently handle horizontal angle guage.
+      check_baf() |>
+      mutate(REPLICATES = case_when(
+        (DIAMETER < BRK_DBH) & ((TREE_COUNT * INV_PLOT_SIZE) > 1000) ~
+          trunc(TREE_COUNT * INV_PLOT_SIZE / 1000) + 1,
+        (DIAMETER >= BRK_DBH) & ((TREE_COUNT * -BASAL_AREA_FACTOR) > 1000) ~
+          trunc(TREE_COUNT * -BASAL_AREA_FACTOR / 1000) + 1,
+        .default = 1
+      )) |>
+      uncount(REPLICATES, .remove = FALSE) |>
+      group_by(TREE_CN) |>
+      mutate(
+        TREE_COUNT = case_when(
+          (REPLICATES == 1) ~ TREE_COUNT,
+          (DIAMETER < BRK_DBH) & (row_number() == 1) ~
+            ((TREE_COUNT * INV_PLOT_SIZE) %% 1000) / INV_PLOT_SIZE,
+          (DIAMETER < BRK_DBH) & (row_number() > 1) ~
+            (1000 / INV_PLOT_SIZE),
+          (DIAMETER >= BRK_DBH) & (row_number() == 1) ~
+            ((TREE_COUNT * -BASAL_AREA_FACTOR) %% 1000) / -BASAL_AREA_FACTOR,
+          (DIAMETER >= BRK_DBH) & (row_number() > 1) ~
+            (1000 / -BASAL_AREA_FACTOR)
         ),
-      overwrite = TRUE
-    )
-  })
-
+        # Cook up a new TREE_ID for FVS to use. FVS uses 1,000,000 + TREE_ID
+        # for its synthetic trees, and trees on the microplot are synthetic.
+        # We'll Multiply by 10 and add the REPLICATE number (assuming that
+        # no tree will represent at least 10,000 TPA and therefore need
+        # more than 10 replicates)
+        TREE_ID = case_when(
+          (REPLICATES > 1) & (TREE_ID > 1000000) ~ (TREE_ID * 10) + row_number(),
+          (REPLICATED > 1) ~ 10000 + (TREE_ID * 10) + row_number(),
+          .default = TREE_ID
+        )
+        # TREE_CN is a foreign key to additional information about the tree,
+        # so leave it alone.
+      ) |>
+      ungroup() |>
+      select(-any_of(c("BRK_DBH", "BASAL_AREA_FACTOR", "INV_PLOT_SIZE", "REPLICATES"))),
+    overwrite = TRUE
+  )
+ 
   # Return the name of the file created / modified
   filename
 }
