@@ -227,20 +227,13 @@ fvs_fia_input <- function(fiadb, stands, harvest, filename) {
             ((TREE_COUNT * -BASAL_AREA_FACTOR) %% 1000) / -BASAL_AREA_FACTOR,
           (DIAMETER >= BRK_DBH) & (row_number() > 1) ~
             (1000 / -BASAL_AREA_FACTOR)
-        ),
-        # Cook up a new TREE_ID for FVS to use. FVS uses 1,000,000 + TREE_ID
-        # for its synthetic trees, and trees on the microplot are synthetic.
-        # We'll Multiply by 10 and add the REPLICATE number (assuming that
-        # no tree will represent at least 10,000 TPA and therefore need
-        # more than 10 replicates)
-        TREE_ID = case_when(
-          (REPLICATES > 1) & (TREE_ID > 1000000) ~ (TREE_ID * 10) + row_number(),
-          (REPLICATES > 1) ~ 10000 + (TREE_ID * 10) + row_number(),
-          .default = TREE_ID
         )
-        # TREE_CN is a foreign key to additional information about the tree,
-        # so leave it alone.
       ) |>
+      ungroup() |>
+      # Create new TREE_IDs. We can try to be clever, but it's really not worth it.
+      group_by(STAND_ID, PLOT_ID) |>
+      arrange(TREE_ID, TREE_COUNT) |> # Maintain the same order
+      mutate(TREE_ID = row_number()) |>
       ungroup() |>
       select(-any_of(c("BRK_DBH", "BASAL_AREA_FACTOR", "INV_PLOT_SIZE", "REPLICATES"))),
     overwrite = TRUE
