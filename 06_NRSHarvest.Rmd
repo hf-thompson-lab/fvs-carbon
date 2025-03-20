@@ -758,25 +758,25 @@ s <- seedlings |>
   summarize(TPA = sum(TPA_UNADJ, na.rm = TRUE), .groups = "keep") |>
   ungroup() |>
   mutate(TPA = TPA / 100) |>
-  mutate(YearsSinceHarvest = YearsSinceHarvest - 3) |>
+  mutate(YearsSinceHarvest = YearsSinceHarvest - 1) |>
   mutate(GRM = "Seedl.")
 
 r <- fia_grm |>
   group_by(YearsSinceHarvest, SCIENTIFIC_NAME, SIZE_CLASS) |>
   summarize(TPA = sum(TPA, na.rm = TRUE), .groups = "keep") |>
   ungroup() |>
-  mutate(YearsSinceHarvest = YearsSinceHarvest - 2) |>
+  mutate(YearsSinceHarvest = YearsSinceHarvest) |>
   mutate(GRM = "Recr.")
 
 m <- mort_rate |>
   group_by(YearsSinceHarvest, SCIENTIFIC_NAME, SIZE_CLASS) |>
   summarize(TPA = sum(TPAMORT, na.rm = TRUE), .groups = "keep") |>
   ungroup() |>
-  mutate(YearsSinceHarvest = YearsSinceHarvest - 1) |>
+  mutate(YearsSinceHarvest = YearsSinceHarvest + 1) |>
   mutate(GRM = "Mort.")
 
 grm <- tibble(
-  YearsSinceHarvest = c(-6, -5, -4, -1, 0, 1, 4, 5, 6, 9, 10, 11),
+  YearsSinceHarvest = c(-4, -3, -2, 1, 2, 3, 6, 7, 8, 11, 12, 13),
   GRM = rep(c("Seedl.", "Recr.", "Mort."), 4),
   TPA = c(-1.75),
   SCIENTIFIC_NAME = c("Other"),
@@ -787,9 +787,11 @@ ggplot(r, aes(YearsSinceHarvest, TPA, fill = SCIENTIFIC_NAME, pattern = SIZE_CLA
   geom_col_pattern(width = 1, pattern_fill = "grey20", pattern_density = 0.05) +
   geom_col_pattern(data = m, width = 1, pattern_fill = "grey20", pattern_density = 0.05) +
   geom_col_pattern(data = s, width = 1, pattern_fill = "grey20", pattern_density = 0.05) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
   geom_text(data = grm, size = 2) +
   scale_fill_manual(values = color_scale) +
   scale_pattern_manual(values = pattern_scale) +
+  scale_x_continuous(breaks = c(-8, -3, 0, 2, 7, 12, 17), minor_breaks = NULL) +
   theme_bw() +
   ggtitle("Post-Harvest Seedlings, Recruitment and Mortality") +
   ylab("TPA (seedling TPA/100)")
