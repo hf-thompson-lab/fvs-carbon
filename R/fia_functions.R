@@ -221,6 +221,27 @@ fia_grm_ingrowth <- function(fiadb, plots) {
     collect()
 }
 
+fia_grm_mortality <- function(fiadb, plots) {
+  con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
+  on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
+  
+  tbl(con, "TREE_GRM_COMPONENT") |>
+    inner_join(plots |> select(CN), by = join_by(PLT_CN == CN), copy = TRUE) |>
+    filter(
+      MICR_COMPONENT_AL_FOREST == 'MORTALITY1' |
+        MICR_COMPONENT_AL_FOREST == 'MORTALITY2' |
+        SUBP_COMPONENT_AL_FOREST == 'MORTALITY1' |
+        SUBP_COMPONENT_AL_FOREST == 'MORTALITY2'
+    ) |>
+    select(
+      TRE_CN, PREV_TRE_CN, PLT_CN,
+      DIA_BEGIN, DIA_MIDPT, DIA_END, ANN_DIA_GROWTH, ANN_HT_GROWTH,
+      MICR_COMPONENT_AL_FOREST, MICR_TPAGROW_UNADJ_AL_FOREST, MICR_TPAMORT_UNADJ_AL_FOREST,
+      SUBP_COMPONENT_AL_FOREST, SUBP_TPAGROW_UNADJ_AL_FOREST, SUBP_TPAMORT_UNADJ_AL_FOREST
+    ) |>
+    collect()
+}
+
 fia_grm_estn <- function(fiadb, trees) {
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)

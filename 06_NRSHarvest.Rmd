@@ -514,6 +514,20 @@ fia_grow_mort |> distinct(sizeClass)
 Note that this only gives sizeClass == 5, so ingrowth of trees >= 5" DBH.
 We will need a lot of saplings, 1" < DBH < 5", so let's look at other methods.
 
+```{r}
+fia_grow_mort |>
+  mutate(TREE_GROUP = paste0(SCIENTIFIC_NAME, " ", if_else(sizeClass < 4, "(sapling)", "(tree)"))) |>
+  left_join(nrshrv_plot_stats |> select(CN, HRVYR), by = join_by(PLT_CN == CN)) |>
+  mutate(YearsSinceHarvest = YEAR - HRVYR) |>
+  group_by(YearsSinceHarvest, TREE_GROUP) |>
+  summarize(TPA = sum(RECR_TPA, na.rm = TRUE), .groups = "keep") |>
+  ungroup() |>
+  ggplot(aes(YearsSinceHarvest, TPA, fill = TREE_GROUP)) +
+  geom_col() +
+  theme_bw() +
+  ggtitle("Post-Harvest Ingrowth")
+```
+
 ## FIA GRM
 
 ```{r fia grm regen, eval = FALSE}
@@ -531,6 +545,11 @@ fia_grm <- fia_grm_ingrowth(fiadb, sample_plots) |>
     by = join_by(STATECD, COUNTYCD, PLOT)
   ) |>
   mutate(
+    SIZE_CLASS = case_when(
+      DIA_END < 1 ~ "seedling",
+      DIA_END < 5 ~ "sapling",
+      .default = "tree"
+    ),
     TPA = coalesce(MICR_TPAGROW_UNADJ_AL_FOREST, SUBP_TPAGROW_UNADJ_AL_FOREST),
     YearsSinceHarvest = MEASYEAR - HRVYR
   ) |>
@@ -555,19 +574,143 @@ ggplot(fia_grm, aes(DIA_END, HT)) + geom_point()
 ```
 
 ```{r plot fia grm rate, eval = FALSE}
+pattern_scale <- c(
+  "tree" = "stripe",
+  "sapling" = "none",
+  "seedling" = "circle"
+)
+
 fia_grm |>
-  mutate(TREE_GROUP = paste0(SCIENTIFIC_NAME, " ", if_else(DIA_END < 4, "(sapling)", "(tree)"))) |>
-  group_by(YearsSinceHarvest, TREE_GROUP) |>
-  summarize(TPA = sum(TPA, na.rm = TRUE), .groups = "keep") |>
+  group_by(YearsSinceHarvest, SCIENTIFIC_NAME, SIZE_CLASS) |>
+  summarize(
+    TPA = sum(TPA, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
   ungroup() |>
-  ggplot(aes(YearsSinceHarvest, TPA, fill = TREE_GROUP)) +
-  geom_col() +
+  mutate(TREE_GROUP = paste0(SCIENTIFIC_NAME, " (", SIZE_CLASS, ")")) |>
+  ggplot(aes(YearsSinceHarvest, TPA, fill = SCIENTIFIC_NAME, pattern = SIZE_CLASS)) +
+  geom_col_pattern(pattern_fill = "grey20", pattern_density = 0.05) +
+  scale_pattern_manual(values = pattern_scale) +
   theme_bw() +
   ggtitle("Post-Harvest Ingrowth")
 ```
 
 Which gets us a bunch of 1" trees, so much better visibility earlier in the
 growth timeline.
+
+## Early Mortality
+
+Seedlings and saplings die quickly. Let's see if we can find rates.
+
+```{r}
+mort <- fia_grm_mortality(fiadb, sample_plots) |>
+  left_join(
+    nrshrv_plot |>
+      select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR),
+    by = join_by(PLT_CN == CN)
+  ) |>
+  left_join(
+    nrshrv_plot_stats |> filter(!is.na(HRVYR)) |> select(STATECD, COUNTYCD, PLOT, HRVYR),
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
+  mutate(YearsSinceHarvest = MEASYEAR - HRVYR)
+
+mort_spcd_mixin <- fia_trees_by_cn(
+    fiadb,
+    mort |>
+      distinct(TRE_CN) |>
+      rename(CN = TRE_CN)
+  ) |>
+  select(CN, SPCD)
+mort_rate <- mort |>
+  left_join(mort_spcd_mixin, by = join_by(TRE_CN == CN)) |>
+  mutate(
+    SIZE_CLASS = case_when(
+      DIA_BEGIN < 1 ~ "seedling",
+      DIA_BEGIN < 5 ~ "sapling",
+      .default = "tree"
+    ),
+    TPAMORT = case_when(
+      SIZE_CLASS == "tree" ~ SUBP_TPAMORT_UNADJ_AL_FOREST,
+      .default = MICR_TPAMORT_UNADJ_AL_FOREST
+    ),
+    TPAGROW = case_when(
+      SIZE_CLASS == "tree" ~ SUBP_TPAGROW_UNADJ_AL_FOREST,
+      .default = MICR_TPAGROW_UNADJ_AL_FOREST
+    )
+  ) |>
+#  group_by(SPCD, SIZE_CLASS, MEASYEAR) |>
+#  summarize(
+#    MORTALITY = sum(TPAMORT),# * mean(TPAGROW),
+#    .groups = "keep"
+#  ) |>
+#  ungroup() |>
+  left_join(species_crosswalk, by = join_by(SPCD))
+```
+
+```{r plot fia grm rate, eval = FALSE}
+mort_rate |>
+  group_by(YearsSinceHarvest, SCIENTIFIC_NAME, SIZE_CLASS) |>
+  summarize(TPA = sum(TPAMORT, na.rm = TRUE), .groups = "keep") |>
+  ungroup() |>
+  mutate(TREE_GROUP = paste0(SCIENTIFIC_NAME, " (", SIZE_CLASS, ")")) |>
+  ggplot(aes(YearsSinceHarvest, TPA, fill = SCIENTIFIC_NAME, pattern = SIZE_CLASS)) +
+  geom_col_pattern(pattern_fill = "grey20", pattern_density = 0.05) +
+  scale_pattern_manual(name = "SIZE_CLASS", values = pattern_scale) +
+  theme_bw() +
+  ggtitle("Post-Harvest Mortality")
+```
+
+Can we plot these next to each other?
+```{r}
+r <- fia_grm |>
+  group_by(YearsSinceHarvest, SCIENTIFIC_NAME, SIZE_CLASS) |>
+  summarize(TPA = sum(TPA, na.rm = TRUE), .groups = "keep") |>
+  ungroup() |>
+  mutate(YearsSinceHarvest = YearsSinceHarvest - 3) |>
+  mutate(GRM = "Recruit")
+
+m <- mort_rate |>
+  group_by(YearsSinceHarvest, SCIENTIFIC_NAME, SIZE_CLASS) |>
+  summarize(TPA = sum(TPAMORT, na.rm = TRUE), .groups = "keep") |>
+  ungroup() |>
+  mutate(YearsSinceHarvest = YearsSinceHarvest - 1) |>
+  mutate(GRM = "Mortality")
+
+grm <- tibble(
+  YearsSinceHarvest = c(-6, -4, -1, 1, 4, 6, 9, 11),
+  GRM = c("Recruit", "Mortality", "Recruit", "Mortality", "Recruit", "Mortality", "Recruit", "Mortality"),
+  TPA = c(-1.75),
+  SCIENTIFIC_NAME = c(NA),
+  SIZE_CLASS = c(NA)
+)
+
+color_scale <- c(
+  "Abies balsamea" = "blue",
+  "Acer rubrum" = "red1",
+  "Acer saccharum" = "gold2",
+  "Acer spicatum" = "darkorange",
+  "Betula alleghaniensis" = "olivedrab3",
+  "Picea rubens" = "lightblue"
+)
+
+ggplot(r, aes(YearsSinceHarvest, TPA, fill = SCIENTIFIC_NAME, pattern = SIZE_CLASS, label = GRM)) +
+  geom_col_pattern(width = 2, pattern_fill = "grey20", pattern_density = 0.05) +
+  geom_col_pattern(data = m, width = 2, pattern_fill = "grey20", pattern_density = 0.05) +
+  geom_text(data = grm, size = 3) +
+  scale_fill_manual(values = color_scale) +
+  scale_pattern_manual(values = pattern_scale) +
+  theme_bw() +
+  ggtitle("Post-Harvest Recruitment vs. Mortality")
+
+```
+
+FVS wants mortality as a percent, so mortality % is TPAMORT at t+1
+over TPA at t.
+
+Note that no seedling mortality is noted; we can get an apprximation
+of seedling mortality by looking at the delta in number of seedlings
+(less the number of new saplings).
 
 # Run FVS
 
