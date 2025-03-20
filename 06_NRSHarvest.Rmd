@@ -514,7 +514,7 @@ fia_grow_mort |> distinct(sizeClass)
 Note that this only gives sizeClass == 5, so ingrowth of trees >= 5" DBH.
 We will need a lot of saplings, 1" < DBH < 5", so let's look at other methods.
 
-```{r}
+```{r plot fia growth and mortality, eval = FALSE}
 fia_grow_mort |>
   mutate(TREE_GROUP = paste0(SCIENTIFIC_NAME, " ", if_else(sizeClass < 4, "(sapling)", "(tree)"))) |>
   left_join(nrshrv_plot_stats |> select(CN, HRVYR), by = join_by(PLT_CN == CN)) |>
@@ -602,7 +602,7 @@ growth timeline.
 
 Seedlings and saplings die quickly. Let's see if we can find rates.
 
-```{r}
+```{r gather fia mortality, eval = FALSE}
 mort <- fia_grm_mortality(fiadb, sample_plots) |>
   left_join(
     nrshrv_plot |>
@@ -648,7 +648,7 @@ mort_rate <- mort |>
   left_join(species_crosswalk, by = join_by(SPCD))
 ```
 
-```{r plot fia grm rate, eval = FALSE}
+```{r plot fia mortality, eval = FALSE}
 mort_rate |>
   group_by(YearsSinceHarvest, SCIENTIFIC_NAME, SIZE_CLASS) |>
   summarize(TPA = sum(TPAMORT, na.rm = TRUE), .groups = "keep") |>
@@ -662,7 +662,7 @@ mort_rate |>
 ```
 
 Can we plot these next to each other?
-```{r}
+```{r plot fia recruitment and mortality, eval = FALSE}
 r <- fia_grm |>
   group_by(YearsSinceHarvest, SCIENTIFIC_NAME, SIZE_CLASS) |>
   summarize(TPA = sum(TPA, na.rm = TRUE), .groups = "keep") |>
@@ -691,7 +691,8 @@ color_scale <- c(
   "Acer saccharum" = "gold2",
   "Acer spicatum" = "darkorange",
   "Betula alleghaniensis" = "olivedrab3",
-  "Picea rubens" = "lightblue"
+  "Picea rubens" = "lightblue",
+  "Other" = "gray30"
 )
 
 ggplot(r, aes(YearsSinceHarvest, TPA, fill = SCIENTIFIC_NAME, pattern = SIZE_CLASS, label = GRM)) +
@@ -705,12 +706,134 @@ ggplot(r, aes(YearsSinceHarvest, TPA, fill = SCIENTIFIC_NAME, pattern = SIZE_CLA
 
 ```
 
-FVS wants mortality as a percent, so mortality % is TPAMORT at t+1
-over TPA at t.
+## Seedlings
 
 Note that no seedling mortality is noted; we can get an apprximation
-of seedling mortality by looking at the delta in number of seedlings
-(less the number of new saplings).
+of seedling mortality by looking at the number of seedlings at t
+vs the number of saplings at t + 1.
+
+```{r gather fia seedlings, eval = FALSE}
+seedlings <- fia_seedlings(fiadb, sample_plots) |>
+  left_join(
+    nrshrv_plot |> select(CN, MEASYEAR),
+    by = join_by(PLT_CN == CN)
+  ) |>
+  left_join(
+    nrshrv_plot_stats |> filter(HARVEST == 1) |> select(STATECD, COUNTYCD, PLOT, HRVYR),
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
+  select(-SPGRPCD) |>
+  left_join(
+    species_crosswalk,
+    by = join_by(SPCD)
+  ) |>
+  mutate(
+    YearsSinceHarvest = MEASYEAR - HRVYR,
+    SIZE_CLASS = "seedling"
+  )
+```
+
+```{r plot fia seedlings, eval = FALSE}
+seedlings |>
+  mutate(SCIENTIFIC_NAME = if_else(SCIENTIFIC_NAME %in% names(color_scale), SCIENTIFIC_NAME, "Other")) |>
+  group_by(YearsSinceHarvest, SCIENTIFIC_NAME, SIZE_CLASS) |>
+  summarize(TPA = sum(TPA_UNADJ, na.rm = TRUE), .groups = "keep") |>
+  ungroup() |>
+  mutate(TPA = TPA / 100) |>
+  mutate(YearsSinceHarvest = YearsSinceHarvest - 2) |>
+  ggplot(aes(YearsSinceHarvest, TPA, fill = SCIENTIFIC_NAME, pattern = SIZE_CLASS)) +
+  geom_col_pattern(width = 2, pattern_fill = "grey20", pattern_density = 0.05) +
+  scale_fill_manual(values = color_scale) +
+  scale_pattern_manual(name = "SIZE_CLASS", values = pattern_scale) +
+  theme_bw() +
+  ggtitle("Post-Harvest Seedling Abundance")
+
+```
+
+Can we plot them all together?
+```{r plot fia seedlings recruitment and mortality, eval = FALSE}
+s <- seedlings |>
+  mutate(SCIENTIFIC_NAME = if_else(SCIENTIFIC_NAME %in% names(color_scale), SCIENTIFIC_NAME, "Other")) |>
+  group_by(YearsSinceHarvest, SCIENTIFIC_NAME, SIZE_CLASS) |>
+  summarize(TPA = sum(TPA_UNADJ, na.rm = TRUE), .groups = "keep") |>
+  ungroup() |>
+  mutate(TPA = TPA / 100) |>
+  mutate(YearsSinceHarvest = YearsSinceHarvest - 3) |>
+  mutate(GRM = "Seedl.")
+
+r <- fia_grm |>
+  group_by(YearsSinceHarvest, SCIENTIFIC_NAME, SIZE_CLASS) |>
+  summarize(TPA = sum(TPA, na.rm = TRUE), .groups = "keep") |>
+  ungroup() |>
+  mutate(YearsSinceHarvest = YearsSinceHarvest - 2) |>
+  mutate(GRM = "Recr.")
+
+m <- mort_rate |>
+  group_by(YearsSinceHarvest, SCIENTIFIC_NAME, SIZE_CLASS) |>
+  summarize(TPA = sum(TPAMORT, na.rm = TRUE), .groups = "keep") |>
+  ungroup() |>
+  mutate(YearsSinceHarvest = YearsSinceHarvest - 1) |>
+  mutate(GRM = "Mort.")
+
+grm <- tibble(
+  YearsSinceHarvest = c(-6, -5, -4, -1, 0, 1, 4, 5, 6, 9, 10, 11),
+  GRM = rep(c("Seedl.", "Recr.", "Mort."), 4),
+  TPA = c(-1.75),
+  SCIENTIFIC_NAME = c("Other"),
+  SIZE_CLASS = c("tree")
+)
+
+ggplot(r, aes(YearsSinceHarvest, TPA, fill = SCIENTIFIC_NAME, pattern = SIZE_CLASS, label = GRM)) +
+  geom_col_pattern(width = 1, pattern_fill = "grey20", pattern_density = 0.05) +
+  geom_col_pattern(data = m, width = 1, pattern_fill = "grey20", pattern_density = 0.05) +
+  geom_col_pattern(data = s, width = 1, pattern_fill = "grey20", pattern_density = 0.05) +
+  geom_text(data = grm, size = 2) +
+  scale_fill_manual(values = color_scale) +
+  scale_pattern_manual(values = pattern_scale) +
+  theme_bw() +
+  ggtitle("Post-Harvest Seedlings, Recruitment and Mortality") +
+  ylab("TPA (seedling TPA/100)")
+```
+
+How many seedlings become saplings in the subsequent timestep?
+```{r plot seedling survival rate, eval = FALSE}
+survivors <- fia_grm |>
+  filter(SIZE_CLASS == "sapling") |>
+  left_join(nrshrv_plot |> select(CN, INVYR), by = join_by(PLT_CN == CN)) |>
+  group_by(SPCD) |>
+  arrange(INVYR) |>
+  mutate(PREV_INVYR = lag(INVYR)) |>
+  ungroup() |>
+  select(SPCD, PREV_INVYR, TPA) |>
+  rename(TPA_SAPL = TPA)
+
+seedlings |>
+  group_by(PLT_CN, STATECD, COUNTYCD, PLOT, SPCD, INVYR) |>
+  summarize(TPA_SEED = sum(TPA_UNADJ, na.rm = TRUE), .groups = "keep") |>
+  ungroup() |>
+  left_join(survivors, by = join_by(SPCD, INVYR == PREV_INVYR)) |>
+  left_join(nrshrv_plot |> select(CN, MEASYEAR), by = join_by(PLT_CN == CN)) |>
+  left_join(
+    nrshrv_plot_stats |>
+      filter(HARVEST == 1) |>
+      select(STATECD, COUNTYCD, PLOT, HRVYR),
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
+  mutate(
+    TPA_SAPL = coalesce(TPA_SAPL, 0),
+    SURVIVAL = (TPA_SAPL / TPA_SEED),
+    YearsSinceHarvest = MEASYEAR - HRVYR
+  ) |>
+  left_join(species_crosswalk, by = join_by(SPCD)) |>
+  ggplot(aes(YearsSinceHarvest, SURVIVAL, fill = SCIENTIFIC_NAME)) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(limits = c(0, 1)) +
+  scale_fill_manual(values = color_scale) +
+  scale_pattern_manual(values = pattern_scale) +
+  theme_bw() +
+  ggtitle("Post-Harvest Seedling Survival Rate") +
+  ylab("Fraction of seedlings that progress to saplings")
+```
 
 # Run FVS
 

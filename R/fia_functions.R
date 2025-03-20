@@ -255,3 +255,12 @@ fia_grm_estn <- function(fiadb, trees) {
     ) |>
     collect()
 }
+
+fia_seedlings <- function(fiadb, plots) {
+  con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
+  on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
+  
+  tbl(con, "SEEDLING") |>
+    inner_join(plots |> select(CN), by = join_by(PLT_CN == CN), copy = TRUE) |>
+    collect()
+}
