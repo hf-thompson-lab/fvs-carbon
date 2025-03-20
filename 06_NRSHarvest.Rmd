@@ -837,6 +837,23 @@ seedlings |>
   ylab("Fraction of seedlings that progress to saplings")
 ```
 
+This indicates that seedlings are not useful as a predictor of sapling or
+tree recruitment.
+
+## Recruitment for FVS
+
+We'll put together recruitment similar to how we did for grow-only plots,
+but instead of creating a recruitment rate, we'll put in specific trees
+in specific years.
+
+```{r nrshrv_estab, eval = FALSE}
+nrhhrv_estab <- fia_grm_ingrowth(fiadb, nrshrv_plot) |>
+  filter_estab_height(fiadb)
+# TODO: reformat to what FVS requires
+# TODO: some trees get Inf height
+# TODO: some trees get HT_ESTAB > 200, which is crazy
+```
+
 # Run FVS
 
 We will use prescription harvest to tell FVS which trees to harvest, when.

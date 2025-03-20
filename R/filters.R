@@ -416,6 +416,169 @@ filter_plots_ba_frac <- function(.data, con, spcds, frac) {
     inner_join(plots_ba_frac, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
+
+#' Estimate Height for Establishment
+#'
+#' Given FIADB.TREE_GRM_COMPONENT records for INGROWTH,
+#' fill in heights, either actual height for trees <= 2.95" DBH,
+#' or estimated height at 3" DBH for larger trees.
+#' 
+#' Estimated height is taken from trees sampled from:
+#' 1. The same species on the same plot;
+#' 2. The same species in the ecosubregion;
+#' 3. The same species in the ecoregion;
+#' 4. The same species in all NRS-managed plots,
+#' whichever first provides at least min_sample_size trees. If none does,
+#' then height is taken from all NRS-managed plots with no minimum sample size.
+#' 
+#' Trees used for estimation are restricted to those with diameter between
+#' min_sample_dia and max_sample_dia.
+#'
+#' @param estab dataframe of rows from FIADB.TREE_GRM_COMPONENT
+#' @param fiadb path to SQLite_FIADB_ENTIRE.db
+#' @param min_sample_size Minimum number of trees in sample
+#' @param max_sample_size Maximum number of trees in sample
+#' @param min_sample_dia Minimum diameter for trees sampled
+#' @param max_sample_dia Maximum diameter for trees sampled
+#'
+#' @returns input data framw with added column ESTAB_HT
+#' @export
+#'
+#' @examples
+filter_estab_height <- function(
+    estab,
+    fiadb,
+    min_sample_size = 3,
+    max_sample_size = 9,
+    min_sample_dia = 2.5,
+    max_sample_dia = 6
+) {
+  plot_cns <- estab |> select(PLT_CN) |> rename(CN = PLT_CN)
+  
+  ecocd_mixin <- fia_plots_by_cn(fiadb, plot_cns) |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    arrange(desc(INVYR)) |>
+    filter(row_number() == 1) |>
+    ungroup() |>
+    select(STATECD, COUNTYCD, PLOT, ECOSUBCD) |>
+    mutate(ECOCD = substr(ECOSUBCD, 1, nchar(ECOSUBCD) - 1))
+
+  plot_mixin <- fia_plots_by_cn(fiadb, plot_cns) |>
+    select(CN, STATECD, COUNTYCD, PLOT, INVYR) |>
+    rename(PLT_CN = CN)
+  
+  tmp_trees <- fia_trees(fiadb, plot_mixin)
+  
+  prev_tre_mixin <- fia_trees_by_cn(
+    fiadb,
+    tmp_trees |>
+      select(PREV_TRE_CN) |>
+      rename(CN = PREV_TRE_CN)
+  ) |>
+    select(CN, DIA, HT) |>
+    rename(
+      PREV_TRE_CN = CN,
+      PREV_DIA = DIA,
+      PREV_HT = HT
+    )
+
+  trees_for_ht_estimation <- tmp_trees |>
+    left_join(prev_tre_mixin, by = join_by(PREV_TRE_CN)) |>
+    # Overcome a data issue: some trees have no HT, but have PREV_HT
+    mutate(HT = coalesce(HT, PREV_HT), DIA = coalesce(DIA, PREV_DIA)) |>
+    filter(!is.na(HT) & !is.na(DIA)) |>
+    filter(min_sample_dia < DIA & DIA < max_sample_dia) |>
+    # Each tree will be in the data many times; take only the
+    # record for each tree where the diameter is closest to 3" DBH
+    group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
+    arrange(abs(DIA - 3)) |>
+    filter(row_number() == 1) |>
+    ungroup() |>
+    left_join(ecocd_mixin, by = join_by(STATECD, COUNTYCD, PLOT))
+
+  estab_height_plot <- trees_for_ht_estimation |>
+    group_by(STATECD, COUNTYCD, PLOT, SPCD) |>
+    arrange(abs(DIA - 3)) |>
+    filter(row_number() <= max_sample_size) |>
+    mutate(HT_PLOT = HT * 3 / DIA) |>
+    filter(n() >= min_sample_size) |>
+    summarize(ESTAB_HT_PLOT = mean(HT_PLOT), .groups = "keep") |>
+    ungroup()
+  
+  estab_height_ecosubcd <- trees_for_ht_estimation |>
+    group_by(ECOSUBCD, SPCD) |>
+    arrange(abs(DIA - 3)) |>
+    filter(row_number() <= max_sample_size) |>
+    mutate(HT_ECOSUBCD = HT * 3 / DIA) |>
+    filter(n() >= min_sample_size) |>
+    summarize(ESTAB_HT_ECOSUBCD = mean(HT_ECOSUBCD), .groups = "keep") |>
+    ungroup()
+  
+  estab_height_ecocd <- trees_for_ht_estimation |>
+    group_by(ECOCD, SPCD) |>
+    arrange(abs(DIA - 3)) |>
+    filter(row_number() <= max_sample_size) |>
+    mutate(HT_ECOCD = HT * 3 / DIA) |>
+    filter(n() >= min_sample_size) |>
+    summarize(ESTAB_HT_ECOCD = mean(HT_ECOCD), .groups = "keep") |>
+    ungroup()
+  
+  estab_height_ne <- trees_for_ht_estimation |>
+    group_by(SPCD) |>
+    arrange(abs(DIA - 3)) |>
+    filter(row_number() <= max_sample_size) |>
+    mutate(HT_NE = HT * 3 / DIA) |>
+    filter(n() >= min_sample_size) |>
+    summarize(ESTAB_HT_NE = mean(HT_NE), .groups = "keep") |>
+    ungroup()
+  
+  # height_catchall ignores the minimum number of trees,
+  # and will produce values even for a single tree
+  # anywhere in the region. It is a last-ditch catch-all.
+  estab_height_catchall <- trees_for_ht_estimation |>
+    group_by(SPCD) |>
+    arrange(abs(DIA - 3)) |> # closest to 3" first
+    filter(row_number() <= max_sample_size) |> 
+    mutate(HT_CATCHALL = HT * 3 / DIA) |>
+    summarize(ESTAB_HT_CATCHALL = mean(HT_CATCHALL)) |>
+    ungroup()
+  
+  spcd_mixin <- fia_trees_by_cn(
+    fiadb,
+    estab |> select(TRE_CN) |> rename(CN = TRE_CN)
+  ) |>
+    select(CN, SPCD) |>
+    rename(TRE_CN = CN)
+  
+  estab |>
+    left_join(plot_mixin, by = join_by(PLT_CN)) |>
+    left_join(ecocd_mixin, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+    left_join(spcd_mixin, by = join_by(TRE_CN)) |>
+    left_join(estab_height_plot, by = join_by(STATECD, COUNTYCD, PLOT, SPCD)) |>
+    left_join(estab_height_ecosubcd, by = join_by(ECOSUBCD, SPCD)) |>
+    left_join(estab_height_ecocd, by = join_by(ECOCD, SPCD)) |>
+    left_join(estab_height_ne, by = join_by(SPCD)) |>
+    left_join(estab_height_catchall, by = join_by(SPCD)) |>
+    mutate(
+      HT_TREE_BEGIN = (DIA_BEGIN / ANN_DIA_GROWTH) * ANN_HT_GROWTH,
+      HT_TREE_MIDPT = (DIA_MIDPT / ANN_DIA_GROWTH) * ANN_HT_GROWTH,
+      HT_TREE_END = (DIA_END / ANN_DIA_GROWTH) * ANN_HT_GROWTH,
+      ESTAB_HT_TREE = case_when(
+        DIA_END <= 3 ~ HT_TREE_END,
+        DIA_MIDPT <= 3 ~ HT_TREE_MIDPT,
+        DIA_BEGIN <= 3 ~ HT_TREE_BEGIN
+      ),
+      ESTAB_HT = coalesce(
+        ESTAB_HT_TREE,
+        ESTAB_HT_PLOT,
+        ESTAB_HT_ECOSUBCD,
+        ESTAB_HT_ECOCD,
+        ESTAB_HT_NE,
+        ESTAB_HT_CATCHALL
+      )
+    )
+}
+
 filter_decode_forest_type_group <- function(.data) {
   # Consolidate a few rare forest type groups into a single 'Other' group:
   # Exotic hardwoods group

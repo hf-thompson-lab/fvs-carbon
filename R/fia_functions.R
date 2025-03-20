@@ -100,6 +100,14 @@ fia_plots <- function(fiadb, plots) {
   }
 }
 
+fia_plots_by_cn <- function(fiadb, plots) {
+  con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
+  on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
+  tbl(con, "PLOT") |>
+    inner_join(plots |> distinct(CN), by = join_by(CN), copy = TRUE) |>
+    collect()
+}
+
 fia_plots_filtered <- function(fiadb, plots = NULL, filter) {
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
