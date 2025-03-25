@@ -122,7 +122,7 @@ tar_target(
       title = title,
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
-      #regen = estab_for_fvs,
+      regen = nrshrv_estab,
       harvest = harvest_for_fvs,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
