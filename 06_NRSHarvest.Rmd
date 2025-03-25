@@ -19,6 +19,7 @@ library(dbplyr) # window_order()
 library(measurements) # conv_unit and conv_multiunit
 library(maps)
 library(ggspatial)
+library(ggpattern) # Patterns in ggplot2 charts
 library(pbapply) # Progress bar for long operations
 # Color palette to use in charts, for consistency
 color_palette <- RColorBrewer::brewer.pal(9, "Greens")
@@ -289,7 +290,7 @@ Fetch trees that were standing pre-harvest, that are not standing post-harvest.
 tree_in_pre_harvest_plots <- fia_trees_filtered(
     fiadb,
     nrshrv_plot_stats_all |> filter(PRE_HARVEST == 1),
-    filter = \(.data, com) {
+    filter = \(.data, con) {
       .data |>
         filter(STATUSCD == 1 | STATUSCD == 2) |> # live or dead trees
         select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, MORTYR, STATUSCD)  
@@ -476,48 +477,75 @@ map_data('state', fvsne_states$STATE_NAME) |>
 
 Pick a sample of plots to work with:
 ```{r sample plot, eval = FALSE}
-sample_plot <- nrshrv_plot |> slice_sample(n = 1)
+sample_plots <- nrshrv_plot |> slice_sample(n = 10)
 ```
 
 ## FIA Regen
 
-We want actual regeneration. See what we can get from FIA:
-```{r rfia growmort regen, eval = FALSE}
+We want actual regeneration. See what we can get from rFIA.
+
+NB: This takes ~1 minute per plot in the sample, so ~10 minutes for 10 plots.
+
+```{r rfia growmort, eval = FALSE}
 con <- DBI::dbConnect(RSQLite::SQLite(), fiadb)
 
-state_cd <- sample_plot |> pull(STATECD)
-county_cd <- sample_plot |> pull(COUNTYCD)
-plot_cd <- sample_plot |> pull(PLOT)
+rfia_for_state <- function(state) {
+  rFIA::readFIA(
+    con = con,
+    schema = "main",
+    states = state,
+    inMemory = FALSE # Each state uses >1GB RAM; we trade time for space
+  )
+}
 
-fia <- rFIA::readFIA(
-  con = con,
-  schema = "main",
-  states = fvsne_states |> filter(STATECD == state_cd) |> pull(STATE_ABBR),
-  inMemory = FALSE
-)
-fia_grow_mort <- rFIA::growMort(
-  fia,
-  method = "TI", # "TI", "annual", "SMA", "LMA", "EMA"
-  stateVar = "TPA",
-  areaDomain = COUNTYCD == county_cd & PLOT == plot_cd,
-  byPlot = TRUE,
-  bySpecies = TRUE,
-  bySizeClass = TRUE
-) |>
-  filter(RECR_TPA > 0 | MORT_TPA > 0 | REMV_TPA > 0 | GROW_TPA > 0)
+states <- sample_plots |>
+    distinct(STATECD) |>
+    left_join(fvsne_states, by = join_by(STATECD)) |>
+    _$STATE_ABBR
+
+fia <- Map(rfia_for_state, states)
+
+rfia_grow_mort <- do.call(rbind, pbapply(sample_plots, 1, \(sample_plot) {
+  state <- fvsne_states |>
+    filter(STATECD == sample_plot[["STATECD"]]) |>
+    _$STATE_ABBR
+  county_cd <- sample_plot[["COUNTYCD"]]
+  plot_cd <- sample_plot[["PLOT"]]
+
+  rFIA::growMort(
+    fia[[state]],
+    method = "TI", # "TI", "annual", "SMA", "LMA", "EMA"
+    stateVar = "TPA",
+    areaDomain = COUNTYCD == county_cd & PLOT == plot_cd,
+    byPlot = TRUE,
+    bySpecies = TRUE,
+    bySizeClass = TRUE
+  ) |>
+    filter(RECR_TPA > 0)
+}))
 
 DBI::dbDisconnect(con)
-
-fia_grow_mort |> distinct(sizeClass)
+rm(fia)
 ```
 
-Note that this only gives sizeClass == 5, so ingrowth of trees >= 5" DBH.
-We will need a lot of saplings, 1" < DBH < 5", so let's look at other methods.
+```{r rfia grow more size class, eval=FALSE}
+rfia_grow_mort |> distinct(sizeClass)
+```
+
+Note that this only gives sizeClass >= 5, so ingrowth of trees >= 5" DBH. Given
+the short post-harvest time window we have, most of the "release" from harvest
+will only be visible in saplings 1" < DBH < 5", so let's look at other methods.
 
 ```{r plot fia growth and mortality, eval = FALSE}
-fia_grow_mort |>
-  mutate(TREE_GROUP = paste0(SCIENTIFIC_NAME, " ", if_else(sizeClass < 4, "(sapling)", "(tree)"))) |>
-  left_join(nrshrv_plot_stats |> select(CN, HRVYR), by = join_by(PLT_CN == CN)) |>
+rfia_grow_mort |>
+  mutate(TREE_GROUP = paste0(SCIENTIFIC_NAME, " ", if_else(sizeClass < 5, "(sapling)", "(tree)"))) |>
+  left_join(nrshrv_plot |> select(CN, STATECD, COUNTYCD, PLOT), by = join_by(PLT_CN == CN)) |>
+  left_join(
+    nrshrv_plot_stats |>
+      filter(HARVEST == 1) |>
+      select(STATECD, COUNTYCD, PLOT, HRVYR),
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
   mutate(YearsSinceHarvest = YEAR - HRVYR) |>
   group_by(YearsSinceHarvest, TREE_GROUP) |>
   summarize(TPA = sum(RECR_TPA, na.rm = TRUE), .groups = "keep") |>
@@ -525,16 +553,27 @@ fia_grow_mort |>
   ggplot(aes(YearsSinceHarvest, TPA, fill = TREE_GROUP)) +
   geom_col() +
   theme_bw() +
-  ggtitle("Post-Harvest Ingrowth")
+  ggtitle("Post-Harvest Ingrowth from rFIA")
 ```
 
 ## FIA GRM
 
+We can fetch Growth / Regeneration / Mortality (GRM) data directly from the FIA
+database. This includes information about saplings 1" <= DBH <= 5" on
+microplots, so should be more informative about what's going on in the early
+years post-harvest.
+
 ```{r fia grm regen, eval = FALSE}
+
+# Expand sample_plots to include all inventories for the chosen sample.
 sample_plots <- nrshrv_plot |>
-  semi_join(sample_plot, by = join_by(STATECD, COUNTYCD, PLOT))
+  semi_join(sample_plots |> head(1), by = join_by(STATECD, COUNTYCD, PLOT))
+
+# Fetch all ingrowth for all inventories on the sample plots
 fia_grm <- fia_grm_ingrowth(fiadb, sample_plots) |>
+  # Estimate height at the time of inventory
   mutate(HT = (DIA_END / ANN_DIA_GROWTH) * ANN_HT_GROWTH) |>
+  # Get harvest year for the plot
   left_join(
     nrshrv_plot |>
       select(CN, STATECD, COUNTYCD, PLOT, MEASYEAR),
@@ -544,6 +583,7 @@ fia_grm <- fia_grm_ingrowth(fiadb, sample_plots) |>
     nrshrv_plot_stats |> filter(!is.na(HRVYR)) |> select(STATECD, COUNTYCD, PLOT, HRVYR),
     by = join_by(STATECD, COUNTYCD, PLOT)
   ) |>
+  # Add a general size class
   mutate(
     SIZE_CLASS = case_when(
       DIA_END < 1 ~ "seedling",
@@ -555,6 +595,7 @@ fia_grm <- fia_grm_ingrowth(fiadb, sample_plots) |>
   ) |>
   select(!starts_with("MICR_") & !starts_with("SUBP_"))
 
+# Fetch species information for these trees
 fia_grm <- fia_grm |>
   left_join(
     fia_trees_by_cn(
@@ -570,8 +611,21 @@ fia_grm <- fia_grm |>
     species_crosswalk,
     by = join_by(SPCD)
   )
-ggplot(fia_grm, aes(DIA_END, HT)) + geom_point()
+
+fia_grm |>
+  group_by(GENUS) |>
+  mutate(
+    GROUP = paste0(GENUS, ", n=", n()),
+    GROUP_SIZE = n()
+  ) |>
+  ungroup() |>
+  ggplot(aes(DIA_END, HT, color = fct_reorder(GROUP, desc(GROUP_SIZE)))) +
+  geom_point()
 ```
+
+Much faster, and many trees with DBH < 5". Height estimation clearly has
+outliers, especially among the Poplar (Liriodendron) and Cedar (Thuja).
+
 
 ```{r plot fia grm rate, eval = FALSE}
 pattern_scale <- c(
@@ -581,26 +635,26 @@ pattern_scale <- c(
 )
 
 fia_grm |>
-  group_by(YearsSinceHarvest, SCIENTIFIC_NAME, SIZE_CLASS) |>
+  group_by(YearsSinceHarvest, GENUS, SIZE_CLASS) |>
   summarize(
-    TPA = sum(TPA, na.rm = TRUE),
+    TPA = sum(TPA, na.rm = TRUE) / n(),
     .groups = "keep"
   ) |>
   ungroup() |>
-  mutate(TREE_GROUP = paste0(SCIENTIFIC_NAME, " (", SIZE_CLASS, ")")) |>
-  ggplot(aes(YearsSinceHarvest, TPA, fill = SCIENTIFIC_NAME, pattern = SIZE_CLASS)) +
+  mutate(TREE_GROUP = paste0(GENUS, " (", SIZE_CLASS, ")")) |>
+  ggplot(aes(YearsSinceHarvest, TPA, fill = GENUS, pattern = SIZE_CLASS)) +
   geom_col_pattern(pattern_fill = "grey20", pattern_density = 0.05) +
   scale_pattern_manual(values = pattern_scale) +
   theme_bw() +
   ggtitle("Post-Harvest Ingrowth")
 ```
 
-Which gets us a bunch of 1" trees, so much better visibility earlier in the
-growth timeline.
+Which gets us a bunch of saplings 1" <= DBH <= 5", so much better visibility
+earlier in the growth timeline.
 
 ## Early Mortality
 
-Seedlings and saplings die quickly. Let's see if we can find rates.
+Seedlings and saplings die at a high rate. Let's see if we can find rates.
 
 ```{r gather fia mortality, eval = FALSE}
 mort <- fia_grm_mortality(fiadb, sample_plots) |>
@@ -650,38 +704,43 @@ mort_rate <- mort |>
 
 ```{r plot fia mortality, eval = FALSE}
 mort_rate |>
-  group_by(YearsSinceHarvest, SCIENTIFIC_NAME, SIZE_CLASS) |>
-  summarize(TPA = sum(TPAMORT, na.rm = TRUE), .groups = "keep") |>
+  group_by(YearsSinceHarvest, GENUS, SIZE_CLASS) |>
+  summarize(TPA = sum(TPAMORT, na.rm = TRUE) / n(), .groups = "keep") |>
   ungroup() |>
-  mutate(TREE_GROUP = paste0(SCIENTIFIC_NAME, " (", SIZE_CLASS, ")")) |>
-  ggplot(aes(YearsSinceHarvest, TPA, fill = SCIENTIFIC_NAME, pattern = SIZE_CLASS)) +
+  mutate(TREE_GROUP = paste0(GENUS, " (", SIZE_CLASS, ")")) |>
+  ggplot(aes(YearsSinceHarvest, TPA, fill = GENUS, pattern = SIZE_CLASS)) +
   geom_col_pattern(pattern_fill = "grey20", pattern_density = 0.05) +
   scale_pattern_manual(name = "SIZE_CLASS", values = pattern_scale) +
   theme_bw() +
   ggtitle("Post-Harvest Mortality")
 ```
 
+This includes all mortality, so we see tree as well as sapling mortality, but
+it is dominated by sapling mortality.
+
 Can we plot these next to each other?
 ```{r plot fia recruitment and mortality, eval = FALSE}
+bar_width <- 0.4
+
 r <- fia_grm |>
-  group_by(YearsSinceHarvest, SCIENTIFIC_NAME, SIZE_CLASS) |>
-  summarize(TPA = sum(TPA, na.rm = TRUE), .groups = "keep") |>
+  group_by(YearsSinceHarvest, GENUS, SIZE_CLASS) |>
+  summarize(TPA = sum(TPA, na.rm = TRUE) / n(), .groups = "keep") |>
   ungroup() |>
-  mutate(YearsSinceHarvest = YearsSinceHarvest - 3) |>
+  mutate(YearsSinceHarvest = YearsSinceHarvest - (.5 + bar_width/2)) |>
   mutate(GRM = "Recruit")
 
 m <- mort_rate |>
-  group_by(YearsSinceHarvest, SCIENTIFIC_NAME, SIZE_CLASS) |>
-  summarize(TPA = sum(TPAMORT, na.rm = TRUE), .groups = "keep") |>
+  group_by(YearsSinceHarvest, GENUS, SIZE_CLASS) |>
+  summarize(TPA = sum(TPAMORT, na.rm = TRUE) / n(), .groups = "keep") |>
   ungroup() |>
-  mutate(YearsSinceHarvest = YearsSinceHarvest - 1) |>
+  mutate(YearsSinceHarvest = YearsSinceHarvest - (.5 - bar_width/2)) |>
   mutate(GRM = "Mortality")
 
 grm <- tibble(
   YearsSinceHarvest = c(-6, -4, -1, 1, 4, 6, 9, 11),
   GRM = c("Recruit", "Mortality", "Recruit", "Mortality", "Recruit", "Mortality", "Recruit", "Mortality"),
   TPA = c(-1.75),
-  SCIENTIFIC_NAME = c(NA),
+  GENUS = c(NA),
   SIZE_CLASS = c(NA)
 )
 
@@ -695,11 +754,11 @@ color_scale <- c(
   "Other" = "gray30"
 )
 
-ggplot(r, aes(YearsSinceHarvest, TPA, fill = SCIENTIFIC_NAME, pattern = SIZE_CLASS, label = GRM)) +
-  geom_col_pattern(width = 2, pattern_fill = "grey20", pattern_density = 0.05) +
-  geom_col_pattern(data = m, width = 2, pattern_fill = "grey20", pattern_density = 0.05) +
-  geom_text(data = grm, size = 3) +
-  scale_fill_manual(values = color_scale) +
+ggplot(r, aes(YearsSinceHarvest, TPA, fill = GENUS, pattern = SIZE_CLASS, label = GRM)) +
+  geom_col_pattern(width = bar_width, pattern_fill = "grey20", pattern_density = 0.05) +
+  geom_col_pattern(data = m, width = bar_width, pattern_fill = "grey20", pattern_density = 0.05) +
+#  geom_text(data = grm, size = 3) +
+#  scale_fill_manual(values = color_scale) +
   scale_pattern_manual(values = pattern_scale) +
   theme_bw() +
   ggtitle("Post-Harvest Recruitment vs. Mortality")
@@ -740,9 +799,9 @@ seedlings |>
   summarize(TPA = sum(TPA_UNADJ, na.rm = TRUE), .groups = "keep") |>
   ungroup() |>
   mutate(TPA = TPA / 100) |>
-  mutate(YearsSinceHarvest = YearsSinceHarvest - 2) |>
+  mutate(YearsSinceHarvest = YearsSinceHarvest - (0.5 - bar_width/2)) |>
   ggplot(aes(YearsSinceHarvest, TPA, fill = SCIENTIFIC_NAME, pattern = SIZE_CLASS)) +
-  geom_col_pattern(width = 2, pattern_fill = "grey20", pattern_density = 0.05) +
+  geom_col_pattern(width = bar_width, pattern_fill = "grey20", pattern_density = 0.05) +
   scale_fill_manual(values = color_scale) +
   scale_pattern_manual(name = "SIZE_CLASS", values = pattern_scale) +
   theme_bw() +
@@ -842,16 +901,64 @@ tree recruitment.
 
 ## Recruitment for FVS
 
-We'll put together recruitment similar to how we did for grow-only plots,
-but instead of creating a recruitment rate, we'll put in specific trees
+We'll put together recruitment similar to how we did for grow-only plots, but
+instead of creating a recruitment rate, we'll put in groups of specific species
 in specific years.
 
-```{r nrshrv_estab, eval = FALSE}
-nrhhrv_estab <- fia_grm_ingrowth(fiadb, nrshrv_plot) |>
-  filter_estab_height(fiadb)
-# TODO: reformat to what FVS requires
-# TODO: some trees get Inf height
-# TODO: some trees get HT_ESTAB > 200, which is crazy
+```{r nrshrv_estab, tar_simple = TRUE}
+estab <- fia_grm_ingrowth(fiadb, nrshrv_plot)
+
+nrshrv_estab <- estab |>
+  filter_fvs_spcd(fiadb, species_crosswalk) |> # Species handled by FVSne
+  filter_estab_height(fiadb) |> # Height of 3" DBH trees
+  mutate(
+    SIZE_CLASS = if_else(DIA_END < 5, "sapling", "tree"),
+    # TREE_GRM_COMPONENT will specify microplot TPAUNADJ for trees that hit
+    # 5" DBH on the microplot, which is wrong. We just hard code appropriate
+    # TAP for saplings vs. trees (assuming standard plot design).
+    DENSITY = if_else(SIZE_CLASS == "sapling", 75, 6)
+  ) |>
+  group_by(STATECD, COUNTYCD, PLOT, INVYR, SPCD, SIZE_CLASS) |>
+  summarize(
+    HEIGHT = mean(ESTAB_HT, na.rm = TRUE),
+    DENSITY = sum(DENSITY),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  mutate(
+    # Adjust height for small trees
+    HEIGHT = if_else(SIZE_CLASS == "sapling", HEIGHT / 3, HEIGHT)
+  ) |>
+  left_join(
+    nrshrv_plot |> select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR),
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+  ) |>
+  left_join(
+    nrshrv_plot |>
+      group_by(STATECD, COUNTYCD, PLOT) |>
+      arrange(INVYR) |>
+      filter(row_number() == 1) |>
+      ungroup() |>
+      select(STATECD, COUNTYCD, PLOT, CN),
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, FVS_SPCD),
+    by = join_by(SPCD)
+  ) |>
+  left_join(
+    species_crosswalk |>
+      filter(SPECIES == "spp.") |>
+      select(GENUS, FVS_SPCD) |>
+      rename(FVS_GNCD = FVS_SPCD),
+    by = join_by(GENUS)
+  ) |>
+  mutate(
+    STAND_CN = CN,
+    YEAR = MEASYEAR,
+    SPECIES = coalesce(FVS_SPCD, FVS_GNCD)
+  ) |>
+  select(STAND_CN, YEAR, SPECIES, DENSITY, HEIGHT, SIZE_CLASS)
 ```
 
 # Run FVS
@@ -1480,7 +1587,7 @@ align_by_ba_2 <- bind_rows(
 ggplot(align_by_ba_2, aes(PROPORTION)) +
   geom_histogram(binwidth = 0.05) +
   theme_bw() +
-  ggtitle("Proportion of BA specified for harvested that was actually harvested") +
+  ggtitle("Proportion of BA specified for harvest that was actually harvested") +
   ylab("Species/Plot Combinations") +
   xlab("Harvested Proportion")
 ```

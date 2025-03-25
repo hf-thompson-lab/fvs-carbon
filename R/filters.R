@@ -416,20 +416,154 @@ filter_plots_ba_frac <- function(.data, con, spcds, frac) {
     inner_join(plots_ba_frac, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
+#' Twiddle species code to be something FVS supports.
+#' 
+#' Given trees with STATECD, COUNTYCD, PLOT, ECOSUBCD, ECOCD, SPCD,
+#' and a species crosswalk, this will find species codes not handled
+#' by FVS and shift them to the species code of the same genus most common
+#' in the plot, ecosubregion, ecoregion, or region, whichever it finds first.
+#'
+#' @param estab data.frame of FIADB.GRM_ establishment records
+#' @param species_crosswalk Species crosswalk with GENUS, SPCD, FVS_SPCD
+#'
+#' @returns trees with adjusted SPCD and original SPCD in SPCD_UNADJ
+#' @export
+#'
+#' @examples
+filter_fvs_spcd <- function(estab, fiadb, species_crosswalk) {
+  plot_cns <- estab |>
+    select(PLT_CN) |>
+    rename(CN = PLT_CN)
+  
+  plots <- fia_plots_by_cn(fiadb, plot_cns) |>
+    select(CN, STATECD, COUNTYCD, PLOT, INVYR, ECOSUBCD) |>
+    mutate(ECOCD = substr(ECOSUBCD, 1, nchar(ECOSUBCD) - 1)) |>
+    rename(PLT_CN = CN)
+  
+  # all_trees is all trees on all plots in the selected INVYRs, not just
+  # those trees that correspond to establishment records
+  # DEBATE: should this be restricted to the input plots, or opened up to
+  # all plots in the ecosubregions of the input plots?
+  all_trees <- fia_trees_filtered(
+    fiadb,
+    plots,
+    \(.data, con) {
+      .data |>
+        filter(STATUSCD == 1) |> # only live trees
+        # Only the most recent (live) instance of each tree
+        group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
+        filter(INVYR == max(INVYR, na.rm = TRUE)) |>
+        ungroup() |>
+        # add ECOSUBCD from PLOT
+        left_join(
+          tbl(con, "PLOT") |>
+            select(STATECD, COUNTYCD, PLOT, INVYR, ECOSUBCD),
+          by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+        ) |>
+        # limit the fields we pull back to R
+        select(STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, SPCD, ECOSUBCD)
+    }
+  ) |>
+    mutate(ECOCD = substr(ECOSUBCD, 1, nchar(ECOSUBCD) - 1))
+  
+  # Most common species handled by FVS of each genus in each plot
+  mcs_plot <- all_trees |>
+    left_join(species_crosswalk, by = join_by(SPCD)) |>
+    filter(!is.na(FVS_SPCD)) |>
+    group_by(STATECD, COUNTYCD, PLOT, GENUS, SPCD) |>
+    summarize(COUNT = n(), .groups = "keep") |>
+    ungroup() |>
+    group_by(STATECD, COUNTYCD, PLOT, GENUS) |>
+    filter(COUNT == max(COUNT)) |>
+    filter(SPCD == min(SPCD)) |> # break ties by SPCD
+    ungroup() |>
+    select(!COUNT) |>
+    rename(MCS_PLOT = SPCD)
+
+  # Most common species handled by FVS of each genus in each ecosubregion  
+  mcs_ecosubcd <- all_trees |>
+    left_join(species_crosswalk, by = join_by(SPCD)) |>
+    filter(!is.na(FVS_SPCD)) |>
+    group_by(ECOSUBCD, GENUS, SPCD) |>
+    summarize(COUNT = n(), .groups = "keep") |>
+    ungroup() |>
+    group_by(ECOSUBCD, GENUS) |>
+    filter(COUNT == max(COUNT)) |>
+    filter(SPCD == min(SPCD)) |> # break ties by SPCD
+    ungroup() |>
+    select(!COUNT) |>
+    rename(MCS_ECOSUBCD = SPCD)
+  
+  # Most common species handled by FVS of each genus in each ecoregion  
+  mcs_ecocd <- all_trees |>
+    left_join(species_crosswalk, by = join_by(SPCD)) |>
+    filter(!is.na(FVS_SPCD)) |>
+    group_by(ECOCD, GENUS, SPCD) |>
+    summarize(COUNT = n(), .groups = "keep") |>
+    ungroup() |>
+    group_by(ECOCD, GENUS) |>
+    filter(COUNT == max(COUNT)) |>
+    filter(SPCD == min(SPCD)) |> # break ties by SPCD
+    ungroup() |>
+    select(!COUNT) |>
+    rename(MCS_ECOCD = SPCD)
+  
+  # Most common species handled by FVS of each genus in all plots  
+  mcs_region <- all_trees |>
+    left_join(species_crosswalk, by = join_by(SPCD)) |>
+    filter(!is.na(FVS_SPCD)) |>
+    group_by(GENUS, SPCD) |>
+    summarize(COUNT = n(), .groups = "keep") |>
+    ungroup() |>
+    group_by(GENUS) |>
+    filter(COUNT == max(COUNT)) |>
+    filter(SPCD == min(SPCD)) |> # break ties by SPCD
+    ungroup() |>
+    select(!COUNT) |>
+    rename(MCS_REGION = SPCD)
+  
+  estab_spcd_mixin <- fia_trees_by_cn(
+    fiadb,
+    estab |>
+      select(TRE_CN) |>
+      rename(CN = TRE_CN)
+  ) |>
+    select(CN, SPCD) |>
+    rename(TRE_CN = CN)
+  
+  estab |>
+    left_join(plots, by = join_by(PLT_CN)) |>
+    left_join(estab_spcd_mixin, by = join_by(TRE_CN)) |>
+    left_join(species_crosswalk |> select(SPCD, GENUS, FVS_SPCD), by = join_by(SPCD)) |>
+    left_join(mcs_plot, by = join_by(STATECD, COUNTYCD, PLOT, GENUS)) |>
+    left_join(mcs_ecosubcd, by = join_by(ECOSUBCD, GENUS)) |>
+    left_join(mcs_ecocd, by = join_by(ECOCD, GENUS)) |>
+    left_join(mcs_region, by = join_by(GENUS)) |>
+    mutate(SPCD_UNADJ = SPCD) |>
+    mutate(SPCD = if_else(is.na(FVS_SPCD), NA, SPCD)) |>
+    mutate(SPCD = coalesce(SPCD, MCS_PLOT, MCS_ECOSUBCD, MCS_ECOCD, MCS_REGION, SPCD_UNADJ)) |>
+    select(SPCD | !any_of(names(species_crosswalk)))
+}
 
 #' Estimate Height for Establishment
 #'
 #' Given FIADB.TREE_GRM_COMPONENT records for INGROWTH,
-#' fill in heights, either actual height for trees <= 2.95" DBH,
-#' or estimated height at 3" DBH for larger trees.
+#' fill in estimated height at 3" DBH.
 #' 
 #' Estimated height is taken from trees sampled from:
+#' 
 #' 1. The same species on the same plot;
 #' 2. The same species in the ecosubregion;
 #' 3. The same species in the ecoregion;
 #' 4. The same species in all NRS-managed plots,
+#' 
 #' whichever first provides at least min_sample_size trees. If none does,
 #' then height is taken from all NRS-managed plots with no minimum sample size.
+#' 
+#' Trees are sampled in order of how close their diameter is to 3" DBH;
+#' therefore, the larger the sample size, the more divergent tree diameters are
+#' included in the sample. For this reason a maximum sample size is included;
+#' this supports a trade-off between sample size and diameter divergence.
 #' 
 #' Trees used for estimation are restricted to those with diameter between
 #' min_sample_dia and max_sample_dia.
@@ -487,7 +621,7 @@ filter_estab_height <- function(
     # Overcome a data issue: some trees have no HT, but have PREV_HT
     mutate(HT = coalesce(HT, PREV_HT), DIA = coalesce(DIA, PREV_DIA)) |>
     filter(!is.na(HT) & !is.na(DIA)) |>
-    filter(min_sample_dia < DIA & DIA < max_sample_dia) |>
+    filter(min_sample_dia <= DIA & DIA <= max_sample_dia) |>
     # Each tree will be in the data many times; take only the
     # record for each tree where the diameter is closest to 3" DBH
     group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
@@ -550,23 +684,51 @@ filter_estab_height <- function(
     select(CN, SPCD) |>
     rename(TRE_CN = CN)
   
+  if (!"STATECD" %in% names(estab)) {
+    estab <- estab |> left_join(plot_mixin, by = join_by(PLT_CN))
+  }
+  if (!"ECOSUBCD" %in% names(estab)) {
+    estab <- estab |> left_join(ecocd_mixin, by = join_by(STATECD, COUNTYCD, PLOT))
+  }
+  if (!"SPCD" %in% names(estab)) {
+    estab <- estab |> left_join(spcd_mixin, by = join_by(TRE_CN)) 
+  }
+  
   estab |>
-    left_join(plot_mixin, by = join_by(PLT_CN)) |>
-    left_join(ecocd_mixin, by = join_by(STATECD, COUNTYCD, PLOT)) |>
-    left_join(spcd_mixin, by = join_by(TRE_CN)) |>
     left_join(estab_height_plot, by = join_by(STATECD, COUNTYCD, PLOT, SPCD)) |>
     left_join(estab_height_ecosubcd, by = join_by(ECOSUBCD, SPCD)) |>
     left_join(estab_height_ecocd, by = join_by(ECOCD, SPCD)) |>
     left_join(estab_height_ne, by = join_by(SPCD)) |>
     left_join(estab_height_catchall, by = join_by(SPCD)) |>
     mutate(
-      HT_TREE_BEGIN = (DIA_BEGIN / ANN_DIA_GROWTH) * ANN_HT_GROWTH,
-      HT_TREE_MIDPT = (DIA_MIDPT / ANN_DIA_GROWTH) * ANN_HT_GROWTH,
-      HT_TREE_END = (DIA_END / ANN_DIA_GROWTH) * ANN_HT_GROWTH,
-      ESTAB_HT_TREE = case_when(
-        DIA_END <= 3 ~ HT_TREE_END,
-        DIA_MIDPT <= 3 ~ HT_TREE_MIDPT,
-        DIA_BEGIN <= 3 ~ HT_TREE_BEGIN
+      # Replace zero growth rate with NA so we don't end up with Inf heights
+      ANN_DIA_GROWTH = if_else(ANN_DIA_GROWTH == 0, NA, ANN_DIA_GROWTH),
+      
+      # Compute establishment height from annual growth rates
+      # Note that this often says the tree is > 100' tall or under 1' tall;
+      # we remove those by comparing to ESTAB_HT_CATCHALL below.
+      ESTAB_HT_TREE = (DIA_END / ANN_DIA_GROWTH) * ANN_HT_GROWTH * 3 / DIA_END,
+      
+      # This may seem backwards, but isn't: we're going to use the catchall
+      # as a baseline for validation, but sometimes the baseline is null.
+      # Use ESTAB_HT_TREE as the baseline in these cases.
+      ESTAB_HT_CATCHALL = coalesce(ESTAB_HT_CATCHALL, ESTAB_HT_TREE),
+
+      # Remove any heights that are more than 25% different from the catchall
+      ESTAB_HT_TREE = if_else(
+        (ESTAB_HT_TREE < 1.25 * ESTAB_HT_CATCHALL) & (ESTAB_HT_TREE > 0.75 * ESTAB_HT_CATCHALL), ESTAB_HT_TREE, NA
+      ),
+      ESTAB_HT_PLOT = if_else(
+        (ESTAB_HT_PLOT < 1.25 * ESTAB_HT_CATCHALL) & (ESTAB_HT_PLOT > 0.75 * ESTAB_HT_CATCHALL), ESTAB_HT_PLOT, NA
+      ),
+      ESTAB_HT_ECOSUBCD = if_else(
+        (ESTAB_HT_ECOSUBCD < 1.25 * ESTAB_HT_CATCHALL) & (ESTAB_HT_ECOSUBCD > 0.75 * ESTAB_HT_CATCHALL), ESTAB_HT_ECOSUBCD, NA
+      ),
+      ESTAB_HT_ECOCD = if_else(
+        (ESTAB_HT_ECOCD < 1.25 * ESTAB_HT_CATCHALL) & (ESTAB_HT_ECOCD > 0.75 * ESTAB_HT_CATCHALL), ESTAB_HT_ECOCD, NA
+      ),
+      ESTAB_HT_NE = if_else(
+        (ESTAB_HT_NE < 1.25 * ESTAB_HT_CATCHALL) & (ESTAB_HT_NE > 0.75 * ESTAB_HT_CATCHALL), ESTAB_HT_NE, NA
       ),
       ESTAB_HT = coalesce(
         ESTAB_HT_TREE,
