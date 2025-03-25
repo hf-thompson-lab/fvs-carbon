@@ -2,7 +2,7 @@ tar_target(nrshrv_tree_removed, {
   tree_in_pre_harvest_plots <- fia_trees_filtered(
       fiadb,
       nrshrv_plot_stats_all |> filter(PRE_HARVEST == 1),
-      filter = \(.data, com) {
+      filter = \(.data, con) {
         .data |>
           filter(STATUSCD == 1 | STATUSCD == 2) |> # live or dead trees
           select(CN, STATECD, COUNTYCD, PLOT, SUBP, TREE, INVYR, MORTYR, STATUSCD)  

@@ -905,7 +905,7 @@ We'll put together recruitment similar to how we did for grow-only plots, but
 instead of creating a recruitment rate, we'll put in groups of specific species
 in specific years.
 
-```{r nrshrv_estab, tar_simple = TRUE}
+```{targets nrshrv_estab, tar_simple = TRUE}
 estab <- fia_grm_ingrowth(fiadb, nrshrv_plot)
 
 nrshrv_estab <- estab |>
