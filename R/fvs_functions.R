@@ -53,11 +53,6 @@ fvs_TimeConfig <- function(FirstYear, LastYear, Timestep) {
 
 fvs_Estab <- function(rows) {
   natural_regen <- function(row) {
-    year <- if ("YEAR" %in% names(row) & !is.na(row["YEAR"])) {
-      row["YEAR"]
-    } else {
-      0
-    }
     species <- row["SPECIES"]
     density <- as.numeric(row["DENSITY"]) # TPA
     survival <- 100 # percent
@@ -71,6 +66,11 @@ fvs_Estab <- function(rows) {
     fvs_kwd("Natural", year, species, density, survival, age, height, shade)
   }
   if (!is.null(rows)) {
+    # if YEAR isn't in rows, add it
+    if (!"YEAR" %in% names(row)) {
+      row["YEAR"] <- 0
+    }
+    
     # FVS has a limit of 1000 trees per tree record. Each establishment
     # keyword creates one tree record, so if there are more than 1000 trees
     # split it into multiple records.
@@ -88,18 +88,35 @@ fvs_Estab <- function(rows) {
       )) |>
       ungroup() |>
       select(-any_of(c("ROW_NUMBER", "REPLICATES")))
-    c(
-      fvs_kwd("If", 0),
-      fvs_kwd("mod(cycle,1) eq 0"),
-      fvs_kwd("Then"),
-      fvs_kwd("Estab", 0),
-      fvs_kwd("MechPrep", 0, 0),
-      fvs_kwd("BurnPrep", 0, 0),
-      fvs_kwd("Sprout"),
-      apply(rows, 1, natural_regen),
-      fvs_kwd("End"),
-      fvs_kwd("EndIf")
-    )
+    if (any(rows$YEAR > 0)) {
+      scheduled <- c(
+        fvs_kwd("Estab", 0),
+        fvs_kwd("MechPrep", 0, 0),
+        fvs_kwd("BurnPrep", 0, 0),
+        fvs_kwd("Sprout"),
+        apply(rows |> filter(YEAR > 0), 1, natural_regen),
+        fvs_kwd("End")
+      )
+    } else {
+      scheduled <- c()
+    }
+    if (any(rows$YEAR == 0)) {
+      background <- c(
+        fvs_kwd("If", 0),
+        fvs_kwd("mod(cycle,1) eq 0"),
+        fvs_kwd("Then"),
+        fvs_kwd("Estab", 0),
+        fvs_kwd("MechPrep", 0, 0),
+        fvs_kwd("BurnPrep", 0, 0),
+        fvs_kwd("Sprout"),
+        apply(rows |> filter(YEAR == 0), 1, natural_regen),
+        fvs_kwd("End"),
+        fvs_kwd("EndIf")
+      )
+    } else {
+      background <- c()
+    }
+    c(scheduled, background)
   } else {
     c()
   }
