@@ -961,6 +961,23 @@ nrshrv_estab <- estab |>
   select(STAND_CN, YEAR, SPECIES, DENSITY, HEIGHT, SIZE_CLASS)
 ```
 
+Let's see how that looks
+```{r plot nrshrv_estab, eval = FALSE}
+nrshrv_estab |>
+  left_join(nrshrv_plot |> select(CN, STATECD, COUNTYCD, PLOT), by = join_by(STAND_CN == CN)) |>
+  left_join(nrshrv_plot_stats |> filter(HARVEST == 1) |> select(STATECD, COUNTYCD, PLOT, MEASYEAR, HRVYR), by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  left_join(species_crosswalk |> filter(!is.na(FVS_SPCD)), by = join_by(SPECIES == FVS_SPCD)) |>
+  mutate(YearsSinceHarvest = MEASYEAR - HRVYR) |>
+  group_by(YearsSinceHarvest, GENUS, SIZE_CLASS) |>
+  summarize(COUNT = mean(DENSITY), .groups = "keep") |>
+  ungroup() |>
+  ggplot(aes(YearsSinceHarvest, COUNT, fill = GENUS, pattern = SIZE_CLASS)) +
+  geom_col_pattern()
+```
+
+...which is a mess, but seems to indicate that there are lots of saplings being
+recruited.
+
 # Run FVS
 
 We will use prescription harvest to tell FVS which trees to harvest, when.
@@ -1170,7 +1187,7 @@ tar_target(
       title = title,
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
-      #regen = estab_for_fvs,
+      regen = nrshrv_estab,
       harvest = harvest_for_fvs,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,

@@ -53,7 +53,11 @@ fvs_TimeConfig <- function(FirstYear, LastYear, Timestep) {
 
 fvs_Estab <- function(rows) {
   natural_regen <- function(row) {
-    year <- 0
+    year <- if ("YEAR" %in% names(row) & !is.na(row["YEAR"])) {
+      row["YEAR"]
+    } else {
+      0
+    }
     species <- row["SPECIES"]
     density <- as.numeric(row["DENSITY"]) # TPA
     survival <- 100 # percent
