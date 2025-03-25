@@ -943,20 +943,20 @@ nrshrv_estab <- estab |>
     by = join_by(STATECD, COUNTYCD, PLOT)
   ) |>
   left_join(
-    species_crosswalk |> select(SPCD, GENUS, FVS_SPCD),
+    species_crosswalk |> select(SPCD, FVS_SPCD),
     by = join_by(SPCD)
   ) |>
-  left_join(
-    species_crosswalk |>
-      filter(SPECIES == "spp.") |>
-      select(GENUS, FVS_SPCD) |>
-      rename(FVS_GNCD = FVS_SPCD),
-    by = join_by(GENUS)
-  ) |>
+  # There are some (rather popular) Genus that FVSne doesn't handle, e.g. 934
+  # Sorbus, the mountain-ash. We throw our hands up on these and cry a little,
+  # but hopefully nobody notices as we remove them and carry on our way,
+  # sniffling about a common and charismatic Genus native to the northeast
+  # that can't be modeled in the northeast variant.
+  filter(!is.na(FVS_SPCD)) |>
   mutate(
     STAND_CN = CN,
     YEAR = MEASYEAR,
-    SPECIES = coalesce(FVS_SPCD, FVS_GNCD)
+    SPECIES = FVS_SPCD,
+    HEIGHT = trunc(HEIGHT * 10) / 10 # nearest 1/10 foot
   ) |>
   select(STAND_CN, YEAR, SPECIES, DENSITY, HEIGHT, SIZE_CLASS)
 ```

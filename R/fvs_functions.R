@@ -53,6 +53,7 @@ fvs_TimeConfig <- function(FirstYear, LastYear, Timestep) {
 
 fvs_Estab <- function(rows) {
   natural_regen <- function(row) {
+    year <- row["YEAR"]
     species <- row["SPECIES"]
     density <- as.numeric(row["DENSITY"]) # TPA
     survival <- 100 # percent
@@ -67,8 +68,8 @@ fvs_Estab <- function(rows) {
   }
   if (!is.null(rows)) {
     # if YEAR isn't in rows, add it
-    if (!"YEAR" %in% names(row)) {
-      row["YEAR"] <- 0
+    if (!"YEAR" %in% names(rows)) {
+      rows["YEAR"] <- 0
     }
     
     # FVS has a limit of 1000 trees per tree record. Each establishment
@@ -89,14 +90,20 @@ fvs_Estab <- function(rows) {
       ungroup() |>
       select(-any_of(c("ROW_NUMBER", "REPLICATES")))
     if (any(rows$YEAR > 0)) {
-      scheduled <- c(
-        fvs_kwd("Estab", 0),
-        fvs_kwd("MechPrep", 0, 0),
-        fvs_kwd("BurnPrep", 0, 0),
-        fvs_kwd("Sprout"),
-        apply(rows |> filter(YEAR > 0), 1, natural_regen),
-        fvs_kwd("End")
-      )
+      years <- rows|>
+        filter(YEAR > 0) |>
+        distinct(YEAR) |> 
+        _$YEAR
+      scheduled <- lapply(years, \(year){
+        c(
+          fvs_kwd("Estab", year),
+          fvs_kwd("MechPrep", 0, 0),
+          fvs_kwd("BurnPrep", 0, 0),
+          fvs_kwd("Sprout"),
+          apply(rows |> filter(YEAR == year), 1, natural_regen),
+          fvs_kwd("End")
+        )
+      })
     } else {
       scheduled <- c()
     }
@@ -116,7 +123,7 @@ fvs_Estab <- function(rows) {
     } else {
       background <- c()
     }
-    c(scheduled, background)
+    c(scheduled, background, recursive = TRUE)
   } else {
     c()
   }
