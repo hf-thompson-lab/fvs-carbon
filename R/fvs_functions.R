@@ -70,6 +70,8 @@ fvs_Estab <- function(rows) {
     # if YEAR isn't in rows, add it
     if (!"YEAR" %in% names(rows)) {
       rows["YEAR"] <- 0
+    } else {
+      rows$YEAR[is.na(rows$YEAR)] <- 0
     }
     
     # FVS has a limit of 1000 trees per tree record. Each establishment

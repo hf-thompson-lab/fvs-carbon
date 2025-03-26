@@ -30,6 +30,17 @@ tar_load(nk_plot_crosswalk)
 tar_load(nk_fig_2)
 ```
 
+## Preload targets results from this document
+
+When tar_make() has already built the objects defined in this document,
+run this block to pre-load them. You can then skip running ```{targets} blocks.
+
+```{r load tar objects defined here, eval = FALSE}
+get_this_rmd_file() |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+```
+
 # Configuring FVS
 
 FVS Software with `Release date: 20240401` was used.
