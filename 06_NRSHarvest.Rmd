@@ -1652,13 +1652,14 @@ starting_ba <- nrshrv_prsc_treelist |>
     StartingBA = sum(TPA * pi * (DBH / 12) / 2, na.rm = TRUE),
     .groups = "keep"
   ) |>
-  ungroup()
+  ungroup() |>
+  mutate(
+    StartingBA = conv_multiunit(StartingBA, "ft2 / acre", "m2 / hectare")
+  )
 starting_ba |>
   ggplot(aes(StartingBA)) +
   geom_histogram()
 ```
-
-Quartiles here are also very close to 100, 125, 150.
 
 What about harvested BA?
 
@@ -1669,7 +1670,10 @@ harvested_ba <- nrshrv_prsc_cutlist |>
     HarvestedBA = sum(TPA * pi * (DBH / 12) / 2, na.rm = TRUE),
     .groups = "keep"
   ) |>
-  ungroup()
+  ungroup() |>
+  mutate(
+    HarvestedBA = conv_multiunit(HarvestedBA, "ft2 / acre", "m2 / hectare")
+  )
 harvested_ba |>
   ggplot(aes(HarvestedBA)) +
   geom_histogram()
@@ -1681,29 +1685,33 @@ Let's look at % of BA harvested by starting BA
 harvest_summary <- starting_ba |>
   left_join(harvested_ba, by = join_by(StandID)) |>
   mutate(
+    HarvestedBA = coalesce(HarvestedBA, 0),
     HarvestFraction = HarvestedBA / StartingBA
   )
-harvest_summary |> ggplot(aes(StartingBA, HarvestFraction)) +
-  geom_point()
+harvest_summary |> ggplot(aes(StartingBA, HarvestedBA)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = c(0,0)) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  coord_cartesian(xlim = c(0, 400), ylim = c(0, 400))
 ```
 
 ```{r harvest plotting breakpoints, eval = FALSE}
 summary(harvest_summary)
 ```
 
-It looks like using StartingBA breakpoints of c(400, 500, 600) and
-HarvestFraction breakpoints of c(0.1, 0.2, 0.3) would give us a reasonable 4x4
-breakdown.
+Quartile breaks for StartingBA are roughly c(90, 115, 140)
+Quartile breaks for HarvestFraction are roughly c(0.1, 0.2, 0.3)
 
 ```{r harvest summary categories, eval = FALSE}
 harvest_summary <- harvest_summary |>
   mutate(
     StandBA = ordered(case_when(
-      StartingBA < 400 ~ "< 400",
-      StartingBA < 500 ~ "400 - 500",
-      StartingBA < 600 ~ "500 - 600",
-      .default = ">= 600"
-    ), levels = c("< 400", "400 - 500", "500 - 600", ">= 600")),
+      StartingBA < 90 ~ "< 90",
+      StartingBA < 115 ~ "90 - 115",
+      StartingBA < 140 ~ "115 - 140",
+      .default = ">= 140"
+    ), levels = c("< 90", "90 - 115", "115 - 140", ">= 140")),
     HarvestIntensity = ordered(case_when(
       HarvestFraction < 0.1 ~ "< 0.1",
       HarvestFraction < 0.2 ~ "0.1 - 0.2",
@@ -1714,7 +1722,7 @@ harvest_summary <- harvest_summary |>
 ```
 
 Do we get a more or less even breakdown?
-```{r harvest intensity distribution}
+```{r harvest intensity distribution, eval = FALSE}
 harvest_summary |>
   group_by(HarvestIntensity) |>
   summarize(N = n()) |>
@@ -1748,7 +1756,7 @@ ggplot(aes(x = YearsSinceHarvest, y = Aboveground_Total_Live)) +
 
 which is lovely, but hard to read.
 
-```{r how to handle time, eval = FALSE}
+```{r how to handle projected time, eval = FALSE}
 nrshrv_prsc_carbon |>
   group_by(StandID) |>
   arrange(Year) |>
@@ -1773,8 +1781,9 @@ nrshrv_prsc_carbon |>
   ) |>
   left_join(harvest_summary, by = join_by(StandID)) |>
   ggplot(aes(TimeStep, Aboveground_Total_Live, fill = HarvestIntensity)) +
+  facet_wrap("HarvestIntensity") +
   geom_boxplot(outlier.size = 0.1) +
-  geom_vline(xintercept = "0", color = "black", linewidth = 0.25) +
+  #geom_vline(xintercept = "0", color = "black", linewidth = 0.25) +
   theme_bw() +
   scale_fill_discrete(name = "Harvest Intensity") +
   ggtitle("FVS Projected Carbon in Harvested Stands") +
@@ -1782,6 +1791,11 @@ nrshrv_prsc_carbon |>
   xlab("Years since Harvest")
 ```
 
+Do BAI as well - can we get pre-harvest?
+
+```{r pre harvest bai, eval = FALSE}
+
+```
 
 ### Measured Carbon
 
@@ -1807,7 +1821,7 @@ ggplot(
 
 Also lovely, also impossible to interpret, so let's see how we should deal with time.
 
-```{r how to handle time, eval = FALSE}
+```{r how to handle measured time, eval = FALSE}
 nrshrv_srvy_carbon |>
   group_by(StandID) |>
   arrange(Year) |>
@@ -1819,7 +1833,7 @@ nrshrv_srvy_carbon |>
 
 So, much more clearly in 5-year increments (no surprise).
 
-```{r}
+```{r mesured time buckets, eval = FALSE}
 nrshrv_srvy_carbon |>
   mutate(
     TimeStep = ordered(case_when(
@@ -1832,7 +1846,7 @@ nrshrv_srvy_carbon |>
   ) |>
   left_join(harvest_summary, by = join_by(StandID)) |>
   ggplot(aes(TimeStep, Aboveground_Total_Live, fill = HarvestIntensity)) +
-  # facet_wrap("StandBA") +
+  facet_wrap("HarvestIntensity") +
   geom_boxplot(outlier.size = 0.1) +
   geom_vline(xintercept = "0", color = "black", linewidth = 0.25) +
   theme_bw() +
@@ -1841,6 +1855,10 @@ nrshrv_srvy_carbon |>
   ylab(bquote("Aboveground Live Carbon" ~ (`Mg C` %.% ha^-1))) +
   xlab("Years since Harvest")
 ```
+
+BAI by intensity
+Observed vs. Projected
+Remove mountain ash plots?
 
 ## Carbon Flux
 
