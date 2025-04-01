@@ -20,6 +20,7 @@ library(measurements) # conv_unit and conv_multiunit
 library(maps)
 library(ggspatial)
 library(ggpattern) # Patterns in ggplot2 charts
+library(patchwork) # arrange multiple ggplot2 plots on a page
 library(pbapply) # Progress bar for long operations
 # Color palette to use in charts, for consistency
 color_palette <- RColorBrewer::brewer.pal(9, "Greens")
@@ -1442,7 +1443,7 @@ fvs_harvested_trees <- nrshrv_prsc_cutlist |>
   ) |>
   mutate(
     SPCD = as.integer(SPCD),
-    BA = TPA * pi * (DIA / 2) ^ 2,
+    BA = TPA * pi * (DIA / 12 / 2) ^ 2,
     DIA_TENTHS = as.integer(0.5 + DIA * 10), # DIA_TENTHS is tenths of an inch
     FVS_HARVEST = 1
   )
@@ -1470,7 +1471,7 @@ fia_harvested_trees <- fia_trees_filtered(
   select(STAND_ID, SUBP, TREE, SPCD, TPA, DIA) |>
   mutate(
     TREE = as.character(TREE), # FVS TREE uses letters
-    BA = TPA * pi * (DIA / 2) ^ 2,
+    BA = TPA * pi * (DIA / 12 / 2) ^ 2,
     DIA_TENTHS = trunc(0.5 + DIA * 10), # DIA is now tenths of an inch
     FIA_HARVEST = 1
   )
@@ -1514,12 +1515,12 @@ correct BA was harvested of each species on each plot.
 ```{r align harvest by basal area, eval = FALSE}
 fia_harvested_ba <- fia_harvested_trees |>
   group_by(STAND_ID, SPCD) |>
-  summarize(FIA_BA = sum(BA / 12), .groups = "keep") |>
+  summarize(FIA_BA = sum(BA), .groups = "keep") |>
   ungroup()
 
 fvs_harvested_ba <- fvs_harvested_trees |>
   group_by(STAND_ID, SPCD) |>
-  summarize(FVS_BA = sum(BA / 12), .groups = "keep") |>
+  summarize(FVS_BA = sum(BA), .groups = "keep") |>
   ungroup()
 
 align_by_ba <- fia_harvested_ba |>
@@ -1649,7 +1650,7 @@ starting_ba <- nrshrv_prsc_treelist |>
   group_by(StandID) |>
   filter(Year == min(Year)) |>
   summarize(
-    StartingBA = sum(TPA * pi * (DBH / 12) / 2, na.rm = TRUE),
+    StartingBA = sum(TPA * pi * (DBH / 12 / 2)^2, na.rm = TRUE),
     .groups = "keep"
   ) |>
   ungroup() |>
@@ -1661,13 +1662,36 @@ starting_ba |>
   geom_histogram()
 ```
 
+Aside: does the BA calculated from trees line up with BALIVE from FIA?
+```{r ba vs balive, eval = FALSE}
+nrshrv_prsc_treelist |>
+  group_by(StandID) |>
+  filter(Year == min(Year)) |>
+  summarize(
+    StartingBA = sum(TPA * pi * (DBH / 12 / 2)^2, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  left_join(
+    nrshrv_plot_stats |>
+      filter(PRE_HARVEST == 1) |>
+      select(STAND_ID, BALIVE),
+    by = join_by(StandID == STAND_ID)
+  ) |>
+  mutate(
+    FVS_TO_FIA = StartingBA / BALIVE
+  ) |>
+  ggplot(aes(FVS_TO_FIA)) +
+  geom_histogram(binwidth = 0.05)
+```
+
 What about harvested BA?
 
 ```{r harvest basal area, eval = FALSE}
 harvested_ba <- nrshrv_prsc_cutlist |>
   group_by(StandID) |>
   summarize(
-    HarvestedBA = sum(TPA * pi * (DBH / 12) / 2, na.rm = TRUE),
+    HarvestedBA = sum(TPA * pi * (DBH / 12 / 2)^2, na.rm = TRUE),
     .groups = "keep"
   ) |>
   ungroup() |>
@@ -1689,11 +1713,11 @@ harvest_summary <- starting_ba |>
     HarvestFraction = HarvestedBA / StartingBA
   )
 harvest_summary |> ggplot(aes(StartingBA, HarvestedBA)) +
-  geom_point() +
-  geom_abline(slope = 1, intercept = c(0,0)) +
+  geom_point(size = 1, color = color_palette[7]) +
+  geom_abline(slope = 1, intercept = c(0,0), linewidth = 0.5, linetype = "dashed") +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  coord_cartesian(xlim = c(0, 400), ylim = c(0, 400))
+  coord_cartesian(xlim = c(0, 60), ylim = c(0, 60))
 ```
 
 ```{r harvest plotting breakpoints, eval = FALSE}
@@ -1707,21 +1731,32 @@ Quartile breaks for HarvestFraction are roughly c(0.1, 0.2, 0.3)
 harvest_summary <- harvest_summary |>
   mutate(
     StandBA = ordered(case_when(
-      StartingBA < 90 ~ "< 90",
-      StartingBA < 115 ~ "90 - 115",
-      StartingBA < 140 ~ "115 - 140",
-      .default = ">= 140"
-    ), levels = c("< 90", "90 - 115", "115 - 140", ">= 140")),
+      StartingBA < 22 ~ "< 22",
+      StartingBA < 28 ~ "22 - 28",
+      StartingBA < 35 ~ "28 - 35",
+      .default = ">= 35"
+    ), levels = c("< 22", "22 - 28", "28 - 35", ">= 35")),
     HarvestIntensity = ordered(case_when(
-      HarvestFraction < 0.1 ~ "< 0.1",
-      HarvestFraction < 0.2 ~ "0.1 - 0.2",
-      HarvestFraction < 0.33 ~ "0.2 - 0.3",
-      .default = ">= 0.3"
-    ), levels = c("< 0.1", "0.1 - 0.2", "0.2 - 0.3", ">= 0.3"))
+      HarvestFraction < 0.20 ~ "< 0.20",
+      HarvestFraction < 0.35 ~ "0.20 - 0.35",
+      HarvestFraction < 0.55 ~ "0.35 - 0.55",
+      .default = ">= 0.55"
+    ), levels = c("< 0.20", "0.20 - 0.35", "0.35 - 0.55", ">= 0.55"))
   )
 ```
 
 Do we get a more or less even breakdown?
+
+
+```{r starting ba distribution, eval = FALSE}
+harvest_summary |>
+  group_by(StandBA) |>
+  summarize(N = n()) |>
+  ungroup() |>
+  ggplot(aes(StandBA, N)) +
+  geom_col()
+```
+
 ```{r harvest intensity distribution, eval = FALSE}
 harvest_summary |>
   group_by(HarvestIntensity) |>
@@ -1793,7 +1828,155 @@ nrshrv_prsc_carbon |>
 
 Do BAI as well - can we get pre-harvest?
 
-```{r pre harvest bai, eval = FALSE}
+Less than 30% of plots have a PREV_PLT_CN, so for the most part we can't go back
+prior to the first inventory. We can, however, estimate the BAI up to harvest
+by:
+
+- for trees not harvested, take post-harvest DBH minus pre-harvest DBH / delta MEASYEAR
+- for trees harvested, take harvest DBH minus pre-harvest DBH / (HRVYR - MEASYEAR)
+
+```{r first increment bai, eval = FALSE}
+harvested_plots <- nrshrv_plot_stats |>
+  filter(HARVEST == 1) |>
+  distinct(CN, STATECD, COUNTYCD, PLOT, INVYR)
+
+# What can we learn about trees that survived from one inventory to the next
+trees_in_harvest_inventory <- fia_trees_filtered(fiadb, harvested_plots, \(.data, con) {
+  .data |>
+    select(
+      CN, STATECD, COUNTYCD, PLOT, INVYR,
+      STATUSCD, TPA_UNADJ, DIA, PREVDIA
+    )
+})
+
+# For ingrowth, we can fill in PREVDIA from the GRM table
+# For harvest, we can fill in DIA from the GRM table; we will also need
+# to adjust MEASYEAR to HRVYR
+grm_dia <- fia_grm_estn(fiadb, trees_in_harvest_inventory) |>
+  # Each TRE_CN will have multiple rows with different estimation types;
+  # they all have the same diameter information, so pick one record
+  filter(LAND_BASIS == "FORESTLAND" & ESTN_TYPE == "AL") |>
+  group_by(TRE_CN) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  select(TRE_CN, DIA_BEGIN, DIA_MIDPT, DIA_END, TPAGROW_UNADJ) |>
+  rename(CN = TRE_CN)
+```
+
+Let's gather:
+1. The BAI of the stand at the start
+   a. FIA provides BALIVE for the entire stand; this may or may not
+      line up with what we want
+   b. In the first post-harvest inventory, we can find the start / end BA of all
+      non-harvested trees, and the start / harvested BA of all harvested trees,
+      then divide by the measurement interval or measurement-to-harvest interval
+      to get stand-level BAI
+2. The BAI of the stand for each subsequent post-harvest inventory
+   a. From the second post-harvest inventory onward, we can sum the BA of all
+      trees from start to finish to get BAI
+3. We can then plot Pre-harvest BAI, and post-harvest BAI 1 & 2
+
+```{r pre_harvest_bai, eval=FALSE}
+pre_harvest_bai_trees <- trees_in_harvest_inventory |>
+  filter(STATUSCD %in% c(1, 3)) |> # live or harvested, not dead or no status
+  left_join(
+    nrshrv_plot_stats |>
+      filter(HARVEST == 1) |>
+      select(STATECD, COUNTYCD, PLOT, MEASYEAR, HRVYR),
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
+  left_join(
+    nrshrv_plot_stats |>
+      filter(PRE_HARVEST == 1) |>
+      select(STATECD, COUNTYCD, PLOT, MEASYEAR) |>
+      rename(PREV_MEASYEAR = MEASYEAR),
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
+  left_join(grm_dia, by = join_by(CN)) |>
+  mutate(
+    PREVDIA = coalesce(DIA_BEGIN, PREVDIA, DIA),
+    DIA = coalesce(DIA_MIDPT, DIA, PREVDIA), # Harvested trees get midpoint diameter
+    MEASYEAR = case_when(
+      STATUSCD == 3 ~ HRVYR, # Ending diameter is as of harvest
+      .default = MEASYEAR
+    ),
+    # It can happen that previous measurement and harvest happened in the same
+    # year; in that case, add a year to the second measurement so that they
+    # don't happen in the same year.
+    MEASYEAR = case_when(
+      MEASYEAR == PREV_MEASYEAR ~ MEASYEAR + 1,
+      .default = MEASYEAR
+    ),
+    TPA_UNADJ = coalesce(
+      TPAGROW_UNADJ, # Harvested trees
+      TPA_UNADJ,
+      case_when(
+        DIA >= 5 ~ 6.018046,
+        .default = 74.965282
+      )
+    ),
+    BA_START = TPA_UNADJ * pi * (PREVDIA / 12 / 2)^2,
+    BA_END = TPA_UNADJ * pi * (DIA / 12 / 2)^2,
+    BA_DELTA = BA_END - BA_START,
+    BAI = BA_DELTA / (MEASYEAR - PREV_MEASYEAR)
+  )
+pre_harvest_bai <- pre_harvest_bai_trees |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  summarize(
+    MEASYEAR = max(MEASYEAR),
+    PREV_MEASYEAR = min(PREV_MEASYEAR),
+    HRVYR = min(HRVYR),
+    BA_START = sum(BA_START),
+    BA_END = sum(BA_END),
+    BA_DELTA = sum(BA_DELTA),
+    BAI = sum(BAI),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  left_join(
+    nrshrv_plot_stats |>
+      filter(PRE_HARVEST == 1) |>
+      select(STATECD, COUNTYCD, PLOT, BALIVE) |>
+      rename(BALIVE_FIA = BALIVE),
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
+  left_join(
+    nrshrv_plot_stats |>
+      filter(HARVEST == 1) |>
+      select(STATECD, COUNTYCD, PLOT, BALIVE) |>
+      rename(BALIVE_END_FIA = BALIVE),
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  )
+```
+
+Some of these are crazy:
+```{r pre_harvest_bai_error, eval = FALSE}
+ba_err <- pre_harvest_bai |>
+  mutate(
+    BA_START_ERROR = BALIVE_FIA - BA_START,
+    BA_START_ERRPCT = BA_START_ERROR / BA_START,
+    BA_START_PROP = BA_START / BALIVE_FIA
+  )
+ggplot(ba_err, aes(BA_START_ERROR)) +
+  geom_histogram(binwidth = 10) +
+  ggplot(ba_err, aes(BA_START_PROP)) +
+  geom_histogram(binwidth = 0.05)
+```
+
+But even FVS input is off from FIA BALIVE, so ignore for now.
+
+Let's get subsequent increments of BA and BAI.
+
+```{r post harvest bai, eval = FALSE}
+
+  mutate(
+    TimeStep = factor(case_when(
+      YearsSinceHarvest < 0 ~ "-10 - -1",
+      YearsSinceHarvest == 0 ~ "0",
+      YearsSinceHarvest < 10 ~ "1 - 10",
+      .default = "10 - 20"
+    ))
+  ) |>
 
 ```
 
@@ -1861,7 +2044,6 @@ Observed vs. Projected
 Remove mountain ash plots?
 
 ## Carbon Flux
-
 
 ```{r plot measured flux, eval = FALSE}
 all_years <- tibble(YearsSinceHarvest = min(nrshrv_srvy_carbon$YearsSinceHarvest):max(nrshrv_srvy_carbon$YearsSinceHarvest))
