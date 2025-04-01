@@ -116,7 +116,7 @@ fia_plots_filtered(fiadb, nrshrv_plot_all, \(.data, con) {
     
     cond_stats <- tbl(con, "COND") |>
       inner_join(plots, by = plots_join_by) |>
-      select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, FORTYPCD) |>
+      select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, CONDPROP_UNADJ, FORTYPCD) |>
       group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
       # QMD = sqrt(sum(DIA^2) / n)
       # Which is equivalent to
@@ -129,7 +129,7 @@ fia_plots_filtered(fiadb, nrshrv_plot_all, \(.data, con) {
       # FIADB data dictionary 2.5.51 BALIVE says "Basal area in square feet per
       # acre of all live trees ω1.0 inch d.b.h/d.r.c sampled in the condition."
       summarize(
-        BALIVE = sum(BALIVE, na.rm = TRUE),
+        BALIVE = sum(BALIVE * CONDPROP_UNADJ, na.rm = TRUE),
         FORTYPCD = max(FORTYPCD, na.rm = TRUE),
         STDAGE = max(STDAGE, na.rm = TRUE),
         .groups = "keep"
@@ -1662,9 +1662,10 @@ starting_ba |>
   geom_histogram()
 ```
 
-Aside: does the BA calculated from trees line up with BALIVE from FIA?
+Aside: does the BA calculated from FVS trees line up with BALIVE from FIA?
+
 ```{r ba vs balive, eval = FALSE}
-nrshrv_prsc_treelist |>
+ba_vs_balive <- nrshrv_prsc_treelist |>
   group_by(StandID) |>
   filter(Year == min(Year)) |>
   summarize(
@@ -1680,10 +1681,13 @@ nrshrv_prsc_treelist |>
   ) |>
   mutate(
     FVS_TO_FIA = StartingBA / BALIVE
-  ) |>
+  )
+ba_vs_balive |>
   ggplot(aes(FVS_TO_FIA)) +
   geom_histogram(binwidth = 0.05)
 ```
+
+Yes, lines up almost perfectly.
 
 What about harvested BA?
 
@@ -1844,7 +1848,7 @@ harvested_plots <- nrshrv_plot_stats |>
 trees_in_harvest_inventory <- fia_trees_filtered(fiadb, harvested_plots, \(.data, con) {
   .data |>
     select(
-      CN, STATECD, COUNTYCD, PLOT, INVYR,
+      CN, STATECD, COUNTYCD, PLOT, INVYR, MORTYR,
       STATUSCD, TPA_UNADJ, DIA, PREVDIA
     )
 })
@@ -1878,7 +1882,6 @@ Let's gather:
 
 ```{r pre_harvest_bai, eval=FALSE}
 pre_harvest_bai_trees <- trees_in_harvest_inventory |>
-  filter(STATUSCD %in% c(1, 3)) |> # live or harvested, not dead or no status
   left_join(
     nrshrv_plot_stats |>
       filter(HARVEST == 1) |>
@@ -1898,6 +1901,7 @@ pre_harvest_bai_trees <- trees_in_harvest_inventory |>
     DIA = coalesce(DIA_MIDPT, DIA, PREVDIA), # Harvested trees get midpoint diameter
     MEASYEAR = case_when(
       STATUSCD == 3 ~ HRVYR, # Ending diameter is as of harvest
+      STATUSCD == 2 ~ HRVYR, # Ending diameter is as of death, presumed to be close to harvest
       .default = MEASYEAR
     ),
     # It can happen that previous measurement and harvest happened in the same
@@ -1919,7 +1923,9 @@ pre_harvest_bai_trees <- trees_in_harvest_inventory |>
     BA_END = TPA_UNADJ * pi * (DIA / 12 / 2)^2,
     BA_DELTA = BA_END - BA_START,
     BAI = BA_DELTA / (MEASYEAR - PREV_MEASYEAR)
-  )
+  ) |>
+  filter(!is.na(DIA) & !is.na(PREVDIA)) # Trees that have been dead for two inventories
+
 pre_harvest_bai <- pre_harvest_bai_trees |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   summarize(
@@ -1949,7 +1955,12 @@ pre_harvest_bai <- pre_harvest_bai_trees |>
   )
 ```
 
-Some of these are crazy:
+NOTE: We'd love to compute this relative to FIA's BALIVE in the pre-harvest
+inventory, but we need to compute each individual tree's BAI because they
+live for different amounts of time (harvest, mortality), and FIA only gives
+stand-level BALIVE, not tree-level.
+
+This gets us within 25% of BALIVE in the pre-harvest inventory.
 ```{r pre_harvest_bai_error, eval = FALSE}
 ba_err <- pre_harvest_bai |>
   mutate(
@@ -1963,7 +1974,12 @@ ggplot(ba_err, aes(BA_START_ERROR)) +
   geom_histogram(binwidth = 0.05)
 ```
 
-But even FVS input is off from FIA BALIVE, so ignore for now.
+What BAI do we compute for the pre-harvest inventory:
+```{r plot pre harvest bai, eval = FALSE}
+pre_harvest_bai |>
+  ggplot(aes(BAI)) +
+  geom_histogram(binwidth = 0.5)
+```
 
 Let's get subsequent increments of BA and BAI.
 
