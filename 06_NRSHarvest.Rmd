@@ -2197,10 +2197,10 @@ post_harvest_bai_fia <- nrshrv_plot_stats |>
       levels = c("Pre-Harvest", "Harvest", "1 - 5", "5 - 10", "10 - 15", "15 - 20", "20+")
     )
   ) |>
-  select(StandID, TimeStep, YearsSinceHarvest, HarvestIntensity, BAI, Source) |>
+  select(StandID, TimeStep, YearsSinceHarvest, HarvestIntensity, StandBA, BAI, Source) |>
   union_all(
     fvs_bai |>
-      select(StandID, TimeStep, YearsSinceHarvest, HarvestIntensity, BAI, Source)
+      select(StandID, TimeStep, YearsSinceHarvest, HarvestIntensity, StandBA, BAI, Source)
   )
 ```
 
@@ -2222,16 +2222,17 @@ post_harvest_bai_fia |>
 
 ```{r plot post-harvest bai fia by starting ba, eval = FALSE}
 post_harvest_bai_fia |>
-  filter(YearsSinceHarvest < 20) |>
-#  mutate(BAI = conv_multiunit(BAI, "ft2 / acre", "m2 / hectare")) |>
-  ggplot(aes(TimeStep, BAI, fill = StandBA)) +
+  filter(YearsSinceHarvest < 20 & YearsSinceHarvest != 0) |>
+  mutate(BAI = conv_multiunit(BAI, "ft2 / acre", "m2 / hectare")) |>
+  ggplot(aes(TimeStep, BAI, fill = Source)) +
   geom_boxplot(outlier.size = 0.1) +
   facet_wrap("StandBA", labeller = label_both) +
   theme_bw() +
   scale_fill_discrete(name = "Starting Stand BA") +
   ggtitle("Estimated BAI in Harvested Stands") +
   xlab("Years since Harvest") +
-  ylab(bquote("BAI" ~ (ft^2 %.% acre^-1 %.% year^-1)))
+  ylab(bquote("BAI" ~ (ft^2 %.% acre^-1 %.% year^-1))) +
+  coord_cartesian(ylim = c(-2, 6))
 ```
 
 
