@@ -1742,10 +1742,10 @@ harvest_summary <- harvest_summary |>
     ), levels = c("< 22", "22 - 28", "28 - 35", ">= 35")),
     HarvestIntensity = ordered(case_when(
       HarvestFraction < 0.20 ~ "< 0.20",
-      HarvestFraction < 0.35 ~ "0.20 - 0.35",
-      HarvestFraction < 0.55 ~ "0.35 - 0.55",
-      .default = ">= 0.55"
-    ), levels = c("< 0.20", "0.20 - 0.35", "0.35 - 0.55", ">= 0.55"))
+      HarvestFraction < 0.35 ~ "0.20 - 0.40",
+      HarvestFraction < 0.55 ~ "0.40 - 0.60",
+      .default = ">= 0.60"
+    ), levels = c("< 0.20", "0.20 - 0.40", "0.40 - 0.60", ">= 0.60"))
   )
 ```
 
@@ -1796,35 +1796,44 @@ ggplot(aes(x = YearsSinceHarvest, y = Aboveground_Total_Live)) +
 which is lovely, but hard to read.
 
 ```{r how to handle projected time, eval = FALSE}
-nrshrv_prsc_carbon |>
+time_distribution <- nrshrv_prsc_carbon |>
   group_by(StandID) |>
   arrange(Year) |>
-  mutate(MeasNum = factor(row_number())) |>
-  ungroup() |>
-  ggplot(aes(MeasNum, YearsSinceHarvest)) +
-  geom_boxplot()
+  mutate(MeasNum = row_number()) |>
+  ungroup()
+  ggplot(time_distribution, aes(factor(MeasNum), YearsSinceHarvest)) +
+  geom_boxplot() +
+  ggplot(time_distribution, aes(MeasNum)) +
+  geom_histogram(binwidth = 0.25)
+  
 ```
 
 Which makes it look like we should use year breakpoints of c(-10, 0, 10, 20),
-calling out 0 as a special case, so 10<0, 0, 0<10, 10<20.
+calling out 0 as a special case, so 10<0, 0, 0<10, 10<20, 20+.
 
 ```{r time buckets, eval = FALSE}
 nrshrv_prsc_carbon |>
   mutate(
-    TimeStep = factor(case_when(
-      YearsSinceHarvest < 0 ~ "-10 - -1",
-      YearsSinceHarvest == 0 ~ "0",
-      YearsSinceHarvest < 10 ~ "1 - 10",
-      .default = "10 - 20"
-    ))
+    TimeStep = ordered(
+      case_when(
+        YearsSinceHarvest < 0 ~ "Pre-Harvest",
+        YearsSinceHarvest == 0 ~ "Harvest",
+        YearsSinceHarvest < 5 ~ "1 - 5",
+        YearsSinceHarvest < 10 ~ "5 - 10",
+        YearsSinceHarvest < 15 ~ "10 - 15",
+        YearsSinceHarvest < 20 ~ "15 - 20",
+        .default = "20+"
+      ),
+      levels = c("Pre-Harvest", "Harvest", "1 - 5", "5 - 10", "10 - 15", "15 - 20", "20+")
+    )
   ) |>
   left_join(harvest_summary, by = join_by(StandID)) |>
   ggplot(aes(TimeStep, Aboveground_Total_Live, fill = HarvestIntensity)) +
   facet_wrap("HarvestIntensity") +
   geom_boxplot(outlier.size = 0.1) +
-  #geom_vline(xintercept = "0", color = "black", linewidth = 0.25) +
   theme_bw() +
   scale_fill_discrete(name = "Harvest Intensity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   ggtitle("FVS Projected Carbon in Harvested Stands") +
   ylab(bquote("Aboveground Live Carbon" ~ (`Mg C` %.% ha^-1))) +
   xlab("Years since Harvest")
@@ -1981,20 +1990,71 @@ pre_harvest_bai |>
   geom_histogram(binwidth = 0.5)
 ```
 
-Let's get subsequent increments of BA and BAI.
-
-```{r post harvest bai, eval = FALSE}
-
+```{r bai fvs, eval = FALSE}
+fvs_bai <- nrshrv_prsc_treelist |>
   mutate(
-    TimeStep = factor(case_when(
-      YearsSinceHarvest < 0 ~ "-10 - -1",
-      YearsSinceHarvest == 0 ~ "0",
-      YearsSinceHarvest < 10 ~ "1 - 10",
-      .default = "10 - 20"
-    ))
+    PREV_DBH = DBH - DG,
+    BA = TPA * pi * (DBH / 12 / 2)^2,
+    PREV_BA = TPA * pi * (PREV_DBH / 12 / 2)^2,
+    BAI = (BA - PREV_BA) / PrdLen
   ) |>
+  group_by(StandID, Year) |>
+  summarize(BAI = sum(BAI), .groups = "keep") |>
+  ungroup() |>
+  left_join(
+    nrshrv_plot_stats |> filter(HARVEST == 1) |> select(STAND_ID, STATECD, COUNTYCD, PLOT, HRVYR),
+    by = join_by(StandID == STAND_ID)
+  ) |>
+  filter(Year > HRVYR) |>
+  select(StandID, Year, HRVYR, BAI) |>
+  mutate(Source = "FVS") |>
+  union_all(
+    pre_harvest_bai |>
+      left_join(
+        nrshrv_plot_stats |> select(STATECD, COUNTYCD, PLOT, STAND_ID),
+        by = join_by(STATECD, COUNTYCD, PLOT)
+      ) |>
+      select(STAND_ID, PREV_MEASYEAR, HRVYR, BAI) |>
+      rename(StandID = STAND_ID, Year = PREV_MEASYEAR) |>
+      mutate(Source = "Estimated")
+  ) |>
+  mutate(
+    YearsSinceHarvest = Year - HRVYR,
+    TimeStep = ordered(
+      case_when(
+        YearsSinceHarvest < 0 ~ "Pre-Harvest",
+        YearsSinceHarvest == 0 ~ "Harvest",
+        YearsSinceHarvest < 5 ~ "1 - 5",
+        YearsSinceHarvest < 10 ~ "5 - 10",
+        YearsSinceHarvest < 15 ~ "10 - 15",
+        YearsSinceHarvest < 20 ~ "15 - 20",
+        .default = "20+"
+      ),
+      levels = c("Pre-Harvest", "Harvest", "1 - 5", "5 - 10", "10 - 15", "15 - 20", "20+")
+    )
+  ) |>
+  left_join(
+    harvest_summary,
+    by = join_by(StandID)
+  )
+```
+
+```{r plot fvs bai, eval = FALSE}
+fvs_bai |>
+  filter(YearsSinceHarvest < 20 & YearsSinceHarvest != 0) |>
+  mutate(BAI = conv_multiunit(BAI, "ft2 / acre", "m2 / hectare")) |>
+  ggplot(aes(TimeStep, BAI, fill = Source)) +
+  facet_wrap("HarvestIntensity", labeller = label_both) +
+  geom_boxplot(outlier.size = 0.1) +
+  theme_bw() +
+  scale_fill_discrete(name = "BAI Source") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("FVS Projected BAI in Harvested Stands") +
+  xlab("Years since Harvest") +
+  ylab(bquote("BAI" ~ (m^2 %.% hectare^-1 %.% year^-1)))
 
 ```
+
 
 ### Measured Carbon
 
@@ -2007,7 +2067,6 @@ ggplot(
   geom_bin2d(bins = 25) +
   scale_fill_gradient(
     name = "Number of Plots",
-    # transform = "log10",
     low = color_palette[1],
     high = color_palette[8],
     limits = c(0, 50)
@@ -2021,13 +2080,16 @@ ggplot(
 Also lovely, also impossible to interpret, so let's see how we should deal with time.
 
 ```{r how to handle measured time, eval = FALSE}
-nrshrv_srvy_carbon |>
+time_for_measurement <- nrshrv_srvy_carbon |>
   group_by(StandID) |>
   arrange(Year) |>
-  mutate(MeasNum = factor(row_number())) |>
-  ungroup() |>
-  ggplot(aes(MeasNum, YearsSinceHarvest)) +
-  geom_boxplot()
+  mutate(MeasNum = row_number()) |>
+  ungroup()
+ggplot(time_for_measurement, aes(factor(MeasNum), YearsSinceHarvest)) +
+  geom_boxplot() +
+  ggplot(time_for_measurement, aes(MeasNum)) +
+  geom_histogram(binwidth = 0.25)
+  
 ```
 
 So, much more clearly in 5-year increments (no surprise).
@@ -2035,29 +2097,143 @@ So, much more clearly in 5-year increments (no surprise).
 ```{r mesured time buckets, eval = FALSE}
 nrshrv_srvy_carbon |>
   mutate(
-    TimeStep = ordered(case_when(
-      YearsSinceHarvest < 0 ~ "-5 - 0",
-      YearsSinceHarvest < 5 ~ "0 - 5",
-      YearsSinceHarvest < 10 ~ "5 - 10",
-      YearsSinceHarvest < 15 ~ "10 - 15",
-      .default = "15 - 20"
-    ), levels = c("-5 - 0", "0 - 5", "5 - 10", "10 - 15", "15 - 20"))
+    TimeStep = ordered(
+      case_when(
+        YearsSinceHarvest < 0 ~ "Pre-Harvest",
+        YearsSinceHarvest == 0 ~ "Harvest",
+        YearsSinceHarvest < 5 ~ "1 - 5",
+        YearsSinceHarvest < 10 ~ "5 - 10",
+        YearsSinceHarvest < 15 ~ "10 - 15",
+        YearsSinceHarvest < 20 ~ "15 - 20",
+        .default = "20+"
+      ),
+      levels = c("Pre-Harvest", "Harvest", "1 - 5", "5 - 10", "10 - 15", "15 - 20", "20+")
+    )
   ) |>
+  filter(TimeStep != "Harvest") |>
   left_join(harvest_summary, by = join_by(StandID)) |>
   ggplot(aes(TimeStep, Aboveground_Total_Live, fill = HarvestIntensity)) +
-  facet_wrap("HarvestIntensity") +
+  facet_wrap("HarvestIntensity", labeller = label_both) +
   geom_boxplot(outlier.size = 0.1) +
   geom_vline(xintercept = "0", color = "black", linewidth = 0.25) +
   theme_bw() +
   scale_fill_discrete(name = "Harvest Intensity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   ggtitle("FIA Measured Carbon in Harvested Stands") +
   ylab(bquote("Aboveground Live Carbon" ~ (`Mg C` %.% ha^-1))) +
   xlab("Years since Harvest")
 ```
 
-BAI by intensity
+✓ BAI by intensity
 Observed vs. Projected
 Remove mountain ash plots?
+
+Let's get subsequent increments of BA and BAI.
+
+```{r post harvest bai fia, eval = FALSE}
+prev_inv_mixin <- nrshrv_plot_stats |>
+  select(STATECD, COUNTYCD, PLOT, INVNUM, MEASYEAR, BALIVE) |>
+  mutate(INVNUM = INVNUM + 1) |>
+  rename(
+    PREV_MEASYEAR = MEASYEAR,
+    PREV_BALIVE = BALIVE
+  )
+
+harvest_year_mixin <- nrshrv_plot_stats |>
+  filter(HARVEST == 1) |>
+  select(STATECD, COUNTYCD, PLOT, HRVYR)
+
+post_harvest_bai_fia <- nrshrv_plot_stats |>
+  filter(HARVEST == 0 & PRE_HARVEST == 0) |>
+  left_join(
+    prev_inv_mixin,
+    by = join_by(STATECD, COUNTYCD, PLOT, INVNUM)
+  ) |>
+  select(-HRVYR) |>
+  left_join(
+    harvest_year_mixin,
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
+  mutate(
+    BA_DELTA = BALIVE - PREV_BALIVE,
+    BAI = BA_DELTA / (MEASYEAR - PREV_MEASYEAR),
+    Source = "FIA"
+  ) |>
+  select(STATECD, COUNTYCD, PLOT, MEASYEAR, HRVYR, BAI, Source) |>
+  left_join(
+    nrshrv_plot_stats |>
+      filter(PRE_HARVEST == 1) |>
+      select(STATECD, COUNTYCD, PLOT, STAND_ID) |>
+      rename(StandID = STAND_ID),
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
+  select(StandID, BAI, Source, MEASYEAR, HRVYR) |>
+  union_all(
+    # Fill in the two missing rows with values that won't show in the chart
+    data.frame(
+      StandID = c("002300300203", "000900300230"),
+      BAI = c(9999, 9999),
+      Source = c("FIA", "FIA"),
+      MEASYEAR = c(1, 1),
+      HRVYR = c(0, 0)
+    )
+  ) |>
+  left_join(
+    harvest_summary,
+    by = join_by(StandID)
+  ) |>
+  mutate(
+    YearsSinceHarvest = MEASYEAR - HRVYR,
+    TimeStep = ordered(
+      case_when(
+        YearsSinceHarvest < 0 ~ "Pre-Harvest",
+        YearsSinceHarvest == 0 ~ "Harvest",
+        YearsSinceHarvest < 5 ~ "1 - 5",
+        YearsSinceHarvest < 10 ~ "5 - 10",
+        YearsSinceHarvest < 15 ~ "10 - 15",
+        YearsSinceHarvest < 20 ~ "15 - 20",
+        .default = "20+"
+      ),
+      levels = c("Pre-Harvest", "Harvest", "1 - 5", "5 - 10", "10 - 15", "15 - 20", "20+")
+    )
+  ) |>
+  select(StandID, TimeStep, YearsSinceHarvest, HarvestIntensity, BAI, Source) |>
+  union_all(
+    fvs_bai |>
+      select(StandID, TimeStep, YearsSinceHarvest, HarvestIntensity, BAI, Source)
+  )
+```
+
+```{r plot post-harvest bai fia, eval = FALSE}
+post_harvest_bai_fia |>
+  filter(YearsSinceHarvest < 20 & YearsSinceHarvest != 0) |>
+  mutate(BAI = conv_multiunit(BAI, "ft2 / acre", "m2 / hectare")) |>
+  ggplot(aes(TimeStep, BAI, fill = Source)) +
+  geom_boxplot(outlier.size = 0.1) +
+  facet_wrap("HarvestIntensity", labeller = label_both) +
+  theme_bw() +
+  scale_fill_discrete(name = NULL) +
+  ggtitle("BAI in Harvested Stands") +
+  xlab("Years since Harvest") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylab(bquote("BAI" ~ (m^2 %.% hectare^-1 %.% year^-1))) +
+  coord_cartesian(ylim = c(-2, 6))
+```
+
+```{r plot post-harvest bai fia by starting ba, eval = FALSE}
+post_harvest_bai_fia |>
+  filter(YearsSinceHarvest < 20) |>
+#  mutate(BAI = conv_multiunit(BAI, "ft2 / acre", "m2 / hectare")) |>
+  ggplot(aes(TimeStep, BAI, fill = StandBA)) +
+  geom_boxplot(outlier.size = 0.1) +
+  facet_wrap("StandBA", labeller = label_both) +
+  theme_bw() +
+  scale_fill_discrete(name = "Starting Stand BA") +
+  ggtitle("Estimated BAI in Harvested Stands") +
+  xlab("Years since Harvest") +
+  ylab(bquote("BAI" ~ (ft^2 %.% acre^-1 %.% year^-1)))
+```
+
 
 ## Carbon Flux
 
