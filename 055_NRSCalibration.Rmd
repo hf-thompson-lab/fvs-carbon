@@ -1,0 +1,475 @@
+---
+title: "055_Calibration"
+author: "Nikolaus Bates-Haus"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+# Setup
+
+```{r setup, include=FALSE}
+library(targets)
+library(tarchetypes)
+library(tidyverse)
+library(reshape2) # melt()
+library(measurements) # conv_unit and conv_multiunit
+library(maps)
+library(ggspatial)
+options(scipen = 9) # Use integer notation for numbers under 9 digits
+tar_source()
+```
+
+
+## Load targets results from other documents
+
+```{r load tar objects defined elsewhere}
+tar_load(fiadb)
+tar_load(species_crosswalk)
+```
+
+## Preload everything from 05_NRSGrowOnly.Rmd
+
+```{r load 05 nrsgrowonly, eval = FALSE}
+get_this_rmd_file() |>
+  str_replace("055_NRSCalibration", "05_NRSGrowOnly") |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+```
+
+## Preload targets results from this document
+
+When tar_make() has already built the objects defined in this document,
+run this block to pre-load them. You can then skip running ```{targets} blocks.
+
+```{r load tar objects defined here, eval = FALSE}
+get_this_rmd_file() |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+```
+
+# Lack of Calibration
+
+## Notes
+
+rmrs_p061_289_306.pdf p 8 / 296
+CalbStat - print calibration stats
+ReadCorR - Readjust Correction for Regeneration (height)
+ReadCorD - Readjust Correction for large tree Diameter
+ReadCorH - Readjust Correction for large tree Height
+"can be constructed from the mean multipliers listed in the calibration statistics report"
+EssentialFVS 6.5.2.1
+ any available growth observations that are present in the input data for the site
+being projected
+So, I'm not getting calibration because I'm almost always starting with the first survey of a stand and there is no previous observation
+I could copy the next growth increment backwards a step.
+
+The scaling procedure (Stage 1973), when stripped of statistical condiments, is really
+quite simple. Both the large-tree diameter growth model and the small-tree height growth
+model are linear with logarithmically scaled dependent variables. Therefore, the model
+intercepts are, in effect, growth multipliers. An increment is predicted to match each
+observed increment for a species, and differences are sorted. The median difference is
+then added to the model for that species, on the logarithmic scale, as an additional
+intercept term (see section 7.2 for detailed information). (EssentialFVS)
+
+## Lack of Calibration
+
+Why, in all these runs, do we so rarely see FVS kick in its internal calibration?
+
+It's because we're starting at the beginning of time for each plot, so there is
+no remeasurement, and no growth rate in either height or diameter.
+
+```{r nrsgro_none_calibration, eval = FALSE}
+single_seed <- nrsgro_none |>
+  group_by() |>
+  filter(random_seed == min(random_seed)) |>
+  ungroup()
+nrsgro_none_cases <- fvs_read_output(single_seed, "FVS_Cases")
+nrsgro_none_calibstats <- fvs_read_output(single_seed, "FVS_CalibStats")
+num_cases <- nrsgro_none_cases |> distinct(CaseID) |> nrow()
+num_cases_calibrated <- nrsgro_none_calibstats |> distinct(CaseID) |> nrow()
+num_cases_calibrated /  num_cases
+```
+
+# FVS vs FIA Growth
+
+FIADB.TREE_GRM_COMPONENT has ANN_DIA_GROWTH and ANN_HT_GROWTH
+
+FVS_TreeInit_Plot has DG and HTG
+
+FIADB.PLOT.REMPER,
+FIADB.TREE_GRM_ESTN.REMPER - remeasurement period to the nearest 0.1 year
+
+Do these have anything to do with each other?
+
+```{r sample_plots, eval = FALSE}
+sample_plots <- nrsgro_plot |>
+  sample_n(10, replace = FALSE)
+```
+
+## FIA Growth Rates
+
+FIADB has annual diameter and height growth rates in the GRM_COMPONENT table,
+but these are sparsely populated. We can compute our own from remeasured trees.
+
+```{r fia growth, eval = FALSE}
+tmp_tre <- fia_trees(fiadb, sample_plots)
+tmp_prv_tre <- fia_trees_by_cn(
+  fiadb,
+  tmp_tre |>
+    select(PREV_TRE_CN) |>
+    rename(CN = PREV_TRE_CN)
+) |>
+  select(CN, DIA, HT) |>
+  rename(
+    PREV_TRE_CN = CN,
+    PREV_DIA = DIA,
+    PREV_HT = HT
+  )
+tmp_plt <- fia_plots_by_cn(
+  fiadb,
+  tmp_tre |>
+    select(PLT_CN) |>
+    rename(CN = PLT_CN)
+) |>
+  select(CN, REMPER) |>
+  rename(PLT_CN = CN)
+fia_growth <- tmp_tre |>
+  left_join(tmp_prv_tre, by = join_by(PREV_TRE_CN)) |>
+  left_join(tmp_plt, by = join_by(PLT_CN)) |>
+  mutate(
+    ANN_DIA_GROWTH = (DIA - PREV_DIA) / REMPER,
+    ANN_HT_GROWTH = (HT - PREV_HT) / REMPER
+  ) |>
+  filter(!is.na(ANN_DIA_GROWTH) & !is.na(ANN_HT_GROWTH))
+fia_growth |>
+  ggplot(aes(ANN_DIA_GROWTH, ANN_HT_GROWTH)) +
+  geom_point()
+```
+
+That's a lot of negative height growth, and a modest amount of negative
+diameter growth, but that is what the data shows.
+
+## FVS Growth Rates
+
+From EssentialFVS:
+Diameter increment data
+may be entered into FVS either as an inside bark diameter increment (future or past), or a
+second outside bark DBH measurement (future or past). If the second method is used, the
+program will automatically convert DG to an inside bark increment prior to calibration.
+When the sample tree records are plain text (not in a database) and the value entered for
+DG does not contain a decimal point the value is assumed to be in tenths of inches (one
+implied decimal place). When the sample tree records are in a database the value is read
+as entered (no implied decimal place).
+
+so we're switching from a past "outside bark DBH measurement" to a future
+"outside bark DBH measurement".
+
+EssentialFVS goes on to say:
+It is also recommended that a growth measurement period be used corresponding to the
+period used to fit the diameter growth models for the variant you are using (generally 10
+years). [...] Both the method of growth
+measurement and the length of the period are entered on the GROWTH keyword record
+(see section 4.2.3.4).
+
+
+```{r fvs growth, eval = FALSE}
+fvs_growth <- fia_tbl(fiadb, "FVS_TreeInit_Plot", \(.data, con) {
+  .data |>
+    inner_join(
+      sample_plots |> select(CN) |> rename(STAND_CN = CN),
+      by = join_by(STAND_CN),
+      copy = TRUE
+    )
+}) |>
+  mutate(
+    DIA_GROWTH = DIAMETER - DG,
+    HT_GROWTH = HT - HTG
+  ) |>
+  filter(!is.na(DIA_GROWTH) & !is.na(HT_GROWTH))
+fvs_growth |>
+  ggplot(aes(DIA_GROWTH, HT_GROWTH)) +
+  geom_point()
+```
+
+Note that FVS never has negative growth, in either diameter or height.
+
+Did we get FVS growth corresponding to all FIA growth?
+
+```{r}
+a <- fvs_growth |>
+  anti_join(
+    fia_growth,
+    by = join_by(TREE_CN == CN)
+  ) |>
+  select(TREE_CN, DIAMETER) |>
+  rename(CN = TREE_CN, DIA = DIAMETER) |>
+  mutate(SOURCE = "FVS")
+b <- fia_growth |>
+  anti_join(
+    fvs_growth,
+    by = join_by(CN == TREE_CN)
+  ) |>
+  select(CN, DIA) |>
+  mutate(SOURCE = "FIA")
+missing_growth <- bind_rows(a, b)
+```
+
+That's a bunch of FIA trees not in the FVS data; where did they go?
+Oh, they don't have DG or HTG filled in, so FVS doesn't get growth for them.
+
+## FVS vs FIA Growth
+
+How do FVS and FIA growth rates compare?
+
+```{r}
+cmp_growth <- fvs_growth |>
+  select(TREE_CN, DIA_GROWTH, HT_GROWTH) |>
+  left_join(
+    fia_growth |> select(CN, ANN_DIA_GROWTH, ANN_HT_GROWTH),
+    by = join_by(TREE_CN == CN)
+  ) |>
+  mutate(DIA_GROWTH = DIA_GROWTH / 5)
+
+cmp_growth |>
+  ggplot(aes(DIA_GROWTH, ANN_DIA_GROWTH)) +
+  geom_abline(slope = 1, intercept = 0) +
+  theme(aspect.ratio = 1) +
+  geom_point()
+```
+
+These are not exact because, when computing FVS_TreeInit_Plot.DG, the
+growth period is assumed to be 5 years, rather than PLOT.REMPER. Note that
+this imparts a very slight positive growth bias:
+```{r growth bias, eval = FALSE}
+# compute RMSE for DIA_GROWTH compared to ANN_DIA_GROWTH
+cmp_growth |>
+  summarise(
+    RMSE = sqrt(mean((DIA_GROWTH - ANN_DIA_GROWTH) ^ 2))
+  )
+```
+
+# Calibrating FVS
+
+## GROWTH Keyword
+
+It looks like we will want to use the GROWTH keyword to adjust the observation
+period:
+GROWTH
+- Field 1: diameter method; we will use value 3: "Subsequent measurement. Current diameter represents an
+outside-bark measurement at the beginning of the growth
+measurement period, and diameter increment represents a total
+outside-bark diameter measurement at the end of the growth
+measurement period."
+- Field 2: Length of growth remeasurement; we will use 5 years
+- Field 3: height method; we will used 3 to match field 1
+- Field 4: Length of height remeasurement; we will use 5 years
+- Field 5: Mortality observation period; we will use 5 years
+
+## Choices and Rationale
+
+Fields 1 and 3 we will use method 3 because we have subsequent measurement 
+available in the FIA data, and we can input FIA measurements directly.
+
+Fields 2 and 4, FVS recommends using the number of years the model is calibrated
+for, typically 10. This leaves us with a choice; do we:
+
+a. use a single FIA remeasurement interval (5 years); this is how FIA populates
+   FIADB.FVS_TreeInit_Plot.DG; or
+b. use two remeasurement intervals (10 years) to align with FVS calibration
+
+Since FIA uses 5 years, we will use option a, 5 years.
+
+This gives us another choice; do we:
+
+a. use the actual measurement from the next FIA inventory, which may be
+   more or less than 5 years out; or
+b. compute the annualized growth using FIADB.PLOT.REMPER then multiply by the
+   growth interval
+   
+FIA uses the actual value, no matter how long the remeasurement period is.
+We choose instead to use method b, to compute an accurate annual growth rate
+and multiply by the growth remeasurement period given to FVS.
+
+Thus, we will:
+
+- For all FIA trees in the FVS stand,
+- Compute ANNUAL_DIA_GROWTH = (NEXT_TREE.DIA - TREE.DIA) / NEXT_PLOT.REMPER
+  (and the same for HT)
+- Compute DG = ANNUAL_DIA_GROWTH * FVS_DIA_REMPER
+  (and the same for ht)
+- Fill these into a calibration table
+- When populating FVS input tables, override DG and HTG from the calibration table
+- When generating FVS keywords, fill in GROWTH appropriately
+
+# Calibration Table
+
+```{targets nrsgro_calb_calibration, tar_simple = TRUE}
+starting_plots <- nrsgro_plot |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  arrange(INVYR) |>
+  filter(row_number() == 1) |> 
+  ungroup()
+
+tmp_tre <- fia_trees(fiadb, starting_plots) |>
+  select(CN, PLT_CN, STATECD, COUNTYCD, PLOT, INVYR, PREV_TRE_CN, DIA, HT)
+
+tmp_nxt_tre <- fia_trees_filtered(
+  fiadb,
+  plots = NULL,
+  \(.data, con) {
+    .data |>
+      inner_join(
+        tmp_tre |>
+          select(CN) |>
+          rename(PREV_TRE_CN = CN),
+        by = join_by(PREV_TRE_CN),
+        copy = TRUE
+      ) |>
+      select(PREV_TRE_CN, CN, PLT_CN, DIA, HT) |>
+      rename(
+        NEXT_TRE_CN = CN,
+        CN = PREV_TRE_CN,
+        NEXT_PLT_CN = PLT_CN,
+        NEXT_DIA = DIA,
+        NEXT_HT = HT
+      )
+  }
+)
+
+tmp_plt <- nrsgro_plot |>
+  select(CN, REMPER) |>
+  rename(NEXT_PLT_CN = CN)
+
+# For FVS, we need:
+# STAND_CN
+# TREE_CN
+# DG
+# HTG
+# The rest is assumed
+
+tmp_tre |>
+  left_join(tmp_nxt_tre, by = join_by(CN)) |>
+  left_join(tmp_plt, by = join_by(NEXT_PLT_CN)) |>
+  mutate(
+    ANN_DIA_GROWTH = (NEXT_DIA - DIA) / REMPER,
+    DG = DIA + ANN_DIA_GROWTH * 5,
+    ANN_HT_GROWTH = (NEXT_HT - HT) / REMPER,
+    HTG = HT + ANN_HT_GROWTH * 5
+  ) |>
+  filter(!is.na(DG) & !is.na(HTG)) |>
+  select(PLT_CN, CN, DG, HTG) |>
+  rename(
+    STAND_CN = PLT_CN,
+    TREE_CN = CN
+  )
+```
+
+# Run FVS
+
+```{targets nrsgro_calb}
+tar_target(
+  nrsgro_calb,
+  {
+    # fvs_run wants a table of the form:
+    # STAND_ID - arbitrary identifier for a stand
+    # STAND_CN - CN for the plot
+    # FIRST_YEAR - start of the projection; if this doesn't align with the actual
+    #   year (MEASYEAR) of first survey, the stand will be projected from the
+    #   survey year to the start of the projection.
+    # LAST_YEAR - end of the projection
+    timestep <- 10 # years; determined by FVSne variant
+    
+    plots_for_fvs <- nrsgro_plot |>
+      group_by(STATECD, COUNTYCD, PLOT) |>
+      arrange(INVYR) |>
+      mutate(
+        STAND_CN = if_else(row_number() == 1, CN, NA)
+      ) |>
+      summarize(
+        STAND_CN = min(STAND_CN, na.rm = TRUE), # only one will not be NA
+        FIRST_YEAR = min(MEASYEAR, na.rm = TRUE),
+        LAST_YEAR = max(MEASYEAR, na.rm = TRUE),
+        .groups = "keep"
+      ) |>
+      ungroup() |>
+      mutate(
+        # STAND_ID won't match FVS_PLOTINIT_PLOT.STAND_ID; that's OK
+        STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
+      )
+    
+    # fvs_run wants establishment in the form:
+    # STAND_CN
+    # SPECIES (FVS_SPCD)
+    # DENSITY (TPA)
+    # HEIGHT (FT)
+    estab_for_fvs <- nrsgro_estab_rate |>
+      mutate(
+        STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
+      ) |>
+      left_join(
+        plots_for_fvs |> select(STAND_ID, STAND_CN),
+        by = join_by(STAND_ID)
+      ) |>
+      select(STAND_CN, STATECD, COUNTYCD, PLOT, SPCD, RATE_PER_ACRE) |>
+      mutate(RATE_PER_ACRE = floor(RATE_PER_ACRE * timestep)) |>
+      rename(DENSITY = RATE_PER_ACRE) |>
+      left_join(
+        nrsgro_estab_height |>
+          select(STATECD, COUNTYCD, PLOT, SPCD, HT),
+        by = join_by(STATECD, COUNTYCD, PLOT, SPCD)
+      ) |>
+      mutate(HT = floor(HT)) |>
+      rename(HEIGHT = HT) |>
+      left_join(
+        species_crosswalk |>
+          select(SPCD, FVS_SPCD),
+        by = join_by(SPCD)
+      ) |>
+      rename(SPECIES = FVS_SPCD) |>
+      filter(!is.na(SPECIES) & !is.na(DENSITY) & !is.na(HEIGHT)) |>
+      select(STAND_CN, SPECIES, DENSITY, HEIGHT)
+      
+    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
+    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    data_dir <- "data/fvs"
+    title <- "NRSGrowOnly"
+    mgmt_id <- "CALB"
+    
+    # We communicate with FVS through files. FVSOnline shows a model in which
+    # a "project" (the inputs and outputs of a single FVS run) live in a
+    # single directory; we follow that model.
+    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+    if (!dir.exists(project_dir)) {
+      dir.create(project_dir)
+    }
+    
+    fvs_run(
+      fvsbin_dir = fvsbin_dir,
+      fvs_variant = fvs_variant,
+      project_dir = project_dir,
+      fiadb = fiadb,
+      title = title,
+      mgmt_id = mgmt_id,
+      stands = plots_for_fvs,
+      calibration = nrsgro_calb_calibration,
+      regen = estab_for_fvs,
+      num_partitions = fvs_num_partitions,
+      partition = fvs_partition,
+      random_seed = fvs_randseed
+    )
+  },
+  # iteration = "vector" branches execution for each partition value (see below)
+  iteration = "vector",
+  # cross() and map() are unparsed targets:: functions here.
+  # cross() ensures that every combination of values for its arguments is processed
+  # map() distributes each value of its argument to a separate sub-target (branch)
+  # so cross(randseed, map(partition)) will run each partition in a separate branch,
+  # and each branch will run with each value of randseed
+  pattern = cross(fvs_randseed, map(fvs_partition))
+)
+```
