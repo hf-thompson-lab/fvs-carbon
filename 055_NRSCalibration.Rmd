@@ -473,3 +473,148 @@ tar_target(
   pattern = cross(fvs_randseed, map(fvs_partition))
 )
 ```
+
+# Load Results
+
+## NRS GrowOnly CALB
+
+Carbon
+
+```{targets nrsgro_calb_carbon, tar_simple = TRUE}
+fvs_read_output(nrsgro_calb, "FVS_Carbon") |>
+  group_by(StandID, Year) |> # Combine results from different random seeds
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    .groups = "keep"
+  ) |>
+  ungroup()
+```
+
+Summary
+
+```{targets nrsgro_calb_summary, tar_simple = TRUE}
+fvs_read_output(nrsgro_calb, "FVS_Summary2_East") |>
+  group_by(StandID, Year) |>
+  summarize(
+    BA = mean(BA),
+    Tpa = mean(Tpa),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+```
+
+# Calibration Rate
+
+Did we actually get calibration?
+
+```{r nrsgro_calb_calibration, eval = FALSE}
+single_seed <- nrsgro_calb |>
+  group_by() |>
+  filter(random_seed == min(random_seed)) |>
+  ungroup()
+nrsgro_calb_cases <- fvs_read_output(single_seed, "FVS_Cases")
+nrsgro_calb_calibstats <- fvs_read_output(single_seed, "FVS_CalibStats")
+num_cases <- nrsgro_calb_cases |> distinct(CaseID) |> nrow()
+num_cases_calibrated <- nrsgro_calb_calibstats |> distinct(CaseID) |> nrow()
+num_cases_calibrated /  num_cases
+```
+...which makes it look like 60% of runs got calibration.
+
+Did we populate the calibration table correctly?
+```{r calibration input, eval = FALSE}
+first_random_seed <- nrsgro_calb |>
+  filter(random_seed == min(random_seed))
+calibration_input <- fvs_read_input(first_random_seed, "FVS_TreeInit_Plot") |>
+  select(STAND_CN, TREE_CN, SPECIES, DIAMETER, HT, DG, HTG) |>
+  mutate(Diameter = DG / DIAMETER, Height = HTG / HT) |>
+  pivot_longer(
+    cols = c(Diameter, Height),
+    names_to = "Metric",
+    values_to = "Ratio"
+  ) |> filter(!is.na(Ratio))
+calibration_input |>
+  ggplot(aes(Ratio, fill = Metric)) +
+  geom_histogram(position = "dodge", binwidth = 0.1) +
+  coord_cartesian(xlim = c(0, 2))
+```
+
+
+which shows that the calibration data for most trees has them growing, rather
+than shrinking. Note that trees often shrink in the FIA data, so this meets
+expectations.
+
+What kind of calibration did we get?
+```{r plot calibstats, eval = FALSE}
+nrsgro_calb_calibstats |>
+  mutate(Log10ScaleFactor = log10(ScaleFactor)) |>
+  ggplot(aes(Log10ScaleFactor)) +
+  geom_histogram(binwidth = 0.1) +
+  geom_vline(xintercept = 0) +
+  theme_bw()
+```
+
+So it skews a bit towards negative, but not as much as I thought.
+
+```{r calibstats scalefactor rmse, eval = FALSE}
+nrsgro_calb_calibstats |>
+  mutate(Log10ScaleFactor = log10(ScaleFactor)) |>
+  summarise(
+    RMSE = sqrt(mean((Log10ScaleFactor) ^ 2))
+  )
+```
+
+# Calibrated vs. Uncalibrated
+
+```{r calb_vs_none, eval = FALSE}
+stand_mixin <- nrsgro_plot_stats |>
+  filter_add_stand_id() |>
+  group_by(STAND_ID) |>
+  arrange(INVYR) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  select(STAND_ID, MEASYEAR) |>
+  rename(StandID = STAND_ID, StartYear = MEASYEAR)
+
+none_carbon_tmp <- nrsgro_none_carbon |>
+  rename(Carbon = Aboveground_Total_Live) |>
+  select(StandID, Year, Carbon) |>
+  group_by(StandID) |>
+  arrange(Year) |>
+  mutate(Carbon_Flux = Carbon - lag(Carbon)) |>
+  ungroup() |>
+  mutate(Calibration = "Future")
+
+calb_carbon_tmp <- nrsgro_calb_carbon |>
+  rename(Carbon = Aboveground_Total_Live) |>
+  select(StandID, Year, Carbon) |>
+  group_by(StandID) |>
+  arrange(Year) |>
+  mutate(Carbon_Flux = Carbon - lag(Carbon)) |>
+  ungroup() |>
+  mutate(Calibration = "None")
+
+calb_vs_none <- none_carbon_tmp |>
+  rename(Carbon_Calb = Carbon, Carbon_Flux_Calb = Carbon_Flux) |>
+  full_join(calb_carbon_tmp, by = join_by(StandID, Year)) |>
+  rename(Carbon_None = Carbon, Carbon_Flux_None = Carbon_Flux) |>
+  mutate(
+    Carbon_Delta = Carbon_Calb - Carbon_None,
+    Carbon_Flux_Delta = Carbon_Flux_Calb - Carbon_Flux_None
+  ) |>
+  left_join(stand_mixin, by = join_by(StandID)) |>
+  mutate(ProjectionYears = Year - StartYear)
+```
+
+```{r plot calb_vs_none, eval = FALSE}
+calb_vs_none |>
+  filter(!is.na(Carbon_Flux_Delta)) |>
+  ggplot(aes(factor(ProjectionYears), Carbon_Flux_Delta)) +
+  geom_boxplot(outlier.size = 0.1) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  coord_cartesian(ylim = c(-3, 3), xlim = c(1, 20)) +
+  ggtitle("FVS Grow-Only Calibrated vs. Uncalibrated Annual Carbon Flux") +
+  xlab("Projection Years") +
+  ylab(bquote("Carbon Flux Delta" ~ (`Mg C` %.% ha^-1 %.% year^-1)))
+```
+
