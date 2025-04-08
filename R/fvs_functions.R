@@ -158,7 +158,7 @@ fvs_ThinPRSC <- function(rows) {
 # > TODO nik: this should take FIA plots, conds, or subplots, and
 # > Do The Right Thing. fvs_run() would need to take the same
 # > input for stands.
-fvs_fia_input <- function(fiadb, stands, harvest, filename) {
+fvs_fia_input <- function(fiadb, stands, calibration, harvest, filename) {
   fia <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(fia), add = TRUE, after = FALSE)
   
@@ -186,17 +186,29 @@ fvs_fia_input <- function(fiadb, stands, harvest, filename) {
       collect(),
     overwrite = TRUE
   )
+  
+  swizzle_growth <- if (is.null(calibration)) {
+    function(.data) { .data }
+  } else {
+    function(.data) {
+      .data |>
+        select(-any_of(DG, HTG)) |>
+        left_join(
+          calibration |> select(TREE_CN, DG, HTG),
+          by = join_by(TREE_CN)
+        )
+    }
+  }
 
   append_prescription <- if (is.null(harvest)) {
     function(.data) { .data }
   } else {
     function(.data) {
       .data |>
-        select(!PRESCRIPTION) |>
+        select(-PRESCRIPTION) |>
         left_join(
           harvest |> select(TREE_CN, PRESCRIPTION),
-          by = join_by(TREE_CN),
-          copy = TRUE
+          by = join_by(TREE_CN)
         )
     }
   }
@@ -223,6 +235,8 @@ fvs_fia_input <- function(fiadb, stands, harvest, filename) {
         by = join_by(STAND_CN)
       ) |>
       collect() |>
+      # If calibration data is provided, replace the default growth data
+      swizzle_growth() |>
       # Append the prescription column
       append_prescription() |>
       # Break up records representing more than 1000 trees
@@ -234,8 +248,8 @@ fvs_fia_input <- function(fiadb, stands, harvest, filename) {
       # For non-microplot trees, BASAL_AREA_FACTOR is the multiplier to get
       # TPA; if BASAL_AREA_FACTOR < 0, then it is the negative of 1/acre for
       # a large-tree fixed area plot; if BASAL_AREA_FACTOR > 0 then it is
-      # basal area factor for horizontal angle guage in ft2/acre/tree.
-      # This code does not currently handle horizontal angle guage.
+      # basal area factor for horizontal angle gauge in ft2/acre/tree.
+      # This code does not currently handle horizontal angle gauge.
       check_baf() |>
       mutate(REPLICATES = case_when(
         (DIAMETER < BRK_DBH) & ((TREE_COUNT * INV_PLOT_SIZE) > 1000) ~
@@ -282,6 +296,7 @@ fvs_keywordfile_section <- function(
     stand_cn,
     first_year,
     last_year,
+    calibration,
     regen,
     harvest,
     carb_calc,
@@ -297,6 +312,20 @@ fvs_keywordfile_section <- function(
   #   stand_table <- "FVS_PlotInit_Plot"
   #   tree_table <- "FVS_TreeInit_Plot"
   # but need to match StandPlot_CN instead of STAND_CN
+  
+  # If calibration data is provided, we assume it is taken
+  # from subsequent FIA measurement 5 years after the initial
+  # stand inventory.
+  if (!is.null(calibration)) {
+    # Field 1: Diameter method
+    # Field 2: Length of growth remeasurement (years)
+    # Field 3: Height method
+    # Field 4: Length of height remeasurement (years)
+    # Field 5: Mortality observation period (years)
+    growth <- fvs_kwd("GROWTH", 3, 5, 3, 5, 5)
+  } else {
+    growth <- c()
+  }
   
   if (carb_calc == "FFE") { cc_code = 0 }
   else if (carb_calc == "Jenkins") { cc_code = 1 }
@@ -332,6 +361,9 @@ fvs_keywordfile_section <- function(
     fvs_kwd("MgmtId"),
     mgmt_id,
     fvs_TimeConfig(first_year, last_year, 10),
+    # GROWTH must proceed TREEDATA / TreeSQL
+    # Since it's affiliated with time, we include it here
+    growth,
     RannSeed,
     fvs_kwd("Stats"),
     fvs_kwd("CutList", 0),
@@ -383,6 +415,7 @@ fvs_write_keyword_file <- function(
   title,
   mgmt_id,
   stands,
+  calibration,
   regen,
   harvest,
   carb_calc,
@@ -400,6 +433,7 @@ fvs_write_keyword_file <- function(
         stand_cn = row["STAND_CN"],
         first_year = row["FIRST_YEAR"],
         last_year = row["LAST_YEAR"],
+        calibration = calibration,
         regen = regen,
         harvest = harvest,
         carb_calc = carb_calc,
@@ -423,6 +457,7 @@ fvs_run <- function(
     title,
     mgmt_id,
     stands,
+    calibration = NULL,
     harvest = NULL,
     regen = NULL,
     carb_calc = "Jenkins",
@@ -462,6 +497,7 @@ fvs_run <- function(
   fvs_input_db <- fvs_fia_input(
     fiadb,
     stands,
+    calibration,
     harvest,
     file.path(project_dir, paste0(file_basename, "_Input.db"))
   )
@@ -485,6 +521,7 @@ fvs_run <- function(
     title = title,
     mgmt_id = mgmt_id,
     stands = stands,
+    calibration = calibration,
     regen = regen,
     harvest = harvest,
     carb_calc = carb_calc,
