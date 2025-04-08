@@ -43,7 +43,7 @@ tar_target(nrsgro_plot_stats, {
         ungroup()
       
       .data |>
-        select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR, REMPER) |>
+        select(STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR) |>
         left_join(cond_stats, by = plots_join_by) |>
         left_join(tree_stats, by = plots_join_by) |>
         left_join(forest_type, by = join_by(FORTYPCD)) |>
