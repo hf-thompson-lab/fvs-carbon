@@ -1,3 +1,12 @@
+fia_tbl <- function(fiadb, table, filter) {
+  con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
+  on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
+
+  tbl(con, table) |>
+    filter(con) |>
+    collect()
+}
+
 fia_version <- function(fiadb) {
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
