@@ -200,7 +200,7 @@ Note that FVS never has negative growth, in either diameter or height.
 
 Did we get FVS growth corresponding to all FIA growth?
 
-```{r}
+```{r missing_growth, eval = FALSE}
 a <- fvs_growth |>
   anti_join(
     fia_growth,
@@ -226,7 +226,7 @@ Oh, they don't have DG or HTG filled in, so FVS doesn't get growth for them.
 
 How do FVS and FIA growth rates compare?
 
-```{r}
+```{r cmp growth, eval = FALSE}
 cmp_growth <- fvs_growth |>
   select(TREE_CN, DIA_GROWTH, HT_GROWTH) |>
   left_join(
@@ -245,7 +245,7 @@ cmp_growth |>
 These are not exact because, when computing FVS_TreeInit_Plot.DG, the
 growth period is assumed to be 5 years, rather than PLOT.REMPER. Note that
 this imparts a very slight positive growth bias:
-```{r growth bias, eval = FALSE}
+```{r growth rmse, eval = FALSE}
 # compute RMSE for DIA_GROWTH compared to ANN_DIA_GROWTH
 cmp_growth |>
   summarise(
