@@ -4,7 +4,7 @@ filter_plots_fvsne <- function(.data, con) {
     # Narrow and rename columns to facilitate join
     filter(FVS_VARIANT == "NE") |>
     select(CN, FVS_VARIANT)
-  
+
   .data |>
     # inner_join will both filter and add column(s)
     inner_join(fia_plotgeom, by = join_by(CN))
@@ -12,11 +12,11 @@ filter_plots_fvsne <- function(.data, con) {
 
 filter_plots_ners <- function(.data, con) {
   # FIA.SURVEY.RCSD tells which research station administers a plot.
-  fia_survey <- tbl(con, 'SURVEY') |>
+  fia_survey <- tbl(con, "SURVEY") |>
     filter(RSCD == 24) |> # NERS has RSCD 24
     select(CN, RSCD) |>
     rename(SRV_CN = CN)
-  .data |> 
+  .data |>
     # inner_join will both filter and add column(s)
     inner_join(fia_survey, by = join_by(SRV_CN))
 }
@@ -25,7 +25,7 @@ filter_plots_modern <- function(.data, con) {
   # FIADB database description Appendix G describes plot designs.
   # DESIGNCD 1 is the modern plot design.
   # Many other plot designs are compatible with DESIGNCD == 1
-  #.data |> filter(
+  # .data |> filter(
   #  (DESIGNCD == 1) |
   #  (DESIGNCD > 100 & DESIGNCD < 200) |
   #  (DESIGNCD >= 220 & DESIGNCD < 299) |
@@ -35,7 +35,7 @@ filter_plots_modern <- function(.data, con) {
   #  (DESIGNCD == 553) |
   #  (DESIGNCD == 554) |
   #  (DESIGNCD > 600 & DESIGNCD < 700)
-  #)
+  # )
   # ---
   # Simpler: since all plots were switched to the modern design
   # by 2005, then if the plot was part of the 2005 or later inventories,
@@ -43,7 +43,7 @@ filter_plots_modern <- function(.data, con) {
   plots_modern <- tbl(con, "PLOT") |>
     filter(INVYR >= 2005) |>
     distinct(STATECD, COUNTYCD, PLOT)
-  
+
   .data |>
     inner_join(plots_modern, by = join_by(STATECD, COUNTYCD, PLOT))
 }
@@ -69,7 +69,7 @@ filter_plots_forested <- function(.data, con) {
     filter(max(COND_STATUS_CD, na.rm = TRUE) == 1) |>
     summarize(.groups = "keep") |>
     ungroup()
-  
+
   .data |>
     inner_join(plots_forested, by = join_by(STATECD, COUNTYCD, PLOT))
 }
@@ -85,13 +85,13 @@ filter_plots_undisturbed <- function(.data, con) {
     # Note that we do not group by INVYR
     group_by(STATECD, COUNTYCD, PLOT) |>
     filter(
-      (is.na(max(DSTRBCD1, na.rm = TRUE)) | max(DSTRBCD1, na.rm = TRUE) == 0) & 
+      (is.na(max(DSTRBCD1, na.rm = TRUE)) | max(DSTRBCD1, na.rm = TRUE) == 0) &
         (is.na(max(DSTRBCD2, na.rm = TRUE)) | max(DSTRBCD2, na.rm = TRUE) == 0) &
         (is.na(max(DSTRBCD3, na.rm = TRUE)) | max(DSTRBCD3, na.rm = TRUE) == 0)
     ) |>
     summarize(.groups = "keep") |>
     ungroup()
-  
+
   .data |>
     inner_join(plots_undisturbed, by = join_by(STATECD, COUNTYCD, PLOT))
 }
@@ -113,7 +113,7 @@ filter_plots_untreated <- function(.data, con) {
     ) |>
     summarize(.groups = "keep") |>
     ungroup()
-  
+
   .data |>
     inner_join(plots_untreated, by = join_by(STATECD, COUNTYCD, PLOT))
 }
@@ -142,7 +142,7 @@ filter_plots_harvested <- function(.data, con) {
     ) |>
     summarize(.groups = "keep") |>
     ungroup()
-  
+
   # Some conditions are not marked as harvested, but they
   # contain trees that are harvested.
   # TREE.STATUSCD == 3 indicates that the tree was harvested
@@ -157,7 +157,7 @@ filter_plots_harvested <- function(.data, con) {
   # To be consistent across all kinds of disturbance, we use the FIA
   # definitions for all disturbance, including harvest, and therefore
   # do NOT mark a plot as harvested if there are harvested trees.
-  #plots_harvested_bytree <- tbl(con, "TREE") |>
+  # plots_harvested_bytree <- tbl(con, "TREE") |>
   #  # Expectation is that this filter will come late enough in the chain
   #  # that it's more efficient to filter conditions prior to grouping
   #  inner_join(
@@ -178,8 +178,8 @@ filter_plots_harvested <- function(.data, con) {
   #  # damage to 25 percent of the trees in the condition"
   #  filter(NUM_HRVST / NUM_TREES >= 0.25) |>
   #  distinct(STATECD, COUNTYCD, PLOT)
-  #  
-  #plots_harvested <- union(plots_harvested_bytree, plots_harvested_bycond)
+  #
+  # plots_harvested <- union(plots_harvested_bytree, plots_harvested_bycond)
 
   .data |>
     inner_join(plots_harvested_bycond, by = join_by(STATECD, COUNTYCD, PLOT))
@@ -228,7 +228,7 @@ filter_plots_unfertilized <- function(.data, con) {
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
     # Note that we do not group by INVYR
-    group_by(STATECD, COUNTYCD, PLOT) |> 
+    group_by(STATECD, COUNTYCD, PLOT) |>
     #    filter(
     #      sum(
     #        if_else(!is.na(TRTCD1) & TRTCD1 == 30, 1,
@@ -265,7 +265,7 @@ filter_plots_measured_pre_post_harvest <- function(.data, con) {
   # meaning more than one of TRTCD1, TRTCD2 and TRTCD3 is 10, and
   # TRTYR1, TRTYR2 and TRTYR3 are different.
   # We want the latest of the latest harvests.
-  plots_harvested_bycond <- tbl(con, "COND") |> 
+  plots_harvested_bycond <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
     inner_join(
@@ -287,10 +287,10 @@ filter_plots_measured_pre_post_harvest <- function(.data, con) {
       .groups = "keep"
     ) |>
     ungroup()
-  
+
   # See note in filter_plots_harvested for why we no not look at
   # harvest at the tree level.
-  #plots_harvested_bytree <- tbl(con, "TREE") |>
+  # plots_harvested_bytree <- tbl(con, "TREE") |>
   #  # Expectation is that this filter will come late enough in the chain
   #  # that it's more efficient to filter conditions prior to grouping
   #  inner_join(
@@ -328,7 +328,7 @@ filter_plots_measured_pre_post_harvest <- function(.data, con) {
   #    .groups = "keep"
   #  )
 
-  #plots_harvested <- plots_harvested_bycond |>
+  # plots_harvested <- plots_harvested_bycond |>
   #  union_all(plots_harvested_bytree) |>
   #  group_by(STATECD, COUNTYCD, PLOT) |>
   #  summarize(
@@ -337,7 +337,7 @@ filter_plots_measured_pre_post_harvest <- function(.data, con) {
   #    .groups = "keep"
   #  ) |>
   #  ungroup()
-  
+
   .data |>
     group_by(STATECD, COUNTYCD, PLOT) |>
     mutate(
@@ -348,12 +348,12 @@ filter_plots_measured_pre_post_harvest <- function(.data, con) {
     inner_join(plots_harvested_bycond, by = join_by(STATECD, COUNTYCD, PLOT)) |>
     filter(
       (MIN_MEASYEAR < MIN_HRVYR) &
-      (MAX_MEASYEAR > MAX_HRVYR + 10)
+        (MAX_MEASYEAR > MAX_HRVYR + 10)
     )
 }
 
 filter_plots_single_cond <- function(.data, con) {
-  plots_single_cond <- tbl(con, "COND") |> 
+  plots_single_cond <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
     inner_join(
@@ -364,13 +364,13 @@ filter_plots_single_cond <- function(.data, con) {
     filter(max(CONDID, na.rm = TRUE) == 1) |>
     summarize(.groups = "keep") |>
     ungroup()
-  
+
   .data |>
     inner_join(plots_single_cond, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
 filter_plots_trees <- function(.data, con) {
-  plots_trees <- tbl(con, "COND") |> 
+  plots_trees <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
     inner_join(
@@ -383,7 +383,7 @@ filter_plots_trees <- function(.data, con) {
     ) |>
     summarize(.groups = "keep") |>
     ungroup()
-  
+
   .data |>
     inner_join(plots_trees, by = join_by(STATECD, COUNTYCD, PLOT))
 }
@@ -411,13 +411,13 @@ filter_plots_ba_frac <- function(.data, con, spcds, frac) {
     mutate(BA_FVS_FRAC = BA_FVS / BA_TOTAL) |>
     filter(BA_FVS_FRAC >= frac) |>
     select(STATECD, COUNTYCD, PLOT)
-  
+
   .data |>
     inner_join(plots_ba_frac, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
 #' Twiddle species code to be something FVS supports.
-#' 
+#'
 #' Given trees with STATECD, COUNTYCD, PLOT, ECOSUBCD, ECOCD, SPCD,
 #' and a species crosswalk, this will find species codes not handled
 #' by FVS and shift them to the species code of the same genus most common
@@ -434,12 +434,12 @@ filter_fvs_spcd <- function(estab, fiadb, species_crosswalk) {
   plot_cns <- estab |>
     select(PLT_CN) |>
     rename(CN = PLT_CN)
-  
+
   plots <- fia_plots_by_cn(fiadb, plot_cns) |>
     select(CN, STATECD, COUNTYCD, PLOT, INVYR, ECOSUBCD) |>
     mutate(ECOCD = substr(ECOSUBCD, 1, nchar(ECOSUBCD) - 1)) |>
     rename(PLT_CN = CN)
-  
+
   # all_trees is all trees on all plots in the selected INVYRs, not just
   # those trees that correspond to establishment records
   # DEBATE: should this be restricted to the input plots, or opened up to
@@ -465,7 +465,7 @@ filter_fvs_spcd <- function(estab, fiadb, species_crosswalk) {
     }
   ) |>
     mutate(ECOCD = substr(ECOSUBCD, 1, nchar(ECOSUBCD) - 1))
-  
+
   # Most common species handled by FVS of each genus in each plot
   mcs_plot <- all_trees |>
     left_join(species_crosswalk, by = join_by(SPCD)) |>
@@ -480,7 +480,7 @@ filter_fvs_spcd <- function(estab, fiadb, species_crosswalk) {
     select(!COUNT) |>
     rename(MCS_PLOT = SPCD)
 
-  # Most common species handled by FVS of each genus in each ecosubregion  
+  # Most common species handled by FVS of each genus in each ecosubregion
   mcs_ecosubcd <- all_trees |>
     left_join(species_crosswalk, by = join_by(SPCD)) |>
     filter(!is.na(FVS_SPCD)) |>
@@ -493,8 +493,8 @@ filter_fvs_spcd <- function(estab, fiadb, species_crosswalk) {
     ungroup() |>
     select(!COUNT) |>
     rename(MCS_ECOSUBCD = SPCD)
-  
-  # Most common species handled by FVS of each genus in each ecoregion  
+
+  # Most common species handled by FVS of each genus in each ecoregion
   mcs_ecocd <- all_trees |>
     left_join(species_crosswalk, by = join_by(SPCD)) |>
     filter(!is.na(FVS_SPCD)) |>
@@ -507,8 +507,8 @@ filter_fvs_spcd <- function(estab, fiadb, species_crosswalk) {
     ungroup() |>
     select(!COUNT) |>
     rename(MCS_ECOCD = SPCD)
-  
-  # Most common species handled by FVS of each genus in all plots  
+
+  # Most common species handled by FVS of each genus in all plots
   mcs_region <- all_trees |>
     left_join(species_crosswalk, by = join_by(SPCD)) |>
     filter(!is.na(FVS_SPCD)) |>
@@ -521,7 +521,7 @@ filter_fvs_spcd <- function(estab, fiadb, species_crosswalk) {
     ungroup() |>
     select(!COUNT) |>
     rename(MCS_REGION = SPCD)
-  
+
   estab_spcd_mixin <- fia_trees_by_cn(
     fiadb,
     estab |>
@@ -530,7 +530,7 @@ filter_fvs_spcd <- function(estab, fiadb, species_crosswalk) {
   ) |>
     select(CN, SPCD) |>
     rename(TRE_CN = CN)
-  
+
   estab |>
     left_join(plots, by = join_by(PLT_CN)) |>
     left_join(estab_spcd_mixin, by = join_by(TRE_CN)) |>
@@ -549,22 +549,22 @@ filter_fvs_spcd <- function(estab, fiadb, species_crosswalk) {
 #'
 #' Given FIADB.TREE_GRM_COMPONENT records for INGROWTH,
 #' fill in estimated height at 3" DBH.
-#' 
+#'
 #' Estimated height is taken from trees sampled from:
-#' 
+#'
 #' 1. The same species on the same plot;
 #' 2. The same species in the ecosubregion;
 #' 3. The same species in the ecoregion;
 #' 4. The same species in all NRS-managed plots,
-#' 
+#'
 #' whichever first provides at least min_sample_size trees. If none does,
 #' then height is taken from all NRS-managed plots with no minimum sample size.
-#' 
+#'
 #' Trees are sampled in order of how close their diameter is to 3" DBH;
 #' therefore, the larger the sample size, the more divergent tree diameters are
 #' included in the sample. For this reason a maximum sample size is included;
 #' this supports a trade-off between sample size and diameter divergence.
-#' 
+#'
 #' Trees used for estimation are restricted to those with diameter between
 #' min_sample_dia and max_sample_dia.
 #'
@@ -585,10 +585,11 @@ filter_estab_height <- function(
     min_sample_size = 3,
     max_sample_size = 9,
     min_sample_dia = 2.5,
-    max_sample_dia = 6
-) {
-  plot_cns <- estab |> select(PLT_CN) |> rename(CN = PLT_CN)
-  
+    max_sample_dia = 6) {
+  plot_cns <- estab |>
+    select(PLT_CN) |>
+    rename(CN = PLT_CN)
+
   ecocd_mixin <- fia_plots_by_cn(fiadb, plot_cns) |>
     group_by(STATECD, COUNTYCD, PLOT) |>
     arrange(desc(INVYR)) |>
@@ -600,9 +601,9 @@ filter_estab_height <- function(
   plot_mixin <- fia_plots_by_cn(fiadb, plot_cns) |>
     select(CN, STATECD, COUNTYCD, PLOT, INVYR) |>
     rename(PLT_CN = CN)
-  
+
   tmp_trees <- fia_trees(fiadb, plot_mixin)
-  
+
   prev_tre_mixin <- fia_trees_by_cn(
     fiadb,
     tmp_trees |>
@@ -638,7 +639,7 @@ filter_estab_height <- function(
     filter(n() >= min_sample_size) |>
     summarize(ESTAB_HT_PLOT = mean(HT_PLOT), .groups = "keep") |>
     ungroup()
-  
+
   estab_height_ecosubcd <- trees_for_ht_estimation |>
     group_by(ECOSUBCD, SPCD) |>
     arrange(abs(DIA - 3)) |>
@@ -647,7 +648,7 @@ filter_estab_height <- function(
     filter(n() >= min_sample_size) |>
     summarize(ESTAB_HT_ECOSUBCD = mean(HT_ECOSUBCD), .groups = "keep") |>
     ungroup()
-  
+
   estab_height_ecocd <- trees_for_ht_estimation |>
     group_by(ECOCD, SPCD) |>
     arrange(abs(DIA - 3)) |>
@@ -656,7 +657,7 @@ filter_estab_height <- function(
     filter(n() >= min_sample_size) |>
     summarize(ESTAB_HT_ECOCD = mean(HT_ECOCD), .groups = "keep") |>
     ungroup()
-  
+
   estab_height_ne <- trees_for_ht_estimation |>
     group_by(SPCD) |>
     arrange(abs(DIA - 3)) |>
@@ -665,25 +666,25 @@ filter_estab_height <- function(
     filter(n() >= min_sample_size) |>
     summarize(ESTAB_HT_NE = mean(HT_NE), .groups = "keep") |>
     ungroup()
-  
+
   # height_catchall ignores the minimum number of trees,
   # and will produce values even for a single tree
   # anywhere in the region. It is a last-ditch catch-all.
   estab_height_catchall <- trees_for_ht_estimation |>
     group_by(SPCD) |>
     arrange(abs(DIA - 3)) |> # closest to 3" first
-    filter(row_number() <= max_sample_size) |> 
+    filter(row_number() <= max_sample_size) |>
     mutate(HT_CATCHALL = HT * 3 / DIA) |>
     summarize(ESTAB_HT_CATCHALL = mean(HT_CATCHALL)) |>
     ungroup()
-  
+
   spcd_mixin <- fia_trees_by_cn(
     fiadb,
     estab |> select(TRE_CN) |> rename(CN = TRE_CN)
   ) |>
     select(CN, SPCD) |>
     rename(TRE_CN = CN)
-  
+
   if (!"STATECD" %in% names(estab)) {
     estab <- estab |> left_join(plot_mixin, by = join_by(PLT_CN))
   }
@@ -691,9 +692,9 @@ filter_estab_height <- function(
     estab <- estab |> left_join(ecocd_mixin, by = join_by(STATECD, COUNTYCD, PLOT))
   }
   if (!"SPCD" %in% names(estab)) {
-    estab <- estab |> left_join(spcd_mixin, by = join_by(TRE_CN)) 
+    estab <- estab |> left_join(spcd_mixin, by = join_by(TRE_CN))
   }
-  
+
   estab |>
     left_join(estab_height_plot, by = join_by(STATECD, COUNTYCD, PLOT, SPCD)) |>
     left_join(estab_height_ecosubcd, by = join_by(ECOSUBCD, SPCD)) |>
@@ -703,12 +704,12 @@ filter_estab_height <- function(
     mutate(
       # Replace zero growth rate with NA so we don't end up with Inf heights
       ANN_DIA_GROWTH = if_else(ANN_DIA_GROWTH == 0, NA, ANN_DIA_GROWTH),
-      
+
       # Compute establishment height from annual growth rates
       # Note that this often says the tree is > 100' tall or under 1' tall;
       # we remove those by comparing to ESTAB_HT_CATCHALL below.
       ESTAB_HT_TREE = (DIA_END / ANN_DIA_GROWTH) * ANN_HT_GROWTH * 3 / DIA_END,
-      
+
       # This may seem backwards, but isn't: we're going to use the catchall
       # as a baseline for validation, but sometimes the baseline is null.
       # Use ESTAB_HT_TREE as the baseline in these cases.
@@ -751,7 +752,7 @@ filter_decode_forest_type_group <- function(.data) {
     mutate(FOREST_TYPE_GROUP = case_when(
       startsWith(FOREST_TYPE_GROUP, "Other") ~ "Other",
       startsWith(FOREST_TYPE_GROUP, "Exotic") ~ "Other",
-      .default = str_replace(FOREST_TYPE_GROUP, ' group', '')
+      .default = str_replace(FOREST_TYPE_GROUP, " group", "")
     ))
 }
 
@@ -774,11 +775,18 @@ filter_decode_cclcd <- function(.data) {
   .data |>
     mutate(
       CCL = case_when(
-        CCLCD == 1 ~"Open grown",
-        CCLCD == 2 ~"Dominant",
-        CCLCD == 3 ~"Codominant",
-        CCLCD == 4 ~"Intermediate",
-        CCLCD == 5 ~"Overtopped"
+        CCLCD == 1 ~ "Open grown",
+        CCLCD == 2 ~ "Dominant",
+        CCLCD == 3 ~ "Codominant",
+        CCLCD == 4 ~ "Intermediate",
+        CCLCD == 5 ~ "Overtopped"
       )
+    )
+}
+
+filter_add_stand_id <- function(.data) {
+  .data |>
+    mutate(
+      STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT)
     )
 }
