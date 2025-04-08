@@ -192,7 +192,7 @@ fvs_fia_input <- function(fiadb, stands, calibration, harvest, filename) {
   } else {
     function(.data) {
       .data |>
-        select(-any_of(DG, HTG)) |>
+        select(-any_of(c("DG", "HTG"))) |>
         left_join(
           calibration |> select(TREE_CN, DG, HTG),
           by = join_by(TREE_CN)
