@@ -1,4 +1,4 @@
-tar_target(nrsgro_projected_vs_measured, {
+tar_target(nrsgro_none_proj_vs_meas, {
   projected_carbon_tmp <- nrsgro_none_carbon |>
     select(StandID, Year, Aboveground_Total_Live) |>
     rename(Projected_Carbon = Aboveground_Total_Live)

@@ -3080,10 +3080,10 @@ summary(annual_vs_decadal[, c("Annual_Carbon_Flux", "Decadal_Carbon_Flux")])
 
 Filter projections to corresponding observations.
 
-nrsgro_projected_vs_measured has the projection and measurement for the quantities
+nrsgro_none_proj_vs_meas has the projection and measurement for the quantities
 of interest in the first and last year, and nothing in between.
 
-```{targets nrsgro_projected_vs_measured, tar_simple = TRUE}
+```{targets nrsgro_none_proj_vs_meas, tar_simple = TRUE}
 projected_carbon_tmp <- nrsgro_none_carbon |>
   select(StandID, Year, Aboveground_Total_Live) |>
   rename(Projected_Carbon = Aboveground_Total_Live)
@@ -3149,7 +3149,7 @@ nrsgro_plot |>
   mutate(BA_Residual = Projected_BA - Measured_BA) |>
   mutate(BA_Error = 2 * abs(BA_Residual) / (Projected_BA + Measured_BA)) |>
   mutate(BA_Delta_Residual = Projected_BA_Delta - Measured_BA_Delta) |>
-  mutate(BA_Flux_Residual = BA_Delta_Residual / Projection_Years) |>
+  mutate(BAI_Residual = BA_Delta_Residual / Projection_Years) |>
   mutate(Carbon_Residual = Projected_Carbon - Measured_Carbon) |>
   mutate(Carbon_Error = 2 * abs(Carbon_Residual) / (Projected_Carbon + Measured_Carbon)) |>
   mutate(Carbon_Delta_Residual = Projected_Carbon_Delta - Measured_Carbon_Delta) |>
@@ -3161,7 +3161,7 @@ rather than shrank.
 
 ```{r sanity-check-plots-grew, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0),
   aes(x = Projection_Years, y = Measured_BA_Delta)
 ) +
   geom_bin2d(bins = 30) +
@@ -3176,7 +3176,7 @@ ggplot(
 ## Carbon Projection
 
 ```{r projected_carbon_vs_measured_carbon, eval = FALSE}
-nrsgro_projected_vs_measured |>
+nrsgro_none_proj_vs_meas |>
   filter(Projection_Years > 0) |>
   mutate(Ratio = Projected_Carbon / Measured_Carbon) |>
   ggplot(aes(x = Ratio)) +
@@ -3188,8 +3188,8 @@ nrsgro_projected_vs_measured |>
   xlab("Ratio (FVS Projected / FIA Measured)")
 ```
 
-```{r summary nrsgro_projected_vs_measured, eval = FALSE}
-nrsgro_projected_vs_measured |>
+```{r summary nrsgro_none_proj_vs_meas, eval = FALSE}
+nrsgro_none_proj_vs_meas |>
   filter(Projection_Years > 0) |>
   mutate(Ratio = Measured_Carbon / Projected_Carbon) |>
   summary()
@@ -3197,7 +3197,7 @@ nrsgro_projected_vs_measured |>
 
 ```{r projected_carbon_vs_measured_carbon_with_trendline, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0),
   aes(x = Measured_Carbon, y = Projected_Carbon)
 ) +
   geom_bin2d(bins = 50) +
@@ -3302,7 +3302,7 @@ nrsgro_srvy_carbon |>
   ungroup() |>
   full_join(
     expand.grid(
-      StandID = unique(nrsgro_projected_vs_measured$StandID),
+      StandID = unique(nrsgro_none_proj_vs_meas$StandID),
       Year = all_years$Year
     ),
     by = join_by(StandID, Year)
@@ -3329,7 +3329,7 @@ nrsgro_srvy_carbon |>
 
 ```{r measured_vs_projected_carbon_change, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0) |> arrange(Projection_Years),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0) |> arrange(Projection_Years),
   aes(x = Measured_Carbon_Delta, y = Projected_Carbon_Delta)
 ) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
@@ -3363,10 +3363,10 @@ ggplot(
 ```{r measured_vs_projected_carbon_flux, eval = FALSE}
 lr <- lm(
   Projected_Carbon_Flux ~ Measured_Carbon_Flux,
-  data = nrsgro_projected_vs_measured |> filter(Projection_Years > 0)
+  data = nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0)
 )
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0),
   aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux)
 ) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
@@ -3411,12 +3411,12 @@ Show us that stats:
 ```{r projected vs measured linear regression, eval = FALSE}
 summary(lm(
   Projected_Carbon_Flux ~ Measured_Carbon_Flux,
-  data = nrsgro_projected_vs_measured |> filter(Projection_Years > 0)
+  data = nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0)
 ))
 ```
 
 ```{r carbon flux ratio, eval = FALSE}
-nrsgro_projected_vs_measured |>
+nrsgro_none_proj_vs_meas |>
   filter(Projection_Years > 0) |>
   mutate(Ratio = Projected_Carbon_Flux / Measured_Carbon_Flux) |>
   filter(-10 < Ratio & Ratio < 10) |>
@@ -3433,14 +3433,14 @@ nrsgro_projected_vs_measured |>
 
 
 ```{r summary projected vs measured carbon flux, eval = FALSE}
-nrsgro_projected_vs_measured |>
+nrsgro_none_proj_vs_meas |>
   filter(Projection_Years > 0) |>
   mutate(Ratio = Projected_Carbon_Flux / Measured_Carbon_Flux) |>
   summary()
 ```
 
 ```{r projected-vs-measured-carbon-flux, eval = FALSE}
-projected_vs_measured_with_n <- nrsgro_projected_vs_measured |>
+projected_vs_measured_with_n <- nrsgro_none_proj_vs_meas |>
   filter(Projection_Years > 0) |>
   group_by(FOREST_TYPE_GROUP) |>
   mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
@@ -3481,14 +3481,14 @@ This is Mg of carbon per hectare per year.
 
 ```{r carbon-flux-by-forest-type, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0),
   aes(Carbon_Flux_Residual, fct_reorder(FOREST_TYPE_GROUP, Measured_Carbon, .fun = sum))
 ) +
   geom_vline(xintercept = 0, color = "red") +
   geom_boxplot(varwidth = TRUE, outlier.size = 0.1) +
   # scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
   geom_point(
-    data = nrsgro_projected_vs_measured |>
+    data = nrsgro_none_proj_vs_meas |>
       filter(Projection_Years > 0) |>
       group_by(FOREST_TYPE_GROUP) |>
       summarize(
@@ -3515,13 +3515,13 @@ ggplot(
 
 ```{r carbon-flux-by-forest-type-detail, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0),
   aes(Carbon_Flux_Residual, fct_reorder(FOREST_TYPE_GROUP, Measured_Carbon, .fun = sum))
 ) +
   geom_vline(xintercept = 0, color = "red") +
   geom_boxplot(varwidth = TRUE, outlier.size = 0.1) +
   geom_point(
-    data = nrsgro_projected_vs_measured |>
+    data = nrsgro_none_proj_vs_meas |>
       filter(Projection_Years > 0) |>
       group_by(FOREST_TYPE_GROUP) |>
       summarize(
@@ -3551,7 +3551,7 @@ ggplot(
 
 ```{r carbon-flux-by-ecoregion, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0),
   aes(Carbon_Flux_Residual, fct_reorder(ECOCD, Measured_Carbon, .fun = sum))
 ) +
   geom_vline(xintercept = 0, color = "red") +
@@ -3569,7 +3569,7 @@ ggplot(
 
 ```{r carbon_residual_vs_projection_years, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0),
   aes(x = Projection_Years, y = Carbon_Residual)
 ) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
@@ -3599,7 +3599,7 @@ ggplot(
 
 ```{r carbon_error_vs_projection_yearsm, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0),
   aes(x = Projection_Years, y = Carbon_Error)
 ) +
   geom_bin2d(bins = 20) +
@@ -3627,7 +3627,7 @@ ggplot(
 
 ```{r carbon_flux_residual_vs_projection_years, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0),
   aes(x = Projection_Years, y = Carbon_Flux_Residual)
 ) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
@@ -3658,7 +3658,7 @@ ggplot(
 
 ```{r carbon_residual_vs_measured_ba, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0),
   mapping = aes(x = Measured_BA, y = Carbon_Residual)
 ) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
@@ -3688,7 +3688,7 @@ ggplot(
 
 ```{r carbon_error_vs_measured_ba, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |>
+  nrsgro_none_proj_vs_meas |>
     filter(Projection_Years > 0) |>
     filter(Carbon_Error < 1),
   aes(x = Measured_BA, y = Carbon_Error)
@@ -3721,7 +3721,7 @@ This omits outliers; looking just at the outliers (error >= 2x value):
 
 ```{r carbon_error_vs_measured_ba_outliers, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |>
+  nrsgro_none_proj_vs_meas |>
     filter(Projection_Years > 0) |>
     filter(Carbon_Error >= 1),
   aes(x = Measured_BA, y = Carbon_Error)
@@ -3737,7 +3737,7 @@ ggplot(
 
 ```{r carbon_flux_residual_vs_measured_ba, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0),
   mapping = aes(x = Measured_BA, y = Carbon_Flux_Residual)
 ) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
@@ -3768,7 +3768,7 @@ ggplot(
 
 ```{r carbon_residuals_vs_qmd, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
   aes(x = QMD_METRIC, y = Carbon_Residual)
 ) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
@@ -3797,7 +3797,7 @@ ggplot(
 
 ```{r carbon_flux_residuals_vs_qmd, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
   aes(x = QMD_METRIC, y = Carbon_Flux_Residual)
 ) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
@@ -3829,7 +3829,7 @@ ggplot(
 
 ```{r projected_ba_vs_measured_ba, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0),
   aes(x = Measured_BA, y = Projected_BA)
 ) +
   geom_abline(intercept = 0, slope = 1, linetype = "dashed", linewidth = 0.25, color = "lightgray") +
@@ -3859,7 +3859,7 @@ ggplot(
 
 ```{r basal_area_trend, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |>
+  nrsgro_none_proj_vs_meas |>
     filter(Projection_Years > 0) |>
     mutate(
       BA_Range = cut(Measured_BA, 0:19 * 5)
@@ -3867,13 +3867,14 @@ ggplot(
     group_by(FOREST_TYPE_GROUP) |>
     mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
     ungroup(),
-  aes(x = BA_Range, y = BA_Flux_Residual)
+  aes(x = BA_Range, y = BAI_Residual)
 ) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
   scale_fill_discrete(name = "Forest Type Group") +
-  ggtitle("BA Residual vs. Measured BA") +
-  ylab(bquote("BA Residual "(m^2 %.% ha^-1 %.% yr^-1))) +
+  ggtitle("BAI Residual vs. Measured BA") +
+  labs(caption = "Without Calibration") +
+  ylab(bquote("BAI Residual "(m^2 %.% ha^-1 %.% yr^-1))) +
   xlab(bquote("Measured Stand BA "(m^2 %.% ha^-1))) +
   theme_bw() +
   coord_cartesian(ylim = c(-2, 3))
@@ -3881,7 +3882,7 @@ ggplot(
 
 ```{r p_vs_m_bai, eval=FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0),
   aes(x = Measured_BAI, y = Projected_BAI)
 ) +
   geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.25, color = "black") +
@@ -3971,7 +3972,7 @@ remove(plot_location_tmp)
 
 ```{r ba_residual_vs_projection_years, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0),
   aes(x = Projection_Years, y = BA_Residual)
 ) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
@@ -4001,7 +4002,7 @@ ggplot(
 
 ```{r ba_error_vs_projection_years, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(BA_Error < 1),
+  nrsgro_none_proj_vs_meas |> filter(BA_Error < 1),
   aes(x = Projection_Years, y = BA_Error)
 ) +
   geom_bin2d(bins = 20) +
@@ -4031,7 +4032,7 @@ ggplot(
 
 ```{r ba_residual_vs_qmd, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0) |> filter(QMD_METRIC < 100),
   aes(x = QMD_METRIC, y = BA_Residual)
 ) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
@@ -4060,7 +4061,7 @@ ggplot(
 
 ```{r qmd_trend2, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |>
+  nrsgro_none_proj_vs_meas |>
     filter(Projection_Years > 0) |>
     mutate(
       QMD_Range = cut(QMD_METRIC, 0:19 * 5)
@@ -4068,7 +4069,7 @@ ggplot(
     group_by(FOREST_TYPE_GROUP) |>
     mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
     ungroup(),
-  aes(x = QMD_Range, y = BA_Flux_Residual)
+  aes(x = QMD_Range, y = BAI_Residual)
 ) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
@@ -4082,7 +4083,7 @@ ggplot(
 
 ```{r ba_residual_vs_qmd2, eval = FALSE}
 ggplot(
-  nrsgro_projected_vs_measured |> filter(Projection_Years > 0),
+  nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0),
   aes(x = Measured_Tpa, y = Projected_Tpa)
 ) +
   geom_abline(intercept = c(0, 0), slope = 1, linetype = "dashed", linewidth = 0.25, color = "lightgray") +
@@ -4117,7 +4118,7 @@ ggplot(
 ```{r qmd_trend, eval = FALSE}
 options(scipen = 9)
 ggplot(
-  nrsgro_projected_vs_measured |>
+  nrsgro_none_proj_vs_meas |>
     filter(Projection_Years > 0) |>
     mutate(
       Tpa_Range = cut(Measured_Tpa, 0:10 * 2000, labels = (1:10 * 2000))
@@ -4125,7 +4126,7 @@ ggplot(
     group_by(FOREST_TYPE_GROUP) |>
     mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
     ungroup(),
-  aes(x = Tpa_Range, y = BA_Flux_Residual)
+  aes(x = Tpa_Range, y = BAI_Residual)
 ) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_boxplot(outlier.size = 0.1, varwidth = TRUE, position = position_nudge(x = -0.5)) +
