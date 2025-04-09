@@ -507,7 +507,7 @@ fvs_read_output(nrsgro_calb, "FVS_Summary2_East") |>
 
 Did we actually get calibration?
 
-```{r nrsgro_calb_calibration, eval = FALSE}
+```{r nrsgro_calb_calibration cases, eval = FALSE}
 single_seed <- nrsgro_calb |>
   group_by() |>
   filter(random_seed == min(random_seed)) |>
@@ -616,5 +616,153 @@ calb_vs_none |>
   ggtitle("FVS Grow-Only Calibrated vs. Uncalibrated Annual Carbon Flux") +
   xlab("Projection Years") +
   ylab(bquote("Carbon Flux Delta" ~ (`Mg C` %.% ha^-1 %.% year^-1)))
+```
+
+# Projected vs. Measured
+
+Build a dataframe to compare projected carbon (with calibration) to measured
+carbon (as done before, no calibration needed).
+
+```{targets nrsgro_calb_proj_vs_meas, tar_simple = TRUE}
+projected_carbon_tmp <- nrsgro_calb_carbon |>
+  select(StandID, Year, Aboveground_Total_Live) |>
+  rename(Projected_Carbon = Aboveground_Total_Live)
+
+projected_ba_tmp <- nrsgro_calb_summary |>
+  select(StandID, Year, BA, Tpa) |>
+  mutate(Projected_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
+  rename(Projected_Tpa = Tpa)
+
+projected_tmp <- projected_carbon_tmp |>
+  full_join(projected_ba_tmp, by = join_by(StandID, Year)) |>
+  select(StandID, Year, Projected_Carbon, Projected_BA, Projected_Tpa)
+
+surveyed_carbon_tmp <- nrsgro_srvy_carbon |>
+  select(StandID, Year, Aboveground_Total_Live) |>
+  rename(Measured_Carbon = Aboveground_Total_Live)
+
+surveyed_ba_tmp <- nrsgro_srvy_summary |>
+  select(StandID, Year, BA, Tpa) |>
+  mutate(Measured_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
+  rename(Measured_Tpa = Tpa)
+
+surveyed_tmp <- surveyed_carbon_tmp |>
+  full_join(surveyed_ba_tmp, by = join_by(StandID, Year)) |>
+  filter(!is.na(Measured_Carbon)) |> # other metrics get an extra year
+  select(StandID, Year, Measured_Carbon, Measured_BA, Measured_Tpa)
+
+nrsgro_plot |>
+  filter_add_stand_id() |>
+  rename(StandID = STAND_ID, Year = MEASYEAR) |>
+  left_join(nrsgro_plot_stats, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+  select(
+    StandID, Year,
+    STDAGE, FOREST_TYPE, FOREST_TYPE_GROUP, ECOSUBCD,
+    QMD, QMD_METRIC
+  ) |>
+  left_join(projected_tmp, by = join_by(StandID, Year)) |>
+  left_join(surveyed_tmp, by = join_by(StandID, Year)) |>
+  filter_decode_forest_type_group() |>
+  group_by(StandID) |>
+  mutate(
+    ECOCD = substr(ECOSUBCD, 1, nchar(ECOSUBCD) - 1),
+    First_Year = min(Year, na.rm = TRUE),
+    Last_Year = max(Year, na.rm = TRUE),
+    Starting_Carbon = min(if_else(Year == First_Year, Measured_Carbon, NA), na.rm = TRUE),
+    Projected_Carbon_Delta = Projected_Carbon - Starting_Carbon,
+    Projected_Carbon_Flux = if_else(Year == First_Year, 0, -(Projected_Carbon_Delta / (Year - First_Year))),
+    Measured_Carbon_Delta = Measured_Carbon - Starting_Carbon,
+    Measured_Carbon_Flux = if_else(Year == First_Year, 0, -(Measured_Carbon_Delta / (Year - First_Year))),
+    Starting_BA = min(if_else(Year == First_Year, Measured_BA, NA), na.rm = TRUE),
+    Projected_BA_Delta = Projected_BA - Starting_BA,
+    Projected_BAI = if_else(Year == First_Year, 0, Projected_BA_Delta / (Year - First_Year)),
+    Measured_BA_Delta = Measured_BA - Starting_BA,
+    Measured_BAI = if_else(Year == First_Year, 0, Measured_BA_Delta / (Year - First_Year))
+  ) |>
+  ungroup() |>
+  filter(Year == First_Year | Year == Last_Year) |>
+  filter(!is.na(Projected_Carbon) & !is.na(Measured_Carbon)) |>
+  mutate(
+    Projection_Years = Year - First_Year,
+    BA_Residual = Projected_BA - Measured_BA,
+    BA_Error = 2 * abs(BA_Residual) / (Projected_BA + Measured_BA),
+    BA_Delta_Residual = Projected_BA_Delta - Measured_BA_Delta,
+    BA_Flux_Residual = BA_Delta_Residual / Projection_Years,
+    Carbon_Residual = Projected_Carbon - Measured_Carbon,
+    Carbon_Error = 2 * abs(Carbon_Residual) / (Projected_Carbon + Measured_Carbon),
+    Carbon_Delta_Residual = Projected_Carbon_Delta - Measured_Carbon_Delta,
+    Carbon_Flux_Residual = Projected_Carbon_Flux - Measured_Carbon_Flux
+  )
+```
+
+# Carbon Flux
+
+How does projected carbon flux compare to measured carbon flux?
+
+```{r proj_vs_meas_carbon_flux, eval = FALSE}
+lr <- lm(
+  Projected_Carbon_Flux ~ Measured_Carbon_Flux,
+  data = nrsgro_calb_proj_vs_meas |> filter(Projection_Years > 0)
+)
+ggplot(
+  nrsgro_calb_proj_vs_meas |> filter(Projection_Years > 0),
+  aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux)
+) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
+  geom_vline(xintercept = 0, linewidth = 0.25, color = "black") +
+  geom_abline(intercept = 0, slope = 1, linewidth = 0.25, linetype = "dashed", color = "lightgray") +
+  geom_bin2d(bins = 50) +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    # transform = "log10",
+    low = "lightblue",
+    high = "darkblue",
+    limits = c(0, 125)
+  ) +
+  geom_abline(
+    intercept = lr$coefficients[1],
+    slope = lr$coefficients[2],
+    linetype = "dashed",
+    color = "darkblue"
+  ) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  ggtitle(scales::label_wrap(35)("FVS Projected vs. FIA Measured AGL Carbon Flux in Grow-Only Stands")) +
+  labs(caption = "With Calibration") +
+  annotate(
+    "text",
+    x = -10,
+    y = 10,
+    label = paste0(
+      "Slope: ", round(lr$coefficients[2], 3), "\n",
+      "Intercept: ", round(lr$coefficients[1], 3), "\n",
+      "R-squared: ", round(summary(lr)$r.squared, 3)
+    ),
+    size = 3,
+    hjust = 0,
+    vjust = 1
+  ) +
+  xlab(bquote("Measured Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  ylab(bquote("Projected Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
+```
+
+Show us the stats
+```{r calibrated vs measured linear regression, eval = FALSE}
+summary(lm(
+  Projected_Carbon_Flux ~ Measured_Carbon_Flux,
+  data = nrsgro_calb_proj_vs_meas |> filter(Projection_Years > 0)
+))
+```
+Compare to lm without calibration:
+```
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-4.5569 -0.4120  0.0535  0.4510  4.2553 
+
+Coefficients:
+                     Estimate Std. Error t value Pr(>|t|)    
+(Intercept)          -1.79345    0.01981  -90.51   <2e-16 ***
+Measured_Carbon_Flux  0.17030    0.01221   13.95   <2e-16 ***
 ```
 
