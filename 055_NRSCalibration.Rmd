@@ -687,7 +687,7 @@ nrsgro_plot |>
     BA_Residual = Projected_BA - Measured_BA,
     BA_Error = 2 * abs(BA_Residual) / (Projected_BA + Measured_BA),
     BA_Delta_Residual = Projected_BA_Delta - Measured_BA_Delta,
-    BA_Flux_Residual = BA_Delta_Residual / Projection_Years,
+    BAI_Residual = BA_Delta_Residual / Projection_Years,
     Carbon_Residual = Projected_Carbon - Measured_Carbon,
     Carbon_Error = 2 * abs(Carbon_Residual) / (Projected_Carbon + Measured_Carbon),
     Carbon_Delta_Residual = Projected_Carbon_Delta - Measured_Carbon_Delta,
@@ -766,3 +766,28 @@ Coefficients:
 Measured_Carbon_Flux  0.17030    0.01221   13.95   <2e-16 ***
 ```
 
+# Basal Area
+
+
+```{r bai residual vs starting ba, eval = FALSE}
+ggplot(
+  nrsgro_calb_proj_vs_meas |>
+    filter(Projection_Years > 0) |>
+    mutate(
+      BA_Range = cut(Measured_BA, 0:19 * 5)
+    ) |>
+    group_by(FOREST_TYPE_GROUP) |>
+    mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
+    ungroup(),
+  aes(x = BA_Range, y = BAI_Residual)
+) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
+  scale_fill_discrete(name = "Forest Type Group") +
+  ggtitle("BAI Residual vs. Measured BA") +
+  labs(caption = "With Calibration") +
+  ylab(bquote("BAI Residual "(m^2 %.% ha^-1 %.% yr^-1))) +
+  xlab(bquote("Measured Stand BA "(m^2 %.% ha^-1))) +
+  theme_bw() +
+  coord_cartesian(ylim = c(-2, 3))
+```
