@@ -193,6 +193,7 @@ fia_plots_filtered(fiadb, nrsgro_plot, \(.data, con) {
       summarize(
         CARBON_AG = sum(CARBON_AG, na.rm = TRUE),
         CPA = sum(CARBON_AG * TPA_UNADJ, na.rm = TRUE),
+        # BA_TREES is the number of trees to be used in BA computations
         # Restrict to trees that match those used in QMD computation, below.
         BA_TREES = sum(if_else(DIA >= 1, TPA_UNADJ, 0), na.rm = TRUE),
         .groups = "keep"
@@ -3734,6 +3735,9 @@ ggplot(
   xlab(bquote("Measured BA" ~ (m^2 %.% ha^-1))) +
   ylab(bquote("Carbon Projection Error (fraction)"))
 ```
+
+
+
 
 ```{r carbon_flux_residual_vs_measured_ba, eval = FALSE}
 ggplot(
