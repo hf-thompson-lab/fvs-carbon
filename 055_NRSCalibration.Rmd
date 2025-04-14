@@ -713,7 +713,7 @@ ggplot(
     name = "Number of Plots",
     low = "lightblue",
     high = "darkblue",
-    limits = c(0, 125)
+#    limits = c(0, 125)
   ) +
   # stat_poly_* plots and annotates a fit; they need to be configured to match
   stat_poly_line(
@@ -727,7 +727,7 @@ ggplot(
   stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, size = 3) +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  ggtitle("FVS Projected vs. FIA Measured\nAGL Carbon Flux\nin Grow-Only Stands") +
+  ggtitle("FVS Projected vs. FIA Measured\nAGL Carbon Flux in Grow-Only Stands") +
   labs(caption = "With Calibration") +
   xlab(bquote("Measured Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
   ylab(bquote("Projected Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
@@ -927,7 +927,8 @@ ggplot(fvsne_states_map, aes(long, lat, group = group)) +
   geom_polygon(fill = "white", color = "black") +
   geom_point(
     plot_carbon_tmp,
-    mapping = aes(long, lat, group = group, color = Measured_Carbon_Flux)
+    mapping = aes(long, lat, group = group, color = Measured_Carbon_Flux),
+    size = 0.5
   ) +
   coord_sf(crs = 4326) +
   annotation_scale(location = "br") +
@@ -943,7 +944,7 @@ ggplot(fvsne_states_map, aes(long, lat, group = group)) +
   scale_color_gradient2(
     name = bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1)),
     high = "red",
-    mid = "white",
+    mid = "lightgray",
     low = "blue"
   ) +
   ggtitle("FIA Measured Carbon Flux by Plot Location")
@@ -1070,9 +1071,11 @@ wrong_ba_stands <- fvs_vs_fia_ba |>
 
 Among those stands that have good starting ba, how does BAI trend with latitude?
 ```{r measured bai by latitude}
+#formula <- y ~ poly(x, 2, raw = TRUE)
+formula <- y ~ x
+
 nrsgro_calb_proj_vs_meas |>
   filter(Projection_Years > 0) |>
-  anti_join(wrong_ba_stands, by = join_by(StandID)) |>
   left_join(
     nrsgro_plot |>
       filter_add_stand_id() |>
@@ -1083,8 +1086,8 @@ nrsgro_calb_proj_vs_meas |>
   mutate(lat_adj = LAT + ELEV / 500) |>
   ggplot(aes(LAT, Measured_BAI)) +
   geom_point(size = 0.1) +
-  stat_poly_line(se = FALSE) +
-  stat_poly_eq(use_label("eq", "R2")) +
+  stat_poly_line(formula = formula, se = FALSE) +
+  stat_poly_eq(use_label("eq", "R2"), formula = formula) +
   #facet_wrap("FOREST_TYPE_GROUP") +
   theme_bw() +
   ggtitle("FIA Measured BAI by Latitude") +
@@ -1095,12 +1098,10 @@ nrsgro_calb_proj_vs_meas |>
 
 Among those stands that have good starting ba, how does BAI trend with latitude?
 ```{r projected bai by latitude}
-#formula <- y ~ poly(x, 2, raw = TRUE)
 formula <- y ~ x
 
 nrsgro_calb_proj_vs_meas |>
   filter(Projection_Years > 0) |>
-  anti_join(wrong_ba_stands, by = join_by(StandID)) |>
   left_join(
     nrsgro_plot |>
       filter_add_stand_id() |>
