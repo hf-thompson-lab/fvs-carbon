@@ -201,7 +201,7 @@ fia_plots_filtered(fiadb, nrsgro_plot, \(.data, con) {
     
     cond_stats <- tbl(con, "COND") |>
       inner_join(plots |> select(STATECD, COUNTYCD, PLOT, INVYR), by = plots_join_by) |>
-      select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, FORTYPCD) |>
+      select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, CONDPROP_UNADJ, FORTYPCD) |>
       group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
       # QMD = sqrt(sum(DIA^2) / n)
       # Which is equivalent to
@@ -214,7 +214,7 @@ fia_plots_filtered(fiadb, nrsgro_plot, \(.data, con) {
       # FIADB data dictionary 2.5.51 BALIVE says "Basal area in square feet per
       # acre of all live trees ω1.0 inch d.b.h/d.r.c sampled in the condition."
       summarize(
-        BALIVE = sum(BALIVE, na.rm = TRUE),
+        BALIVE = sum(BALIVE * CONDPROP_UNADJ, na.rm = TRUE),
         FORTYPCD = max(FORTYPCD, na.rm = TRUE),
         STDAGE = max(STDAGE, na.rm = TRUE),
         .groups = "keep"
@@ -3362,10 +3362,6 @@ ggplot(
 ```
 
 ```{r measured_vs_projected_carbon_flux, eval = FALSE}
-lr <- lm(
-  Projected_Carbon_Flux ~ Measured_Carbon_Flux,
-  data = nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0)
-)
 ggplot(
   nrsgro_none_proj_vs_meas |> filter(Projection_Years > 0),
   aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux)
@@ -3378,27 +3374,18 @@ ggplot(
     name = "Number of Plots",
     low = "lightblue",
     high = "darkblue",
-    limits = c(0, 125)
+#    limits = c(0, 125)
   ) +
-  geom_abline(
-    intercept = lr$coefficients[1],
-    slope = lr$coefficients[2],
+  # stat_poly_* plots and annotates a fit; they need to be configured to match
+  stat_poly_line(
+    formula = y ~ x,
+    fullrange = TRUE,
+    se = FALSE,
+    color = "darkblue",
     linetype = "dashed",
-    color = "darkblue"
-  ) +
-  annotate(
-    "text",
-    x = -10,
-    y = 10,
-    label = paste0(
-      "Slope: ", round(lr$coefficients[2], 3), "\n",
-      "Intercept: ", round(lr$coefficients[1], 3), "\n",
-      "R-squared: ", round(summary(lr)$r.squared, 3)
-    ),
-    size = 3,
-    hjust = 0,
-    vjust = 1
-  ) +
+    linewidth = 0.5
+) +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, size = 3) +
   theme_bw() +
   theme(aspect.ratio = 1) +
   ggtitle(scales::label_wrap(35)("FVS Projected vs. FIA Measured AGL Carbon Flux in Grow-Only Stands")) +
