@@ -1,0 +1,233 @@
+---
+title: "FVS Carbon Modeling Analysis"
+author: "Nikolaus Bates-Haus"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+# Setup
+
+```{r setup, include=FALSE}
+library(targets)
+library(tarchetypes)
+library(tidyverse)
+library(reshape2) # melt()
+library(measurements) # conv_unit and conv_multiunit
+library(maps)
+library(ggspatial) # for maps
+library(ggpmisc) # for stat_poly_eq
+options(scipen = 9) # Use integer notation for numbers under 9 digits
+tar_source()
+```
+
+
+## Load targets results from other documents
+
+```{r load tar objects defined elsewhere, eval = FALSE}
+tar_load(fiadb)
+tar_load(species_crosswalk)
+```
+
+## Preload targets results from this document
+
+When tar_make() has already built the objects defined in this document,
+run this block to pre-load them. You can then skip running ```{targets} blocks.
+
+```{r load tar objects defined here, eval = FALSE}
+get_this_rmd_file() |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+```
+
+# Grow-Only Plots in the United States
+
+49 continental states
+```{targets fiagro_states, tar_simple = TRUE}
+fia_plots_filtered(fiadb, plots = NULL, \(.data, con) {
+  fia_state <- tbl(con, "REF_RESEARCH_STATION") |>
+    distinct(STATECD, STATE_NAME, STATE_ABBR)
+  .data |>
+    filter(STATECD <= 56) |> # Wyoming is 56 because there are gaps
+    distinct(STATECD) |>
+    left_join(fia_state, by = join_by(STATECD)) |>
+    filter(STATE_NAME != "Hawaii")
+})
+```
+
+Modern, forested plots that grew undisturbed for at least 10 years.
+Note: this takes about 5 minutes on a 2024 MacBook.
+```{targets fiagro_plot, tar_simple = TRUE}
+fia_plots_filtered(
+  fiadb, filter = \(.data, con) {
+    .data |>
+      filter(INVYR >= 1999) |> # Do this first, it impacts later filters
+      filter(STATECD %in% fiagro_states$STATECD) |>
+      filter_plots_modern(con) |>
+      filter_plots_trees(con) |>
+      filter_plots_long_measurement(con) |>
+      filter_plots_forested(con) |>
+      filter_plots_undisturbed(con) |>
+      filter_plots_untreated(con)
+  }) |>
+  # Filter down to just the first and last inventory
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  filter(INVYR == min(INVYR) | INVYR == max(INVYR)) |>
+  ungroup()
+```
+
+Gather additional statistics about the plots
+```{targets fiagro_plot_stats, tar_simple = TRUE}
+fia_plots_filtered(fiadb, fiagro_plot, \(.data, con) {
+    plots <- .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR)
+    plots_join_by <- join_by(STATECD, COUNTYCD, PLOT, INVYR)
+
+    forest_type <- tbl(con, "REF_FOREST_TYPE") |>
+      select(VALUE, MEANING) |>
+      rename(FORTYPCD = VALUE) |>
+      rename(FORTYPE = MEANING)
+    
+    condprop_unadj <- tbl(con, "COND") |>
+      inner_join(plots, by = plots_join_by) |>
+      distinct(STATECD, COUNTYCD, PLOT, CONDID, INVYR, CONDPROP_UNADJ)
+    
+    tree_stats <- tbl(con, "TREE") |>
+      inner_join(plots, by = plots_join_by) |>
+      left_join(
+        condprop_unadj,
+        by = join_by(STATECD, COUNTYCD, PLOT, CONDID, INVYR)
+      ) |>
+      select(STATECD, COUNTYCD, PLOT, INVYR, DIA, CARBON_AG, TPA_UNADJ, CONDPROP_UNADJ) |>
+      mutate(TPA = TPA_UNADJ * CONDPROP_UNADJ) |>
+      group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
+      summarize(
+        CARBON_AG = sum(CARBON_AG, na.rm = TRUE),
+        CPA = sum(CARBON_AG * TPA, na.rm = TRUE),
+        # BA_TREES is a number of trees, not basal area.
+        # Restrict to trees that match those used in QMD computation, below.
+        BA_TREES = sum(if_else(DIA >= 1, TPA, 0), na.rm = TRUE),
+        .groups = "keep"
+      )
+
+    cond_stats <- tbl(con, "COND") |>
+      inner_join(plots, by = plots_join_by) |>
+      select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, CONDPROP_UNADJ, FORTYPCD) |>
+      group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
+      # QMD = sqrt(sum(DIA^2) / n)
+      # Which is equivalent to
+      # QMD = sqrt(sum(BALIVE * TPA_UNADJ) / (n * k)), where n is number of trees,
+      # and k is π/576 ≅ 0.005454 for B in square feet and QMD in inches;
+      # and k is π/40000 ≅ 0.0000785 for B in square meters and QMD in centimeters.
+      # (see https://doi.org/10.1016/j.fecs.2023.100114 )
+      # When computing QMD from BA we need to use the same trees for BA and n;
+      # FIADB data dictionary 2.5.51 BALIVE says "Basal area in square feet per
+      # acre of all live trees ω1.0 inch d.b.h/d.r.c sampled in the condition."
+      summarize(
+        BALIVE = sum(BALIVE * CONDPROP_UNADJ, na.rm = TRUE),
+        FORTYPCD = max(FORTYPCD, na.rm = TRUE),
+        STDAGE = max(STDAGE, na.rm = TRUE),
+        .groups = "keep"
+      ) |>
+      ungroup()
+
+    .data |>
+      select(CN, STATECD, COUNTYCD, PLOT, INVYR, MEASYEAR) |>
+      left_join(cond_stats, by = plots_join_by) |>
+      left_join(tree_stats, by = plots_join_by) |>
+      left_join(forest_type, by = join_by(FORTYPCD)) |>
+      rename(FOREST_TYPE = FORTYPE) |>
+      mutate(
+        STDAGE = if_else(STDAGE < 0, NA, STDAGE),
+        FRTYGRCD = floor(FORTYPCD / 10) * 10
+      ) |>
+      left_join(forest_type, by = join_by(FRTYGRCD == FORTYPCD)) |>
+      rename(FOREST_TYPE_GROUP = FORTYPE)
+  }) |>
+  filter_decode_forest_type_group() |>
+  mutate(
+    STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT),
+    BALIVE_METRIC = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare"),
+    QMD = sqrt(BALIVE / (BA_TREES * (pi / 576))),
+    QMD_METRIC = sqrt(BALIVE_METRIC / (BA_TREES * (pi / 40000))),
+    CARBON_METRIC = conv_multiunit(CPA, "lbs / acre", "Mg / hectare")
+  ) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  mutate(
+    BALIVE_START = if_else(MEASYEAR == min(MEASYEAR, na.rm = TRUE), BALIVE_METRIC, NA),
+    BALIVE_DELTA = BALIVE_METRIC - max(BALIVE_START, na.rm = TRUE),
+    YEARS = MEASYEAR - min(MEASYEAR, na.rm = TRUE)
+  ) |> 
+  ungroup()
+```
+
+```{targets fiagro_bai, tar_simple = TRUE}
+prev_plot_tmp <- fiagro_plot |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  filter(INVYR == min(INVYR)) |>
+  ungroup() |>
+  left_join(
+    fiagro_plot_stats |> select(STATECD, COUNTYCD, PLOT, INVYR, BALIVE),
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+  ) |>
+  select(STATECD, COUNTYCD, PLOT, LAT, LON, ELEV, REMPER, MEASYEAR, BALIVE) |>
+  rename(
+    PREV_MEASYEAR = MEASYEAR,
+    PREV_BALIVE = BALIVE
+  )
+
+fiagro_plot_stats |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  filter(INVYR == max(INVYR)) |>
+  ungroup() |>
+  left_join(prev_plot_tmp, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  mutate(
+    BALIVE = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare"),
+    PREV_BALIVE = conv_multiunit(PREV_BALIVE, "ft2 / acre", "m2 / hectare"),
+    BA_DELTA = BALIVE - PREV_BALIVE,
+    BAI = BA_DELTA / (MEASYEAR - PREV_MEASYEAR)
+  )  
+```
+
+```{r measured bai by latitude and forest type group, eval = FALSE}
+formula <- y ~ x
+
+fiagro_bai |>
+  filter(BAI > quantile(fiagro_bai$BAI, 0.01) &
+         BAI < quantile(fiagro_bai$BAI, 0.99)) |>
+  ggplot(aes(LAT, BAI)) +
+  geom_point(size = 0.1) +
+  stat_poly_line(formula = formula, se = FALSE) +
+  stat_poly_eq(use_label("eq", "R2"), formula = formula) +
+  facet_wrap("FOREST_TYPE_GROUP") +
+  theme_bw() +
+  ggtitle("FIA Measured BAI by Latitude and Forest Type Group") +
+  ylab(bquote("BAI" ~ (m^2 %.% ha^-1 %.% yr^-1))) +
+  xlab("Latitude (degrees)") +
+  labs(caption = "1% outliers removed")
+
+```
+
+```{r measured bai by latitude, eval = FALSE}
+formula <- y ~ x
+
+fiagro_bai |>
+  filter(
+    BAI > quantile(fiagro_bai$BAI, 0.01),
+    BAI < quantile(fiagro_bai$BAI, 0.99)
+  ) |>
+  ggplot(aes(LAT, BAI)) +
+  geom_point(size = 0.1) +
+  stat_poly_line(formula = formula, se = FALSE, linewidth = 0.5) +
+  stat_poly_eq(use_label("eq", "R2"), formula = formula) +
+  geom_hline(yintercept = 0, linewidth = 0.25) +
+  theme_bw() +
+  coord_cartesian(ylim = c(-1, 2)) +
+  ggtitle("FIA Measured BAI in grow-only plots by Latitude, 1999 - 2024") +
+  ylab(bquote("BAI" ~ (m^2 %.% ha^-1 %.% yr^-1))) +
+  xlab("Latitude (degrees)") +
+  labs(caption = "1% outliers removed")
+```

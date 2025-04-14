@@ -21,6 +21,7 @@ filter_plots_ners <- function(.data, con) {
     inner_join(fia_survey, by = join_by(SRV_CN))
 }
 
+# Modern plots are plots compatible with DESIGNCD 1.
 filter_plots_modern <- function(.data, con) {
   # FIADB database description Appendix G describes plot designs.
   # DESIGNCD 1 is the modern plot design.
@@ -37,9 +38,8 @@ filter_plots_modern <- function(.data, con) {
   #  (DESIGNCD > 600 & DESIGNCD < 700)
   # )
   # ---
-  # Simpler: since all plots were switched to the modern design
-  # by 2005, then if the plot was part of the 2005 or later inventories,
-  # it's modern.
+  # Simpler: all plots switched to the modern design by 2005, so
+  # if a plot was part of the 2005 or later inventories, it's modern.
   plots_modern <- tbl(con, "PLOT") |>
     filter(INVYR >= 2005) |>
     distinct(STATECD, COUNTYCD, PLOT)
@@ -48,14 +48,19 @@ filter_plots_modern <- function(.data, con) {
     inner_join(plots_modern, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
+# Only retain plots that have measurements a long time apart
+# "A long time" is currently 10 years, as determined by MEASYEAR.
 filter_plots_long_measurement <- function(.data, con) {
-  # Only retain plots that have measurements a long time apart
   .data |>
     group_by(STATECD, COUNTYCD, PLOT) |>
+    # Note: A more stringent metric would be sum(PLOT.REMPER) > 10
+    # Note: A less stringent metric would be n_distinct(INVYR) > 2
     filter((max(MEASYEAR, na.rm = TRUE) - min(MEASYEAR, na.rm = TRUE)) >= 10) |>
     ungroup()
 }
 
+# COND.COND_SATUS_CD identifies whether a condition is forested. Only keep plots
+# where all conditions were forested for all inventories of interest.
 filter_plots_forested <- function(.data, con) {
   plots_forested <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
@@ -64,7 +69,7 @@ filter_plots_forested <- function(.data, con) {
       .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
-    # Note that we do not group by INVYR
+    # Note that we do not group by INVYR; all INVYR must be forested.
     group_by(STATECD, COUNTYCD, PLOT) |>
     filter(max(COND_STATUS_CD, na.rm = TRUE) == 1) |>
     summarize(.groups = "keep") |>
@@ -74,6 +79,9 @@ filter_plots_forested <- function(.data, con) {
     inner_join(plots_forested, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
+
+# COND.DSTRBCD1/2/3 mark conditions that are disturbed. Remove plots
+# where any condition was disturbed in any inventory of interest.
 filter_plots_undisturbed <- function(.data, con) {
   plots_undisturbed <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
@@ -82,7 +90,7 @@ filter_plots_undisturbed <- function(.data, con) {
       .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
-    # Note that we do not group by INVYR
+    # Note that we do not group by INVYR; all INVYR must be undisturbed.
     group_by(STATECD, COUNTYCD, PLOT) |>
     filter(
       (is.na(max(DSTRBCD1, na.rm = TRUE)) | max(DSTRBCD1, na.rm = TRUE) == 0) &
@@ -96,6 +104,8 @@ filter_plots_undisturbed <- function(.data, con) {
     inner_join(plots_undisturbed, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
+# COND.TRTCD1/2/3 mark conditions that are treated. Remove pltos
+# where any condition was treated in any inventory of interest.
 filter_plots_untreated <- function(.data, con) {
   plots_untreated <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
@@ -118,8 +128,7 @@ filter_plots_untreated <- function(.data, con) {
     inner_join(plots_untreated, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
-# Note that this is a POSITIVE filter:
-# unlike other filters, it RETAINS plots that are harvested
+# Note that this is a POSITIVE filter: it RETAINS plots that ARE harvested.
 filter_plots_harvested <- function(.data, con) {
   plots_harvested_bycond <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
@@ -369,6 +378,8 @@ filter_plots_single_cond <- function(.data, con) {
     inner_join(plots_single_cond, by = join_by(STATECD, COUNTYCD, PLOT))
 }
 
+# All conditions for all the inventories of the plot have trees on them.
+# This is determined by having BALIVE > 0.
 filter_plots_trees <- function(.data, con) {
   plots_trees <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
@@ -378,6 +389,7 @@ filter_plots_trees <- function(.data, con) {
       by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
     ) |>
     group_by(STATECD, COUNTYCD, PLOT) |>
+    # Note that this sums the number of occasions when BALIVE is NOT > 0
     filter(
       sum(if_else(is.na(BALIVE) | (BALIVE == 0), 1, 0), na.rm = TRUE) == 0
     ) |>
