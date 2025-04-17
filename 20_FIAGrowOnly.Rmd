@@ -21,6 +21,8 @@ library(measurements) # conv_unit and conv_multiunit
 library(maps)
 library(ggspatial) # for maps
 library(ggpmisc) # for stat_poly_eq
+library(rFIA)
+library(pbapply)
 options(scipen = 9) # Use integer notation for numbers under 9 digits
 tar_source()
 ```
@@ -76,7 +78,8 @@ fia_plots_filtered(
   }) |>
   # Filter down to just the first and last inventory
   group_by(STATECD, COUNTYCD, PLOT) |>
-  filter(INVYR == min(INVYR) | INVYR == max(INVYR)) |>
+  # find first and last by MEASYEAR; some INVYR are 9999, which is unhelpful
+  filter(MEASYEAR == min(MEASYEAR) | MEASYEAR == max(MEASYEAR)) |>
   ungroup()
 ```
 
@@ -230,4 +233,166 @@ fiagro_bai |>
   ylab(bquote("BAI" ~ (m^2 %.% ha^-1 %.% yr^-1))) +
   xlab("Latitude (degrees)") +
   labs(caption = "1% outliers removed")
+```
+
+```{r qmd hist, eval = FALSE}
+fiagro_bai |>
+  filter(
+    BAI > quantile(fiagro_bai$BAI, 0.01),
+    BAI < quantile(fiagro_bai$BAI, 0.99)
+  ) |>
+  ggplot(aes(QMD)) +
+  geom_histogram(bins = 100) +
+  theme_bw() +
+  ggtitle("FIA Measured QMD in grow-only plots") +
+  ylab("Count") +
+  xlab("QMD (cm)") +
+  labs(caption = "1% outliers removed")
+```
+
+```{r measured bai by latitude and qmd, eval = FALSE}
+formula <- y ~ x
+fiagro_bai |>
+  filter(
+    BAI > quantile(fiagro_bai$BAI, 0.01),
+    BAI < quantile(fiagro_bai$BAI, 0.99)
+  ) |>
+  mutate(
+    QMD_Range = cut(QMD, quantile(fiagro_bai$QMD, 0:9/9), include.lowest = TRUE)
+  ) |>
+  ggplot(aes(LAT, BAI)) +
+  geom_point(size = 0.1) +
+  stat_poly_line(formula = formula, se = FALSE, linewidth = 0.5) +
+  stat_poly_eq(use_label("eq", "R2"), formula = formula) +
+  geom_hline(yintercept = 0, linewidth = 0.25) +
+  facet_wrap("QMD_Range", labeller = "label_both") +
+  theme_bw() +
+  coord_cartesian(ylim = c(-1, 2)) +
+  ggtitle("FIA Measured BAI in grow-only plots by Latitude, 1999 - 2024") +
+  ylab(bquote("BAI" ~ (m^2 %.% ha^-1 %.% yr^-1))) +
+  xlab("Latitude (degrees)") +
+  labs(caption = "1% outliers removed")
+```
+
+
+```{r balive_start histogram, eval=FALSE}
+fiagro_bai |>
+  filter(
+    BAI > quantile(fiagro_bai$BAI, 0.01),
+    BAI < quantile(fiagro_bai$BAI, 0.99)
+  ) |>
+  ggplot(aes(PREV_BALIVE)) +
+  geom_histogram(bins = 100) +
+  theme_bw() +
+  ggtitle("FIA Measured PREV_BALIVE in grow-only plots") +
+  ylab("Count") +
+  xlab("PREV_BALIVE (m2 / hectare)") +
+  labs(caption = "1% outliers removed")
+```
+
+
+```{r measured bai by latitude and starting ba range, eval = FALSE}
+formula <- y ~ x
+fiagro_bai |>
+  filter(
+    BAI > quantile(fiagro_bai$BAI, 0.01),
+    BAI < quantile(fiagro_bai$BAI, 0.99)
+  ) |>
+  mutate(
+    BA_Range = cut(PREV_BALIVE, quantile(fiagro_bai$PREV_BALIVE, 0:10/10), include.lowest = TRUE)
+  ) |>
+  ggplot(aes(LAT, BAI)) +
+  geom_point(size = 0.1) +
+  stat_poly_line(formula = formula, se = FALSE, linewidth = 0.5) +
+  stat_poly_eq(use_label("eq", "R2"), formula = formula) +
+  geom_hline(yintercept = 0, linewidth = 0.25) +
+  facet_wrap("BA_Range", ncol = 2, labeller = "label_both") +
+  theme_bw() +
+  coord_cartesian(ylim = c(-1, 2)) +
+  ggtitle("FIA Measured BAI in grow-only plots by Latitude, 1999 - 2024") +
+  ylab(bquote("BAI" ~ (m^2 %.% ha^-1 %.% yr^-1))) +
+  xlab("Latitude (degrees)") +
+  labs(caption = "1% outliers removed")
+```
+
+# FIA Biomass
+
+use rFIA to compute biomass
+see https://doserlab.com/files/rfia/reference/biomass
+
+Intersection of state and year(s) is an evalid: https://doserlab.com/files/rfia/reference/findevalid
+Then use clipFIA to clip to a state and evalid: https://doserlab.com/files/rfia/reference/clipfia
+Then use biomass to get biomass for that year: https://doserlab.com/files/rfia/reference/biomass
+note: clipFIA returns a FIA.Database, which can be passed to other things
+
+```{targets fiagro_biomass}
+tar_target(
+  fiagro_biomass,
+  {
+    do.call(
+      rbind,
+      pbapply(fiagro_states, 1, \(state) {
+        fia_biomass_for_state(fiadb, state[["STATECD"]])
+      })
+    )
+  },
+  iteration = "vector",
+  # cross() and map() are unparsed targets:: functions here:
+  pattern = map(fiagro_states)
+)
+```
+Align that with plots so we can do spatial and temporal things:
+```{r align, eval = FALSE}
+plots_with_carbon <- fiagro_plot |>
+  left_join(fiagro_biomass, by = join_by(CN == PLT_CN, MEASYEAR == YEAR)) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  filter(all(!is.na(CARB_HECTARE))) |>
+  ungroup()
+prev_plot_carbon <- plots_with_carbon |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  filter(INVYR == min(INVYR)) |>
+  ungroup() |>
+  select(STATECD, COUNTYCD, PLOT, MEASYEAR, CARB_HECTARE, BIO_HECTARE) |>
+  rename(
+    PREV_MEASYEAR = MEASYEAR,
+    PREV_BIO_HECTARE = BIO_HECTARE,
+    PREV_CARB_HECTARE = CARB_HECTARE
+  )
+fia_carbon_flux <- plots_with_carbon |>
+  select(STATECD, COUNTYCD, PLOT, LAT, LON, ELEV, REMPER, MEASYEAR, CARB_HECTARE, BIO_HECTARE) |>
+  left_join(prev_plot_carbon, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  mutate(
+    BIO_FLUX = (BIO_HECTARE - PREV_BIO_HECTARE) / (MEASYEAR - PREV_MEASYEAR),
+    CARB_FLUX = (CARB_HECTARE - PREV_CARB_HECTARE) / (MEASYEAR - PREV_MEASYEAR)
+  ) |>
+  filter(!is.na(CARB_FLUX)) |>
+  left_join(
+    fiagro_plot_stats |> 
+      group_by(STATECD, COUNTYCD, PLOT) |>
+      arrange(MEASYEAR) |>
+      filter(row_number() == 1) |>
+      ungroup() |>
+      select(STATECD, COUNTYCD, PLOT, FOREST_TYPE_GROUP),
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  )
+```
+
+plot it
+```{r plot align, eval = FALSE}
+formula <- y ~ x
+
+fia_carbon_flux |>
+  filter(CARB_FLUX > quantile(fia_carbon_flux$CARB_FLUX, 0.01) &
+         CARB_FLUX < quantile(fia_carbon_flux$CARB_FLUX, 0.99)) |>
+  ggplot(aes(LAT, CARB_FLUX)) +
+  geom_point(size = 0.1) +
+  stat_poly_line(formula = formula, se = FALSE) +
+  stat_poly_eq(use_label("eq", "R2"), formula = formula) +
+  facet_wrap("FOREST_TYPE_GROUP") +
+  theme_bw() +
+  ggtitle("rFIA computed annual carbon flux by Latitude") +
+  ylab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  xlab("Latitude (degrees)") +
+  labs(caption = "1% outliers removed")
+
 ```

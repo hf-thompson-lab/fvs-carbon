@@ -55,3 +55,61 @@ hectare_at <- function(lat, lon) {
   st_axis_order(old_axis_order)
   hectare_polygon
 }
+
+#' FIA Biomass for each plot in a state
+#' 
+#' Given an FIA state code and file path to a SQLite FIADB, returns
+#' the biomass for all plots in the state for each inventory year from 1999:2024
+#' Result columns are as described in https://doserlab.com/files/rfia/reference/biomass,
+#' with the addition of:
+#'
+#' - BIO_HECTARE - BIO_ACRE converted to megagrams per hectare
+#' - CARB_HECTARE - CARB_ACRE converted to megagrams per hectare
+#'
+#' @param fiadb character path to SQLite FIADB
+#' @param statecd numeric FIA STATECD for state of interest
+#'
+#' @returns tibble of biomass for each plot in the state for each year
+#' @export
+#'
+#' @examples
+fia_biomass_for_state <- function(fiadb, statecd) {
+  con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
+  on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
+  
+  state <- tbl(con, "REF_RESEARCH_STATION") |>
+    filter(STATECD == statecd) |>
+    distinct(STATECD, STATE_NAME, STATE_ABBR) |>
+    collect()
+  
+  state_abbr <- state[["STATE_ABBR"]]
+  state_data <- rFIA::readFIA(
+    con = con,
+    schema = "main",
+    states = state_abbr, # state abbreviation, e.g. "MA", or c("MA", "CT")
+    inMemory = TRUE # findEVALID doesn't work with inMemory = FALSE
+  )
+  
+  state_name <- state[["STATE_NAME"]]
+  evalids <- rFIA::findEVALID(
+    state_data,
+    mostRecent = FALSE,
+    state = state_name, # full names of states of interest
+    year = 1999:2024, # Evidence suggests this wants an INVYR, not MEASYEAR
+    type = NULL #  ('ALL', 'CURR', 'VOL', 'GROW', 'MORT', 'REMV', 'CHANGE', 'DWM', 'REGEN')
+  )
+  
+  # Clip to inventories of interest
+  # This is necessary for biomass() to return anything other than just
+  # the most recent year.
+  state_data_clipped <- rFIA::clipFIA(state_data, mostRecent = FALSE, evalid = evalids)
+  
+  # note that byPlot=TRUE causes the result's YEAR to be MEASYEAR
+  rFIA::biomass(state_data_clipped, byPlot = TRUE) |>
+    mutate(
+      # BIO_ACRE: estimate of mean tree biomass per acre (short tons/acre)
+      BIO_HECTARE = conv_multiunit(BIO_ACRE, "short_ton / acre", "Mg / hectare"),
+      # CARB_ACRE: estimate of mean tree carbon per acre (short tons/acre)
+      CARB_HECTARE = conv_multiunit(CARB_ACRE, "short_ton / acre", "Mg / hectare")
+    )
+}

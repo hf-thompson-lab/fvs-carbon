@@ -13,6 +13,7 @@ tar_target(fiagro_plot, {
     }) |>
     # Filter down to just the first and last inventory
     group_by(STATECD, COUNTYCD, PLOT) |>
-    filter(INVYR == min(INVYR) | INVYR == max(INVYR)) |>
+    # find first and last by MEASYEAR; some INVYR are 9999, which is unhelpful
+    filter(MEASYEAR == min(MEASYEAR) | MEASYEAR == max(MEASYEAR)) |>
     ungroup()
 })
