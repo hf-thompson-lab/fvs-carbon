@@ -131,6 +131,7 @@ tmp_prv_tre <- fia_trees_by_cn(
     PREV_DIA = DIA,
     PREV_HT = HT
   )
+
 tmp_plt <- fia_plots_by_cn(
   fiadb,
   tmp_tre |>
@@ -139,12 +140,15 @@ tmp_plt <- fia_plots_by_cn(
 ) |>
   select(CN, REMPER) |>
   rename(PLT_CN = CN)
+
 fia_growth <- tmp_tre |>
   left_join(tmp_prv_tre, by = join_by(PREV_TRE_CN)) |>
   left_join(tmp_plt, by = join_by(PLT_CN)) |>
   mutate(
     ANN_DIA_GROWTH = (DIA - PREV_DIA) / REMPER,
-    ANN_HT_GROWTH = (HT - PREV_HT) / REMPER
+    ANN_DIA_GROWTH5 = (DIA - PREV_DIA) / 5,
+    ANN_HT_GROWTH = (HT - PREV_HT) / REMPER,
+    ANN_HT_GROWTH5 = (HT - PREV_HT) / 5
   ) |>
   filter(!is.na(ANN_DIA_GROWTH) & !is.na(ANN_HT_GROWTH))
 fia_growth |>
@@ -252,6 +256,201 @@ cmp_growth |>
   summarise(
     RMSE = sqrt(mean((DIA_GROWTH - ANN_DIA_GROWTH) ^ 2))
   )
+```
+
+If we switch the FIA growth to use 5 years instead of REMPER, things line up 
+much nicer:
+
+```{r cmp growth, eval = FALSE}
+cmp_growth <- fvs_growth |>
+  select(TREE_CN, DIA_GROWTH, HT_GROWTH) |>
+  left_join(
+    fia_growth |> select(CN, ANN_DIA_GROWTH5, ANN_HT_GROWTH5),
+    by = join_by(TREE_CN == CN)
+  ) |>
+  mutate(DIA_GROWTH = DIA_GROWTH / 5)
+
+cmp_growth |>
+  ggplot(aes(DIA_GROWTH, ANN_DIA_GROWTH5)) +
+  geom_abline(slope = 1, intercept = 0) +
+  theme(aspect.ratio = 1) +
+  geom_point()
+```
+
+
+## Mortality
+
+FVS uses mortality from the tree list to calibrate mortality for a stand. The
+default period for the mortality observation period is 5 years.
+
+```{r single seed tree init, eval = FALSE}
+nrsgro_none_treeinit <- fvs_read_input(single_seed, "FVS_TreeInit_Plot")
+```
+
+FVS uses HISTORY to record the status of trees, where:
+- Tree history codes of 0-5 are used to represent live tree records that are proejcted by FVS. FVS does not distinguish between the various live tree codes.
+- Tree history codes 6, 7, 8 and 9 indicates types of tree records taht are not projected.
+- The codes 6 and 7 trees are assumed to have died during the mortality observation period. FVS makes no distinction between tree records coded with a tree history of 6 or 7.
+- The codes 8 and 9 represent trees that have been dead for longer periods of time. These records are included in the inventory list of trees but are not included in stand densities during calibration. FVS makes no distinction between tree records coded with a tree history of 8 or 9.
+
+(Essential FVS, 4.2.1 Sample Tree Data Description)
+
+```{r tree history histogram, eval = FALSE}
+num_recent_dead <- nrsgro_none_treeinit |>
+  filter(HISTORY %in% 6:7) |>
+  nrow()
+nrsgro_none_treeinit |>
+  mutate(
+    STATUS = case_when(
+      HISTORY %in% 0:5 ~ "Live",
+      HISTORY %in% 6:7 ~ "Recent Mortality",
+      HISTORY %in% 8:9 ~ "Old Mortality",
+      .default = "Other"
+    )
+  ) |>
+  mutate(STATUS = as.factor(STATUS)) |>
+  ggplot(aes(STATUS)) +
+  geom_bar() +
+  geom_text(aes(y = after_stat(count + 3500), label = after_stat(count)), stat = "count") +
+  theme_bw()
+```
+
+So, ~1800 instances of recent mortality across 3000+ plots.
+
+If we look in FIA, how many dead trees do we get if we expand from initial
+survey to initial + 1 surveys?
+
+nrsgro_tree is only live trees, so we need to go find the dead ones.
+```{r nrsgro_tree_dead, eval = FALSE}
+nrsgro_tree_dead <- fia_trees_filtered(fiadb, nrsgro_plot, \(.data, con) {
+  .data |>
+    # Only dead trees
+    filter(STATUSCD == 2) |>
+    # Only keep the first record of any dead tree
+    group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
+    dbplyr::window_order(INVYR) |>
+    filter(row_number() == 1) |>
+    ungroup()
+}) |>
+  left_join(
+    nrsgro_plot |>
+      group_by(STATECD, COUNTYCD, PLOT) |>
+      arrange(INVYR) |>
+      mutate(INVNUM = row_number()) |>
+      ungroup() |>
+      select(STATECD, COUNTYCD, PLOT, INVYR, INVNUM),
+    by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+  ) |>
+  left_join(
+    nrsgro_none_treeinit |>
+      filter(HISTORY %in% 6:7) |>
+      select(TREE_CN, HISTORY) |>
+      rename(FVS_HISTORY = HISTORY),
+    by = join_by(CN == TREE_CN)
+  )
+
+```
+
+```{r dead trees by inventory, eval = FALSE}
+nrsgro_tree_dead |>
+    PREV_STATUS = case_when(
+      PREV_STATUS_CD == 1 ~ "FIA Live",
+      PREV_STATUS_CD == 2 ~ "FIA Dead",
+      .default = "Unknown"
+    )
+  ) |>
+  mutate(
+    DECAY = ordered(DECAY, c("Minimal", "Branches", "Sapwood", "Heartwood", "Advanced"))
+  ) |>
+  ggplot(aes(INVNUM, fill = PREV_STATUS, group = PREV_STATUS)) +
+  geom_bar(position = "dodge") +
+  geom_text(aes(y = after_stat(count + 100), label = after_stat(count)), position = position_dodge(1), stat = "count")
+```
+
+...wait a second, that had 13000+ dead trees in INVNUM==1, whereas FVS only sees
+1800 of them. Where'd the rest go?
+
+Looking across TREEHISTCD, DECAYCD, PREV_STATUS_CD, and MORTYR, none of these
+clearly results in 1863 recently dead trees.
+
+So, it seems the thing to do is pick the 8541 recently dead trees in INVNUM==2
+and back-propagate them to FVS, and extend the mortality observation period to
+10 years.
+
+Next challenge: FVS uses FIA tree numbers and synthesizes its own, and has limits
+on the range of tree numbers. How do we insert these trees with appropriate
+numbers such that they don't conflict with the live versions of themselves?
+
+Note that all recent mortality in INVNUM==2 has PREV_TRE_CN matching TREE_CN
+in FVS_TreeInit_Plot, so we can readily find those records and duplicate them
+for mortality, adjusting DIA and HT as needed.
+
+```{r dead trees by inventory and size class, eval = FALSE}
+nrsgro_none_treeinit |>
+  filter(HISTORY %in% 0:5) |>
+  semi_join(
+    nrsgro_tree_dead |> 
+      filter(INVNUM == 2 & PREV_STATUS_CD == 1),
+    by = join_by(TREE_CN == PREV_TRE_CN)
+  ) |>
+  nrow()
+```
+
+Oh, wait - I'm an idiot. I can join these two, so I can see what the FIA
+trees have in common that causes them to be considered "recently dead" in
+the FVS data.
+
+```{r fia recently dead, eval = FALSE}
+nrsgro_tree_dead |>
+  filter(INVNUM == 1) |>
+  ggplot(aes(DECAYCD, fill = FVS_HISTORY, group = FVS_HISTORY)) +
+  geom_bar(position = "dodge") +
+  geom_text(aes(y = after_stat(count + 100), label = after_stat(count)), position = position_dodge(1), stat = "count")
+```
+
+Still nothing that correlates. But one thing this reveals is a bunch of trees
+with TREECLCD_NERS==6 ("Tree that has recently died (within the last several years)")
+that are not in FVS_TreeInit_Plot as dead trees; they could all be added.
+
+Does TREECLCD_NERS==6 correlate with DECAYCD==1?
+
+```{r tree class vs decay class, eval = FALSE}
+nrsgro_tree_dead |>
+  filter(INVNUM == 1 & !is.na(TREECLCD_NERS) & !is.na(DECAYCD)) |>
+  mutate(TREECLCD_NERS = as.factor(TREECLCD_NERS)) |>
+  mutate(DECAYCD = as.factor(DECAYCD)) |>
+  ggplot(aes(TREECLCD_NERS, DECAYCD)) +
+  geom_bin2d()
+```
+
+lol no; TREECLCD_NERS==6 "recently ded with twigs" seem to correspond primarily
+with DECAYCD==4 "few or no limb stubs remain" and DECAYCD==5 "no evidence of branches remain".
+
+Well, most (but not all) "recently dead" trees in FVS_TreeInit_Plot have
+DECAYCD < 5, and the total number of trees there is close to the number
+of recently dead trees in later inventories, so I'll add all trees
+
+```{r plot candidate recently dead trees for fvs, eval = FALSE}
+nrsgro_tree_dead |>
+  filter(INVNUM < 5) |>
+  mutate(
+    MORT_STATUS = case_when(
+      FVS_HISTORY == 6 ~ "FVS Observed",
+      PREV_STATUS_CD == 1 ~ "FIA Recently Dead",
+      PREV_STATUS_CD == 2 ~ "FIA Long-Term Dead",
+      INVNUM == 1 & DECAYCD < 5 ~ "FVS Candidate",
+      .default = "Unknown"
+    )
+  ) |>
+  ggplot(aes(INVNUM, fill = MORT_STATUS, group = MORT_STATUS)) +
+  geom_bar(position = "dodge") +
+  geom_text(aes(y = after_stat(count + 250), label = after_stat(count)), position = position_dodge(1), stat = "count") +
+  scale_fill_discrete(name = "Mortality Status") +
+  ylab("Number of trees") +
+  xlab("Inventory Number") +
+  ggtitle("Candidate Trees for FVS Mortality Calibration")
+
+
 ```
 
 # Calibrating FVS
