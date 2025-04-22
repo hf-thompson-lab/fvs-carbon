@@ -780,42 +780,73 @@ none_carbon_tmp <- nrsgro_none_carbon |>
   select(StandID, Year, Carbon) |>
   group_by(StandID) |>
   arrange(Year) |>
-  mutate(Carbon_Flux = Carbon - lag(Carbon)) |>
+  mutate(Carbon_Delta = Carbon - lag(Carbon)) |>
   ungroup() |>
-  mutate(Calibration = "Future")
+  filter(!is.na(Carbon_Delta))
 
 calb_carbon_tmp <- nrsgro_calb_carbon |>
   rename(Carbon = Aboveground_Total_Live) |>
   select(StandID, Year, Carbon) |>
   group_by(StandID) |>
   arrange(Year) |>
-  mutate(Carbon_Flux = Carbon - lag(Carbon)) |>
+  mutate(Carbon_Delta = Carbon - lag(Carbon)) |>
   ungroup() |>
-  mutate(Calibration = "None")
+  filter(!is.na(Carbon_Delta))
 
 calb_vs_none <- none_carbon_tmp |>
-  rename(Carbon_Calb = Carbon, Carbon_Flux_Calb = Carbon_Flux) |>
-  full_join(calb_carbon_tmp, by = join_by(StandID, Year)) |>
-  rename(Carbon_None = Carbon, Carbon_Flux_None = Carbon_Flux) |>
-  mutate(
-    Carbon_Delta = Carbon_Calb - Carbon_None,
-    Carbon_Flux_Delta = Carbon_Flux_Calb - Carbon_Flux_None
-  ) |>
+  rename(Carbon_None = Carbon, Carbon_Delta_None = Carbon_Delta) |>
+  left_join(calb_carbon_tmp, by = join_by(StandID, Year)) |>
+  rename(Carbon_Calb = Carbon, Carbon_Delta_Calb = Carbon_Delta) |>
   left_join(stand_mixin, by = join_by(StandID)) |>
-  mutate(ProjectionYears = Year - StartYear)
+  mutate(
+    Carbon_Diff = Carbon_Calb - Carbon_None,
+    ProjectionYears = Year - StartYear,
+    Carbon_Flux_Calb = Carbon_Delta_Calb / ProjectionYears,
+    Carbon_Flux_None = Carbon_Delta_None / ProjectionYears,
+    Carbon_Flux_Delta = Carbon_Flux_Calb - Carbon_Flux_None
+  )
 ```
+
+```{r plot calb_vs_none flux, eval = FALSE}
+formula <- y ~ x
+
+calb_vs_none |>
+  group_by(StandID) |>
+  arrange(desc(ProjectionYears)) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  filter(is.finite(Carbon_Flux_Calb) & is.finite(Carbon_Flux_None)) |>
+  filter(
+    Carbon_Flux_None > quantile(calb_vs_none$Carbon_Flux_None, 0.01, na.rm = TRUE),
+    Carbon_Flux_None < quantile(calb_vs_none$Carbon_Flux_None, 0.99, na.rm = TRUE)
+  ) |>
+  ggplot(aes(Carbon_Flux_None, Carbon_Flux_Calb)) +
+  geom_point(size = 0.1) +
+  geom_abline(slope = 1, intercept = 0, linewidth = 0.25) +
+  scale_y_continuous(limits = c(0, 5)) +
+  scale_x_continuous(limits = c(0, 5)) +
+  stat_poly_line(formula = formula, se = FALSE, linewidth = 0.25) +
+  stat_poly_eq(use_label("eq", "R2"), formula = formula) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  ggtitle("FVS Grow-Only Calibrated vs. Uncalibrated Annual Carbon Flux") +
+  xlab(bquote("Uncalibrated Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab(bquote("Calibrated Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1)))
+
+```
+
 
 ```{r plot calb_vs_none, eval = FALSE}
 calb_vs_none |>
   filter(!is.na(Carbon_Flux_Delta)) |>
-  ggplot(aes(factor(ProjectionYears), Carbon_Flux_Delta)) +
+  ggplot(aes(factor(ProjectionYears), Carbon_Diff)) +
   geom_boxplot(outlier.size = 0.1) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   coord_cartesian(ylim = c(-3, 3), xlim = c(1, 20)) +
-  ggtitle("FVS Grow-Only Calibrated vs. Uncalibrated Annual Carbon Flux") +
+  ggtitle("FVS Grow-Only Calibrated vs. Uncalibrated Projected Stand Carbon") +
   xlab("Projection Years") +
-  ylab(bquote("Carbon Flux Delta" ~ (`Mg C` %.% ha^-1 %.% year^-1)))
+  ylab(bquote("Stand Carbon Delta" ~ (`Mg C` %.% ha^-1)))
 ```
 
 # Projected vs. Measured
