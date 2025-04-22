@@ -372,7 +372,7 @@ fia_carbon_flux <- plots_with_carbon |>
       arrange(MEASYEAR) |>
       filter(row_number() == 1) |>
       ungroup() |>
-      select(STATECD, COUNTYCD, PLOT, FOREST_TYPE_GROUP),
+      select(STATECD, COUNTYCD, PLOT, FOREST_TYPE_GROUP, STDAGE),
     by = join_by(STATECD, COUNTYCD, PLOT)
   )
 ```
@@ -391,6 +391,27 @@ fia_carbon_flux |>
   facet_wrap("FOREST_TYPE_GROUP") +
   theme_bw() +
   ggtitle("rFIA computed annual carbon flux by Latitude") +
+  ylab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  xlab("Latitude (degrees)") +
+  labs(caption = "1% outliers removed")
+
+```
+
+```{r plot align, eval = FALSE}
+formula <- y ~ x
+
+fia_carbon_flux |>
+  filter(!is.na(STDAGE)) |>
+  mutate(STDAGE_RANGE = cut(STDAGE, quantile(fia_carbon_flux$STDAGE, 0:9/9, na.rm = TRUE), include.lowest = TRUE)) |>
+  filter(CARB_FLUX > quantile(fia_carbon_flux$CARB_FLUX, 0.01) &
+         CARB_FLUX < quantile(fia_carbon_flux$CARB_FLUX, 0.99)) |>
+  ggplot(aes(LAT, CARB_FLUX)) +
+  geom_point(size = 0.1) +
+  stat_poly_line(formula = formula, se = FALSE) +
+  stat_poly_eq(use_label("eq", "R2"), formula = formula) +
+  facet_wrap("STDAGE_RANGE", labeller = "label_both") +
+  theme_bw() +
+  ggtitle("rFIA computed annual carbon flux by Stand Age") +
   ylab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
   xlab("Latitude (degrees)") +
   labs(caption = "1% outliers removed")
