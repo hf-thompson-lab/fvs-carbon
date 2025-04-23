@@ -30,8 +30,9 @@ tar_target(nrsgro_calb_proj_vs_meas, {
     filter_add_stand_id() |>
     rename(StandID = STAND_ID, Year = MEASYEAR) |>
     left_join(nrsgro_plot_stats, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+    left_join(fvsne_states, by = join_by(STATECD)) |>
     select(
-      StandID, Year,
+      StandID, Year, STATE_NAME,
       STDAGE, FOREST_TYPE, FOREST_TYPE_GROUP, ECOSUBCD,
       QMD, QMD_METRIC
     ) |>
@@ -62,7 +63,7 @@ tar_target(nrsgro_calb_proj_vs_meas, {
       BA_Residual = Projected_BA - Measured_BA,
       BA_Error = 2 * abs(BA_Residual) / (Projected_BA + Measured_BA),
       BA_Delta_Residual = Projected_BA_Delta - Measured_BA_Delta,
-      BA_Flux_Residual = BA_Delta_Residual / Projection_Years,
+      BAI_Residual = BA_Delta_Residual / Projection_Years,
       Carbon_Residual = Projected_Carbon - Measured_Carbon,
       Carbon_Error = 2 * abs(Carbon_Residual) / (Projected_Carbon + Measured_Carbon),
       Carbon_Delta_Residual = Projected_Carbon_Delta - Measured_Carbon_Delta,

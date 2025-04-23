@@ -28,7 +28,7 @@ tar_source()
 
 ## Load targets results from other documents
 
-```{r load tar objects defined elsewhere}
+```{r load tar objects defined elsewhere, eval = FALSE}
 tar_load(fiadb)
 tar_load(species_crosswalk)
 ```
@@ -261,7 +261,7 @@ cmp_growth |>
 If we switch the FIA growth to use 5 years instead of REMPER, things line up 
 much nicer:
 
-```{r cmp growth, eval = FALSE}
+```{r plot cmp growth, eval = FALSE}
 cmp_growth <- fvs_growth |>
   select(TREE_CN, DIA_GROWTH, HT_GROWTH) |>
   left_join(
@@ -353,6 +353,7 @@ nrsgro_tree_dead <- fia_trees_filtered(fiadb, nrsgro_plot, \(.data, con) {
 
 ```{r dead trees by inventory, eval = FALSE}
 nrsgro_tree_dead |>
+  mutate(
     PREV_STATUS = case_when(
       PREV_STATUS_CD == 1 ~ "FIA Live",
       PREV_STATUS_CD == 2 ~ "FIA Dead",
@@ -360,7 +361,7 @@ nrsgro_tree_dead |>
     )
   ) |>
   mutate(
-    DECAY = ordered(DECAY, c("Minimal", "Branches", "Sapwood", "Heartwood", "Advanced"))
+    DECAY = ordered(DECAYCD, c("Minimal", "Branches", "Sapwood", "Heartwood", "Advanced"))
   ) |>
   ggplot(aes(INVNUM, fill = PREV_STATUS, group = PREV_STATUS)) +
   geom_bar(position = "dodge") +
@@ -405,30 +406,40 @@ nrsgro_tree_dead |>
   filter(INVNUM == 1) |>
   ggplot(aes(DECAYCD, fill = FVS_HISTORY, group = FVS_HISTORY)) +
   geom_bar(position = "dodge") +
-  geom_text(aes(y = after_stat(count + 100), label = after_stat(count)), position = position_dodge(1), stat = "count")
+  geom_text(
+    aes(y = after_stat(count + 100), label = after_stat(count)),
+    position = position_dodge(1),
+    stat = "count"
+  )
 ```
 
 Still nothing that correlates. But one thing this reveals is a bunch of trees
-with TREECLCD_NERS==6 ("Tree that has recently died (within the last several years)")
+with TREECLCD_NERS==5 ("Tree that has recently died (within the last several years)")
 that are not in FVS_TreeInit_Plot as dead trees; they could all be added.
 
-Does TREECLCD_NERS==6 correlate with DECAYCD==1?
+Does TREECLCD_NERS==5 correlate with DECAYCD==1?
 
 ```{r tree class vs decay class, eval = FALSE}
 nrsgro_tree_dead |>
   filter(INVNUM == 1 & !is.na(TREECLCD_NERS) & !is.na(DECAYCD)) |>
   mutate(TREECLCD_NERS = as.factor(TREECLCD_NERS)) |>
   mutate(DECAYCD = as.factor(DECAYCD)) |>
-  ggplot(aes(TREECLCD_NERS, DECAYCD)) +
-  geom_bin2d()
+  ggplot(aes(DECAYCD, fill = TREECLCD_NERS, group = TREECLCD_NERS)) +
+  geom_bar(position = "dodge") +
+  geom_text(
+    aes(y = after_stat(count + 60), label = after_stat(count)),
+    position = position_dodge(1),
+    stat = "count"
+  )
 ```
 
-lol no; TREECLCD_NERS==6 "recently ded with twigs" seem to correspond primarily
-with DECAYCD==4 "few or no limb stubs remain" and DECAYCD==5 "no evidence of branches remain".
+TREECLCD_NERS==5 "recently dead with twigs" seem to correspond primarily
+with DECAYCD==1-3, whereas DECAYCD 4-5 correspond with TREECLCD_NERS==6
 
 Well, most (but not all) "recently dead" trees in FVS_TreeInit_Plot have
 DECAYCD < 5, and the total number of trees there is close to the number
-of recently dead trees in later inventories, so I'll add all trees
+of recently dead trees in later inventories, so we could add all dead trees
+for calibration.
 
 ```{r plot candidate recently dead trees for fvs, eval = FALSE}
 nrsgro_tree_dead |>
@@ -450,6 +461,201 @@ nrsgro_tree_dead |>
   xlab("Inventory Number") +
   ggtitle("Candidate Trees for FVS Mortality Calibration")
 
+
+```
+
+A more principled approach, however, would be to remove the dead trees from
+FVS_TreeInit_Plot, and replace them with dead trees from the next inventory,
+with appropriate modification to the GROWTH keyword (Field 5: Mortality
+observation period (years))
+
+What would it take to do this?
+
+We need to remove the mortality records that FIA puts in FVS_TreeInit_Plot,
+and instead insert our own.
+
+```{r fia mortality tree records, eval = FALSE}
+knitr::kable(nrsgro_none_treeinit |>
+  mutate(
+    STATUS = case_when(
+      HISTORY %in% 0:5 ~ "Live",
+      HISTORY %in% 6:7 ~ "Recent Mortality",
+      HISTORY %in% 8:9 ~ "Old Mortality",
+      .default = "Other"
+    )
+  ) |>
+  mutate(STATUS = as.factor(STATUS)) |>
+  group_by(STATUS) |>
+  filter(row_number() == 1) |>
+  ungroup())
+```
+
+It looks like:
+* STAND_CN: PLOT.CN from INVNUM==1
+* STAND_ID: fvs_standid() from INVNUM==1
+* PLOT_CN: PLOT.CN from INVNUM==1
+* STANDPLOT_CN: paste0(PLOT.CN, "_", SUBP) from INVNUM==1
+* STANDPLOT_ID: paste0(STAND_ID, "_", SUBP) from INVNUM==1
+* PLOT_ID: SUBP from INVNUM==1
+* TREE_CN: TREE.CN from INVNUM==2
+* TREE_ID: TREE.TREE - needs to be unique within STAND_ID, PLOT_ID, TREE_ID
+  This is an integer, so think carefully :-/ 
+* TAG_ID: NULL
+* DISTANCE: NULL
+* SITE_TREE_FLAG: NULL
+* TREE_COUNT: Probably TPA_UNADJ * CONDPROP_UNADJ
+* MORT_AGENT: NULL
+* WDLND_STEMS: NULL
+* HISTORY: 6 (recent mortality) or 8 (snag)
+* SPECIES: TREE.SPCD - FIA Species Code, must be 3 digits (leading 0s)
+* DIAMETER: TREE.DIA in inches
+* DIAMETER_HTCD: NULL - FVS Ignores this
+* HT: TREE.HEIGHT in feet
+* HTTOPK: height to point of top kill, TREE.ACTUALHT
+* HTBOLE: NULL
+* TPBOLE: NULL
+* HTSAW: NULL
+* HT_TO_CROWN_BASE: NULL for dead trees
+* CRRATIO: NULL for dead trees
+* UNCRRATIO: NULL
+* CRCLASS: NULL for dead trees
+* DAMAGE1/2/3: NULL
+* SEVERITY1/2/3: NULL
+* DEFECT_CUBIC: NULL - FVS Ignores this
+* DEFECT_BOARD: NULL
+* TREEVALUE: NULL
+* PRESCRIPTION: NULL
+* AGE: NULL
+* BH_YEARS: NULL
+* SLOPE: PLOT.SLOPE
+* ASPECT: PLOT.ASPECT
+* PV_CODE: NULL
+* PV_REF_CODE: NULL
+* TOPOCODE: NULL
+* SITEPREP: NULL
+* CREATED_DATE: TREE.CREATED_DATE
+* MODIFIED_DATE: TREE.MODIFIED_DATE
+* VERSION: 2.0.20.0 - FVS Ignores this
+
+Among these, the only interesting one is TREE_ID.
+
+Proposal: max(TREE.TREE) for INVYR==1, plus row_number() of dead trees for INVYR==2
+TREE_CN will have the correct TREE.CN, so it doesn't really matter what we put in TREE_ID.
+
+So we need:
+* STAND_CN: PLOT.CN from INVNUM==1
+* STAND_ID: fvs_standid() from INVNUM==1
+* PLOT_CN: PLOT.CN from INVNUM==1
+* PLOT_ID: SUBP from INVNUM==1
+* STANDPLOT_CN: paste0(PLOT.CN, "_", SUBP) from INVNUM==1
+* STANDPLOT_ID: paste0(STAND_ID, "_", SUBP) from INVNUM==1
+* TREE_CN: TREE.CN from INVNUM==2
+* TREE_ID: TREE.TREE - needs to be unique within STAND_ID, PLOT_ID, TREE_ID
+  This is an integer, so think carefully :-/ 
+* TREE_COUNT: Probably TPA_UNADJ * CONDPROP_UNADJ
+* HISTORY: 6 (recent mortality) or 8 (snag)
+* SPECIES: TREE.SPCD - FIA Species Code, must be 3 digits (leading 0s)
+* DIAMETER: TREE.DIA in inches
+* HT: TREE.HEIGHT in feet
+* SLOPE: COND.SLOPE
+* ASPECT: COND.ASPECT
+
+What's the minimum we can get away with, WITHOUT additional lookups?
+STAND_ID, PLOT_CN, STANDPLOT_CN, STANDPLOTID, SLOPE, ASPECT - can be filled from other data
+So we need:
+STAND_CN, TREE_CN, PLOT_ID, TREE_ID, TREE_COUNT, DIAMETER, HT, HISTORY, SPECIES
+
+Meh, let's just provide a function to fetch next-inventory mortality for a plot.
+
+```{targets nrsgro_calb_mortality, tar_simple = TRUE}
+max_tree_id <- nrsgro_tree_history |>
+  group_by(STATECD, COUNTYCD, PLOT, SUBP, INVYR) |>
+  summarize(MAX_TREE = max(TREE, na.rm = TRUE), .groups = "keep") |>
+  ungroup()
+
+prev_plot_cn <- nrsgro_plot |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  arrange(INVYR) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  select(STATECD, COUNTYCD, PLOT, CN) |>
+  rename(PREV_PLT_CN = CN)
+
+cond_mixin <- fia_conds(
+  fiadb,
+  nrsgro_tree_dead |>
+    filter(INVNUM == 2) |>
+    distinct(STATECD, COUNTYCD, PLOT, INVYR)
+  ) |>
+  select(
+    STATECD, COUNTYCD, PLOT, CONDID, INVYR, SLOPE, ASPECT
+  )
+
+prev_tree_mixin <- fia_trees_by_cn(
+  fiadb,
+  nrsgro_tree_dead |>
+    filter(INVNUM == 2) |>
+    select(PREV_TRE_CN) |>
+    rename(CN = PREV_TRE_CN)
+  ) |>
+  select(CN, DIA, HT, TPA_UNADJ) |>
+  rename(
+    PREV_TRE_CN = CN,
+    PREV_DIA = DIA,
+    PREV_HT = HT,
+    PREV_TPA_UNADJ = TPA_UNADJ
+  )
+
+nrsgro_tree_dead |>
+  filter(INVNUM == 2) |>
+  left_join(
+    max_tree_id,
+    by = join_by(STATECD, COUNTYCD, PLOT, SUBP, INVYR)
+  ) |>
+  group_by(STATECD, COUNTYCD, PLOT, SUBP) |>
+  arrange(TREE) |>
+  mutate(
+    TREE_ID = MAX_TREE + row_number()
+  ) |>
+  ungroup() |>
+  left_join(prev_tree_mixin, by = join_by(PREV_TRE_CN)) |>
+  left_join(prev_plot_cn, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  left_join(cond_mixin, by = join_by(STATECD, COUNTYCD, PLOT, CONDID, INVYR)) |>
+  filter_add_stand_id() |>
+  mutate(
+    STAND_CN = PREV_PLT_CN,
+    STAND_ID = STAND_ID,
+    PLOT_CN = PREV_PLT_CN,
+    PLOT_ID = SUBP,
+    STANDPLOT_CN = paste0(STAND_CN, "_", SUBP),
+    STANDPLOT_ID = paste0(STAND_ID, "_", SUBP),
+    TREE_CN = CN,
+    TREE_ID = TREE_ID,
+    TREE_COUNT = coalesce(TPA_UNADJ, PREV_TPA_UNADJ),
+    SPECIES = sprintf("%03d", SPCD),
+    HISTORY = if_else(PREV_STATUS_CD == 1, "6", "8"),
+    DIAMETER = coalesce(DIA, PREV_DIA),
+    HT = coalesce(HT, PREV_HT),
+    SLOPE = SLOPE,
+    ASPECT = ASPECT
+  ) |>
+  select(
+    STAND_CN,
+    STAND_ID,
+    PLOT_CN,
+    PLOT_ID,
+    STANDPLOT_CN,
+    STANDPLOT_ID,
+    TREE_CN,
+    TREE_ID,
+    TREE_COUNT,
+    SPECIES,
+    HISTORY,
+    DIAMETER,
+    HT,
+    SLOPE,
+    ASPECT
+  )
 
 ```
 
@@ -506,7 +712,7 @@ Thus, we will:
 - When populating FVS input tables, override DG and HTG from the calibration table
 - When generating FVS keywords, fill in GROWTH appropriately
 
-# Calibration Table
+## Calibration Table
 
 ```{targets nrsgro_calb_calibration, tar_simple = TRUE}
 starting_plots <- nrsgro_plot |>
@@ -657,6 +863,7 @@ tar_target(
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
       calibration = nrsgro_calb_calibration,
+      calib_mort = nrsgro_calb_mortality,
       regen = estab_for_fvs,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
@@ -1182,7 +1389,7 @@ ggplot(fvsne_states_map, aes(long, lat, group = group)) +
 remove(plot_location_tmp)
 ```
 
-```{r measured carbon flux by latitude}
+```{r measured carbon flux by latitude, eval = FALSE}
 nrsgro_calb_proj_vs_meas |>
   filter(Projection_Years > 0) |>
   left_join(
@@ -1201,7 +1408,7 @@ nrsgro_calb_proj_vs_meas |>
   xlab("Latitude (degrees)")
 ```
 
-```{r measured carbon flux by latitude adjusted for elevation}
+```{r measured carbon flux by latitude adjusted for elevation, eval = FALSE}
 nrsgro_calb_proj_vs_meas |>
   filter(Projection_Years > 0) |>
   left_join(
@@ -1219,7 +1426,7 @@ nrsgro_calb_proj_vs_meas |>
   xlab("Adjusted Latitude (degrees)")
 ```
 
-```{r projected carbon flux by latitude}
+```{r projected carbon flux by latitude, eval = FALSE}
 nrsgro_calb_proj_vs_meas |>
   filter(Projection_Years > 0) |>
   left_join(
@@ -1237,7 +1444,7 @@ nrsgro_calb_proj_vs_meas |>
   xlab("Latitude (degrees)")
 ```
 
-```{r projected carbon flux by latitude adjusted for elevation}
+```{r projected carbon flux by latitude adjusted for elevation, eval = FALSE}
 nrsgro_calb_proj_vs_meas |>
   filter(Projection_Years > 0) |>
   left_join(
@@ -1261,7 +1468,7 @@ nrsgro_calb_proj_vs_meas |>
 
 Is FVS BA simiar to FIA's?
 
-```{r is ba sane}
+```{r is ba sane, eval = FALSE}
 fia_ba <- nrsgro_plot_stats |>
   filter_add_stand_id() |>
   group_by(STAND_ID) |>
@@ -1289,7 +1496,7 @@ fvs_vs_fia_ba |>
 ```
 
 so, not entirely.
-```{r plots with wrong starting ba}
+```{r plots with wrong starting ba, eval = FALSE}
 wrong_ba_stands <- fvs_vs_fia_ba |>
   filter(BA_PROP < 0.95 | BA_PROP > 1.05)
 ```
@@ -1300,7 +1507,7 @@ wrong_ba_stands <- fvs_vs_fia_ba |>
 ### BAI vs Latitude
 
 Among those stands that have good starting ba, how does BAI trend with latitude?
-```{r measured bai by latitude}
+```{r measured bai by latitude, eval = FALSE}
 #formula <- y ~ poly(x, 2, raw = TRUE)
 formula <- y ~ x
 
@@ -1327,7 +1534,7 @@ nrsgro_calb_proj_vs_meas |>
 
 
 Among those stands that have good starting ba, how does BAI trend with latitude?
-```{r projected bai by latitude}
+```{r projected bai by latitude, eval = FALSE}
 formula <- y ~ x
 
 nrsgro_calb_proj_vs_meas |>
@@ -1376,7 +1583,7 @@ ggplot(
   coord_cartesian(ylim = c(-2, 3))
 ```
 
-```{r ist measured carbon flux}
+```{r list measured carbon flux, eval = FALSE}
 nrsgro_calb_proj_vs_meas |>
     filter(Projection_Years > 0) |>
   ggplot(aes(Measured_Carbon_Flux)) +
@@ -1384,23 +1591,7 @@ nrsgro_calb_proj_vs_meas |>
   geom_vline(xintercept = 0)
 ```
 
-```{r ist measured carbon flux}
-nrsgro_calb_proj_vs_meas |>
-    filter(Projection_Years > 0) |>
-  ggplot(aes(Projected_Carbon_Flux)) +
-  geom_histogram() +
-  geom_vline(xintercept = 0)
-```
-
-```{r ist measured carbon flux}
-nrsgro_calb_proj_vs_meas |>
-    filter(Projection_Years > 0) |>
-  ggplot(aes(Measured_Carbon_Flux)) +
-  geom_histogram() +
-  geom_vline(xintercept = 0)
-```
-
-```{r}
+```{r plot projected vs measured carbon flux, eval = FALSE}
 lr <- lm(
   Projected_Carbon_Flux ~ Measured_Carbon_Flux,
   data = nrsgro_calb_proj_vs_meas |> filter(Projection_Years > 0)

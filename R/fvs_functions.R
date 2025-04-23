@@ -158,7 +158,7 @@ fvs_ThinPRSC <- function(rows) {
 # > TODO nik: this should take FIA plots, conds, or subplots, and
 # > Do The Right Thing. fvs_run() would need to take the same
 # > input for stands.
-fvs_fia_input <- function(fiadb, stands, calibration, harvest, filename) {
+fvs_fia_input <- function(fiadb, stands, calibration, calib_mort, harvest, filename) {
   fia <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(fia), add = TRUE, after = FALSE)
   
@@ -179,7 +179,7 @@ fvs_fia_input <- function(fiadb, stands, calibration, harvest, filename) {
     "FVS_StandInit_Plot",
     tbl(fia, "FVS_StandInit_Plot") |>
       inner_join(
-        stand_cns |> select(STAND_CN),
+        stand_cns,
         by = join_by(STAND_CN),
         copy = TRUE
       ) |>
@@ -218,6 +218,28 @@ fvs_fia_input <- function(fiadb, stands, calibration, harvest, filename) {
     .data
   }
   
+  filter_mort <- function(.data) { .data }
+  if (!is.null(calib_mort)) {
+    # Filter down to just the relevant mortality
+    calib_mort <- calib_mort |>
+      inner_join(stand_cns, by = join_by(STAND_CN))
+    # Fill in any missing columns in calib_mort
+    # from the schema of the table FVS_TreeInit_Plot
+    cols <- DBI::dbListFields(fia, "FVS_TreeInit_Plot")
+    lapply(cols, \(col) {
+      if (!col %in% names(calib_mort)) {
+        calib_mort[col] <- NULL
+      }
+    })
+    # filter_mort() will filter out the FIA provided mortality
+    # and sub in the user provided mortality
+    filter_mort <- function(.data) {
+      .data |>
+        filter(!HISTORY %in% 6:9) |>
+        union_all(calib_mort)
+    }
+  }
+  
   DBI::dbWriteTable(
     out,
     "FVS_TreeInit_Plot",
@@ -228,6 +250,7 @@ fvs_fia_input <- function(fiadb, stands, calibration, harvest, filename) {
         by = join_by(STAND_CN),
         copy = TRUE
       ) |>
+      filter_mort() |>
       # Graft on TPA information
       left_join(
         tbl(fia, "FVS_StandInit_Plot") |>
@@ -297,6 +320,7 @@ fvs_keywordfile_section <- function(
     first_year,
     last_year,
     calibration,
+    calib_mort,
     regen,
     harvest,
     carb_calc,
@@ -322,6 +346,8 @@ fvs_keywordfile_section <- function(
     # Field 3: Height method
     # Field 4: Length of height remeasurement (years)
     # Field 5: Mortality observation period (years)
+    # We could adjust Field 5 according to calib_mort, but
+    # the default is 5 and the desired is 5, so no change.
     growth <- fvs_kwd("GROWTH", 3, 5, 3, 5, 5)
   } else {
     growth <- c()
@@ -416,6 +442,7 @@ fvs_write_keyword_file <- function(
   mgmt_id,
   stands,
   calibration,
+  calib_mort,
   regen,
   harvest,
   carb_calc,
@@ -434,6 +461,7 @@ fvs_write_keyword_file <- function(
         first_year = row["FIRST_YEAR"],
         last_year = row["LAST_YEAR"],
         calibration = calibration,
+        calib_mort,
         regen = regen,
         harvest = harvest,
         carb_calc = carb_calc,
@@ -458,6 +486,7 @@ fvs_run <- function(
     mgmt_id,
     stands,
     calibration = NULL,
+    calib_mort = NULL,
     harvest = NULL,
     regen = NULL,
     carb_calc = "Jenkins",
@@ -498,6 +527,7 @@ fvs_run <- function(
     fiadb,
     stands,
     calibration,
+    calib_mort,
     harvest,
     file.path(project_dir, paste0(file_basename, "_Input.db"))
   )
@@ -522,6 +552,7 @@ fvs_run <- function(
     mgmt_id = mgmt_id,
     stands = stands,
     calibration = calibration,
+    calib_mort = calib_mort,
     regen = regen,
     harvest = harvest,
     carb_calc = carb_calc,

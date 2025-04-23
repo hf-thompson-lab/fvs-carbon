@@ -83,6 +83,7 @@ tar_target(
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
       calibration = nrsgro_calb_calibration,
+      calib_mort = nrsgro_calb_mortality,
       regen = estab_for_fvs,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
