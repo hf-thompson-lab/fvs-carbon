@@ -1039,21 +1039,15 @@ calb_vs_none |>
   arrange(desc(ProjectionYears)) |>
   filter(row_number() == 1) |>
   ungroup() |>
-  filter(is.finite(Carbon_Flux_Calb) & is.finite(Carbon_Flux_None)) |>
-  filter(
-    Carbon_Flux_None > quantile(calb_vs_none$Carbon_Flux_None, 0.01, na.rm = TRUE),
-    Carbon_Flux_None < quantile(calb_vs_none$Carbon_Flux_None, 0.99, na.rm = TRUE)
-  ) |>
   ggplot(aes(Carbon_Flux_None, Carbon_Flux_Calb)) +
   geom_point(size = 0.1) +
   geom_abline(slope = 1, intercept = 0, linewidth = 0.25) +
-  scale_y_continuous(limits = c(0, 5)) +
-  scale_x_continuous(limits = c(0, 5)) +
-  stat_poly_line(formula = formula, se = FALSE, linewidth = 0.25) +
-  stat_poly_eq(use_label("eq", "R2"), formula = formula) +
+  coord_cartesian(xlim = c(0, 5), ylim = c(0, 5)) +
+  stat_poly_line(formula = formula, se = FALSE, linewidth = 0.25, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = formula, color = "blue") +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  ggtitle("FVS Grow-Only Calibrated vs. Uncalibrated Annual Carbon Flux") +
+  ggtitle("FVS Grow-Only\nCalibrated vs. Uncalibrated Annual Carbon Flux") +
   xlab(bquote("Uncalibrated Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
   ylab(bquote("Calibrated Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1)))
 
