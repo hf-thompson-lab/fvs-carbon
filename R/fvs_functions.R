@@ -223,20 +223,13 @@ fvs_fia_input <- function(fiadb, stands, calibration, calib_mort, harvest, filen
     # Filter down to just the relevant mortality
     calib_mort <- calib_mort |>
       inner_join(stand_cns, by = join_by(STAND_CN))
-    # Fill in any missing columns in calib_mort
-    # from the schema of the table FVS_TreeInit_Plot
-    cols <- DBI::dbListFields(fia, "FVS_TreeInit_Plot")
-    lapply(cols, \(col) {
-      if (!col %in% names(calib_mort)) {
-        calib_mort[col] <- NULL
-      }
-    })
     # filter_mort() will filter out the FIA provided mortality
     # and sub in the user provided mortality
     filter_mort <- function(.data) {
-      .data |>
-        filter(!HISTORY %in% 6:9) |>
-        union_all(calib_mort)
+      bind_rows(
+        .data |> filter(!HISTORY %in% 6:9),
+        calib_mort
+      )
     }
   }
   
@@ -250,7 +243,6 @@ fvs_fia_input <- function(fiadb, stands, calibration, calib_mort, harvest, filen
         by = join_by(STAND_CN),
         copy = TRUE
       ) |>
-      filter_mort() |>
       # Graft on TPA information
       left_join(
         tbl(fia, "FVS_StandInit_Plot") |>
@@ -260,6 +252,7 @@ fvs_fia_input <- function(fiadb, stands, calibration, calib_mort, harvest, filen
       collect() |>
       # If calibration data is provided, replace the default growth data
       swizzle_growth() |>
+      filter_mort() |>
       # Append the prescription column
       append_prescription() |>
       # Break up records representing more than 1000 trees
