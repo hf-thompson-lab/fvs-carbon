@@ -341,6 +341,7 @@ tar_target(
   pattern = map(fiagro_states)
 )
 ```
+
 Align that with plots so we can do spatial and temporal things:
 ```{r align, eval = FALSE}
 plots_with_carbon <- fiagro_plot |>
@@ -378,7 +379,7 @@ fia_carbon_flux <- plots_with_carbon |>
 ```
 
 plot it
-```{r plot align, eval = FALSE}
+```{r plot carbon flux by latitude, eval = FALSE}
 formula <- y ~ x
 
 fia_carbon_flux |>
@@ -397,7 +398,7 @@ fia_carbon_flux |>
 
 ```
 
-```{r plot align, eval = FALSE}
+```{r plot carbon flux by stand age, eval = FALSE}
 formula <- y ~ x
 
 fia_carbon_flux |>
@@ -417,3 +418,182 @@ fia_carbon_flux |>
   labs(caption = "1% outliers removed")
 
 ```
+
+
+# FIA TPA and BAA
+
+It is interesting to look at how number of stems and basal area change over time.
+This shows, for example, how the stand density index for a plot changes over time.
+
+Here's the thought:
+- compute BAA and TPA for each stand for each inventory.
+- create a heat map - BAA and TPA, with heat the number of years spent there
+
+we'll want to break BAA and TPA into chunks - maybe start with 50 each?
+
+```{r tpa_for_state, eval = FALSE}
+tpa_for_state <- function(fiadb, statecd) {
+  con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
+  on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
+  
+  state <- tbl(con, "REF_RESEARCH_STATION") |>
+    filter(STATECD == statecd) |>
+    distinct(STATECD, STATE_NAME, STATE_ABBR) |>
+    collect()
+  
+  state_abbr <- state[["STATE_ABBR"]]
+  state_data <- rFIA::readFIA(
+    con = con,
+    schema = "main",
+    states = state_abbr, # state abbreviation, e.g. "MA", or c("MA", "CT")
+    inMemory = TRUE # findEVALID doesn't work with inMemory = FALSE
+  )
+  
+  state_name <- state[["STATE_NAME"]]
+  evalids <- rFIA::findEVALID(
+    state_data,
+    mostRecent = FALSE,
+    state = state_name, # full names of states of interest
+    year = 1999:2024, # Evidence suggests this wants an INVYR, not MEASYEAR
+    type = NULL #  ('ALL', 'CURR', 'VOL', 'GROW', 'MORT', 'REMV', 'CHANGE', 'DWM', 'REGEN')
+  )
+  
+  # Clip to inventories of interest
+  # This is necessary for biomass() to return anything other than just
+  # the most recent year.
+  state_data_clipped <- rFIA::clipFIA(state_data, mostRecent = FALSE, evalid = evalids)
+  
+  # note that byPlot=TRUE causes the result's YEAR to be MEASYEAR
+  rFIA::tpa(state_data_clipped, byPlot = TRUE) |>
+    mutate(
+      # TPA - estimate of mean trees per acre
+      # we are converting from 1/acre to 1/hectare, which is
+      # the same as converting hectares to acres.
+      TPH = conv_unit(TPA, "hectare", "acre"),
+      # BAA - estimate of mean basal area (sq. ft.) per acre
+      BAH = conv_multiunit(BAA, "ft2 / acre", "m2 / hectare")
+    )
+}
+```
+
+```{targets fiagro_tpa}
+tar_target(
+  fiagro_tpa,
+  {
+    do.call(
+      rbind,
+      pbapply(fiagro_states, 1, \(state) {
+        fia_tpa_for_state(fiadb, state[["STATECD"]])
+      })
+    )
+  },
+  iteration = "vector",
+  # cross() and map() are unparsed targets:: functions here:
+  pattern = map(fiagro_states)
+)
+```
+
+```{r plot tph vs bah, eval = FALSE}
+fiagro_tpa |>
+  full_join(
+    expand_grid(
+      pltID = unique(fiagro_tpa$pltID),
+      YEAR = unique(fiagro_tpa$YEAR)
+    ),
+    by = c("pltID", "YEAR")
+  ) |>
+  group_by(pltID) |>
+  arrange(YEAR) |>
+  fill(TPA, BAA, TPH, BAH, .direction = "down") |>
+  ungroup() |>
+  filter(!is.na(BAH) & !is.na(TPH)) |>
+  filter(YEAR > 2001 & YEAR < 2022) |>
+  ggplot(aes(BAH, TPH)) +
+  geom_bin2d(bins = 25) +
+  scale_fill_continuous(transform = "log10") +
+  facet_wrap("YEAR", labeller = label_both) +
+  ggtitle("Heatmap of basal area and tree count") +
+  ylab(bquote("Trees per hectare")) +
+  xlab(bquote("Basal area" ~ (m^2 %.% hectare^-1))) +
+  theme_bw()
+```
+
+Do it by stand age, instead.
+```{r plot tph and bah by stand age, eval = FALSE}
+tmp_tpa <- fiagro_tpa |>
+  separate_wider_delim(pltID, "_", names = c("UNITCD", "STATECD", "COUNTYCD", "PLOT")) |>
+  mutate(
+    STATECD = as.integer(STATECD),
+    UNITCD = as.integer(UNITCD),
+    COUNTYCD = as.integer(COUNTYCD),
+    PLOT = as.integer(PLOT)
+  ) |>
+  rename(MEASYEAR = YEAR) |>
+  # there are somehow duplicates? remove them!
+  group_by(STATECD, COUNTYCD, PLOT, MEASYEAR) |>
+  filter(row_number() == 1) |>
+  ungroup()
+  
+plots_with_tpa <- fiagro_plot |>
+  left_join(
+    tmp_tpa |> select(STATECD, COUNTYCD, PLOT, MEASYEAR, TPH, BAH),
+    by = join_by(STATECD, COUNTYCD, PLOT, MEASYEAR)
+  ) |>
+  select(STATECD, COUNTYCD, PLOT, MEASYEAR, TPH, BAH) |>
+  left_join(
+    fiagro_plot_stats |> 
+      group_by(STATECD, COUNTYCD, PLOT) |>
+      arrange(MEASYEAR) |>
+      filter(row_number() == 1) |>
+      ungroup() |>
+      select(STATECD, COUNTYCD, PLOT, FOREST_TYPE_GROUP, STDAGE),
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  )  
+
+```
+
+```{r plot tpa and bah by stdage, eval=FALSE}
+plots_with_tpa |>
+  filter(!is.na(BAH) & !is.na(TPH)) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  arrange(desc(MEASYEAR)) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  ggplot(aes(TPH, BAH)) +
+  geom_bin2d() +
+  theme_bw() +
+  scale_fill_continuous(name = "Number of Plots", transform = "log10") +
+  ggtitle("Heatmap of basal area and tree count") +
+  xlab(bquote("Stem Density" ~ (trees %.% ha^-1))) +
+  ylab(bquote("Basal Area" ~ (m^2 %.% ha^-1)))
+```
+
+```{r plot tpa and bah by median stdage, eval = FALSE}
+tmp_tpa <- plots_with_tpa |>
+  filter(!is.na(BAH) & !is.na(TPH) & !is.na(STDAGE)) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  arrange(desc(MEASYEAR)) |>
+  filter(row_number() == 1) |>
+  ungroup()
+
+tmp_tpa |>
+  mutate(
+    BAH_RANGE = cut(BAH, 0:20*max(BAH)/20, include.lowest = TRUE),
+    TPH_RANGE = cut(TPH, 0:20*max(TPH)/20, include.lowest = TRUE, dig.lab = 5)
+  ) |>
+  group_by(BAH_RANGE, TPH_RANGE) |>
+  summarize(MEDIAN_STDAGE = median(STDAGE), .groups = "keep") |>
+  ungroup() |>
+  ggplot(aes(TPH_RANGE, BAH_RANGE, color = MEDIAN_STDAGE)) +
+  geom_point(size = 8, shape = "square") +
+  theme_bw() +
+  # rotate x axis labels by 30 degrees
+  theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+  ggtitle("Median Stand Age by Basal Area and Stem Density") +
+  xlab(bquote("Stem Density" ~ (trees %.% ha^-1))) +
+  ylab(bquote("Basal Area" ~ (m^2 %.% ha^-1))) +
+  scale_color_continuous(name = "Median Stand Age\n(Years)", transform = "log10")
+
+```
+
+

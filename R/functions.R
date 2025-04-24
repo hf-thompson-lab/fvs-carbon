@@ -56,24 +56,8 @@ hectare_at <- function(lat, lon) {
   hectare_polygon
 }
 
-#' FIA Biomass for each plot in a state
-#' 
-#' Given an FIA state code and file path to a SQLite FIADB, returns
-#' the biomass for all plots in the state for each inventory year from 1999:2024
-#' Result columns are as described in https://doserlab.com/files/rfia/reference/biomass,
-#' with the addition of:
-#'
-#' - BIO_HECTARE - BIO_ACRE converted to megagrams per hectare
-#' - CARB_HECTARE - CARB_ACRE converted to megagrams per hectare
-#'
-#' @param fiadb character path to SQLite FIADB
-#' @param statecd numeric FIA STATECD for state of interest
-#'
-#' @returns tibble of biomass for each plot in the state for each year
-#' @export
-#'
-#' @examples
-fia_biomass_for_state <- function(fiadb, statecd) {
+
+fia_state_clipped <- function(fiadb, statecd) {
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
   
@@ -102,7 +86,29 @@ fia_biomass_for_state <- function(fiadb, statecd) {
   # Clip to inventories of interest
   # This is necessary for biomass() to return anything other than just
   # the most recent year.
-  state_data_clipped <- rFIA::clipFIA(state_data, mostRecent = FALSE, evalid = evalids)
+  rFIA::clipFIA(state_data, mostRecent = FALSE, evalid = evalids)
+}
+
+
+#' FIA Biomass for each plot in a state
+#' 
+#' Given an FIA state code and file path to a SQLite FIADB, returns
+#' the biomass for all plots in the state for each inventory year from 1999:2024
+#' Result columns are as described in https://doserlab.com/files/rfia/reference/biomass,
+#' with the addition of:
+#'
+#' - BIO_HECTARE - BIO_ACRE converted to megagrams per hectare
+#' - CARB_HECTARE - CARB_ACRE converted to megagrams per hectare
+#'
+#' @param fiadb character path to SQLite FIADB
+#' @param statecd numeric FIA STATECD for state of interest
+#'
+#' @returns tibble of biomass for each plot in the state for each year
+#' @export
+#'
+#' @examples
+fia_biomass_for_state <- function(fiadb, statecd) {
+  state_data_clipped <- fia_state_clipped(fiadb, statecd)
   
   # note that byPlot=TRUE causes the result's YEAR to be MEASYEAR
   rFIA::biomass(state_data_clipped, byPlot = TRUE) |>
@@ -111,5 +117,20 @@ fia_biomass_for_state <- function(fiadb, statecd) {
       BIO_HECTARE = conv_multiunit(BIO_ACRE, "short_ton / acre", "Mg / hectare"),
       # CARB_ACRE: estimate of mean tree carbon per acre (short tons/acre)
       CARB_HECTARE = conv_multiunit(CARB_ACRE, "short_ton / acre", "Mg / hectare")
+    )
+}
+
+fia_tpa_for_state <- function(fiadb, statecd) {
+  state_data_clipped <- fia_state_clipped(fiadb, statecd)
+
+  # note that byPlot=TRUE causes the result's YEAR to be MEASYEAR
+  rFIA::tpa(state_data_clipped, byPlot = TRUE) |>
+    mutate(
+      # TPA - estimate of mean trees per acre
+      # we are converting from 1/acre to 1/hectare, which is
+      # the same as converting hectares to acres.
+      TPH = conv_unit(TPA, "hectare", "acre"),
+      # BAA - estimate of mean basal area (sq. ft.) per acre
+      BAH = conv_multiunit(BAA, "ft2 / acre", "m2 / hectare")
     )
 }
