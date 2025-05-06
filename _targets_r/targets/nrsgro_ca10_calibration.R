@@ -1,12 +1,12 @@
 tar_target(nrsgro_ca10_calibration, {
-  tmp_plot_start <- nrsgro_plot |>
+  tmp_plot_1 <- nrsgro_plot |>
     group_by(STATECD, COUNTYCD, PLOT) |>
     arrange(INVYR) |>
     filter(row_number() == 1) |> 
     ungroup()
   
   # All the trees we'll give to FVS for calibration
-  tmp_tre <- fia_trees(fiadb, tmp_plot_start) |>
+  tmp_tre <- fia_trees(fiadb, tmp_plot_1) |>
     filter(STATUSCD == 1) |>
     select(CN, PLT_CN, STATECD, COUNTYCD, PLOT, INVYR, DIA, HT)
   

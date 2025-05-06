@@ -197,14 +197,14 @@ We need two tables:
 ## Growth Table
 
 ```{targets nrsgro_ca10_calibration, tar_simple = TRUE}
-tmp_plot_start <- nrsgro_plot |>
+tmp_plot_1 <- nrsgro_plot |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   arrange(INVYR) |>
   filter(row_number() == 1) |> 
   ungroup()
 
 # All the trees we'll give to FVS for calibration
-tmp_tre <- fia_trees(fiadb, tmp_plot_start) |>
+tmp_tre <- fia_trees(fiadb, tmp_plot_1) |>
   filter(STATUSCD == 1) |>
   select(CN, PLT_CN, STATECD, COUNTYCD, PLOT, INVYR, DIA, HT)
 
@@ -291,7 +291,7 @@ tmp_plot_1 <- nrsgro_plot |>
   ungroup() |>
   select(STATECD, COUNTYCD, PLOT, INVYR, CN)
 
-tmp_tre_1 <- fia_trees(fiadb, tmp_plot_start) |>
+tmp_tre_1 <- fia_trees(fiadb, tmp_plot_1) |>
   select(
     CN, PREV_TRE_CN, PLT_CN,
     STATECD, COUNTYCD, PLOT, SUBP, CONDID, TREE, INVYR,
@@ -575,7 +575,7 @@ tar_target(
     fvs_variant <- "fvsne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
     title <- "NRSGrowOnly"
-    mgmt_id <- "CALB"
+    mgmt_id <- "CA10"
     
     # We communicate with FVS through files. FVSOnline shows a model in which
     # a "project" (the inputs and outputs of a single FVS run) live in a

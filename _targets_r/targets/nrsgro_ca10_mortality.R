@@ -21,7 +21,7 @@ tar_target(nrsgro_ca10_mortality, {
     ungroup() |>
     select(STATECD, COUNTYCD, PLOT, INVYR, CN)
   
-  tmp_tre_1 <- fia_trees(fiadb, tmp_plot_start) |>
+  tmp_tre_1 <- fia_trees(fiadb, tmp_plot_1) |>
     select(
       CN, PREV_TRE_CN, PLT_CN,
       STATECD, COUNTYCD, PLOT, SUBP, CONDID, TREE, INVYR,

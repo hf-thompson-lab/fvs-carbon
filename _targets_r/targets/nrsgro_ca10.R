@@ -30,7 +30,7 @@ tar_target(
     fvs_variant <- "fvsne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
     title <- "NRSGrowOnly"
-    mgmt_id <- "CALB"
+    mgmt_id <- "CA10"
     
     # We communicate with FVS through files. FVSOnline shows a model in which
     # a "project" (the inputs and outputs of a single FVS run) live in a
