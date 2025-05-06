@@ -196,27 +196,21 @@ fiagro_plot_stats |>
 ```
 
 ```{r measured bai by latitude and forest type group, eval = FALSE}
-formula <- y ~ x
-
 fiagro_bai |>
   filter(BAI > quantile(fiagro_bai$BAI, 0.01) &
-         BAI < quantile(fiagro_bai$BAI, 0.99)) |>
+    BAI < quantile(fiagro_bai$BAI, 0.99)) |>
   ggplot(aes(LAT, BAI)) +
   geom_point(size = 0.1) +
-  stat_poly_line(formula = formula, se = FALSE) +
-  stat_poly_eq(use_label("eq", "R2"), formula = formula) +
-  facet_wrap("FOREST_TYPE_GROUP") +
+  stat_poly_line(formula = y ~ x, se = FALSE) +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x) +
   theme_bw() +
   ggtitle("FIA Measured BAI by Latitude and Forest Type Group") +
   ylab(bquote("BAI" ~ (m^2 %.% ha^-1 %.% yr^-1))) +
   xlab("Latitude (degrees)") +
   labs(caption = "1% outliers removed")
-
 ```
 
 ```{r measured bai by latitude, eval = FALSE}
-formula <- y ~ x
-
 fiagro_bai |>
   filter(
     BAI > quantile(fiagro_bai$BAI, 0.01),
@@ -224,9 +218,10 @@ fiagro_bai |>
   ) |>
   ggplot(aes(LAT, BAI)) +
   geom_point(size = 0.1) +
-  stat_poly_line(formula = formula, se = FALSE, linewidth = 0.5) +
-  stat_poly_eq(use_label("eq", "R2"), formula = formula) +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.5) +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x) +
   geom_hline(yintercept = 0, linewidth = 0.25) +
+  facet_wrap("FOREST_TYPE_GROUP") +
   theme_bw() +
   coord_cartesian(ylim = c(-1, 2)) +
   ggtitle("FIA Measured BAI in grow-only plots by Latitude, 1999 - 2024") +
@@ -258,7 +253,7 @@ fiagro_bai |>
     BAI < quantile(fiagro_bai$BAI, 0.99)
   ) |>
   mutate(
-    QMD_Range = cut(QMD, quantile(fiagro_bai$QMD, 0:9/9), include.lowest = TRUE)
+    QMD_Range = cut(QMD, quantile(fiagro_bai$QMD, 0:9 / 9), include.lowest = TRUE)
   ) |>
   ggplot(aes(LAT, BAI)) +
   geom_point(size = 0.1) +
@@ -299,7 +294,7 @@ fiagro_bai |>
     BAI < quantile(fiagro_bai$BAI, 0.99)
   ) |>
   mutate(
-    BA_Range = cut(PREV_BALIVE, quantile(fiagro_bai$PREV_BALIVE, 0:10/10), include.lowest = TRUE)
+    BA_Range = cut(PREV_BALIVE, quantile(fiagro_bai$PREV_BALIVE, 0:10 / 10), include.lowest = TRUE)
   ) |>
   ggplot(aes(LAT, BAI)) +
   geom_point(size = 0.1) +
@@ -368,7 +363,7 @@ fia_carbon_flux <- plots_with_carbon |>
   ) |>
   filter(!is.na(CARB_FLUX)) |>
   left_join(
-    fiagro_plot_stats |> 
+    fiagro_plot_stats |>
       group_by(STATECD, COUNTYCD, PLOT) |>
       arrange(MEASYEAR) |>
       filter(row_number() == 1) |>
@@ -380,43 +375,37 @@ fia_carbon_flux <- plots_with_carbon |>
 
 plot it
 ```{r plot carbon flux by latitude, eval = FALSE}
-formula <- y ~ x
-
 fia_carbon_flux |>
   filter(CARB_FLUX > quantile(fia_carbon_flux$CARB_FLUX, 0.01) &
-         CARB_FLUX < quantile(fia_carbon_flux$CARB_FLUX, 0.99)) |>
+    CARB_FLUX < quantile(fia_carbon_flux$CARB_FLUX, 0.99)) |>
   ggplot(aes(LAT, CARB_FLUX)) +
   geom_point(size = 0.1) +
-  stat_poly_line(formula = formula, se = FALSE) +
-  stat_poly_eq(use_label("eq", "R2"), formula = formula) +
+  stat_poly_line(formula = y ~ x, se = FALSE) +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x) +
   facet_wrap("FOREST_TYPE_GROUP") +
   theme_bw() +
   ggtitle("rFIA computed annual carbon flux by Latitude") +
   ylab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
   xlab("Latitude (degrees)") +
   labs(caption = "1% outliers removed")
-
 ```
 
 ```{r plot carbon flux by stand age, eval = FALSE}
-formula <- y ~ x
-
 fia_carbon_flux |>
   filter(!is.na(STDAGE)) |>
-  mutate(STDAGE_RANGE = cut(STDAGE, quantile(fia_carbon_flux$STDAGE, 0:9/9, na.rm = TRUE), include.lowest = TRUE)) |>
+  mutate(STDAGE_RANGE = cut(STDAGE, quantile(fia_carbon_flux$STDAGE, 0:9 / 9, na.rm = TRUE), include.lowest = TRUE)) |>
   filter(CARB_FLUX > quantile(fia_carbon_flux$CARB_FLUX, 0.01) &
-         CARB_FLUX < quantile(fia_carbon_flux$CARB_FLUX, 0.99)) |>
+    CARB_FLUX < quantile(fia_carbon_flux$CARB_FLUX, 0.99)) |>
   ggplot(aes(LAT, CARB_FLUX)) +
   geom_point(size = 0.1) +
-  stat_poly_line(formula = formula, se = FALSE) +
-  stat_poly_eq(use_label("eq", "R2"), formula = formula) +
+  stat_poly_line(formula = y ~ x, se = FALSE) +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x) +
   facet_wrap("STDAGE_RANGE", labeller = "label_both") +
   theme_bw() +
   ggtitle("rFIA computed annual carbon flux by Stand Age") +
   ylab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
   xlab("Latitude (degrees)") +
   labs(caption = "1% outliers removed")
-
 ```
 
 
@@ -435,12 +424,12 @@ we'll want to break BAA and TPA into chunks - maybe start with 50 each?
 tpa_for_state <- function(fiadb, statecd) {
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
-  
+
   state <- tbl(con, "REF_RESEARCH_STATION") |>
     filter(STATECD == statecd) |>
     distinct(STATECD, STATE_NAME, STATE_ABBR) |>
     collect()
-  
+
   state_abbr <- state[["STATE_ABBR"]]
   state_data <- rFIA::readFIA(
     con = con,
@@ -448,7 +437,7 @@ tpa_for_state <- function(fiadb, statecd) {
     states = state_abbr, # state abbreviation, e.g. "MA", or c("MA", "CT")
     inMemory = TRUE # findEVALID doesn't work with inMemory = FALSE
   )
-  
+
   state_name <- state[["STATE_NAME"]]
   evalids <- rFIA::findEVALID(
     state_data,
@@ -457,12 +446,12 @@ tpa_for_state <- function(fiadb, statecd) {
     year = 1999:2024, # Evidence suggests this wants an INVYR, not MEASYEAR
     type = NULL #  ('ALL', 'CURR', 'VOL', 'GROW', 'MORT', 'REMV', 'CHANGE', 'DWM', 'REGEN')
   )
-  
+
   # Clip to inventories of interest
   # This is necessary for biomass() to return anything other than just
   # the most recent year.
   state_data_clipped <- rFIA::clipFIA(state_data, mostRecent = FALSE, evalid = evalids)
-  
+
   # note that byPlot=TRUE causes the result's YEAR to be MEASYEAR
   rFIA::tpa(state_data_clipped, byPlot = TRUE) |>
     mutate(
@@ -506,11 +495,13 @@ fiagro_tpa |>
   arrange(YEAR) |>
   fill(TPA, BAA, TPH, BAH, .direction = "down") |>
   ungroup() |>
-  filter(!is.na(BAH) & !is.na(TPH)) |>
+  filter(!is.na(BAH) & BAH > 0, !is.na(TPH) & TPH > 0) |>
   filter(YEAR > 2001 & YEAR < 2022) |>
   ggplot(aes(BAH, TPH)) +
   geom_bin2d(bins = 25) +
-  scale_fill_continuous(transform = "log10") +
+  scale_fill_viridis_c() +
+  scale_x_continuous(transform = "log10") +
+  scale_y_continuous(transform = "log10") +
   facet_wrap("YEAR", labeller = label_both) +
   ggtitle("Heatmap of basal area and tree count") +
   ylab(bquote("Trees per hectare")) +
@@ -533,7 +524,7 @@ tmp_tpa <- fiagro_tpa |>
   group_by(STATECD, COUNTYCD, PLOT, MEASYEAR) |>
   filter(row_number() == 1) |>
   ungroup()
-  
+
 plots_with_tpa <- fiagro_plot |>
   left_join(
     tmp_tpa |> select(STATECD, COUNTYCD, PLOT, MEASYEAR, TPH, BAH),
@@ -541,15 +532,14 @@ plots_with_tpa <- fiagro_plot |>
   ) |>
   select(STATECD, COUNTYCD, PLOT, MEASYEAR, TPH, BAH) |>
   left_join(
-    fiagro_plot_stats |> 
+    fiagro_plot_stats |>
       group_by(STATECD, COUNTYCD, PLOT) |>
       arrange(MEASYEAR) |>
       filter(row_number() == 1) |>
       ungroup() |>
       select(STATECD, COUNTYCD, PLOT, FOREST_TYPE_GROUP, STDAGE),
     by = join_by(STATECD, COUNTYCD, PLOT)
-  )  
-
+  )
 ```
 
 ```{r plot tpa and bah by stdage, eval=FALSE}
@@ -560,9 +550,11 @@ plots_with_tpa |>
   filter(row_number() == 1) |>
   ungroup() |>
   ggplot(aes(TPH, BAH)) +
-  geom_bin2d() +
+  geom_bin2d(bins = 50) +
   theme_bw() +
-  scale_fill_continuous(name = "Number of Plots", transform = "log10") +
+  scale_fill_viridis_c(name = "Number of Plots") + # DOn't know how to get STDAGE in here
+  scale_x_continuous(transform = "log10") +
+  scale_y_continuous(transform = "log10") +
   ggtitle("Heatmap of basal area and tree count") +
   xlab(bquote("Stem Density" ~ (trees %.% ha^-1))) +
   ylab(bquote("Basal Area" ~ (m^2 %.% ha^-1)))
@@ -578,22 +570,222 @@ tmp_tpa <- plots_with_tpa |>
 
 tmp_tpa |>
   mutate(
-    BAH_RANGE = cut(BAH, 0:20*max(BAH)/20, include.lowest = TRUE),
-    TPH_RANGE = cut(TPH, 0:20*max(TPH)/20, include.lowest = TRUE, dig.lab = 5)
+    BAH_RANGE = cut(BAH, 0:20 * max(BAH) / 20, include.lowest = TRUE),
+    TPH_RANGE = cut(TPH, 0:20 * max(TPH) / 20, include.lowest = TRUE, dig.lab = 5)
   ) |>
   group_by(BAH_RANGE, TPH_RANGE) |>
   summarize(MEDIAN_STDAGE = median(STDAGE), .groups = "keep") |>
   ungroup() |>
   ggplot(aes(TPH_RANGE, BAH_RANGE, color = MEDIAN_STDAGE)) +
   geom_point(size = 8, shape = "square") +
+  scale_color_viridis_c(name = "Median Stand Age\n(Years)", transform = "log10") +
   theme_bw() +
   # rotate x axis labels by 30 degrees
   theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
   ggtitle("Median Stand Age by Basal Area and Stem Density") +
   xlab(bquote("Stem Density" ~ (trees %.% ha^-1))) +
-  ylab(bquote("Basal Area" ~ (m^2 %.% ha^-1))) +
-  scale_color_continuous(name = "Median Stand Age\n(Years)", transform = "log10")
-
+  ylab(bquote("Basal Area" ~ (m^2 %.% ha^-1)))
 ```
 
+```{r plot tpa vs bah using heatmap, eval = FALSE}
+tmp_tpa |>
+  # scale axes logarighmicaply
+  mutate(
+    TPH_BIN = 10^(trunc(10 * (log10(TPH) + 0.5)) / 10),
+    BAH_BIN = 10^(trunc(10 * (log10(BAH) + 0.5)) / 10)
+  ) |>
+  group_by(TPH_BIN, BAH_BIN) |>
+  summarize(
+    N = n(),
+    STDAGE = quantile(STDAGE, 0.75),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  ggplot(aes(TPH_BIN, BAH_BIN)) +
+  geom_raster(aes(fill = N)) +
+  scale_x_continuous(name = bquote("Stem Density" ~ (trees %.% ha^-1)), transform = "log10") +
+  scale_y_continuous(name = bquote("Basal Area" ~ (m^2 %.% ha^-1)), transform = "log10") +
+  scale_fill_viridis_c(name = "Number of Stands") +
+  theme_bw()
+```
 
+```{r bah and tph by stand-years, eval=FALSE}
+fiagro_tpa |>
+  full_join(
+    expand_grid(
+      pltID = unique(fiagro_tpa$pltID),
+      YEAR = unique(fiagro_tpa$YEAR)
+    ),
+    by = c("pltID", "YEAR")
+  ) |>
+  group_by(pltID) |>
+  arrange(YEAR) |>
+  fill(TPA, BAA, TPH, BAH, .direction = "down") |>
+  ungroup() |>
+  filter(!is.na(BAH) & BAH > 0, !is.na(TPH) & TPH > 0) |>
+  filter(YEAR > 2001 & YEAR < 2022) |>
+  # scale axes logarighmicaply
+  mutate(
+    TPH_BIN = 10^(trunc(10 * (log10(TPH) + 0.5)) / 10),
+    BAH_BIN = 10^(trunc(10 * (log10(BAH) + 0.5)) / 10)
+  ) |>
+  group_by(TPH_BIN, BAH_BIN) |>
+  summarize(
+    N = n(),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  ggplot(aes(TPH_BIN, BAH_BIN)) +
+  geom_tile(aes(fill = N)) +
+  scale_x_continuous(name = bquote("Stem Density" ~ (trees %.% ha^-1)), transform = "log10") +
+  scale_y_continuous(name = bquote("Basal Area" ~ (m^2 %.% ha^-1)), transform = "log10") +
+  scale_fill_viridis_c(name = "Stand-Years") +
+  theme_bw() +
+  ggtitle("Stand-Years by basal area and stem density") +
+  labs(caption = "FIA Grow-Only plots 2002-2021")
+```
+
+```{r bah and tph by stand-years by year, eval=FALSE}
+x <- fiagro_tpa |>
+  full_join(
+    expand_grid(
+      pltID = unique(fiagro_tpa$pltID),
+      YEAR = unique(fiagro_tpa$YEAR)
+    ),
+    by = c("pltID", "YEAR")
+  ) |>
+  group_by(pltID) |>
+  arrange(YEAR) |>
+  fill(TPA, BAA, TPH, BAH, .direction = "down") |>
+  ungroup() |>
+  filter(!is.na(BAH) & BAH > 0, !is.na(TPH) & TPH > 0) |>
+  filter(YEAR > 2001 & YEAR < 2022) |>
+  # scale axes logarithmically
+  mutate(
+    TPH_BIN = trunc(10^(trunc(10 * (log10(TPH) + 0.5)) / 10)),
+    BAH_BIN = trunc(10^(trunc(10 * (log10(BAH) + 0.5)) / 10))
+  ) |>
+  group_by(TPH_BIN, BAH_BIN, YEAR) |>
+  summarize(
+    GROUP = paste0(TPH_BIN, "_", BAH_BIN),
+    N = n(),
+    .groups = "keep"
+  ) |>
+  ungroup()
+```
+```{r}
+x |>  
+  ggplot(aes(TPH_BIN, BAH_BIN, group = GROUP)) +
+  geom_point(aes(color = N), shape = "square", size = 3) +
+  scale_x_continuous(name = bquote("Stem Density" ~ (trees %.% ha^-1)), transform = "log10") +
+  scale_y_continuous(name = bquote("Basal Area" ~ (m^2 %.% ha^-1)), transform = "log10") +
+  scale_fill_viridis_c(name = "Stand-Years") +
+  theme_bw() +
+  ggtitle("Stand-Years by basal area and stem density in {closest_state}") +
+  labs(caption = "FIA Grow-Only plots 2002-2021") +
+  transition_states(YEAR, state_length = 3)
+```
+
+Can we color this by:
+- From this cell, did stands in aggregate increase or decrease BAH?
+- From this cell, did stands in aggregate increase or decrease TPH?
+
+Use the color wheel for direction:
+    N
+ NW   NE
+W       E
+ SW   SE
+    S
+
+        Red
+  Magenta  Orange
+Purple        Yellow
+  Blue     Green
+       Cyan
+       
+ArcGIS has 8 direction flow diagrams (D8): https://pro.arcgis.com/en/pro-app/latest/tool-reference/spatial-analyst/how-flow-direction-works.htm
+
+Their colors are:
+East - Green
+Southeast - Light Green
+South - Light Blue
+Southwest - Blue
+West - Dark Blue
+Northwest - Lavender
+North - Red
+Northeast - Orange
+
+```{r direction_colors, eval = FALSE}
+direction_colors <- tibble(
+  TPH_DIR = c(
+    -1, 0, 1,
+    -1, 0, 1,
+    -1, 0, 1
+  ),
+  BAH_DIR = c(
+    -1, -1, -1,
+    0, 0, 0,
+    1, 1, 1
+  ),
+  COLOR = c(
+    "magenta", "red", "orange",
+    "purple", "lightgray", "yellow",
+    "blue", "cyan", "green")
+  )
+direction_colors |>
+  ggplot(aes(TPH_DIR, BAH_DIR, fill = COLOR)) +
+  scale_fill_manual(breaks = direction_colors$COLOR, values = direction_colors$COLOR) +
+  geom_raster() +
+  theme_bw()
+```
+
+with white in the center
+
+Really what I want, though, is a plot of arrows pointing in the right direction
+
+```{r tpa with direction, eval = FALSE}
+tph_bah_dir <- fiagro_tpa |>
+  group_by(pltID) |>
+  arrange(YEAR) |>
+  mutate(
+    TPH_DELTA = TPH - lag(TPH),
+    BAH_DELTA = BAH - lag(BAH),
+  ) |>
+  ungroup() |>
+  filter(!is.na(TPH_DELTA) & !is.na(BAH_DELTA)) |>
+  mutate(
+    TPH_BIN = 10^(trunc(10 * (log10(TPH) + 0.5)) / 10),
+    BAH_BIN = 10^(trunc(10 * (log10(BAH) + 0.5)) / 10)
+  ) |>
+  group_by(TPH_BIN, BAH_BIN) |>
+  summarize(
+    TPH_DELTA = mean(TPH_DELTA),
+    BAH_DELTA = mean(BAH_DELTA),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  mutate(
+    TPH_DIR = case_when(
+      TPH_DELTA > 20 ~ -1,
+      TPH_DELTA < -100 ~  1,
+      .default = 0
+    ),
+    BAH_DIR = case_when(
+      BAH_DELTA > 2 ~ -1,
+      BAH_DELTA < -2 ~  1,
+      .default = 0
+    )
+  ) |>
+  left_join(direction_colors, by = join_by(TPH_DIR, BAH_DIR))
+```
+
+```{r}
+tph_bah_dir |>
+  ggplot(aes(TPH_BIN, BAH_BIN, color = COLOR)) +
+  geom_point(shape = "square", size = 3.75) +
+  #geom_raster() +
+  scale_color_manual(breaks = direction_colors$COLOR, values = direction_colors$COLOR) +
+  scale_x_continuous(name = bquote("Stem Density" ~ (trees %.% ha^-1)), transform = "log10") +
+  scale_y_continuous(name = bquote("Basal Area" ~ (m^2 %.% ha^-1)), transform = "log10") +
+  theme_bw()
+```
