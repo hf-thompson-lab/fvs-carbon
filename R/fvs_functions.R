@@ -158,7 +158,14 @@ fvs_ThinPRSC <- function(rows) {
 # > TODO nik: this should take FIA plots, conds, or subplots, and
 # > Do The Right Thing. fvs_run() would need to take the same
 # > input for stands.
-fvs_fia_input <- function(fiadb, stands, calibration, calib_mort, harvest, filename) {
+fvs_fia_input <- function(
+    fiadb,
+    stands,
+    calibration,
+    calib_mort,
+    harvest,
+    filename
+) {
   fia <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(fia), add = TRUE, after = FALSE)
   
@@ -314,6 +321,7 @@ fvs_keywordfile_section <- function(
     last_year,
     calibration,
     calib_mort,
+    calib_years,
     regen,
     harvest,
     carb_calc,
@@ -341,7 +349,7 @@ fvs_keywordfile_section <- function(
     # Field 5: Mortality observation period (years)
     # We could adjust Field 5 according to calib_mort, but
     # the default is 5 and the desired is 5, so no change.
-    growth <- fvs_kwd("GROWTH", 3, 5, 3, 5, 5)
+    growth <- fvs_kwd("GROWTH", 3, calib_years, 3, calib_years, calib_years)
   } else {
     growth <- c()
   }
@@ -436,6 +444,7 @@ fvs_write_keyword_file <- function(
   stands,
   calibration,
   calib_mort,
+  calib_years,
   regen,
   harvest,
   carb_calc,
@@ -455,6 +464,7 @@ fvs_write_keyword_file <- function(
         last_year = row["LAST_YEAR"],
         calibration = calibration,
         calib_mort,
+        calib_years,
         regen = regen,
         harvest = harvest,
         carb_calc = carb_calc,
@@ -480,6 +490,7 @@ fvs_run <- function(
     stands,
     calibration = NULL,
     calib_mort = NULL,
+    calib_years = 5,
     harvest = NULL,
     regen = NULL,
     carb_calc = "Jenkins",
@@ -546,6 +557,7 @@ fvs_run <- function(
     stands = stands,
     calibration = calibration,
     calib_mort = calib_mort,
+    calib_years = calib_years,
     regen = regen,
     harvest = harvest,
     carb_calc = carb_calc,

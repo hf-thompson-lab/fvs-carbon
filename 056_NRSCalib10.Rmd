@@ -595,6 +595,7 @@ tar_target(
       stands = plots_for_fvs,
       calibration = nrsgro_ca10_calibration,
       calib_mort = nrsgro_ca10_mortality,
+      calib_years = 10,
       regen = nrsgro_ca10_regen,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
