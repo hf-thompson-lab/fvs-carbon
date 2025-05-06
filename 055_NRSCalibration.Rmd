@@ -942,7 +942,7 @@ num_cases <- nrsgro_calb_cases |> distinct(CaseID) |> nrow()
 num_cases_calibrated <- nrsgro_calb_calibstats |> distinct(CaseID) |> nrow()
 num_cases_calibrated /  num_cases
 ```
-...which makes it look like 60% of runs got calibration.
+...which makes it look like ~62% of runs got calibration.
 
 Did we populate the calibration table correctly?
 ```{r calibration input, eval = FALSE}
@@ -1156,23 +1156,24 @@ ggplot(
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_vline(xintercept = 0, linewidth = 0.25, color = "black") +
   geom_abline(intercept = 0, slope = 1, linewidth = 0.25, linetype = "dashed", color = "lightgray") +
-  geom_bin2d(bins = 50) +
-  scale_fill_gradient(
-    name = "Number of Plots",
-    low = "lightblue",
-    high = "darkblue",
+  geom_bin2d(binwidth = 0.5) +
+  scale_fill_viridis_c() +
+#  scale_fill_gradient(
+#    name = "Number of Plots",
+#    low = "lightblue",
+#    high = "darkblue",
 #    limits = c(0, 125)
-  ) +
+#  ) +
   # stat_poly_* plots and annotates a fit; they need to be configured to match
   stat_poly_line(
     formula = y ~ x,
     fullrange = TRUE,
     se = FALSE,
-    color = "darkblue",
+    color = "blue",
     linetype = "dashed",
     linewidth = 0.5
 ) +
-  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, size = 3) +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, size = 3, color = "blue") +
   theme_bw() +
   theme(aspect.ratio = 1) +
   ggtitle("FVS Projected vs. FIA Measured\nAGL Carbon Flux in Grow-Only Stands") +
@@ -1304,7 +1305,7 @@ nrsgro_calb_proj_vs_meas |>
     by = join_by(StandID)
   ) |>
   mutate(
-    Latitude = cut(LAT, trunc(min(LAT)):trunc(max(LAT)+1))
+    Latitude = cut(LAT, trunc(min(LAT)):trunc(max(LAT))+1, include.lowest = TRUE)
   ) |>
 ggplot(
   aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux)
@@ -1312,14 +1313,15 @@ ggplot(
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_vline(xintercept = 0, linewidth = 0.25, color = "black") +
   geom_abline(intercept = 0, slope = 1, linewidth = 0.25, linetype = "dashed", color = "lightgray") +
-  #geom_bin2d(bins = 50) +
-  geom_point(size = 0.1) +
-  scale_fill_gradient(
-    name = "Number of Plots",
-    low = "lightblue",
-    high = "darkblue",
+  geom_bin2d(binwidth = 0.5) +
+  #geom_point(size = 0.1) +
+  #scale_fill_gradient(
+  #  name = "Number of Plots",
+  #  low = "lightblue",
+  #  high = "darkblue",
     #limits = c(0, 125)
-  ) +
+  #) +
+  scale_fill_viridis_c(name = "Number of Plots") +
   # stat_poly_* plots and annotates a fit; they need to be configured to match
   stat_poly_line(
     formula = y ~ x,
@@ -1389,12 +1391,13 @@ ggplot(fvsne_states_map, aes(long, lat, group = group)) +
   theme_bw() +
   theme(legend.position = "bottom") +
 #  scale_color_discrete(name = NULL) +
-  scale_color_gradient2(
-    name = bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1)),
-    high = "red",
-    mid = "lightgray",
-    low = "blue"
-  ) +
+#  scale_color_gradient2(
+#    name = bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1)),
+#    high = "red",
+#    mid = "lightgray",
+#    low = "blue"
+#  ) +
+  scale_color_viridis_c(name = bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
   ggtitle("FIA Measured Carbon Flux by Plot Location")
 
 remove(plot_location_tmp)
@@ -1412,7 +1415,7 @@ nrsgro_calb_proj_vs_meas |>
   geom_point(size = 0.1) +
   stat_poly_line() +
   stat_poly_eq(use_label("eq", "R2")) +
-  facet_wrap("FOREST_TYPE_GROUP") +
+  #facet_wrap("FOREST_TYPE_GROUP") +
   theme_bw() +
   ggtitle("FIA Measured Annual Carbon Flux by Latitude") +
   ylab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
@@ -1576,7 +1579,7 @@ ggplot(
   nrsgro_calb_proj_vs_meas |>
     filter(Projection_Years > 0) |>
     mutate(
-      BA_Range = cut(Measured_BA, 0:19 * 5)
+      BA_Range = cut(Measured_BA, 0:19 * 5, include.lowest = TRUE),
     ) |>
     group_by(FOREST_TYPE_GROUP) |>
     mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
@@ -1598,57 +1601,44 @@ ggplot(
 nrsgro_calb_proj_vs_meas |>
     filter(Projection_Years > 0) |>
   ggplot(aes(Measured_Carbon_Flux)) +
-  geom_histogram() +
-  geom_vline(xintercept = 0)
+  geom_histogram(binwidth = 0.5) +
+  geom_vline(xintercept = 0) +
+  theme_bw()
 ```
 
 ```{r plot projected vs measured carbon flux, eval = FALSE}
-lr <- lm(
-  Projected_Carbon_Flux ~ Measured_Carbon_Flux,
-  data = nrsgro_calb_proj_vs_meas |> filter(Projection_Years > 0)
-)
+projected_tmp <- nrsgro_calb_proj_vs_meas |> filter(Projection_Years > 0)
+epsilon = 0.025
 ggplot(
-  nrsgro_calb_proj_vs_meas |> filter(Projection_Years > 0) |>
-    mutate(Measured_Carbon_Flux = log10(Measured_Carbon_Flux),
-            Projected_Carbon_Flux =  log10(Projected_Carbon_Flux)),
+  projected_tmp |>
+    filter(
+      Measured_Carbon_Flux > quantile(projected_tmp$Measured_Carbon_Flux, epsilon),
+      Measured_Carbon_Flux < quantile(projected_tmp$Measured_Carbon_Flux, 1 - epsilon),
+      Projected_Carbon_Flux > quantile(projected_tmp$Projected_Carbon_Flux, epsilon),
+      Projected_Carbon_Flux < quantile(projected_tmp$Projected_Carbon_Flux, 1 - epsilon)
+    ),
   aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux)
 ) +
   geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
   geom_vline(xintercept = 0, linewidth = 0.25, color = "black") +
   geom_abline(intercept = 0, slope = 1, linewidth = 0.25, linetype = "dashed", color = "lightgray") +
-  geom_bin2d(bins = 50) +
-  scale_fill_gradient(
-    name = "Number of Plots",
-    # transform = "log10",
-    low = "lightblue",
-    high = "darkblue",
-    limits = c(0, 125)
+  geom_point(size = 0.1) +
+  scale_fill_viridis_c(
+    name = "Number of Plots"
   ) +
-  geom_abline(
-    intercept = lr$coefficients[1],
-    slope = lr$coefficients[2],
-    linetype = "dashed",
-    color = "darkblue"
+  stat_poly_line(
+    formula = y ~ x,
+    color = "blue",
+    fullrange = TRUE,
+    se = FALSE,
+    linetype = "dashed"
   ) +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  ggtitle(scales::label_wrap(35)("FVS Projected vs. FIA Measured AGL Carbon Flux in Grow-Only Stands")) +
-  labs(caption = "With Calibration") +
-  annotate(
-    "text",
-    x = -10,
-    y = 10,
-    label = paste0(
-      "Slope: ", round(lr$coefficients[2], 3), "\n",
-      "Intercept: ", round(lr$coefficients[1], 3), "\n",
-      "R-squared: ", round(summary(lr)$r.squared, 3)
-    ),
-    size = 3,
-    hjust = 0,
-    vjust = 1
-  ) +
+  ggtitle("FVS Projected vs. FIA Measured\nAGL Carbon Flux in Grow-Only Stands") +
+  labs(caption = paste0(epsilon * 100, "% outliers removed")) +
   xlab(bquote("Measured Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
-  ylab(bquote("Projected Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
-  coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
+  ylab(bquote("Projected Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1)))
 ```
 
