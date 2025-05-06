@@ -613,3 +613,129 @@ tar_target(
 )
 ```
 
+# Load Results
+
+## NRS GrowOnly CA10
+
+Carbon
+
+```{targets nrsgro_ca10_carbon, tar_simple = TRUE}
+fvs_read_output(nrsgro_ca10, "FVS_Carbon") |>
+  group_by(StandID, Year) |> # Combine results from different random seeds
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    .groups = "keep"
+  ) |>
+  ungroup()
+```
+
+Summary
+
+```{targets nrsgro_ca10_summary, tar_simple = TRUE}
+fvs_read_output(nrsgro_ca10, "FVS_Summary2_East") |>
+  group_by(StandID, Year) |>
+  summarize(
+    BA = mean(BA),
+    Tpa = mean(Tpa),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+```
+## Calibration Rate
+
+Did we actually get calibration?
+
+```{r nrsgro_calb_calibration cases, eval = FALSE}
+single_seed <- nrsgro_ca10 |>
+  group_by() |>
+  filter(random_seed == min(random_seed)) |>
+  ungroup()
+nrsgro_ca10_cases <- fvs_read_output(single_seed, "FVS_Cases")
+nrsgro_ca10_calibstats <- fvs_read_output(single_seed, "FVS_CalibStats")
+num_cases <- nrsgro_ca10_cases |> distinct(CaseID) |> nrow()
+num_cases_calibrated <- nrsgro_ca10_calibstats |> distinct(CaseID) |> nrow()
+num_cases_calibrated / num_cases
+```
+
+61%, so about identical to 5-year calibration.
+
+## Scale Factor
+
+
+What kind of calibration did we get?
+```{r plot calibstats, eval = FALSE}
+nrsgro_ca10_calibstats |>
+  mutate(Log10ScaleFactor = log10(ScaleFactor)) |>
+  ggplot(aes(Log10ScaleFactor)) +
+  geom_histogram(binwidth = 0.1) +
+  geom_vline(xintercept = 0) +
+  theme_bw()
+```
+
+looks about the same as 5 year.
+
+# Calibrated vs. Uncalibrated
+
+```{r calb_vs_none, eval = FALSE}
+stand_mixin <- nrsgro_plot_stats |>
+  filter_add_stand_id() |>
+  group_by(STAND_ID) |>
+  arrange(INVYR) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  select(STAND_ID, MEASYEAR) |>
+  rename(StandID = STAND_ID, StartYear = MEASYEAR)
+
+none_carbon_tmp <- nrsgro_none_carbon |>
+  rename(Carbon = Aboveground_Total_Live) |>
+  select(StandID, Year, Carbon) |>
+  group_by(StandID) |>
+  arrange(Year) |>
+  mutate(Carbon_Delta = Carbon - lag(Carbon)) |>
+  ungroup() |>
+  filter(!is.na(Carbon_Delta))
+
+ca10_carbon_tmp <- nrsgro_ca10_carbon |>
+  rename(Carbon = Aboveground_Total_Live) |>
+  select(StandID, Year, Carbon) |>
+  group_by(StandID) |>
+  arrange(Year) |>
+  mutate(Carbon_Delta = Carbon - lag(Carbon)) |>
+  ungroup() |>
+  filter(!is.na(Carbon_Delta))
+
+ca10_vs_none <- none_carbon_tmp |>
+  rename(Carbon_None = Carbon, Carbon_Delta_None = Carbon_Delta) |>
+  left_join(ca10_carbon_tmp, by = join_by(StandID, Year)) |>
+  rename(Carbon_Calb = Carbon, Carbon_Delta_Calb = Carbon_Delta) |>
+  left_join(stand_mixin, by = join_by(StandID)) |>
+  mutate(
+    Carbon_Diff = Carbon_Calb - Carbon_None,
+    ProjectionYears = Year - StartYear,
+    Carbon_Flux_Calb = Carbon_Delta_Calb / ProjectionYears,
+    Carbon_Flux_None = Carbon_Delta_None / ProjectionYears,
+    Carbon_Flux_Delta = Carbon_Flux_Calb - Carbon_Flux_None
+  )
+```
+
+```{r plot calb_vs_none flux, eval = FALSE}
+formula <- y ~ x
+
+ca10_vs_none |>
+  group_by(StandID) |>
+  arrange(desc(ProjectionYears)) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  ggplot(aes(Carbon_Flux_None, Carbon_Flux_Calb)) +
+  geom_point(size = 0.1) +
+  geom_abline(slope = 1, intercept = 0, linewidth = 0.25) +
+  coord_cartesian(xlim = c(0, 5), ylim = c(0, 5)) +
+  stat_poly_line(formula = formula, se = FALSE, linewidth = 0.25, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = formula, color = "blue") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  ggtitle("FVS Grow-Only\nCalibrated vs. Uncalibrated Annual Carbon Flux") +
+  xlab(bquote("Uncalibrated Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab(bquote("Calibrated Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  labs(caption = "With 10-Year Calibration")
+```
