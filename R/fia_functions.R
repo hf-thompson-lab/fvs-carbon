@@ -151,6 +151,17 @@ fia_conds <- function(fiadb, plots) {
     select(VALUE, MEANING) |>
     rename(FORTYPCD = VALUE, FORTYPE = MEANING)
 
+  if ("INVYR" %in% names(plots)) {
+    tbl(con, "COND") |>
+      inner_join(
+        plots |> select(STATECD, COUNTYCD, PLOT, INVYR),
+        by = join_by(STATECD, COUNTYCD, PLOT, INVYR),
+        copy = TRUE
+      ) |>
+      # Dereference forest type codes
+      left_join(fia_ref_forest_type, by = join_by(FORTYPCD)) |>
+      collect()
+  } else {
     tbl(con, "COND") |>
       inner_join(
         plots |> select(STATECD, COUNTYCD, PLOT),
@@ -160,6 +171,7 @@ fia_conds <- function(fiadb, plots) {
       # Dereference forest type codes
       left_join(fia_ref_forest_type, by = join_by(FORTYPCD)) |>
       collect()
+  }
 }
 
 fia_trees <- function(fiadb, plots) {
