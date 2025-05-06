@@ -1,0 +1,1358 @@
+---
+title: "056_NRSCalib10"
+author: "Nikolaus Bates-Haus"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+# Setup
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(targets)
+  library(tarchetypes)
+  library(tidyverse)
+  library(dbplyr) # for window_order
+  library(reshape2) # melt()
+  library(measurements) # conv_unit and conv_multiunit
+  library(maps)
+  library(ggspatial) # for maps
+  library(ggpmisc) # for stat_poly_eq
+})
+options(scipen = 9) # Use integer notation for numbers under 9 digits
+tar_source()
+```
+
+
+## Load targets results from other documents
+
+```{r load tar objects defined elsewhere, eval = FALSE}
+tar_load(fiadb)
+tar_load(species_crosswalk)
+```
+
+## Preload everything from 05_NRSGrowOnly.Rmd and 055_NRSCalibration.Rmd
+
+```{r load 05 nrsgrowonly, eval = FALSE}
+this_rmd_file <- get_this_rmd_file()
+this_rmd_file |>
+  str_replace(basename(this_rmd_file), "05_NRSGrowOnly.Rmd") |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+this_rmd_file |>
+  str_replace(basename(this_rmd_file), "055_NRSCalibration.Rmd") |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+```
+
+
+## Preload targets results from this document
+
+When tar_make() has already built the objects defined in this document,
+run this block to pre-load them. You can then skip running ```{targets} blocks.
+
+```{r load tar objects defined here, eval = FALSE}
+get_this_rmd_file() |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+```
+
+# Longer Calibration Period
+
+Calibration using 5 years of growth and mortality was unhelpful.
+What happens if we use more years of data to calibrate?
+
+FVSne is tuned to 10 years for everything, so that's a possible choice. For
+the small tree height growth model, this is probably the right interval to use,
+since small trees may outgrow the small tree range at larger intervals.
+
+Most of the plots we're looking at have 20 or more years (4 or more inventories)
+of data available, so 20 years is another possibility.
+
+## Tree Survival & Mortality
+
+What portion of trees survive for 20 years?
+
+First, what portion of plots have observations over 20 years?
+```{r plot duration, eval = FALSE}
+num_inventories <- nrsgro_plot |>
+  distinct(STATECD, COUNTYCD, PLOT, MEASYEAR) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  summarize(
+    INVENTORIES = n(),
+    DURATION = max(MEASYEAR) - min(MEASYEAR),
+    .groups = "keep"
+  ) |>
+  ungroup()
+num_inventories |>
+  filter(INVENTORIES > 3) |>
+  nrow()
+```
+
+```{r plot num inventories, eval = FALSE}
+num_inventories |>
+  ggplot(aes(INVENTORIES)) +
+  geom_histogram(binwidth = 1) +
+  theme_bw()
+```
+
+So, 2220 plots have 4 or 5 inventories. Enough to work with.
+
+```{r plot duration, eval = FALSE}
+num_inventories |>
+  filter(DURATION > 14) |>
+  nrow()
+num_inventories |>
+  filter(DURATION > 19) |>
+  nrow()
+num_inventories |>
+  ggplot(aes(DURATION)) +
+  geom_histogram(binwidth = 1) +
+  theme_bw()
+```
+
+So all plots have 10+ years (which makes sense, since that's what we selected for);
+only 612 plots have duration of at least 20 years.
+
+2199 have duration of at least 15 years.
+
+Let's see how many trees are observed for 10 / 15 / 20 years.
+
+Pulling all trees into memory might be too much; we can do this as:
+For each plot,
+get all trees for all time
+For each tree,
+find first live observation year, last live observation year, first dead
+observation year
+
+```{r tree observations, eval = FALSE}
+tree_obs <- fia_trees_filtered(fiadb, nrsgro_plot, \(.data, con) {
+  .data |>
+    select(
+      STATECD, COUNTYCD, PLOT, SUBP, TREE,
+      INVYR, STATUSCD
+    ) |>
+    group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
+    window_order(INVYR) |>
+    mutate(INVNUM = row_number()) |>
+    summarize(
+      INVYR = min(INVYR),
+      FIRST_LIVE = min(INVNUM[STATUSCD == 1]),
+      LAST_LIVE = max(INVNUM[STATUSCD == 1]),
+      FIRST_DEAD = min(INVNUM[STATUSCD == 2]),
+      .groups = "keep"
+    ) |>
+    ungroup()
+  })
+```
+
+```{r plot tree obs, eval = FALSE}
+tmp_tree_duration <- tree_obs |>
+  filter(is.finite(FIRST_LIVE) & is.finite(LAST_LIVE)) |>
+  mutate(DURATION = LAST_LIVE - FIRST_LIVE)
+tmp_tree_duration |>
+  ggplot(aes(DURATION)) +
+  geom_histogram(binwidth = 1) +
+  theme_bw()
+```
+
+118,788 trees that live for at least 10 years; only 18,181 that live for 20.
+Oh, that's because some significant portion of the trees recruit after the
+first inventory.
+
+OK, let's ask a different question: how many trees are alive two inventories
+after the first? And, how many trees are alive once, and dead two inventories
+after the first?
+
+```{r plot tree calib, eval = FALSE}
+nrsgro_plot |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  summarize(INVYR = min(INVYR), .groups = "keep") |>
+  ungroup() |>
+  left_join(tree_obs, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+  mutate(
+    CALIB_CAT = case_when(
+      LAST_LIVE >= 2 ~ "Survivor",
+      FIRST_DEAD == 1 ~ "Dead at 5",
+      FIRST_DEAD == 2 ~ "Dead at 10",
+      !is.na(LAST_LIVE) ~ paste0("Vanished at ", LAST_LIVE),
+      .default = "Phantom"
+    )
+  ) |>
+  ggplot(aes(CALIB_CAT)) +
+  geom_histogram(stat = "count") +
+  geom_text(aes(y = after_stat(count + 2500), label = after_stat(count)), stat = "count") +
+  theme_bw()
+```
+
+So it seems we should be able to use 10 years of survivors and dead trees.
+
+We need two tables:
+
+## Growth Table
+
+```{targets nrsgro_ca10_calibration, tar_simple = TRUE}
+tmp_plot_start <- nrsgro_plot |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  arrange(INVYR) |>
+  filter(row_number() == 1) |> 
+  ungroup()
+
+# All the trees we'll give to FVS for calibration
+tmp_tre <- fia_trees(fiadb, tmp_plot_start) |>
+  filter(STATUSCD == 1) |>
+  select(CN, PLT_CN, STATECD, COUNTYCD, PLOT, INVYR, DIA, HT)
+
+tmp_plot_2 <- nrsgro_plot |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  arrange(INVYR) |>
+  filter(row_number() == 2) |>
+  ungroup()
+
+tmp_tre_grow_2 <- fia_trees(fiadb, tmp_plot_2) |>
+  filter(STATUSCD == 1) |>
+  select(CN, PREV_TRE_CN, DIA, HT) |>
+  rename(
+    DIA2 = DIA,
+    HT2 = HT,
+    PREV_TRE_CN = CN,
+    CN = PREV_TRE_CN
+  )
+
+tmp_plot_3 <- nrsgro_plot |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  arrange(INVYR) |>
+  filter(row_number() == 3) |>
+  ungroup()
+
+tmp_tre_grow_3 <- fia_trees(fiadb, tmp_plot_3) |>
+  filter(STATUSCD == 1) |>
+  select(PREV_TRE_CN, DIA, HT) |>
+  rename(
+    DIA3 = DIA,
+    HT3 = HT
+  )
+
+tmp_tre_grow <- tmp_tre_grow_2 |>
+  left_join(tmp_tre_grow_3, by = join_by(PREV_TRE_CN))
+
+tree_growth <- tmp_tre |>
+  left_join(tmp_tre_grow, by = join_by(CN))
+
+# For FVS, we need:
+# STAND_CN
+# TREE_CN
+# DG
+# HTG
+# The rest is assumed
+
+tree_growth |>
+  filter(!is.na(DIA3) & !is.na(HT3)) |>
+  select(PLT_CN, CN, DIA3, HT3) |>
+  rename(
+    STAND_CN = PLT_CN,
+    TREE_CN = CN,
+    DG = DIA3,
+    HTG = HT3
+  )
+```
+
+## Mortality Table
+
+We need trees that are alive at INVNUM==1, then dead in either INVNUM==2
+or INVNUM==3. We can't just check at INVNUM==3 because trees drop out of the
+inventory pretty fast once they're dead.
+
+```{targets nrsgro_ca10_mortality, tar_simple = TRUE}
+# All the trees we'll give to FVS for calibration
+# There are 7 sets of trees:
+# 1. Trees in INVNUM==1 that die in INVNUM==2
+# 2. Long-term dead in INVNUM==2
+# 3. Trees in INVNUM==1 that die in INVNUM==3
+# 4. Long-term dead in INVNUM==3 that was missed in INVNUM==2
+# 5. Trees in INVNUM==2 that die in INVNUM==3
+# 6. Trees that establish and die in INVNUM==2
+# 7. Trees that establish and die in INVNUM==3
+
+# Trees in INVNUM==1
+# In theory, we could mine some mortality from INVNUM==1
+# (e.g. trees that ingrew and died in the past 5 years), but
+# it's messy and unreliable so we skip it.
+# We need dead trees in INVNUM==1 so we can check long-term mortality.
+tmp_plot_1 <- nrsgro_plot |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  arrange(INVYR) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  select(STATECD, COUNTYCD, PLOT, INVYR, CN)
+
+tmp_tre_1 <- fia_trees(fiadb, tmp_plot_start) |>
+  select(
+    CN, PREV_TRE_CN, PLT_CN,
+    STATECD, COUNTYCD, PLOT, SUBP, CONDID, TREE, INVYR,
+    TPA_UNADJ, SPCD, STATUSCD, PREV_STATUS_CD, DIA, HT
+  ) |>
+  rename(
+    TRE_CN0 = PREV_TRE_CN,
+    TRE_CN1 = CN,
+    STAT0 = PREV_STATUS_CD,
+    STAT1 = STATUSCD,
+    TPA1 = TPA_UNADJ,
+    DIA1 = DIA,
+    HT1 = HT
+  )
+
+# Trees in INVNUM==2
+# We are interrested in dead and live trees.
+# This will include both recent and long-term mortality
+tmp_plot_2 <- nrsgro_plot |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  arrange(INVYR) |>
+  filter(row_number() == 2) |>
+  ungroup()
+
+tmp_tre_2 <- fia_trees(fiadb, tmp_plot_2) |>
+  select(
+    CN, PREV_TRE_CN, PLT_CN,
+    STATECD, COUNTYCD, PLOT, SUBP, CONDID, TREE, INVYR,
+    TPA_UNADJ, SPCD, STATUSCD, PREV_STATUS_CD, DIA, PREVDIA, HT
+  ) |>
+  rename(
+    TRE_CN1 = PREV_TRE_CN,
+    TRE_CN2 = CN,
+    STAT1 = PREV_STATUS_CD,
+    STAT2 = STATUSCD,
+    TPA2 = TPA_UNADJ,
+    DIA1 = PREVDIA,
+    DIA2 = DIA,
+    HT2 = HT
+  )
+
+# Trees in INVNUM==3
+# We are interested only in dead trees.
+# This will include both recent and long-term mortality
+tmp_plot_3 <- nrsgro_plot |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  arrange(INVYR) |>
+  filter(row_number() == 3) |>
+  ungroup()
+
+tmp_tre_3 <- fia_trees(fiadb, tmp_plot_3) |>
+  filter(STATUSCD == 2) |>
+  select(
+    CN, PREV_TRE_CN, PLT_CN,
+    STATECD, COUNTYCD, PLOT, SUBP, CONDID, TREE, INVYR,
+    TPA_UNADJ, SPCD, STATUSCD, PREV_STATUS_CD, DIA, PREVDIA, HT
+  ) |>
+  rename(
+    TRE_CN2 = PREV_TRE_CN,
+    TRE_CN3 = CN,
+    STAT2 = PREV_STATUS_CD,
+    STAT3 = STATUSCD,
+    TPA3 = TPA_UNADJ,
+    DIA2 = PREVDIA,
+    DIA3 = DIA,
+    HT3 = HT
+  )
+
+# 1. Trees in INVNUM==1 that die in INVNUM==2
+# These will have STAT1==1 and STAT2 == 2
+# And
+# 2. Long-term dead in INVNUM==2
+# These will have STAT1==2 and STAT2 == 2
+# 6. Trees that establish and die in INVNUM==2
+# These will have STAT2==2 and TRE_CN1==NA
+tmp_tre_mort_2 <- tmp_tre_2 |>
+  filter(STAT2 == 2) |>
+  left_join(
+    tmp_tre_1 |> select(TRE_CN1, STAT1, TPA1, DIA1, HT1),
+    by = join_by(TRE_CN1)
+  ) |>
+  mutate(
+    STAT1 = coalesce(STAT1.y, STAT1.x),
+    DIA1 = coalesce(DIA1.y, DIA1.x)
+  ) |>
+  select(!ends_with(".x") & !ends_with(".y")) |>
+  filter(
+    is.na(TRE_CN1) | # Case 6
+      STAT1 == 1 |   # Case 1
+      STAT1 == 2     # Case 2
+  )
+
+# 3. Trees in INVNUM==1 that die in INVNUM==3
+# 4. Long-term dead in INVNUM==3 that was missed in INVNUM==2
+# 5. Trees in INVNUM==2 that die in INVNUM==3
+# 7. Trees that establish and die in INVNUM==3
+tmp_tre_mort_3 <- tmp_tre_3 |>
+  filter(STAT3 == 2) |>
+  left_join(
+    tmp_tre_2 |> select(TRE_CN2, STAT2, TPA2, DIA2, DIA1, HT2),
+    by = join_by(TRE_CN2)
+  ) |>
+  mutate(
+    STAT2 = coalesce(STAT2.y, STAT2.x),
+    DIA2 = coalesce(DIA2.y, DIA2.x)
+  ) |>
+  select(!ends_with(".x") & !ends_with(".y")) |>
+  filter(
+    is.na(TRE_CN2) | # Case 7 and 4
+      STAT2 == 1     # Case 3 and 5
+  )
+
+# Combine mortality from INVNUM==2 and INVNUM==3 into one table
+tmp_tre_mort <- tmp_tre_mort_2 |>
+  # Adapt schema
+  mutate(
+    TRE_CN3 = NA,
+    TPA3 = NA,
+    STAT3 = NA,
+    DIA3 = NA,
+    HT3 = NA
+  ) |>
+  union_all(
+    tmp_tre_mort_3 |>
+      mutate(
+        STAT1 = NA,
+        TRE_CN1 = NA,
+        TPA1 = NA,
+        DIA1 = NA,
+        HT1 = NA
+      )
+  )
+
+# No tree should be included from both INVYR==2 and INVYR==3
+stopifnot(
+  tmp_tre_mort |>
+    group_by(STATECD, COUNTYCD, PLOT, SUBP, TREE) |>
+    summarize(N = n(), .groups = "keep") |>
+    ungroup() |>
+    filter(N>1) |>
+    nrow() == 0
+)
+
+# Add remaining info
+tmp_cond_mixin <- fia_conds(
+    fiadb,
+    nrsgro_plot |>
+      distinct(STATECD, COUNTYCD, PLOT, INVYR)
+  ) |>
+  select(
+    STATECD, COUNTYCD, PLOT, CONDID, INVYR, SLOPE, ASPECT
+  )
+
+tmp_tre_mort |>
+  # Don't bother with TREE - this'll get clobbered later anyway.
+  left_join(tmp_cond_mixin, by = join_by(STATECD, COUNTYCD, PLOT, CONDID, INVYR)) |>
+  select(-PLT_CN) |>
+  left_join(
+    tmp_plot_1 |>
+      select(STATECD, COUNTYCD, PLOT, CN) |>
+      rename(PLT_CN = CN),
+    by = join_by(STATECD, COUNTYCD, PLOT)
+  ) |>
+  filter_add_stand_id() |>
+  mutate(
+    STAND_CN = PLT_CN,
+    STAND_ID = STAND_ID,
+    PLOT_CN = PLT_CN,
+    PLOT_ID = SUBP,
+    STANDPLOT_CN = paste0(STAND_CN, "_", SUBP),
+    STANDPLOT_ID = paste0(STAND_ID, "_", SUBP),
+    TREE_CN = coalesce(TRE_CN1, TRE_CN2, TRE_CN3),
+    TREE_ID = TREE,
+    TREE_COUNT = coalesce(TPA3, TPA2, TPA1),
+    SPECIES = sprintf("%03d", SPCD),
+    HISTORY = if_else(
+        # Note: if observed dead in INVNUM==1, then long-term dead;
+        # otherwise it's either recent dead or new establishment death
+        (!is.na(STAT1) & STAT1 == 2), 8, 6
+      ),
+    DIAMETER = coalesce(DIA3, DIA2, DIA1),
+    HT = coalesce(HT3, HT2, HT1),
+    SLOPE = SLOPE,
+    ASPECT = ASPECT
+  ) |>
+  select(
+    STAND_CN,
+    STAND_ID,
+    PLOT_CN,
+    PLOT_ID,
+    STANDPLOT_CN,
+    STANDPLOT_ID,
+    TREE_CN,
+    TREE_ID,
+    TREE_COUNT,
+    SPECIES,
+    HISTORY,
+    DIAMETER,
+    HT,
+    SLOPE,
+    ASPECT
+  )
+
+```
+
+## Regeneration Table
+
+```{targets nrsgro_ca10_regen, tar_simple = TRUE}
+# fvs_run wants establishment in the form:
+# STAND_CN
+# SPECIES (FVS_SPCD)
+# DENSITY (TPA)
+# HEIGHT (FT)
+tmp_plot_cn <- nrsgro_plot |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  arrange(INVYR) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  filter_add_stand_id() |>
+  select(STAND_ID, CN) |>
+  rename(STAND_CN = CN)
+
+nrsgro_cal10_regen <- nrsgro_estab_rate |>
+  filter_add_stand_id() |>
+  left_join(
+    tmp_plot_cn |> select(STAND_ID, STAND_CN),
+    by = join_by(STAND_ID)
+  ) |>
+  select(STAND_CN, STATECD, COUNTYCD, PLOT, SPCD, RATE_PER_ACRE) |>
+  mutate(RATE_PER_ACRE = floor(RATE_PER_ACRE * 10)) |> # 10-year timesteps
+  rename(DENSITY = RATE_PER_ACRE) |>
+  left_join(
+    nrsgro_estab_height |>
+      select(STATECD, COUNTYCD, PLOT, SPCD, HT),
+    by = join_by(STATECD, COUNTYCD, PLOT, SPCD)
+  ) |>
+  mutate(HT = floor(HT)) |>
+  rename(HEIGHT = HT) |>
+  left_join(
+    species_crosswalk |>
+      select(SPCD, FVS_SPCD),
+    by = join_by(SPCD)
+  ) |>
+  rename(SPECIES = FVS_SPCD) |>
+  filter(!is.na(SPECIES) & !is.na(DENSITY) & !is.na(HEIGHT)) |>
+  select(STAND_CN, SPECIES, DENSITY, HEIGHT)
+```
+
+# Run FVS
+
+```{targets nrsgro_ca10}
+tar_target(
+  nrsgro_ca10,
+  {
+    # fvs_run wants a table of the form:
+    # STAND_ID - arbitrary identifier for a stand
+    # STAND_CN - CN for the plot
+    # FIRST_YEAR - start of the projection; if this doesn't align with the actual
+    #   year (MEASYEAR) of first survey, the stand will be projected from the
+    #   survey year to the start of the projection.
+    # LAST_YEAR - end of the projection
+    timestep <- 10 # years; determined by FVSne variant
+    
+    plots_for_fvs <- nrsgro_plot |>
+      group_by(STATECD, COUNTYCD, PLOT) |>
+      arrange(INVYR) |>
+      mutate(
+        STAND_CN = if_else(row_number() == 1, CN, NA)
+      ) |>
+      summarize(
+        STAND_CN = min(STAND_CN, na.rm = TRUE), # only one will not be NA
+        FIRST_YEAR = min(MEASYEAR, na.rm = TRUE),
+        LAST_YEAR = max(MEASYEAR, na.rm = TRUE),
+        .groups = "keep"
+      ) |>
+      ungroup() |>
+      filter_add_stand_id()
+    
+
+    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
+    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    data_dir <- "data/fvs"
+    title <- "NRSGrowOnly"
+    mgmt_id <- "CALB"
+    
+    # We communicate with FVS through files. FVSOnline shows a model in which
+    # a "project" (the inputs and outputs of a single FVS run) live in a
+    # single directory; we follow that model.
+    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+    if (!dir.exists(project_dir)) {
+      dir.create(project_dir)
+    }
+    
+    fvs_run(
+      fvsbin_dir = fvsbin_dir,
+      fvs_variant = fvs_variant,
+      project_dir = project_dir,
+      fiadb = fiadb,
+      title = title,
+      mgmt_id = mgmt_id,
+      stands = plots_for_fvs,
+      calibration = nrsgro_ca10_calibration,
+      calib_mort = nrsgro_ca10_mortality,
+      regen = nrsgro_ca10_regen,
+      num_partitions = fvs_num_partitions,
+      partition = fvs_partition,
+      random_seed = fvs_randseed
+    )
+  },
+  # iteration = "vector" branches execution for each partition value (see pattern, below)
+  iteration = "vector",
+  # cross() and map() are unparsed targets:: functions here.
+  # cross() ensures that every combination of values for its arguments is processed
+  # map() distributes each value of its argument to a separate sub-target (branch)
+  # so cross(randseed, map(partition)) will run each partition in a separate branch,
+  # and each branch will run with each value of randseed
+  pattern = cross(fvs_randseed, map(fvs_partition))
+)
+```
+
+# Load Results
+
+## NRS GrowOnly CALB
+
+Carbon
+
+```{targets nrsgro_calb_carbon, tar_simple = TRUE}
+fvs_read_output(nrsgro_calb, "FVS_Carbon") |>
+  group_by(StandID, Year) |> # Combine results from different random seeds
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    .groups = "keep"
+  ) |>
+  ungroup()
+```
+
+Summary
+
+```{targets nrsgro_calb_summary, tar_simple = TRUE}
+fvs_read_output(nrsgro_calb, "FVS_Summary2_East") |>
+  group_by(StandID, Year) |>
+  summarize(
+    BA = mean(BA),
+    Tpa = mean(Tpa),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+```
+
+# Calibration Rate
+
+Did we actually get calibration?
+
+```{r nrsgro_calb_calibration cases, eval = FALSE}
+single_seed <- nrsgro_calb |>
+  group_by() |>
+  filter(random_seed == min(random_seed)) |>
+  ungroup()
+nrsgro_calb_cases <- fvs_read_output(single_seed, "FVS_Cases")
+nrsgro_calb_calibstats <- fvs_read_output(single_seed, "FVS_CalibStats")
+num_cases <- nrsgro_calb_cases |> distinct(CaseID) |> nrow()
+num_cases_calibrated <- nrsgro_calb_calibstats |> distinct(CaseID) |> nrow()
+num_cases_calibrated /  num_cases
+```
+...which makes it look like ~62% of runs got calibration.
+
+Did we populate the calibration table correctly?
+```{r calibration input, eval = FALSE}
+first_random_seed <- nrsgro_calb |>
+  filter(random_seed == min(random_seed))
+calibration_input <- fvs_read_input(first_random_seed, "FVS_TreeInit_Plot") |>
+  select(STAND_CN, TREE_CN, SPECIES, DIAMETER, HT, DG, HTG) |>
+  mutate(Diameter = DG / DIAMETER, Height = HTG / HT) |>
+  pivot_longer(
+    cols = c(Diameter, Height),
+    names_to = "Metric",
+    values_to = "Ratio"
+  ) |> filter(!is.na(Ratio))
+calibration_input |>
+  ggplot(aes(Ratio, fill = Metric)) +
+  geom_histogram(position = "dodge", binwidth = 0.1) +
+  coord_cartesian(xlim = c(0, 2))
+```
+
+
+which shows that the calibration data for most trees has them growing, rather
+than shrinking. Note that trees often shrink in the FIA data, so this meets
+expectations.
+
+What kind of calibration did we get?
+```{r plot calibstats, eval = FALSE}
+nrsgro_calb_calibstats |>
+  mutate(Log10ScaleFactor = log10(ScaleFactor)) |>
+  ggplot(aes(Log10ScaleFactor)) +
+  geom_histogram(binwidth = 0.1) +
+  geom_vline(xintercept = 0) +
+  theme_bw()
+```
+
+So it skews a bit towards negative, but not as much as I thought.
+
+```{r calibstats scalefactor rmse, eval = FALSE}
+nrsgro_calb_calibstats |>
+  mutate(Log10ScaleFactor = log10(ScaleFactor)) |>
+  summarise(
+    RMSE = sqrt(mean((Log10ScaleFactor) ^ 2))
+  )
+```
+
+# Calibrated vs. Uncalibrated
+
+```{r calb_vs_none, eval = FALSE}
+stand_mixin <- nrsgro_plot_stats |>
+  filter_add_stand_id() |>
+  group_by(STAND_ID) |>
+  arrange(INVYR) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  select(STAND_ID, MEASYEAR) |>
+  rename(StandID = STAND_ID, StartYear = MEASYEAR)
+
+none_carbon_tmp <- nrsgro_none_carbon |>
+  rename(Carbon = Aboveground_Total_Live) |>
+  select(StandID, Year, Carbon) |>
+  group_by(StandID) |>
+  arrange(Year) |>
+  mutate(Carbon_Delta = Carbon - lag(Carbon)) |>
+  ungroup() |>
+  filter(!is.na(Carbon_Delta))
+
+calb_carbon_tmp <- nrsgro_calb_carbon |>
+  rename(Carbon = Aboveground_Total_Live) |>
+  select(StandID, Year, Carbon) |>
+  group_by(StandID) |>
+  arrange(Year) |>
+  mutate(Carbon_Delta = Carbon - lag(Carbon)) |>
+  ungroup() |>
+  filter(!is.na(Carbon_Delta))
+
+calb_vs_none <- none_carbon_tmp |>
+  rename(Carbon_None = Carbon, Carbon_Delta_None = Carbon_Delta) |>
+  left_join(calb_carbon_tmp, by = join_by(StandID, Year)) |>
+  rename(Carbon_Calb = Carbon, Carbon_Delta_Calb = Carbon_Delta) |>
+  left_join(stand_mixin, by = join_by(StandID)) |>
+  mutate(
+    Carbon_Diff = Carbon_Calb - Carbon_None,
+    ProjectionYears = Year - StartYear,
+    Carbon_Flux_Calb = Carbon_Delta_Calb / ProjectionYears,
+    Carbon_Flux_None = Carbon_Delta_None / ProjectionYears,
+    Carbon_Flux_Delta = Carbon_Flux_Calb - Carbon_Flux_None
+  )
+```
+
+```{r plot calb_vs_none flux, eval = FALSE}
+formula <- y ~ x
+
+calb_vs_none |>
+  group_by(StandID) |>
+  arrange(desc(ProjectionYears)) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  ggplot(aes(Carbon_Flux_None, Carbon_Flux_Calb)) +
+  geom_point(size = 0.1) +
+  geom_abline(slope = 1, intercept = 0, linewidth = 0.25) +
+  coord_cartesian(xlim = c(0, 5), ylim = c(0, 5)) +
+  stat_poly_line(formula = formula, se = FALSE, linewidth = 0.25, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = formula, color = "blue") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  ggtitle("FVS Grow-Only\nCalibrated vs. Uncalibrated Annual Carbon Flux") +
+  xlab(bquote("Uncalibrated Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab(bquote("Calibrated Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1)))
+
+```
+
+
+```{r plot calb_vs_none, eval = FALSE}
+calb_vs_none |>
+  filter(!is.na(Carbon_Flux_Delta)) |>
+  ggplot(aes(factor(ProjectionYears), Carbon_Diff)) +
+  geom_boxplot(outlier.size = 0.1) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  coord_cartesian(ylim = c(-3, 3), xlim = c(1, 20)) +
+  ggtitle("FVS Grow-Only Calibrated vs. Uncalibrated Projected Stand Carbon") +
+  xlab("Projection Years") +
+  ylab(bquote("Stand Carbon Delta" ~ (`Mg C` %.% ha^-1)))
+```
+
+# Projected vs. Measured
+
+Build a dataframe to compare projected carbon (with calibration) to measured
+carbon (as done before, no calibration needed).
+
+```{targets nrsgro_calb_proj_vs_meas, tar_simple = TRUE}
+projected_carbon_tmp <- nrsgro_calb_carbon |>
+  select(StandID, Year, Aboveground_Total_Live) |>
+  rename(Projected_Carbon = Aboveground_Total_Live)
+
+projected_ba_tmp <- nrsgro_calb_summary |>
+  select(StandID, Year, BA, Tpa) |>
+  mutate(Projected_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
+  rename(Projected_Tpa = Tpa)
+
+projected_tmp <- projected_carbon_tmp |>
+  full_join(projected_ba_tmp, by = join_by(StandID, Year)) |>
+  select(StandID, Year, Projected_Carbon, Projected_BA, Projected_Tpa)
+
+surveyed_carbon_tmp <- nrsgro_srvy_carbon |>
+  select(StandID, Year, Aboveground_Total_Live) |>
+  rename(Measured_Carbon = Aboveground_Total_Live)
+
+surveyed_ba_tmp <- nrsgro_srvy_summary |>
+  select(StandID, Year, BA, Tpa) |>
+  mutate(Measured_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
+  rename(Measured_Tpa = Tpa)
+
+surveyed_tmp <- surveyed_carbon_tmp |>
+  full_join(surveyed_ba_tmp, by = join_by(StandID, Year)) |>
+  filter(!is.na(Measured_Carbon)) |> # other metrics get an extra year
+  select(StandID, Year, Measured_Carbon, Measured_BA, Measured_Tpa)
+
+nrsgro_plot |>
+  filter_add_stand_id() |>
+  rename(StandID = STAND_ID, Year = MEASYEAR) |>
+  left_join(nrsgro_plot_stats, by = join_by(STATECD, COUNTYCD, PLOT, INVYR)) |>
+  left_join(fvsne_states, by = join_by(STATECD)) |>
+  select(
+    StandID, Year, STATE_NAME,
+    STDAGE, FOREST_TYPE, FOREST_TYPE_GROUP, ECOSUBCD,
+    QMD, QMD_METRIC
+  ) |>
+  left_join(projected_tmp, by = join_by(StandID, Year)) |>
+  left_join(surveyed_tmp, by = join_by(StandID, Year)) |>
+  filter_decode_forest_type_group() |>
+  group_by(StandID) |>
+  mutate(
+    ECOCD = substr(ECOSUBCD, 1, nchar(ECOSUBCD) - 1),
+    First_Year = min(Year, na.rm = TRUE),
+    Last_Year = max(Year, na.rm = TRUE),
+    Starting_Carbon = min(if_else(Year == First_Year, Measured_Carbon, NA), na.rm = TRUE),
+    Projected_Carbon_Delta = Projected_Carbon - Starting_Carbon,
+    Projected_Carbon_Flux = if_else(Year == First_Year, 0, -(Projected_Carbon_Delta / (Year - First_Year))),
+    Measured_Carbon_Delta = Measured_Carbon - Starting_Carbon,
+    Measured_Carbon_Flux = if_else(Year == First_Year, 0, -(Measured_Carbon_Delta / (Year - First_Year))),
+    Starting_BA = min(if_else(Year == First_Year, Measured_BA, NA), na.rm = TRUE),
+    Projected_BA_Delta = Projected_BA - Starting_BA,
+    Projected_BAI = if_else(Year == First_Year, 0, Projected_BA_Delta / (Year - First_Year)),
+    Measured_BA_Delta = Measured_BA - Starting_BA,
+    Measured_BAI = if_else(Year == First_Year, 0, Measured_BA_Delta / (Year - First_Year))
+  ) |>
+  ungroup() |>
+  filter(Year == First_Year | Year == Last_Year) |>
+  filter(!is.na(Projected_Carbon) & !is.na(Measured_Carbon)) |>
+  mutate(
+    Projection_Years = Year - First_Year,
+    BA_Residual = Projected_BA - Measured_BA,
+    BA_Error = 2 * abs(BA_Residual) / (Projected_BA + Measured_BA),
+    BA_Delta_Residual = Projected_BA_Delta - Measured_BA_Delta,
+    BAI_Residual = BA_Delta_Residual / Projection_Years,
+    Carbon_Residual = Projected_Carbon - Measured_Carbon,
+    Carbon_Error = 2 * abs(Carbon_Residual) / (Projected_Carbon + Measured_Carbon),
+    Carbon_Delta_Residual = Projected_Carbon_Delta - Measured_Carbon_Delta,
+    Carbon_Flux_Residual = Projected_Carbon_Flux - Measured_Carbon_Flux
+  )
+```
+
+# Carbon Flux
+
+How does projected carbon flux compare to measured carbon flux?
+```{r proj_vs_meas_carbon_flux, eval = FALSE}
+ggplot(
+  nrsgro_calb_proj_vs_meas |> filter(Projection_Years > 0),
+  aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux)
+) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
+  geom_vline(xintercept = 0, linewidth = 0.25, color = "black") +
+  geom_abline(intercept = 0, slope = 1, linewidth = 0.25, linetype = "dashed", color = "lightgray") +
+  geom_bin2d(binwidth = 0.5) +
+  scale_fill_viridis_c() +
+#  scale_fill_gradient(
+#    name = "Number of Plots",
+#    low = "lightblue",
+#    high = "darkblue",
+#    limits = c(0, 125)
+#  ) +
+  # stat_poly_* plots and annotates a fit; they need to be configured to match
+  stat_poly_line(
+    formula = y ~ x,
+    fullrange = TRUE,
+    se = FALSE,
+    color = "darkblue",
+    linetype = "dashed",
+    linewidth = 0.5
+) +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, size = 3) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  ggtitle("FVS Projected vs. FIA Measured\nAGL Carbon Flux in Grow-Only Stands") +
+  labs(caption = "With Calibration") +
+  xlab(bquote("Measured Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  ylab(bquote("Projected Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
+```
+
+```{r proj_vs_meas_carbon_flux by ecoregion, eval = FALSE}
+ggplot(
+  nrsgro_calb_proj_vs_meas |> filter(Projection_Years > 0),
+  aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux)
+) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
+  geom_vline(xintercept = 0, linewidth = 0.25, color = "black") +
+  geom_abline(intercept = 0, slope = 1, linewidth = 0.25, linetype = "dashed", color = "lightgray") +
+  #geom_bin2d(bins = 50) +
+  geom_point(size = 0.25) +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    low = "lightblue",
+    high = "darkblue",
+    #limits = c(0, 125)
+  ) +
+  # stat_poly_* plots and annotates a fit; they need to be configured to match
+  stat_poly_line(
+    formula = y ~ x,
+    fullrange = TRUE,
+    se = FALSE,
+    color = "darkblue",
+    linetype = "dashed",
+    linewidth = 0.5
+) +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, size = 3) +
+  facet_wrap("ECOCD") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  ggtitle("FVS Projected vs. FIA Measured\nAGL Carbon Flux\nin Grow-Only Stands") +
+  labs(caption = "With Calibration") +
+  xlab(bquote("Measured Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  ylab(bquote("Projected Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
+```
+
+
+```{r proj_vs_meas_carbon_flux by forest type, eval = FALSE}
+ggplot(
+  nrsgro_calb_proj_vs_meas |> filter(Projection_Years > 0),
+  aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux)
+) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
+  geom_vline(xintercept = 0, linewidth = 0.25, color = "black") +
+  geom_abline(intercept = 0, slope = 1, linewidth = 0.25, linetype = "dashed", color = "lightgray") +
+  #geom_bin2d(bins = 50) +
+  geom_point(size = 0.25) +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    low = "lightblue",
+    high = "darkblue",
+    #limits = c(0, 125)
+  ) +
+  # stat_poly_* plots and annotates a fit; they need to be configured to match
+  stat_poly_line(
+    formula = y ~ x,
+    fullrange = TRUE,
+    se = FALSE,
+    color = "darkblue",
+    linetype = "dashed",
+    linewidth = 0.5
+) +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, size = 3) +
+  facet_wrap("FOREST_TYPE_GROUP") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  ggtitle("FVS Projected vs. FIA Measured\nAGL Carbon Flux\nin Grow-Only Stands") +
+  labs(caption = "With Calibration") +
+  xlab(bquote("Measured Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  ylab(bquote("Projected Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
+```
+
+
+```{r proj_vs_meas_carbon_flux by state, eval = FALSE}
+ggplot(
+  nrsgro_calb_proj_vs_meas |> filter(Projection_Years > 0),
+  aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux)
+) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
+  geom_vline(xintercept = 0, linewidth = 0.25, color = "black") +
+  geom_abline(intercept = 0, slope = 1, linewidth = 0.25, linetype = "dashed", color = "lightgray") +
+  #geom_bin2d(bins = 50) +
+  geom_point(size = 0.25) +
+  scale_fill_gradient(
+    name = "Number of Plots",
+    low = "lightblue",
+    high = "darkblue",
+    #limits = c(0, 125)
+  ) +
+  # stat_poly_* plots and annotates a fit; they need to be configured to match
+  stat_poly_line(
+    formula = y ~ x,
+    fullrange = TRUE,
+    se = FALSE,
+    color = "darkblue",
+    linetype = "dashed",
+    linewidth = 0.5
+) +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, size = 3) +
+  facet_wrap("STATE_NAME") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  ggtitle("FVS Projected vs. FIA Measured\nAGL Carbon Flux\nin Grow-Only Stands") +
+  labs(caption = "With Calibration") +
+  xlab(bquote("Measured Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  ylab(bquote("Projected Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
+```
+
+
+```{r proj_vs_meas_carbon_flux by latitude, eval = FALSE}
+nrsgro_calb_proj_vs_meas |>
+  filter(Projection_Years > 0) |>
+  left_join(
+    nrsgro_plot |>
+      filter_add_stand_id() |>
+      select(STAND_ID, LAT, LON, ELEV) |>
+      rename(StandID = STAND_ID),
+    by = join_by(StandID)
+  ) |>
+  mutate(
+    Latitude = cut(LAT, trunc(min(LAT)):trunc(max(LAT))+1, include.lowest = TRUE)
+  ) |>
+ggplot(
+  aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux)
+) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
+  geom_vline(xintercept = 0, linewidth = 0.25, color = "black") +
+  geom_abline(intercept = 0, slope = 1, linewidth = 0.25, linetype = "dashed", color = "lightgray") +
+  geom_bin2d(binwidth = 0.5) +
+  #geom_point(size = 0.1) +
+  #scale_fill_gradient(
+  #  name = "Number of Plots",
+  #  low = "lightblue",
+  #  high = "darkblue",
+    #limits = c(0, 125)
+  #) +
+  scale_fill_viridis_c(name = "Number of Plots") +
+  # stat_poly_* plots and annotates a fit; they need to be configured to match
+  stat_poly_line(
+    formula = y ~ x,
+    fullrange = TRUE,
+    se = FALSE,
+    color = "darkblue",
+    linetype = "dashed",
+    linewidth = 0.5
+) +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, size = 3) +
+  facet_wrap("Latitude", labeller = "label_both") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  ggtitle("FVS Projected vs. FIA Measured\nAGL Carbon Flux\nin Grow-Only Stands") +
+  labs(caption = "With Calibration") +
+  xlab(bquote("Measured Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  ylab(bquote("Projected Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
+```
+
+
+Plot carbon flux on a map
+
+```{r plot location with measured carbon flux, eval = FALSE}
+fvsne_states_map <- fvsne_states |>
+  distinct(STATE_NAME) |>
+  rename(region = STATE_NAME) |>
+  _$region |>
+  map_data("state", region = _)
+
+plot_location_tmp <- nrsgro_plot |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  filter(INVYR == min(INVYR, na.rm = TRUE)) |>
+  ungroup() |>
+  filter_add_stand_id() |>
+  select(STAND_ID, CN, LAT, LON, ELEV) |>
+  rename(
+    StandID = STAND_ID,
+    group = CN,
+    lat = LAT,
+    long = LON,
+    elev = ELEV
+  )
+
+plot_carbon_tmp <- nrsgro_calb_proj_vs_meas |>
+  filter(Projection_Years > 0) |>
+  left_join(
+    plot_location_tmp,
+    by = join_by(StandID)
+  )
+
+ggplot(fvsne_states_map, aes(long, lat, group = group)) +
+  geom_polygon(fill = "white", color = "black") +
+  geom_point(
+    plot_carbon_tmp,
+    mapping = aes(long, lat, group = group, color = Measured_Carbon_Flux),
+    size = 0.5
+  ) +
+  coord_sf(crs = 4326) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(
+    location = "tl",
+    width = unit(1, "cm"),
+    pad_x = unit(0.75, "cm"),
+    pad_y = unit(0.5, "cm")
+  ) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+#  scale_color_discrete(name = NULL) +
+#  scale_color_gradient2(
+#    name = bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1)),
+#    high = "red",
+#    mid = "lightgray",
+#    low = "blue"
+#  ) +
+  scale_color_viridis_c(name = bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  ggtitle("FIA Measured Carbon Flux by Plot Location")
+
+remove(plot_location_tmp)
+```
+
+```{r measured carbon flux by latitude, eval = FALSE}
+nrsgro_calb_proj_vs_meas |>
+  filter(Projection_Years > 0) |>
+  left_join(
+    plot_location_tmp,
+    by = join_by(StandID)
+  ) |>
+  mutate(lat_adj = lat + elev / 500) |>
+  ggplot(aes(lat, Measured_Carbon_Flux)) +
+  geom_point(size = 0.1) +
+  stat_poly_line() +
+  stat_poly_eq(use_label("eq", "R2")) +
+  #facet_wrap("FOREST_TYPE_GROUP") +
+  theme_bw() +
+  ggtitle("FIA Measured Annual Carbon Flux by Latitude") +
+  ylab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  xlab("Latitude (degrees)")
+```
+
+```{r measured carbon flux by latitude adjusted for elevation, eval = FALSE}
+nrsgro_calb_proj_vs_meas |>
+  filter(Projection_Years > 0) |>
+  left_join(
+    plot_location_tmp,
+    by = join_by(StandID)
+  ) |>
+  mutate(lat_adj = lat + elev / 500) |>
+  ggplot(aes(lat_adj, Measured_Carbon_Flux)) +
+  geom_point() +
+  stat_poly_line() +
+  stat_poly_eq(use_label("eq", "R2")) +
+  theme_bw() +
+  ggtitle("Measured Annual Carbon Flux by Latitude adjusted for Elevation") +
+  ylab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  xlab("Adjusted Latitude (degrees)")
+```
+
+```{r projected carbon flux by latitude, eval = FALSE}
+nrsgro_calb_proj_vs_meas |>
+  filter(Projection_Years > 0) |>
+  left_join(
+    plot_location_tmp,
+    by = join_by(StandID)
+  ) |>
+  mutate(lat_adj = lat + elev / 500) |>
+  ggplot(aes(lat, Projected_Carbon_Flux)) +
+  geom_point() +
+  stat_poly_line() +
+  stat_poly_eq(use_label("eq", "R2")) +
+  theme_bw() +
+  ggtitle("FVS Projected Annual Carbon Flux by Latitude") +
+  ylab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  xlab("Latitude (degrees)")
+```
+
+```{r projected carbon flux by latitude adjusted for elevation, eval = FALSE}
+nrsgro_calb_proj_vs_meas |>
+  filter(Projection_Years > 0) |>
+  left_join(
+    plot_location_tmp,
+    by = join_by(StandID)
+  ) |>
+  mutate(lat_adj = lat + elev / 500) |>
+  ggplot(aes(lat_adj, Projected_Carbon_Flux)) +
+  geom_point() +
+  stat_poly_line() +
+  stat_poly_eq(use_label("eq", "R2")) +
+  theme_bw() +
+  ggtitle("FVS Projected Annual Carbon Flux by Latitude adjusted for Elevation") +
+  ylab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  xlab("Adjusted Latitude (degrees)")
+```
+
+# Basal Area
+
+## BA Sanity
+
+Is FVS BA simiar to FIA's?
+
+```{r is ba sane, eval = FALSE}
+fia_ba <- nrsgro_plot_stats |>
+  filter_add_stand_id() |>
+  group_by(STAND_ID) |>
+  arrange(INVYR) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  select(STAND_ID, MEASYEAR, BALIVE) |>
+  rename(StandID = STAND_ID, Year = MEASYEAR, FIA_BA = BALIVE)
+
+fvs_ba <- nrsgro_calb_summary |>
+  group_by(StandID) |>
+  arrange(Year) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  select(StandID, Year, BA) |>
+  rename(FVS_BA = BA)
+
+fvs_vs_fia_ba <- fia_ba |>
+  left_join(fvs_ba, by = join_by(StandID, Year)) |>
+  mutate(BA_PROP = FVS_BA / FIA_BA)
+
+fvs_vs_fia_ba |>
+  ggplot(aes(BA_PROP)) +
+  geom_histogram(binwidth = 0.1)
+```
+
+so, not entirely.
+```{r plots with wrong starting ba, eval = FALSE}
+wrong_ba_stands <- fvs_vs_fia_ba |>
+  filter(BA_PROP < 0.95 | BA_PROP > 1.05)
+```
+
+
+## BAI vs things
+
+### BAI vs Latitude
+
+Among those stands that have good starting ba, how does BAI trend with latitude?
+```{r measured bai by latitude, eval = FALSE}
+#formula <- y ~ poly(x, 2, raw = TRUE)
+formula <- y ~ x
+
+nrsgro_calb_proj_vs_meas |>
+  filter(Projection_Years > 0) |>
+  left_join(
+    nrsgro_plot |>
+      filter_add_stand_id() |>
+      select(STAND_ID, LAT, LON, ELEV) |>
+      rename(StandID = STAND_ID),
+    by = join_by(StandID)
+  ) |>
+  mutate(lat_adj = LAT + ELEV / 500) |>
+  ggplot(aes(LAT, Measured_BAI)) +
+  geom_point(size = 0.1) +
+  stat_poly_line(formula = formula, se = FALSE) +
+  stat_poly_eq(use_label("eq", "R2"), formula = formula) +
+  #facet_wrap("FOREST_TYPE_GROUP") +
+  theme_bw() +
+  ggtitle("FIA Measured BAI by Latitude") +
+  ylab(bquote("BAI" ~ (m^2 %.% ha^-1 %.% yr^-1))) +
+  xlab("Latitude (degrees)")
+```
+
+
+Among those stands that have good starting ba, how does BAI trend with latitude?
+```{r projected bai by latitude, eval = FALSE}
+formula <- y ~ x
+
+nrsgro_calb_proj_vs_meas |>
+  filter(Projection_Years > 0) |>
+  left_join(
+    nrsgro_plot |>
+      filter_add_stand_id() |>
+      select(STAND_ID, LAT, LON, ELEV) |>
+      rename(StandID = STAND_ID),
+    by = join_by(StandID)
+  ) |>
+  mutate(lat_adj = LAT + ELEV / 500) |>
+  ggplot(aes(LAT, Projected_BAI)) +
+  geom_point(size = 0.1) +
+  stat_poly_line(formula = formula) +
+  stat_poly_eq(use_label("eq", "R2"), formula = formula) +
+  theme_bw() +
+  ggtitle("FVS Projected BAI by Latitude") +
+  ylab(bquote("BAI" ~ (m^2 %.% ha^-1 %.% yr^-1))) +
+  xlab("Latitude (degrees)")
+```
+
+
+### BAI vs Starting BA
+
+```{r bai residual vs starting ba, eval = FALSE}
+ggplot(
+  nrsgro_calb_proj_vs_meas |>
+    filter(Projection_Years > 0) |>
+    mutate(
+      BA_Range = cut(Measured_BA, 0:19 * 5, include.lowest = TRUE),
+    ) |>
+    group_by(FOREST_TYPE_GROUP) |>
+    mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
+    ungroup(),
+  aes(x = BA_Range, y = BAI_Residual)
+) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
+  scale_fill_discrete(name = "Forest Type Group") +
+  ggtitle("BAI Residual vs. Measured BA") +
+  labs(caption = "With Calibration") +
+  ylab(bquote("BAI Residual "(m^2 %.% ha^-1 %.% yr^-1))) +
+  xlab(bquote("Measured Stand BA "(m^2 %.% ha^-1))) +
+  theme_bw() +
+  coord_cartesian(ylim = c(-2, 3))
+```
+
+```{r list measured carbon flux, eval = FALSE}
+nrsgro_calb_proj_vs_meas |>
+    filter(Projection_Years > 0) |>
+  ggplot(aes(Measured_Carbon_Flux)) +
+  geom_histogram(binwidth = 0.5) +
+  geom_vline(xintercept = 0) +
+  theme_bw()
+```
+
+```{r plot projected vs measured carbon flux, eval = FALSE}
+projected_tmp <- nrsgro_calb_proj_vs_meas |> filter(Projection_Years > 0)
+epsilon = 0.025
+ggplot(
+  projected_tmp |>
+    filter(
+      Measured_Carbon_Flux > quantile(projected_tmp$Measured_Carbon_Flux, epsilon),
+      Measured_Carbon_Flux < quantile(projected_tmp$Measured_Carbon_Flux, 1 - epsilon),
+      Projected_Carbon_Flux > quantile(projected_tmp$Projected_Carbon_Flux, epsilon),
+      Projected_Carbon_Flux < quantile(projected_tmp$Projected_Carbon_Flux, 1 - epsilon)
+    ),
+  aes(x = Measured_Carbon_Flux, y = Projected_Carbon_Flux)
+) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
+  geom_vline(xintercept = 0, linewidth = 0.25, color = "black") +
+  geom_abline(intercept = 0, slope = 1, linewidth = 0.25, linetype = "dashed", color = "lightgray") +
+  geom_point(size = 0.1) +
+  scale_fill_viridis_c(
+    name = "Number of Plots"
+  ) +
+  stat_poly_line(
+    formula = y ~ x,
+    color = "blue",
+    fullrange = TRUE,
+    se = FALSE,
+    linetype = "dashed"
+  ) +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  ggtitle("FVS Projected vs. FIA Measured\nAGL Carbon Flux in Grow-Only Stands") +
+  labs(caption = paste0(epsilon * 100, "% outliers removed")) +
+  xlab(bquote("Measured Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  ylab(bquote("Projected Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1)))
+```
+
