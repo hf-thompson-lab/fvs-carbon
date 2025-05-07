@@ -676,7 +676,7 @@ looks about the same as 5 year.
 
 # Calibrated vs. Uncalibrated
 
-```{r calb_vs_none, eval = FALSE}
+```{targets nrsgro_ca10_proj_vs_meas, tar_simple = TRUE}
 stand_mixin <- nrsgro_plot_stats |>
   filter_add_stand_id() |>
   group_by(STAND_ID) |>
@@ -704,7 +704,7 @@ ca10_carbon_tmp <- nrsgro_ca10_carbon |>
   ungroup() |>
   filter(!is.na(Carbon_Delta))
 
-ca10_vs_none <- none_carbon_tmp |>
+nrsgro_ca10_proj_vs_meas <- none_carbon_tmp |>
   rename(Carbon_None = Carbon, Carbon_Delta_None = Carbon_Delta) |>
   left_join(ca10_carbon_tmp, by = join_by(StandID, Year)) |>
   rename(Carbon_Calb = Carbon, Carbon_Delta_Calb = Carbon_Delta) |>
@@ -718,10 +718,10 @@ ca10_vs_none <- none_carbon_tmp |>
   )
 ```
 
-```{r plot calb_vs_none flux, eval = FALSE}
+```{r plot nrsgro_ca10_proj_vs_meas flux, eval = FALSE}
 formula <- y ~ x
 
-ca10_vs_none |>
+nrsgro_ca10_proj_vs_meas |>
   group_by(StandID) |>
   arrange(desc(ProjectionYears)) |>
   filter(row_number() == 1) |>
