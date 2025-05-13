@@ -20,6 +20,7 @@ library(reshape2) # melt()
 library(measurements) # conv_unit and conv_multiunit
 library(maps)
 library(ggspatial)
+library(ggpmisc) # for stat_poly_eq
 options(scipen = 9) # Use integer notation for numbers under 9 digits
 tar_source()
 ```
@@ -3671,6 +3672,32 @@ ggplot(
   ggtitle("Carbon Projection Residuals vs. Measured BA\n in Grow-Only Stands") +
   xlab(bquote("Measured BA" ~ (m^2 %.% ha^-1))) +
   ylab(bquote("Carbon Residual" ~ (`Mg C` %.% ha^-1)))
+```
+
+```{r carbon flux residual vs ba, eval = FALSE}
+nrsgro_none_proj_vs_meas |>
+  left_join(
+    nrsgro_plot_stats |>
+      group_by(STATECD, COUNTYCD, PLOT) |>
+      filter(row_number() == 1) |>
+      ungroup() |>
+      filter_add_stand_id() |>
+      select(STAND_ID, BALIVE),
+    by = join_by(StandID == STAND_ID)
+  ) |>
+  mutate(BALIVE_METRIC = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare")) |>
+  #mutate(BALIVE_METRIC = cut(BALIVE_METRIC, 0:19 * 5, include.lowest = TRUE)) |>
+  ggplot(aes(BALIVE_METRIC, Carbon_Flux_Residual)) +
+  geom_point(size=0.25) +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 1, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  theme_bw() +
+  xlab(bquote("Starting Basal Area" ~ (m^2 %.% hectare^-1))) +
+  ylab(bquote("Carbon Flux Residual" ~ (`Mg C` %.% hectare^-1 %.% year^-1))) +
+  ggtitle("Carbon Flux Residual vs. Stand Starting Basal Area (No Calibration)") +
+#  labs(caption = "Without Calibration") +
+  scale_y_continuous(limits = c(-10, 5))
+
 ```
 
 
