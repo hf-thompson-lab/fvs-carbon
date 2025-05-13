@@ -674,6 +674,73 @@ nrsgro_ca10_calibstats |>
 
 looks about the same as 5 year.
 
+# 5- vs 10-year calibration
+
+```{targets nrsgro_ca10_vs_none, tar_simple = TRUE}
+stand_mixin <- nrsgro_plot_stats |>
+  filter_add_stand_id() |>
+  group_by(STAND_ID) |>
+  arrange(INVYR) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  select(STAND_ID, MEASYEAR, BALIVE_METRIC) |>
+  rename(StandID = STAND_ID, StartYear = MEASYEAR)
+
+none_carbon_tmp <- nrsgro_none_carbon |>
+  rename(Carbon = Aboveground_Total_Live) |>
+  select(StandID, Year, Carbon) |>
+  group_by(StandID) |>
+  arrange(Year) |>
+  mutate(Carbon_Delta = Carbon - lag(Carbon)) |>
+  ungroup() |>
+  filter(!is.na(Carbon_Delta))
+
+ca10_carbon_tmp <- nrsgro_ca10_carbon |>
+  rename(Carbon = Aboveground_Total_Live) |>
+  select(StandID, Year, Carbon) |>
+  group_by(StandID) |>
+  arrange(Year) |>
+  mutate(Carbon_Delta = Carbon - lag(Carbon)) |>
+  ungroup() |>
+  filter(!is.na(Carbon_Delta))
+
+nrsgro_ca10_vs_none <- none_carbon_tmp |>
+  rename(Carbon_None = Carbon, Carbon_Delta_None = Carbon_Delta) |>
+  left_join(ca10_carbon_tmp, by = join_by(StandID, Year)) |>
+  rename(Carbon_Ca10 = Carbon, Carbon_Delta_Ca10 = Carbon_Delta) |>
+  left_join(stand_mixin, by = join_by(StandID)) |>
+  mutate(
+    Carbon_Diff = Carbon_Ca10 - Carbon_None,
+    ProjectionYears = Year - StartYear,
+    Carbon_Flux_Ca10 = -(Carbon_Delta_Ca10 / ProjectionYears),
+    Carbon_Flux_None = -(Carbon_Delta_None / ProjectionYears),
+    Carbon_Flux_Residual = Carbon_Flux_Ca10 - Carbon_Flux_None
+  )
+```
+
+
+```{r plot nrsgro_ca10_vs_none flux, eval = FALSE}
+nrsgro_ca10_vs_none |>
+  group_by(StandID) |>
+  arrange(desc(ProjectionYears)) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  ggplot(aes(Carbon_Flux_None, Carbon_Flux_Ca10)) +
+  geom_point(size = 0.1) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.25) +
+  geom_abline(slope = 1, intercept = 0, color = "gray", linewidth = 0.25) +
+  #coord_cartesian(xlim = c(-5, 5), ylim = c(-5, 5)) +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.25, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  ggtitle("10-Year Calibrated vs. Uncalibrated Annual Carbon Flux") +
+  xlab(bquote("Uncalibrated Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab(bquote("Calibrated Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  labs(caption = "With 10-Year Calibration")
+```
+
 # Projected vs. Measured
 
 ```{targets nrsgro_ca10_proj_vs_meas, tar_simple = TRUE}
@@ -683,7 +750,7 @@ stand_mixin <- nrsgro_plot_stats |>
   arrange(INVYR) |>
   filter(row_number() == 1) |>
   ungroup() |>
-  select(STAND_ID, MEASYEAR) |>
+  select(STAND_ID, MEASYEAR, BALIVE_METRIC) |>
   rename(StandID = STAND_ID, StartYear = MEASYEAR)
 
 srvy_carbon_tmp <- nrsgro_srvy_carbon |>
@@ -695,16 +762,6 @@ srvy_carbon_tmp <- nrsgro_srvy_carbon |>
   ungroup() |>
   filter(!is.na(Carbon_Delta))
 
-srvy_summary_tmp <- nrsgro_srvy_summary |>
-  group_by(StandID) |>
-  arrange(Year) |>
-  mutate(
-    BA_Delta = BA - lag(BA),
-    Tpa_Delta = Tpa - lag(Tpa)
-  ) |>
-  ungroup() |>
-  filter(!is.na(BA_Delta ))
-
 ca10_carbon_tmp <- nrsgro_ca10_carbon |>
   rename(Carbon = Aboveground_Total_Live) |>
   select(StandID, Year, Carbon) |>
@@ -714,57 +771,44 @@ ca10_carbon_tmp <- nrsgro_ca10_carbon |>
   ungroup() |>
   filter(!is.na(Carbon_Delta))
 
-nrsgro_ca10_proj_vs_meas <- srvy_carbon_tmp |>
-  rename(Carbon_Srvy = Carbon, Carbon_Delta_Srvy = Carbon_Delta) |>
-  left_join(ca10_carbon_tmp, by = join_by(StandID, Year)) |>
+nrsgro_ca10_proj_vs_meas <- ca10_carbon_tmp |>
+  group_by(StandID) |>
+  arrange(desc(Year)) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
   rename(Carbon_Calb = Carbon, Carbon_Delta_Calb = Carbon_Delta) |>
-  left_join(nrsgro_srvy_summary |> select(StandID, Year, BA), by = join_by(StandID, Year)) |>
-  rename(BA_Srvy = BA) |>
+  left_join(srvy_carbon_tmp, by = join_by(StandID, Year)) |>
+  rename(Carbon_Srvy = Carbon, Carbon_Delta_Srvy = Carbon_Delta) |>
   left_join(stand_mixin, by = join_by(StandID)) |>
   mutate(
     Carbon_Diff = Carbon_Calb - Carbon_Srvy,
     ProjectionYears = Year - StartYear,
-    Carbon_Flux_Calb = Carbon_Delta_Calb / ProjectionYears,
-    Carbon_Flux_Srvy = Carbon_Delta_Srvy / ProjectionYears,
+    Carbon_Flux_Calb = -(Carbon_Delta_Calb / ProjectionYears),
+    Carbon_Flux_Srvy = -(Carbon_Delta_Srvy / ProjectionYears),
     Carbon_Flux_Residual = Carbon_Flux_Calb - Carbon_Flux_Srvy
   )
 ```
 
 ```{r plot nrsgro_ca10_proj_vs_meas flux, eval = FALSE}
-formula <- y ~ x
-
 nrsgro_ca10_proj_vs_meas |>
-  group_by(StandID) |>
-  arrange(desc(ProjectionYears)) |>
-  filter(row_number() == 1) |>
-  ungroup() |>
-  ggplot(aes(Carbon_Flux_None, Carbon_Flux_Calb)) +
-  geom_point(size = 0.1) +
-  geom_abline(slope = 1, intercept = 0, linewidth = 0.25) +
-  coord_cartesian(xlim = c(0, 5), ylim = c(0, 5)) +
-  stat_poly_line(formula = formula, se = FALSE, linewidth = 0.25, color = "blue") +
-  stat_poly_eq(use_label("eq", "R2"), formula = formula, color = "blue") +
+  ggplot(aes(Carbon_Flux_Srvy, Carbon_Flux_Calb)) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.25) +
+  geom_abline(slope = 1, intercept = 0, color = "gray", linewidth = 0.25) +
+  geom_point(size = 0.1, alpha = 0.25) +
+  coord_cartesian(xlim = c(-5, 5), ylim = c(-5, 5)) +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.5, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  ggtitle("FVS Grow-Only\nCalibrated vs. Uncalibrated Annual Carbon Flux") +
-  xlab(bquote("Uncalibrated Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
-  ylab(bquote("Calibrated Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ggtitle("FVS Grow-Only\nProjected vs. Measured Annual Carbon Flux") +
+  xlab(bquote("Measured Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab(bquote("Projected Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
   labs(caption = "With 10-Year Calibration")
 ```
 
 ```{r plot carbon flux residual vs balive, eval = FALSE}
 nrsgro_ca10_proj_vs_meas |>
-  left_join(
-    nrsgro_plot_stats |>
-      group_by(STATECD, COUNTYCD, PLOT) |>
-      filter(row_number() == 1) |>
-      ungroup() |>
-      filter_add_stand_id() |>
-      select(STAND_ID, BALIVE),
-    by = join_by(StandID == STAND_ID)
-  ) |>
-  mutate(BALIVE_METRIC = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare")) |>
-  #mutate(BALIVE_METRIC = cut(BALIVE_METRIC, 0:19 * 5, include.lowest = TRUE)) |>
   ggplot(aes(BALIVE_METRIC, Carbon_Flux_Residual)) +
   geom_point(size=0.25) +
   stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 1, color = "blue") +
@@ -780,9 +824,8 @@ nrsgro_ca10_proj_vs_meas |>
 ```{r basal_area_trend, eval = FALSE}
 ggplot(
   nrsgro_ca10_proj_vs_meas |>
-    filter(ProjectionYears > 0) |>
     mutate(
-      BA_Range = cut(BA_Srvy, 0:19 * 5)
+      BA_Range = cut(BALIVE_METRIC, 0:19 * 5)
     ),# |>
 #    group_by(FOREST_TYPE_GROUP) |>
 #    mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
@@ -792,10 +835,10 @@ ggplot(
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
   scale_fill_discrete(name = "Forest Type Group") +
-  ggtitle("BAI Residual vs. Measured BA") +
+  ggtitle("Carbon Flux Residual vs. Measured BA") +
   labs(caption = "Without Calibration") +
   ylab(bquote("Carbon Flux Residual "(`Mg C` %.% ha^-1 %.% yr^-1))) +
-  xlab(bquote("Measured Stand BA "(m^2 %.% ha^-1))) +
-  theme_bw()# +
-  #coord_cartesian(ylim = c(-2, 3))
+  xlab(bquote("Starting Stand BA "(m^2 %.% ha^-1))) +
+  theme_bw() +
+  coord_cartesian(ylim = c(-5, 5))
 ```

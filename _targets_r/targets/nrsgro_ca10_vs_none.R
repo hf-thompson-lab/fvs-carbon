@@ -1,4 +1,4 @@
-tar_target(nrsgro_ca10_proj_vs_meas, {
+tar_target(nrsgro_ca10_vs_none, {
   stand_mixin <- nrsgro_plot_stats |>
     filter_add_stand_id() |>
     group_by(STAND_ID) |>
@@ -8,7 +8,7 @@ tar_target(nrsgro_ca10_proj_vs_meas, {
     select(STAND_ID, MEASYEAR, BALIVE_METRIC) |>
     rename(StandID = STAND_ID, StartYear = MEASYEAR)
   
-  srvy_carbon_tmp <- nrsgro_srvy_carbon |>
+  none_carbon_tmp <- nrsgro_none_carbon |>
     rename(Carbon = Aboveground_Total_Live) |>
     select(StandID, Year, Carbon) |>
     group_by(StandID) |>
@@ -26,20 +26,16 @@ tar_target(nrsgro_ca10_proj_vs_meas, {
     ungroup() |>
     filter(!is.na(Carbon_Delta))
   
-  nrsgro_ca10_proj_vs_meas <- ca10_carbon_tmp |>
-    group_by(StandID) |>
-    arrange(desc(Year)) |>
-    filter(row_number() == 1) |>
-    ungroup() |>
-    rename(Carbon_Calb = Carbon, Carbon_Delta_Calb = Carbon_Delta) |>
-    left_join(srvy_carbon_tmp, by = join_by(StandID, Year)) |>
-    rename(Carbon_Srvy = Carbon, Carbon_Delta_Srvy = Carbon_Delta) |>
+  nrsgro_ca10_vs_none <- none_carbon_tmp |>
+    rename(Carbon_None = Carbon, Carbon_Delta_None = Carbon_Delta) |>
+    left_join(ca10_carbon_tmp, by = join_by(StandID, Year)) |>
+    rename(Carbon_Ca10 = Carbon, Carbon_Delta_Ca10 = Carbon_Delta) |>
     left_join(stand_mixin, by = join_by(StandID)) |>
     mutate(
-      Carbon_Diff = Carbon_Calb - Carbon_Srvy,
+      Carbon_Diff = Carbon_Ca10 - Carbon_None,
       ProjectionYears = Year - StartYear,
-      Carbon_Flux_Calb = -(Carbon_Delta_Calb / ProjectionYears),
-      Carbon_Flux_Srvy = -(Carbon_Delta_Srvy / ProjectionYears),
-      Carbon_Flux_Residual = Carbon_Flux_Calb - Carbon_Flux_Srvy
+      Carbon_Flux_Ca10 = -(Carbon_Delta_Ca10 / ProjectionYears),
+      Carbon_Flux_None = -(Carbon_Delta_None / ProjectionYears),
+      Carbon_Flux_Residual = Carbon_Flux_Ca10 - Carbon_Flux_None
     )
 })
