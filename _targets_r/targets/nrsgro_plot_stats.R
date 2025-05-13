@@ -10,6 +10,12 @@ tar_target(nrsgro_plot_stats, {
       
       tree_stats <- tbl(con, "TREE") |>
         inner_join(plots |> select(STATECD, COUNTYCD, PLOT, INVYR), by = plots_join_by) |>
+        left_join(
+          tbl(con, "COND") |>
+            select(STATECD, COUNTYCD, PLOT, CONDID, INVYR, CONDPROP_UNADJ),
+          by = join_by(STATECD, COUNTYCD, PLOT, CONDID, INVYR)
+        ) |>
+        mutate(TPA_UNADJ = TPA_UNADJ * CONDPROP_UNADJ) |>
         select(STATECD, COUNTYCD, PLOT, INVYR, DIA, CARBON_AG, TPA_UNADJ) |>
         group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
         summarize(
