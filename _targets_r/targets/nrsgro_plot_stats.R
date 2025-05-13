@@ -15,6 +15,7 @@ tar_target(nrsgro_plot_stats, {
         summarize(
           CARBON_AG = sum(CARBON_AG, na.rm = TRUE),
           CPA = sum(CARBON_AG * TPA_UNADJ, na.rm = TRUE),
+          # BA_TREES is the number of trees to be used in BA computations
           # Restrict to trees that match those used in QMD computation, below.
           BA_TREES = sum(if_else(DIA >= 1, TPA_UNADJ, 0), na.rm = TRUE),
           .groups = "keep"
@@ -22,7 +23,7 @@ tar_target(nrsgro_plot_stats, {
       
       cond_stats <- tbl(con, "COND") |>
         inner_join(plots |> select(STATECD, COUNTYCD, PLOT, INVYR), by = plots_join_by) |>
-        select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, FORTYPCD) |>
+        select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, CONDPROP_UNADJ, FORTYPCD) |>
         group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
         # QMD = sqrt(sum(DIA^2) / n)
         # Which is equivalent to
@@ -35,7 +36,7 @@ tar_target(nrsgro_plot_stats, {
         # FIADB data dictionary 2.5.51 BALIVE says "Basal area in square feet per
         # acre of all live trees ω1.0 inch d.b.h/d.r.c sampled in the condition."
         summarize(
-          BALIVE = sum(BALIVE, na.rm = TRUE),
+          BALIVE = sum(BALIVE * CONDPROP_UNADJ, na.rm = TRUE),
           FORTYPCD = max(FORTYPCD, na.rm = TRUE),
           STDAGE = max(STDAGE, na.rm = TRUE),
           .groups = "keep"
