@@ -1027,7 +1027,7 @@ calb_vs_none <- none_carbon_tmp |>
     ProjectionYears = Year - StartYear,
     Carbon_Flux_Calb = Carbon_Delta_Calb / ProjectionYears,
     Carbon_Flux_None = Carbon_Delta_None / ProjectionYears,
-    Carbon_Flux_Delta = Carbon_Flux_Calb - Carbon_Flux_None
+    Carbon_Flux_Residual = Carbon_Flux_Calb - Carbon_Flux_None
   )
 ```
 
@@ -1056,7 +1056,7 @@ calb_vs_none |>
 
 ```{r plot calb_vs_none, eval = FALSE}
 calb_vs_none |>
-  filter(!is.na(Carbon_Flux_Delta)) |>
+  filter(!is.na(Carbon_Flux_Residual)) |>
   ggplot(aes(factor(ProjectionYears), Carbon_Diff)) +
   geom_boxplot(outlier.size = 0.1) +
   theme_bw() +
@@ -1147,6 +1147,8 @@ nrsgro_plot |>
 
 # Carbon Flux
 
+## Projected vs Measured
+
 How does projected carbon flux compare to measured carbon flux?
 ```{r proj_vs_meas_carbon_flux, eval = FALSE}
 ggplot(
@@ -1182,6 +1184,8 @@ ggplot(
   ylab(bquote("Projected Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
   coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
 ```
+
+### By Ecoregion
 
 ```{r proj_vs_meas_carbon_flux by ecoregion, eval = FALSE}
 ggplot(
@@ -1219,6 +1223,7 @@ ggplot(
   coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
 ```
 
+### By Forest Type
 
 ```{r proj_vs_meas_carbon_flux by forest type, eval = FALSE}
 ggplot(
@@ -1256,6 +1261,7 @@ ggplot(
   coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
 ```
 
+### By State
 
 ```{r proj_vs_meas_carbon_flux by state, eval = FALSE}
 ggplot(
@@ -1293,6 +1299,7 @@ ggplot(
   coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
 ```
 
+### By Latitude
 
 ```{r proj_vs_meas_carbon_flux by latitude, eval = FALSE}
 nrsgro_calb_proj_vs_meas |>
@@ -1342,6 +1349,37 @@ ggplot(
   coord_cartesian(xlim = c(-10, 10), ylim = c(-10, 10))
 ```
 
+## Residual
+
+### By Stand BA
+
+```{r plot carbon flux residual vs balive, eval = FALSE}
+calb_vs_none |>
+  left_join(
+    nrsgro_plot_stats |>
+      group_by(STATECD, COUNTYCD, PLOT) |>
+      filter(row_number() == 1) |>
+      ungroup() |>
+      filter_add_stand_id() |>
+      select(STAND_ID, BALIVE),
+    by = join_by(StandID == STAND_ID)
+  ) |>
+  mutate(BALIVE_METRIC = conv_multiunit(BALIVE, "ft2 / acre", "m2 / hectare")) |>
+  #mutate(BALIVE_METRIC = cut(BALIVE_METRIC, 0:19 * 5, include.lowest = TRUE)) |>
+  ggplot(aes(BALIVE_METRIC, Carbon_Flux_Residual)) +
+  geom_point(size=0.25) +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 1, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  theme_bw() +
+  xlab(bquote("Starting Basal Area" ~ (m^2 %.% hectare^-1))) +
+  ylab(bquote("Carbon Flux Residual" ~ (`Mg C` %.% hectare^-1 %.% year^-1))) +
+  ggtitle("Carbon Flux Residual vs. Stand Starting Basal Area (5-Year Calibration)") +
+  #labs(caption = "With 5-year calibration") +
+  scale_y_continuous(limits = c(-10, 5))
+```
+
+
+## Spatial Map
 
 Plot carbon flux on a map
 
@@ -1403,6 +1441,8 @@ ggplot(fvsne_states_map, aes(long, lat, group = group)) +
 remove(plot_location_tmp)
 ```
 
+## Measured by Latitude
+
 ```{r measured carbon flux by latitude, eval = FALSE}
 nrsgro_calb_proj_vs_meas |>
   filter(Projection_Years > 0) |>
@@ -1422,6 +1462,8 @@ nrsgro_calb_proj_vs_meas |>
   xlab("Latitude (degrees)")
 ```
 
+### With Elevation Adj.
+
 ```{r measured carbon flux by latitude adjusted for elevation, eval = FALSE}
 nrsgro_calb_proj_vs_meas |>
   filter(Projection_Years > 0) |>
@@ -1440,6 +1482,8 @@ nrsgro_calb_proj_vs_meas |>
   xlab("Adjusted Latitude (degrees)")
 ```
 
+## Projected by Latitude
+
 ```{r projected carbon flux by latitude, eval = FALSE}
 nrsgro_calb_proj_vs_meas |>
   filter(Projection_Years > 0) |>
@@ -1457,6 +1501,8 @@ nrsgro_calb_proj_vs_meas |>
   ylab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
   xlab("Latitude (degrees)")
 ```
+
+### With Elevation Adj.
 
 ```{r projected carbon flux by latitude adjusted for elevation, eval = FALSE}
 nrsgro_calb_proj_vs_meas |>
