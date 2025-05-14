@@ -1,0 +1,580 @@
+---
+title: "10_NRSBias"
+output: html_document
+---
+
+#Setup
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(targets)
+  library(tarchetypes)
+  library(tidyverse)
+  library(performance) # for check_model()
+  library(car) # for Anova()
+  library(dbplyr) # for window_order
+  library(reshape2) # melt()
+  library(measurements) # conv_unit and conv_multiunit
+  library(maps)
+  library(ggspatial) # for maps
+  library(ggpmisc) # for stat_poly_eq
+})
+options(scipen = 9) # Use integer notation for numbers under 9 digits
+tar_source()
+```
+
+The package meteoland can compute solar radiation from lat, lon, elevation,
+and some other things.
+https://emf-creaf.github.io/meteolandbook/solarradiation.html
+There's a bunch of solar radiation functions; one of them shuld be useful:
+https://emf-creaf.github.io/meteoland/reference/radiation_julianDay.html
+probably either netRadiaton or solarRadiation - these describe incoming
+solar radiation in units of bquote(MJ %.% m^-2 %.% day^-1)
+
+
+## Load targets results from other documents
+
+```{r load tar objects defined elsewhere, eval = FALSE}
+tar_load(fiadb)
+tar_load(species_crosswalk)
+```
+
+# Context
+
+## Independent Variables
+
+What variables do we have?
+```{r nrsgro_plot}
+tar_load(nrsgro_plot)
+tar_load(nrsgro_plot_stats)
+```
+
+```{r independent_vars}
+tmp_plot_stats <- nrsgro_plot_stats |>
+  filter_add_stand_id() |>
+  group_by(STAND_ID) |>
+  arrange(INVYR) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  mutate(
+    FOREST_TYPE = as.factor(FOREST_TYPE),
+    FOREST_TYPE_GROUP = as.factor(FOREST_TYPE_GROUP)
+  ) |>
+  select(
+    STAND_ID,
+    BALIVE_METRIC, BA_TREES, QMD,
+    FOREST_TYPE_GROUP, FOREST_TYPE, STDAGE
+  ) |>
+  # Fix the name of this so it's not confusing
+  rename(TPA = BA_TREES) |>
+  # Compute Stand Density Index; this is not relative stand density, it's the
+  # absolute number. See FIADB data dictionary sectino 2.5.139 SDI_RMRS,
+  # and VanderSchaaf, C.L., 2013. Reineke’s stand density index: a quantitative and non-unitless
+  # measure of stand density.
+  # In: Guldin, James M., ed. 2013. Proceedings of the 15th biennial southern silvicultural
+  # research conference. e-Gen. Tech. Rep. SRS-GTR-175. Asheville, NC:
+  # US Department of Agriculture, Forest Service, Southern Research Station.
+  # 577-579. (Vol. 175, pp. 577-579).
+  # Here we use 1.605 as the exponent of Reineke's equation, as is commonly reported.
+  mutate(SDI = 10^(log10(TPA) + 1.605*log10(QMD) - 1.605))
+
+independent_vars <- nrsgro_plot |>
+  filter_add_stand_id() |>
+  group_by(STAND_ID) |>
+  arrange(INVYR) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  select(STAND_ID, LAT, LON, ELEV, ECOSUBCD) |>
+  mutate(
+    ECOCD = substr(ECOSUBCD, 1, nchar(ECOSUBCD) - 1),
+    ECOSUBCD = as.factor(ECOSUBCD),
+    ECOCD = as.factor(ECOCD)
+  ) |>
+  left_join(tmp_plot_stats, by = join_by(STAND_ID))  |>
+  mutate(
+    LAT_CTR = LAT - mean(LAT, na.rm = TRUE),
+    LON_CTR = LON - mean(LON, na.rm = TRUE),
+    ELEV_CTR = ELEV - mean(ELEV, na.rm = TRUE),
+    BALIVE_CTR = BALIVE_METRIC - mean(BALIVE_METRIC, na.rm = TRUE),
+    TPA_CTR = TPA - mean(TPA, na.rm = TRUE),
+    QMD_CTR = QMD - mean(QMD, na.rm = TRUE),
+    SDI_CTR = SDI - mean(SDI, na.rm = TRUE),
+    STDAGE_CTR = STDAGE - mean(STDAGE, na.rm = TRUE)
+  )
+# TODO: we need slope and apsect - these are on the COND
+```
+
+```{r plot indep vars}
+independent_vars |>
+#  filter(FOREST_TYPE_GROUP == "Spruce / fir") |>
+  filter(TPA > 10) |>
+  ggplot(aes(TPA, BALIVE_METRIC, color = STDAGE, size = QMD)) +
+  geom_point(position = "jitter") +
+#  facet_wrap("FOREST_TYPE_GROUP") +
+  scale_x_continuous(transform = "log10") +
+  scale_y_continuous(transform = "log10") +
+  scale_color_continuous(transform = "log10")
+```
+
+## Dependent Variable(s)
+
+We want to predict bias in predicted carbon storage, probably over 10 years, maybe 20 or 25.
+
+Let's use the Calb10 data for this.
+
+Question: do we want this per stand, or per tree?
+
+Per stand:
+- It's what FVS gives us as primary output
+- It's what we'll use in analysis of COP
+
+Per tree:
+- Isolates the effects of multiple species
+- Don't have an easy way to get per-tree carbon from FVS
+  - Can correct bias in BAI instead; is that good enough?
+- Don't have an easy way to compute carbon
+  - Can we use rFIA?
+- Don't have an easy way to aggregate to stand level
+  - Can we use rFIA?
+
+```{r dependent variables}
+tar_load(nrsgro_ca10_proj_vs_meas)
+# We're only interested in the error of the final projection
+dependent_variables <- nrsgro_ca10_proj_vs_meas |>
+  group_by(StandID) |>
+  arrange(desc(ProjectionYears)) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  select(-BALIVE_METRIC)
+```
+
+## Observations
+
+Combine independent and dependent variables into observations
+```{r obs}
+obs <- dependent_variables |>
+  left_join(independent_vars, by = join_by(StandID == STAND_ID))
+```
+
+```{r plot obs hist}
+obs |>
+  ggplot(aes(Carbon_Flux_Residual)) +
+  geom_histogram(binwidth = 0.1) +
+  scale_x_continuous(name = bquote("Carbon Flux Residual" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  scale_y_continuous(name = "Number of Plots") +
+  theme_bw() +
+  ggtitle("Histogram of Carbon Flux Residual")
+```
+
+# Carbon Flux Bias Correction
+
+## Linearity
+
+Let's look at the independent variables and see if their (rough) relationship
+with annual carbon flux is linear
+
+### Latitude
+
+```{r lat linearity}
+obs |>
+  ggplot(aes(LAT, Carbon_Flux_Residual)) +
+  geom_point(size=0.25) +
+  facet_wrap("FOREST_TYPE_GROUP") +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.25, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue")
+```
+
+### Longitude
+
+```{r lon linearity}
+obs |>
+  ggplot(aes(LON, Carbon_Flux_Residual)) +
+  geom_point(size=0.25) +
+  facet_wrap("FOREST_TYPE_GROUP") +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.25, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue")
+```
+
+### Elevation
+
+```{r elev linearity}
+obs |>
+  ggplot(aes(ELEV, Carbon_Flux_Residual)) +
+  geom_point(size=0.25) +
+  facet_wrap("FOREST_TYPE_GROUP") +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.25, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue")
+```
+
+### Basal Area
+
+```{r balive linearity}
+obs |>
+  mutate(BALIVE_METRIC = cut(BALIVE_METRIC, 0:19 * 5, include.lowest = TRUE)) |>
+  ggplot(aes(BALIVE_METRIC, Carbon_Flux_Residual)) +
+  geom_boxplot(size=0.25, outlier.size = 0.1) +
+#  facet_wrap("FOREST_TYPE_GROUP") +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.25, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  theme_bw()
+```
+
+### TPA
+
+```{r TPA linearity}
+obs |>
+  ggplot(aes(TPA, Carbon_Flux_Residual)) +
+  geom_point(size=0.25) +
+  facet_wrap("FOREST_TYPE_GROUP") +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.25, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue")
+```
+
+### Stand Age
+
+```{r stdage linearity}
+obs |>
+  ggplot(aes(STDAGE, Carbon_Flux_Residual)) +
+  geom_point(size=0.25) +
+  facet_wrap("FOREST_TYPE_GROUP") +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.25, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue")
+```
+
+### QMD
+
+```{r qmd linearity}
+obs |>
+  ggplot(aes(QMD, Carbon_Flux_Residual)) +
+  geom_point(size=0.25) +
+  facet_wrap("FOREST_TYPE_GROUP") +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.25, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue")
+```
+
+### SDI
+
+```{r sdi linearity}
+obs |>
+  ggplot(aes(SDI, Carbon_Flux_Residual)) +
+  geom_point(size=0.25) +
+  facet_wrap("FOREST_TYPE_GROUP") +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.25, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue")
+```
+
+
+## Model All Independent Variables
+
+```{r multiple linear regression}
+m <- lm(
+  data = obs,
+  formula = Carbon_Flux_Residual ~ LAT + LON + ELEV + BALIVE_METRIC + TPA + QMD + SDI + STDAGE + FOREST_TYPE_GROUP + ProjectionYears
+)
+summary(m)
+Anova(m)
+```
+
+```{r check model m}
+check_model(m)
+```
+
+### Centered
+
+Same, but centered
+
+```{r m_ctr}
+m_ctr <- lm(
+  data = obs,
+  formula = Carbon_Flux_Residual ~ LAT_CTR + LON_CTR + ELEV_CTR + BALIVE_CTR + TPA_CTR + QMD_CTR + SDI_CTR + STDAGE_CTR + ProjectionYears + FOREST_TYPE_GROUP
+)
+summary(m_ctr)
+Anova(m_ctr)
+```
+
+check it
+```{r check m_ctr}
+check_model(m_ctr)
+```
+
+Looks like linearity is not respected, something to explore.
+Homgeneity of variance is also a scatterplot, not sure what's up there.
+Posterior predictive check looks bad - a spike vs. a bell curve. Not sure how to fix that.
+
+## Model P<0.001 Variables
+
+It looks like LON, TPA, and STDAGE aren't contributing, so let's take them out.
+Furthermore, BALIVE and SDI conflict with each other (high colinearity).
+So keep only one of them. Since SDI is comptued from BA and TPA, let's just
+keep BALIVE.
+
+```{r m2}
+m2 <- lm(
+  data = obs,
+  formula = Carbon_Flux_Residual ~ LAT + ELEV + BALIVE_METRIC + QMD + ProjectionYears +
+    FOREST_TYPE_GROUP
+)
+summary(m2)
+Anova(m2)
+```
+
+```{r check m2}
+check_model(m2)
+```
+
+### SDI
+
+Out of curiosity, let's see what happens if we keep SDI instead of BALIVE.
+
+```{r m2 with sdi}
+m2_sdi <- lm(
+  data = obs,
+  formula = Carbon_Flux_Residual ~ LAT + ELEV + SDI + QMD + ProjectionYears + FOREST_TYPE_GROUP
+)
+summary(m2_sdi)
+Anova(m2_sdi)
+
+```
+
+```{r check m2_sdi}
+check_model(m2_sdi)
+```
+
+Pretty much the same.
+
+### ECOCD
+
+Out of curiosity, what happens if we swap FOREST_TYPE_GROUP for ECOCD?
+
+```{r m2 with ecocd}
+m2_ecocd <- lm(
+  data = obs,
+  formula = Carbon_Flux_Residual ~ LAT + ELEV + SDI + QMD + ProjectionYears + ECOCD
+)
+summary(m2_ecocd)
+Anova(m2_ecocd)
+
+```
+
+```{r check m2_ecocd}
+check_model(m2_ecocd)
+```
+
+
+It does not find ECOCD interesting, and we can't plot the summary when using
+ECOCD, so we'll ignore it.
+
+## Scaled Variables
+
+Let's try scaling some things.
+
+```{r m3}
+m3 <- lm(
+  data = obs,
+  formula = Carbon_Flux_Residual ~ sin(LAT * pi / 180) + ELEV + sqrt(BALIVE_METRIC) + QMD + ProjectionYears + FOREST_TYPE_GROUP
+)
+summary(m3)
+Anova(m3)
+```
+
+```{r check m3}
+check_model(m3)
+```
+
+## No Projection Years
+
+I really want a model that's independent of projection years. We know it'll only
+be valid up to ~20 years.
+Let's start with all the independent vars again.
+
+```{r m4}
+m4 <- lm(
+  data = obs,
+  formula = Carbon_Flux_Residual ~ LAT + LON + ELEV + BALIVE_METRIC + TPA + QMD + SDI + STDAGE + FOREST_TYPE_GROUP
+)
+summary(m4)
+Anova(m4)
+```
+
+Well that's completely different.
+
+```{r check m4}
+check_model(m4)
+```
+
+Once again, BALIVE and SDI are colinear, so we pick BALIVE.
+
+```{r m5}
+m5 <- lm(
+  data = obs,
+  formula = Carbon_Flux_Residual ~ ELEV + BALIVE_METRIC + FOREST_TYPE_GROUP
+)
+summary(m5)
+Anova(m5)
+```
+
+
+```{r check m5}
+check_model(m5)
+```
+
+## Apply Carbon Flux Bias Correction
+
+```{r apply m5}
+bias_adjusted <- obs |>
+  select(-ends_with("_CTR")) |>
+  mutate(Carbon_Flux_Bias = unname(predict(m5, obs))) |>
+  mutate(
+    Carbon_Flux_Adjusted = Carbon_Flux_Calb - Carbon_Flux_Bias,
+    Carbon_Flux_BAR = Carbon_Flux_Adjusted - Carbon_Flux_Srvy
+  )
+```
+
+```{r plot apply m5}
+bias_adjusted |>
+  select(c("FOREST_TYPE_GROUP", "Carbon_Flux_Residual", "Carbon_Flux_BAR")) |>
+  pivot_longer(cols = c("Carbon_Flux_Residual", "Carbon_Flux_BAR")) |>
+  ggplot(aes(value, fill = name)) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  geom_histogram(binwidth = 0.1, position = "dodge") +
+  scale_fill_brewer(name = "Series", labels = c("Adjusted", "Original"), palette="Set1") +
+  coord_cartesian(xlim = c(-5, 5)) +
+  #facet_wrap("FOREST_TYPE_GROUP") +
+  theme_bw() +
+  scale_x_continuous(name = bquote("Carbon Flux Residual" ~ (`Mg C` %.% hectare^-1 %.% year^-1))) +
+  scale_y_continuous(name = "Number of Plots") +
+  ggtitle("Bias-Adjusted Carbon Flux Residuals")
+```
+
+### Residual by Starting Stand BA
+
+```{r plot carbon flux residual vs balive, eval = FALSE}
+bias_adjusted |>
+  mutate(BALIVE_METRIC = cut(BALIVE_METRIC, 0:19 * 5, include.lowest = TRUE)) |>
+  ggplot(aes(BALIVE_METRIC, Carbon_Flux_BAR)) +
+  geom_point(size=0.25) +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 1, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  theme_bw() +
+  xlab(bquote("Starting Basal Area" ~ (m^2 %.% hectare^-1))) +
+  ylab(bquote("Carbon Flux Residual" ~ (`Mg C` %.% hectare^-1 %.% year^-1))) +
+  ggtitle("Carbon Flux Residual vs. Stand Starting Basal Area (with bias correction)") +
+  geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
+  coord_cartesian(ylim = c(-5, 5))
+
+```
+
+```{r plot carbon flux residual vs balive, eval = FALSE}
+bias_adjusted |>
+  ggplot(aes(BALIVE_METRIC, Carbon_Flux_BAR)) +
+  geom_point(size=0.25) +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 1, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  theme_bw() +
+  xlab(bquote("Starting Basal Area" ~ (m^2 %.% hectare^-1))) +
+  ylab(bquote("Carbon Flux Residual" ~ (`Mg C` %.% hectare^-1 %.% year^-1))) +
+  ggtitle("Carbon Flux Residual vs. Stand Starting Basal Area (Bias Corrected)") +
+#  labs(caption = "With 10-year calibration") +
+  scale_y_continuous(limits = c(-5, 5))
+```
+
+### Bias-Corrected vs. Measured Flux
+
+```{r proj_vs_meas_carbon_flux, eval = FALSE}
+bias_adjusted |>
+  ggplot(aes(Carbon_Flux_Srvy, Carbon_Flux_Adjusted)) +
+  geom_hline(yintercept = 0, linewidth = 0.25, color = "black") +
+  geom_vline(xintercept = 0, linewidth = 0.25, color = "black") +
+  geom_abline(intercept = 0, slope = 1, linewidth = 0.25, linetype = "dashed", color = "lightgray") +
+  #geom_bin2d(binwidth = 0.5) +
+  #scale_fill_viridis_c() +
+  geom_point(size = 0.25, alpha = 0.25) +
+  # stat_poly_* plots and annotates a fit; they need to be configured to match
+  stat_poly_line(
+    formula = y ~ x,
+    fullrange = TRUE,
+    se = FALSE,
+    color = "blue",
+    linetype = "dashed",
+    linewidth = 0.5
+  ) +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, size = 3, color = "blue") +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  ggtitle("Bias-Corrected vs. Measured Carbon Flux") +
+  xlab(bquote("Measured Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  ylab(bquote("Projected Annual Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  coord_cartesian(xlim = c(-5, 5), ylim = c(-5, 5))
+```
+
+# BAI Bias Correction
+
+## Model BAI Bias
+
+```{r m5_bai}
+m5_bai <- lm(
+  data = obs,
+  formula = BAI_Residual ~ ELEV + BALIVE_METRIC + FOREST_TYPE_GROUP
+)
+summary(m5_bai)
+Anova(m5_bai)
+```
+
+## Apply BAI Bias Correction
+
+```{r apply m5_bai}
+bai_adjusted <- obs |>
+  select(-ends_with("_CTR")) |>
+  mutate(BAI_Bias = unname(predict(m5_bai, obs))) |>
+  mutate(
+    BAI_Adjusted = BAI_Calb - BAI_Bias,
+    BAI_BAR = BAI_Adjusted - BAI_Srvy
+  )
+```
+
+```{r plot apply m5_bai}
+bai_adjusted |>
+  select(c("FOREST_TYPE_GROUP", "BAI_Residual", "BAI_BAR")) |>
+  pivot_longer(cols = c("BAI_Residual", "BAI_BAR")) |>
+  ggplot(aes(value, fill = name)) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  geom_histogram(binwidth = 0.1, position = "dodge") +
+  scale_fill_brewer(name = "Series", labels = c("Adjusted", "Original"), palette="Set1") +
+  #coord_cartesian(xlim = c(-5, 5)) +
+  #facet_wrap("FOREST_TYPE_GROUP") +
+  theme_bw() +
+  scale_x_continuous(name = bquote("BAI Residual" ~ (m^2 %.% hectare^-1 %.% year^-1))) +
+  scale_y_continuous(name = "Number of Plots") +
+  ggtitle("Bias-Adjusted BAI Residuals")
+```
+
+## Residual by Starting Stand BA
+
+```{r plot carbon flux residual vs balive, eval = FALSE}
+bai_adjusted |>
+  mutate(BALIVE_METRIC = cut(BALIVE_METRIC, 0:19 * 5, include.lowest = TRUE)) |>
+  ggplot(aes(BALIVE_METRIC, BAI_BAR)) +
+  geom_point(size=0.25) +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 1, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  theme_bw() +
+  xlab(bquote("Starting Basal Area" ~ (m^2 %.% hectare^-1))) +
+  ylab(bquote("BAI Residual" ~ (m^2 %.% hectare^-1 %.% year^-1))) +
+  ggtitle("BAI Residual vs. Stand Starting Basal Area (with bias correction)") +
+  geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
+  coord_cartesian(ylim = c(-5, 5))
+```
+
+```{r plot carbon flux residual vs balive, eval = FALSE}
+bai_adjusted |>
+  ggplot(aes(BALIVE_METRIC, BAI_BAR)) +
+  geom_point(size=0.25) +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 1, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  theme_bw() +
+  xlab(bquote("Starting Basal Area" ~ (m^2 %.% hectare^-1))) +
+  ylab(bquote("BAI Residual" ~ (m^2 %.% hectare^-1 %.% year^-1))) +
+  ggtitle("BAI Residual vs. Stand Starting Basal Area (Bias Corrected)") +
+#  labs(caption = "With 10-year calibration") +
+  scale_y_continuous(limits = c(-5, 5))
+```
