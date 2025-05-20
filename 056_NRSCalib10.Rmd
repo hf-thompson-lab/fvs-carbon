@@ -849,6 +849,7 @@ nrsgro_ca10_proj_vs_meas |>
   geom_point(size=0.25) +
   stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 1, color = "blue") +
   stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.25) +
   theme_bw() +
   xlab(bquote("Starting Basal Area" ~ (m^2 %.% hectare^-1))) +
   ylab(bquote("Carbon Flux Residual" ~ (`Mg C` %.% hectare^-1 %.% year^-1))) +
@@ -856,6 +857,23 @@ nrsgro_ca10_proj_vs_meas |>
 #  labs(caption = "With 10-year calibration") +
   scale_y_continuous(limits = c(-10, 5))
 ```
+
+
+```{r plot bai residual vs balive, eval = FALSE}
+nrsgro_ca10_proj_vs_meas |>
+  ggplot(aes(BALIVE_METRIC, BAI_Residual)) +
+  geom_point(size=0.25) +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 1, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Starting Basal Area" ~ (m^2 %.% hectare^-1))) +
+  ylab(bquote("BAI Residual" ~ (m^2 %.% hectare^-1 %.% year^-1))) +
+  ggtitle("BAI Residual vs. Stand Starting Basal Area (10-year Calibration)")
+#  labs(caption = "With 10-year calibration") +
+  #scale_y_continuous(limits = c(-10, 5))
+```
+
 
 ```{r basal_area_trend, eval = FALSE}
 ggplot(
