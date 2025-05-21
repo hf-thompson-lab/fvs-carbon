@@ -8,6 +8,13 @@ tar_target(nrshrv_plot_stats_all, {
         rename(FORTYPCD = VALUE) |>
         rename(FORTYPE = MEANING)
       
+      forest_type_group <- tbl(con, "REF_FOREST_TYPE_GROUP") |>
+        select(VALUE, MEANING) |>
+        rename(
+          TYPGRPCD = VALUE,
+          FOREST_TYPE_GROUP = MEANING
+        )
+      
       tree_stats <- tbl(con, "TREE") |>
         inner_join(plots, by = plots_join_by) |>
         select(STATECD, COUNTYCD, PLOT, INVYR, DIA, CARBON_AG, TPA_UNADJ) |>
@@ -86,20 +93,17 @@ tar_target(nrshrv_plot_stats_all, {
         left_join(harvest_mixin, by = plots_join_by) |>
         left_join(pre_harvest_mixin, by = join_by(STATECD, COUNTYCD, PLOT, INVNUM)) |>
         left_join(forest_type, by = join_by(FORTYPCD)) |>
-        rename(FOREST_TYPE = FORTYPE) |>
+        left_join(forest_type_group, by = join_by(TYPGRPCD)) |>
         mutate(
           PRE_HARVEST = if_else(is.na(PRE_HARVEST), 0, PRE_HARVEST),
-          STDAGE = if_else(STDAGE < 0, NA, STDAGE),
-          FRTYGRCD = floor(FORTYPCD / 10) * 10
+          STDAGE = if_else(STDAGE < 0, NA, STDAGE)
         ) |>
         # Mark inventories that come before the pre-harvest inventory
         mutate(PREHRVYEAR = if_else(PRE_HARVEST == 1, MEASYEAR, NA)) |>
         group_by(STATECD, COUNTYCD, PLOT) |>
         window_order(MEASYEAR) |>
         mutate(PRE_PRE_HARVEST = (MEASYEAR < min(PREHRVYEAR, na.rm = TRUE))) |>
-        ungroup() |>
-        left_join(forest_type, by = join_by(FRTYGRCD == FORTYPCD)) |>
-        rename(FOREST_TYPE_GROUP = FORTYPE)
+        ungroup()
     }) |>
     filter_decode_forest_type_group() |>
     mutate(

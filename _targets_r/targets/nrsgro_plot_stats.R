@@ -4,9 +4,18 @@ tar_target(nrsgro_plot_stats, {
       plots_join_by <- join_by(STATECD, COUNTYCD, PLOT, INVYR)
   
       forest_type <- tbl(con, "REF_FOREST_TYPE") |>
+        select(VALUE, TYPGRPCD, MEANING) |>
+        rename(
+          FORTYPCD = VALUE,
+          FOREST_TYPE = MEANING,
+        )
+      
+      forest_type_group <- tbl(con, "REF_FOREST_TYPE_GROUP") |>
         select(VALUE, MEANING) |>
-        rename(FORTYPCD = VALUE) |>
-        rename(FORTYPE = MEANING)
+        rename(
+          TYPGRPCD = VALUE,
+          FOREST_TYPE_GROUP = MEANING
+        )
       
       tree_stats <- tbl(con, "TREE") |>
         inner_join(plots |> select(STATECD, COUNTYCD, PLOT, INVYR), by = plots_join_by) |>
@@ -54,13 +63,10 @@ tar_target(nrsgro_plot_stats, {
         left_join(cond_stats, by = plots_join_by) |>
         left_join(tree_stats, by = plots_join_by) |>
         left_join(forest_type, by = join_by(FORTYPCD)) |>
-        rename(FOREST_TYPE = FORTYPE) |>
+        left_join(forest_type_group, by = join_by(TYPGRPCD)) |>
         mutate(
-          STDAGE = if_else(STDAGE < 0, NA, STDAGE),
-          FRTYGRCD = floor(FORTYPCD / 10) * 10
-        ) |>
-        left_join(forest_type, by = join_by(FRTYGRCD == FORTYPCD)) |>
-        rename(FOREST_TYPE_GROUP = FORTYPE)
+          STDAGE = if_else(STDAGE < 0, NA, STDAGE)
+        )
     }) |>
     filter_decode_forest_type_group() |>
     mutate(
