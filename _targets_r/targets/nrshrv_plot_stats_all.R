@@ -4,7 +4,7 @@ tar_target(nrshrv_plot_stats_all, {
       plots_join_by <- join_by(STATECD, COUNTYCD, PLOT, INVYR)
   
       forest_type <- tbl(con, "REF_FOREST_TYPE") |>
-        select(VALUE, MEANING) |>
+        select(VALUE, MEANING, TYPGRPCD) |>
         rename(FORTYPCD = VALUE) |>
         rename(FORTYPE = MEANING)
       
