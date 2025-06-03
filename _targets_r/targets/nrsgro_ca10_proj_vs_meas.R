@@ -18,12 +18,16 @@ tar_target(nrsgro_ca10_proj_vs_meas, {
     filter(!is.na(Carbon_Delta))
   
   srvy_summary_tmp <- nrsgro_srvy_summary |>
-    mutate(BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
-    select(StandID, Year, BA_METRIC) |>
+    mutate(
+      BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare"),
+      Tph = conv_unit(Tpa, "hectare", "acre") # conv_multiunit(Tpa, "1 / acre", "1 / hectare")
+    ) |>
+    select(StandID, Year, BA_METRIC, Tph) |>
     group_by(StandID) |>
     arrange(Year) |>
     mutate(
-      BA_Delta = BA_METRIC - lag(BA_METRIC)
+      BA_Delta = BA_METRIC - lag(BA_METRIC),
+      Tph_Delta = Tph - lag(Tph)
     ) |>
     ungroup() |>
     filter(!is.na(BA_Delta))
@@ -38,12 +42,16 @@ tar_target(nrsgro_ca10_proj_vs_meas, {
     filter(!is.na(Carbon_Delta))
   
   ca10_summary_tmp <- nrsgro_ca10_summary |>
-    mutate(BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
-    select(StandID, Year, BA_METRIC) |>
+    mutate(
+      BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare"),
+      Tph = conv_unit(Tpa, "hectare", "acre") # conv_multiunit(Tpa, "1 / acre", "1 / hectare")
+    ) |>
+    select(StandID, Year, BA_METRIC, Tph) |>
     group_by(StandID) |>
     arrange(Year) |>
     mutate(
-      BA_Delta = BA_METRIC - lag(BA_METRIC)
+      BA_Delta = BA_METRIC - lag(BA_METRIC),
+      Tph_Delta = Tph - lag(Tph)
     ) |>
     ungroup() |>
     filter(!is.na(BA_Delta))
@@ -57,14 +65,18 @@ tar_target(nrsgro_ca10_proj_vs_meas, {
     left_join(ca10_summary_tmp, by = join_by(StandID, Year)) |>
     rename(
       BA_Calb = BA_METRIC,
-      BA_Delta_Calb = BA_Delta
+      BA_Delta_Calb = BA_Delta,
+      Tph_Calb = Tph,
+      Tph_Delta_Calb = Tph_Delta
     ) |>
     left_join(srvy_carbon_tmp, by = join_by(StandID, Year)) |>
     rename(Carbon_Srvy = Carbon, Carbon_Delta_Srvy = Carbon_Delta) |>
     left_join(srvy_summary_tmp, by = join_by(StandID, Year)) |>
     rename(
       BA_Srvy = BA_METRIC,
-      BA_Delta_Srvy = BA_Delta
+      BA_Delta_Srvy = BA_Delta,
+      Tph_Srvy = Tph,
+      Tph_Delta_Srvy = Tph_Delta
     ) |>
     left_join(stand_mixin, by = join_by(StandID)) |>
     mutate(
