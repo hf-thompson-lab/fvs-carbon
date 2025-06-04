@@ -18,6 +18,8 @@ suppressPackageStartupMessages({
   library(maps)
   library(ggspatial) # for maps
   library(ggpmisc) # for stat_poly_eq
+  library(mlr3verse) # Machine Learning in R framework
+  library(GGally) # ggpairs
 })
 options(scipen = 4) # Use integer notation for numbers under 9 digits
 tar_source()
@@ -78,6 +80,45 @@ tmp_plot_stats <- nrsgro_plot_stats |>
   # Here we use 1.605 as the exponent of Reineke's equation, as is commonly reported.
   mutate(SDI = 10^(log10(TPA) + 1.605*log10(QMD) - 1.605))
 
+FIADB_2_5_35_PHYSCLCD <- read_csv(
+    "data/raw/FIADB_2.5.35_PHYSCLCD.csv",
+    show_col_types = FALSE
+  ) |>
+  filter(!is.na(Code)) |>
+  rename(
+    PHYSCLCD = Code
+  ) |>
+  mutate(
+    SITE_MOISTURE = case_when(
+      `Site Type` == "Xeric" ~ 0,
+      `Site Type` == "Mesic" ~ 0.5,
+      `Site Type` == "Hydric" ~ 1
+    ),
+    PHYSIOGRAPHIC_CLASS = as.factor(Name)
+  ) |>
+  select(PHYSCLCD, SITE_MOISTURE, PHYSIOGRAPHIC_CLASS)
+
+tmp_cond_stats <- fia_conds(fiadb, nrsgro_plot) |>
+  filter(!is.na(SLOPE) & !is.na(ASPECT)) |>
+  # Pick just the first inventory year; this
+  # will align best with other starting conditions.
+  group_by(STATECD, COUNTYCD, PLOT, CONDID) |>
+  arrange(INVYR) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  # Pick the largest condition; this will
+  # cover the most conditions on the plot
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  arrange(desc(CONDPROP_UNADJ)) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  left_join(FIADB_2_5_35_PHYSCLCD, by = join_by(PHYSCLCD)) |>
+  filter_add_stand_id() |>
+  select(STAND_ID, SLOPE, ASPECT, SITE_MOISTURE, PHYSIOGRAPHIC_CLASS) |>
+  mutate(
+    ASPECT = cos(45 - ASPECT) + 1 # Beers Transformation
+  )
+
 independent_vars <- nrsgro_plot |>
   filter_add_stand_id() |>
   group_by(STAND_ID) |>
@@ -92,24 +133,14 @@ independent_vars <- nrsgro_plot |>
     ECOCD = as.factor(ECOCD)
   ) |>
   left_join(tmp_plot_stats, by = join_by(STAND_ID))  |>
-  mutate(
-    LAT_CTR = LAT - mean(LAT, na.rm = TRUE),
-    LON_CTR = LON - mean(LON, na.rm = TRUE),
-    ELEV_CTR = ELEV - mean(ELEV, na.rm = TRUE),
-    BALIVE_CTR = BALIVE_METRIC - mean(BALIVE_METRIC, na.rm = TRUE),
-    TPA_CTR = TPA - mean(TPA, na.rm = TRUE),
-    QMD_CTR = QMD - mean(QMD, na.rm = TRUE),
-    SDI_CTR = SDI - mean(SDI, na.rm = TRUE),
-    STDAGE_CTR = STDAGE - mean(STDAGE, na.rm = TRUE)
-  )
-# TODO: we need slope and apsect - these are on the COND
+  left_join(tmp_cond_stats, by = join_by(STAND_ID))
 ```
 
 ```{r plot indep vars}
 independent_vars |>
 #  filter(FOREST_TYPE_GROUP == "Spruce / fir") |>
   filter(TPA > 10) |>
-  ggplot(aes(TPA, BALIVE_METRIC, color = STDAGE, size = QMD)) +
+  ggplot(aes(TPA, BALIVE_METRIC, color = STDAGE + 1, size = QMD)) +
   geom_point(position = "jitter") +
 #  facet_wrap("FOREST_TYPE_GROUP") +
   scale_x_continuous(transform = "log10") +
@@ -140,13 +171,14 @@ Per tree:
 
 ```{r dependent variables}
 tar_load(nrsgro_ca10_proj_vs_meas)
+tar_load(nrsgro_none_summary)
 # We're only interested in the error of the final projection
 dependent_variables <- nrsgro_ca10_proj_vs_meas |>
   group_by(StandID) |>
   arrange(desc(ProjectionYears)) |>
   filter(row_number() == 1) |>
   ungroup() |>
-  select(-BALIVE_METRIC)
+  select(-BALIVE_METRIC) # BALIVE_METRIC is a copy of the one in independent vars
 ```
 
 ## Observations
@@ -165,6 +197,43 @@ obs |>
   scale_y_continuous(name = "Number of Plots") +
   theme_bw() +
   ggtitle("Histogram of Carbon Flux Residual")
+```
+
+Which hints at what we're trying to fix:
+
+```{r plot density}
+obs |>
+  select(StandID, BAI_Srvy, BAI_Calb) |>
+  pivot_longer(
+    cols = c("BAI_Srvy", "BAI_Calb"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Basal Area Increment Projection")
+```
+
+## Bias by starting BA
+
+```{r bias by starting ba}
+obs |>
+  ggplot(aes(BALIVE_METRIC, BAI_Residual, color = FOREST_TYPE_GROUP)) +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.25) +
+  geom_point(aes(fill = FOREST_TYPE_GROUP), shape = 21, size = 1, color = "black") +
+  stat_poly_line(formula = y ~ x, se = FALSE) +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.25) +
+  scale_fill_viridis_d(name = "Forest Type Group") +
+  scale_color_viridis_d(name = "Forest Type Group") +
+  theme_bw() +
+  ggtitle("FVS BAI vs Starting Stand BA") +
+  xlab(bquote("Starting Stand Basal Area" ~ (m^2 %.% hectare^-1))) +
+  ylab(bquote("Basal Area Increment Residual" ~ (m^2 %.% hectare^-1 %.% year^-1)))
 ```
 
 # Carbon Flux Bias Correction
@@ -206,6 +275,43 @@ obs |>
   stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.25, color = "blue") +
   stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue")
 ```
+
+### Slope
+
+```{r slope linearity}
+obs |>
+  ggplot(aes(SLOPE, Carbon_Flux_Residual)) +
+  geom_point(size=0.25) +
+  facet_wrap("FOREST_TYPE_GROUP") +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.25, color = "blue") +
+  #stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  ggtitle("Slope Linearity")
+```
+
+### Aspect
+
+```{r aspect linearity}
+obs |>
+  ggplot(aes(ASPECT, Carbon_Flux_Residual)) +
+  geom_point(size=0.25) +
+  facet_wrap("FOREST_TYPE_GROUP") +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.25, color = "blue") +
+  #stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  ggtitle("Slope Linearity")
+```
+
+### Physiographic class
+
+```{r physclcd linearity}
+obs |>
+  ggplot(aes(PHYSIOGRAPHIC_CLASS, Carbon_Flux_Residual)) +
+  geom_point(size=0.25) +
+  facet_wrap("FOREST_TYPE_GROUP") +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.25, color = "blue") +
+  #stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  ggtitle("Slope Linearity")
+```
+
 
 ### Basal Area
 
@@ -267,101 +373,151 @@ obs |>
 
 ## Model All Independent Variables
 
-```{r multiple linear regression}
-m <- lm(
+Throw all the independent variables into a pot and see what sorts out.
+
+```{r m_all}
+m_all <- lm(
   data = obs,
-  formula = Carbon_Flux_Residual ~ LAT + LON + ELEV + BALIVE_METRIC + TPA + QMD + SDI + STDAGE + FOREST_TYPE_GROUP + ProjectionYears
+  formula = Carbon_Flux_Residual ~ LAT + LON + ELEV + SLOPE + ASPECT + BALIVE_METRIC + TPA + QMD + SDI + STDAGE + PHYSIOGRAPHIC_CLASS + FOREST_TYPE_GROUP + ProjectionYears
 )
-summary(m)
-Anova(m)
+summary(m_all)
+Anova(m_all)
 ```
 
-```{r check model m}
-check_model(m)
+This is blank; check_model can't handle models with more than one factor.
+
+```{r check m_all}
+check_model(m_all)
 ```
 
-### Centered
+Let's take a look
 
-Same, but centered
+```{r m_all density}
+obs |>
+  mutate(Carbon_Flux_Adj = Carbon_Flux_Calb - unname(predict(m_all, obs))) |>
+  select(StandID, Carbon_Flux_Srvy, Carbon_Flux_Calb, Carbon_Flux_Adj) |>
+  pivot_longer(
+    cols = c("Carbon_Flux_Srvy", "Carbon_Flux_Calb", "Carbon_Flux_Adj"),
+    names_to = "Series",
+    values_to = "Carbon_Flux"
+  ) |>
+  ggplot(aes(Carbon_Flux, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Carbon Flux Projection")
 
-```{r m_ctr}
-m_ctr <- lm(
-  data = obs,
-  formula = Carbon_Flux_Residual ~ LAT_CTR + LON_CTR + ELEV_CTR + BALIVE_CTR + TPA_CTR + QMD_CTR + SDI_CTR + STDAGE_CTR + ProjectionYears + FOREST_TYPE_GROUP
-)
-summary(m_ctr)
-Anova(m_ctr)
 ```
 
-check it
-```{r check m_ctr}
-check_model(m_ctr)
-```
-
-Looks like linearity is not respected, something to explore.
-Homgeneity of variance is also a scatterplot, not sure what's up there.
-Posterior predictive check looks bad - a spike vs. a bell curve. Not sure how to fix that.
+That looks pretty bad.
 
 ## Model P<0.001 Variables
 
 It looks like LON, TPA, and STDAGE aren't contributing, so let's take them out.
-Furthermore, BALIVE and SDI conflict with each other (high colinearity).
-So keep only one of them. Since SDI is comptued from BA and TPA, let's just
-keep BALIVE.
+BALIVE and SDI conflict with each other (high colinearity).
+BALIVE + TPA and QMD conflict with each other.
+Remove the derived traits - SDI and QMD.
 
-```{r m2}
-m2 <- lm(
+```{r m_some}
+m_some <- lm(
   data = obs,
-  formula = Carbon_Flux_Residual ~ LAT + ELEV + BALIVE_METRIC + QMD + ProjectionYears +
-    FOREST_TYPE_GROUP
+  formula = Carbon_Flux_Residual ~ LAT + ELEV + BALIVE_METRIC + TPA + ProjectionYears + FOREST_TYPE_GROUP
 )
-summary(m2)
-Anova(m2)
+summary(m_some)
+Anova(m_some)
 ```
 
-```{r check m2}
-check_model(m2)
+```{r m_some density}
+obs |>
+  mutate(Carbon_Flux_Adj = Carbon_Flux_Calb - unname(predict(m_some, obs))) |>
+  select(StandID, Carbon_Flux_Srvy, Carbon_Flux_Calb, Carbon_Flux_Adj) |>
+  pivot_longer(
+    cols = c("Carbon_Flux_Srvy", "Carbon_Flux_Calb", "Carbon_Flux_Adj"),
+    names_to = "Series",
+    values_to = "Carbon_Flux"
+  ) |>
+  ggplot(aes(Carbon_Flux, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Carbon Flux Projection")
 ```
+
+Similarly bad.
 
 ### SDI
 
 Out of curiosity, let's see what happens if we keep SDI instead of BALIVE.
 
-```{r m2 with sdi}
-m2_sdi <- lm(
+```{r m_some with sdi}
+m_some_sdi <- lm(
   data = obs,
-  formula = Carbon_Flux_Residual ~ LAT + ELEV + SDI + QMD + ProjectionYears + FOREST_TYPE_GROUP
+  formula = Carbon_Flux_Residual ~ LAT + ELEV + SDI + TPA + ProjectionYears + FOREST_TYPE_GROUP
 )
-summary(m2_sdi)
-Anova(m2_sdi)
+summary(m_some_sdi)
+Anova(m_some_sdi)
 
 ```
 
-```{r check m2_sdi}
-check_model(m2_sdi)
+```{r m_some_sdi density}
+obs |>
+  mutate(Carbon_Flux_Adj = Carbon_Flux_Calb - unname(predict(m_some_sdi, obs))) |>
+  select(StandID, Carbon_Flux_Srvy, Carbon_Flux_Calb, Carbon_Flux_Adj) |>
+  pivot_longer(
+    cols = c("Carbon_Flux_Srvy", "Carbon_Flux_Calb", "Carbon_Flux_Adj"),
+    names_to = "Series",
+    values_to = "Carbon_Flux"
+  ) |>
+  ggplot(aes(Carbon_Flux, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Carbon Flux Projection")
 ```
-
 Pretty much the same.
 
 ### ECOCD
 
 Out of curiosity, what happens if we swap FOREST_TYPE_GROUP for ECOCD?
 
-```{r m2 with ecocd}
-m2_ecocd <- lm(
+```{r m_some with ecocd}
+m_some_ecocd <- lm(
   data = obs,
-  formula = Carbon_Flux_Residual ~ LAT + ELEV + SDI + QMD + ProjectionYears + ECOCD
+  formula = Carbon_Flux_Residual ~ LAT + ELEV + BALIVE_METRIC + TPA + ProjectionYears + ECOCD
 )
-summary(m2_ecocd)
-Anova(m2_ecocd)
+summary(m_some_ecocd)
+Anova(m_some_ecocd)
 
 ```
 
-```{r check m2_ecocd}
-check_model(m2_ecocd)
+
+```{r m_some_ecocd density}
+obs |>
+  mutate(Carbon_Flux_Adj = Carbon_Flux_Calb - unname(predict(m_some_ecocd, obs))) |>
+  select(StandID, Carbon_Flux_Srvy, Carbon_Flux_Calb, Carbon_Flux_Adj) |>
+  pivot_longer(
+    cols = c("Carbon_Flux_Srvy", "Carbon_Flux_Calb", "Carbon_Flux_Adj"),
+    names_to = "Series",
+    values_to = "Carbon_Flux"
+  ) |>
+  ggplot(aes(Carbon_Flux, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Carbon Flux Projection")
 ```
-
-
 It does not find ECOCD interesting, and we can't plot the summary when using
 ECOCD, so we'll ignore it.
 
@@ -369,63 +525,258 @@ ECOCD, so we'll ignore it.
 
 Let's try scaling some things.
 
-```{r m3}
-m3 <- lm(
+```{r m2_scaled}
+m2_scaled <- lm(
   data = obs,
-  formula = Carbon_Flux_Residual ~ sin(LAT * pi / 180) + ELEV + sqrt(BALIVE_METRIC) + QMD + ProjectionYears + FOREST_TYPE_GROUP
+  formula = Carbon_Flux_Residual ~ sin(LAT * pi / 180) + ELEV + sqrt(BALIVE_METRIC) + TPA + ProjectionYears + FOREST_TYPE_GROUP
 )
-summary(m3)
-Anova(m3)
+summary(m2_scaled)
+Anova(m2_scaled)
 ```
 
-```{r check m3}
-check_model(m3)
-```
 
+```{r m2_scaled density}
+obs |>
+  mutate(Carbon_Flux_Adj = Carbon_Flux_Calb - unname(predict(m2_scaled, obs))) |>
+  select(StandID, Carbon_Flux_Srvy, Carbon_Flux_Calb, Carbon_Flux_Adj) |>
+  pivot_longer(
+    cols = c("Carbon_Flux_Srvy", "Carbon_Flux_Calb", "Carbon_Flux_Adj"),
+    names_to = "Series",
+    values_to = "Carbon_Flux"
+  ) |>
+  ggplot(aes(Carbon_Flux, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Carbon Flux Projection")
+```
 ## No Projection Years
 
 I really want a model that's independent of projection years. We know it'll only
 be valid up to ~20 years.
-Let's start with all the independent vars again.
+Let's start with all the independent vars again but leave out projection years.
 
-```{r m4}
-m4 <- lm(
+```{r m_timeless_all}
+m_timeless_all <- lm(
   data = obs,
-  formula = Carbon_Flux_Residual ~ LAT + LON + ELEV + BALIVE_METRIC + TPA + QMD + SDI + STDAGE + FOREST_TYPE_GROUP
+  formula = Carbon_Flux_Residual ~
+    # Plot characteristics
+    LAT + LON + ELEV + SLOPE + ASPECT +
+    # Physiological Characteristics
+    PHYSIOGRAPHIC_CLASS +
+    # Stand characteristics
+    BALIVE_METRIC + TPA + QMD + SDI + STDAGE + FOREST_TYPE_GROUP
 )
-summary(m4)
-Anova(m4)
+summary(m_timeless_all)
+Anova(m_timeless_all)
 ```
 
 Well that's completely different.
 
-```{r check m4}
-check_model(m4)
+It seems to lik ELEV, PHYSIOGRAPHIC_CLASS, BALIVE, TPA, SDI, STDAGE, and FOREST_TYPE_GROUP.
+
+```{r m_timeless_all density}
+obs |>
+  mutate(Carbon_Flux_Adj = Carbon_Flux_Calb - unname(predict(m_timeless_all, obs))) |>
+  select(StandID, Carbon_Flux_Srvy, Carbon_Flux_Calb, Carbon_Flux_Adj) |>
+  pivot_longer(
+    cols = c("Carbon_Flux_Srvy", "Carbon_Flux_Calb", "Carbon_Flux_Adj"),
+    names_to = "Series",
+    values_to = "Carbon_Flux"
+  ) |>
+  ggplot(aes(Carbon_Flux, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Carbon Flux Projection")
+```
+Once again, BALIVE, TPA and SDI are intermixed, so we pick BALIVE and TPA.
+BALIVE and STDAGE are colinear, and STDAGE has time baked into it, so we pick BALIVE.
+
+```{r m_timeless}
+m_timeless <- lm(
+  data = obs,
+  formula = Carbon_Flux_Residual ~ ELEV + PHYSIOGRAPHIC_CLASS + BALIVE_METRIC + FOREST_TYPE_GROUP
+)
+summary(m_timeless)
+print("-----")
+Anova(m_timeless)
 ```
 
-Once again, BALIVE and SDI are colinear, so we pick BALIVE.
 
-```{r m5}
-m5 <- lm(
+```{r m_timeless density}
+obs |>
+  mutate(Carbon_Flux_Adj = Carbon_Flux_Calb - unname(predict(m_timeless, obs))) |>
+  select(StandID, Carbon_Flux_Srvy, Carbon_Flux_Calb, Carbon_Flux_Adj) |>
+  pivot_longer(
+    cols = c("Carbon_Flux_Srvy", "Carbon_Flux_Calb", "Carbon_Flux_Adj"),
+    names_to = "Series",
+    values_to = "Carbon_Flux"
+  ) |>
+  ggplot(aes(Carbon_Flux, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Carbon Flux Projection")
+```
+
+### Forest Type
+
+What if we use FOREST_TYPE instead of FOREST_TYPE_GROUP?
+
+
+```{r m_timeless_ungrouped}
+m_timeless_ungrouped <- lm(
+  data = obs,
+  formula = Carbon_Flux_Residual ~ ELEV + PHYSIOGRAPHIC_CLASS + BALIVE_METRIC + FOREST_TYPE
+)
+summary(m_timeless_ungrouped)
+print("-----")
+Anova(m_timeless_ungrouped)
+```
+
+So, strictly worse.
+
+```{r m_timeless_ungrouped density}
+obs |>
+  mutate(Carbon_Flux_Adj = Carbon_Flux_Calb - unname(predict(m_timeless_ungrouped, obs))) |>
+  select(StandID, Carbon_Flux_Srvy, Carbon_Flux_Calb, Carbon_Flux_Adj) |>
+  pivot_longer(
+    cols = c("Carbon_Flux_Srvy", "Carbon_Flux_Calb", "Carbon_Flux_Adj"),
+    names_to = "Series",
+    values_to = "Carbon_Flux"
+  ) |>
+  ggplot(aes(Carbon_Flux, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Carbon Flux Projection")
+```
+
+
+### No Physiographic Class
+
+What if we elimintate physiographic class?
+
+```{r m_timeless_nophys}
+m_timeless_nophys <- lm(
   data = obs,
   formula = Carbon_Flux_Residual ~ ELEV + BALIVE_METRIC + FOREST_TYPE_GROUP
 )
-summary(m5)
+summary(m_timeless_nophys)
 print("-----")
-Anova(m5)
+Anova(m_timeless_nophys)
+```
+
+Ironically better.
+
+```{r m_timeless_nophys density}
+obs |>
+  mutate(Carbon_Flux_Adj = Carbon_Flux_Calb - unname(predict(m_timeless_nophys, obs))) |>
+  select(StandID, Carbon_Flux_Srvy, Carbon_Flux_Calb, Carbon_Flux_Adj) |>
+  pivot_longer(
+    cols = c("Carbon_Flux_Srvy", "Carbon_Flux_Calb", "Carbon_Flux_Adj"),
+    names_to = "Series",
+    values_to = "Carbon_Flux"
+  ) |>
+  ggplot(aes(Carbon_Flux, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Carbon Flux Projection")
+```
+
+### With Plot Metrics
+
+I really want other aspects of the plot to be in there.
+
+```{r m_timeless_plot}
+m_timeless_plot <- lm(
+  data = obs,
+  formula = Carbon_Flux_Residual ~ LAT + SLOPE + ASPECT + ELEV + PHYSIOGRAPHIC_CLASS + BALIVE_METRIC + FOREST_TYPE_GROUP
+)
+summary(m_timeless_plot)
+print("-----")
+Anova(m_timeless_plot)
+```
+
+Meh.
+
+```{r m_timeless_plot density}
+obs |>
+  mutate(Carbon_Flux_Adj = Carbon_Flux_Calb - unname(predict(m_timeless_plot, obs))) |>
+  select(StandID, Carbon_Flux_Srvy, Carbon_Flux_Calb, Carbon_Flux_Adj) |>
+  pivot_longer(
+    cols = c("Carbon_Flux_Srvy", "Carbon_Flux_Calb", "Carbon_Flux_Adj"),
+    names_to = "Series",
+    values_to = "Carbon_Flux"
+  ) |>
+  ggplot(aes(Carbon_Flux, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Carbon Flux Projection")
+```
+
+### Without BALive
+
+```{r m_timeless_baless}
+m_timeless_baless <- lm(
+  data = obs,
+  formula = Carbon_Flux_Residual ~ ELEV + PHYSIOGRAPHIC_CLASS + FOREST_TYPE_GROUP
+)
+summary(m_timeless_baless)
+print("-----")
+Anova(m_timeless_baless)
+```
+
+Meh. Not as good.
+
+```{r m_timeless_baless density}
+obs |>
+  mutate(Carbon_Flux_Adj = Carbon_Flux_Calb - unname(predict(m_timeless_baless, obs))) |>
+  select(StandID, Carbon_Flux_Srvy, Carbon_Flux_Calb, Carbon_Flux_Adj) |>
+  pivot_longer(
+    cols = c("Carbon_Flux_Srvy", "Carbon_Flux_Calb", "Carbon_Flux_Adj"),
+    names_to = "Series",
+    values_to = "Carbon_Flux"
+  ) |>
+  ggplot(aes(Carbon_Flux, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Carbon Flux Projection")
 ```
 
 
-```{r check m5}
-check_model(m5)
-```
+## More Views
 
-## Apply Carbon Flux Bias Correction
+It looks like the best model is m_timeless_nophys
 
 ```{r apply m5}
 bias_adjusted <- obs |>
-  select(-ends_with("_CTR")) |>
-  mutate(Carbon_Flux_Bias = unname(predict(m5, obs))) |>
+  mutate(Carbon_Flux_Bias = unname(predict(m_timeless_nophys, obs))) |>
   mutate(
     Carbon_Flux_Adjusted = Carbon_Flux_Calb - Carbon_Flux_Bias,
     Carbon_Flux_BAR = Carbon_Flux_Adjusted - Carbon_Flux_Srvy
@@ -512,68 +863,185 @@ bias_adjusted |>
 
 # BAI Bias Correction
 
+Let's take the best model, m_timeless_nophys, and use the same structure to
+build a model of BAI prediction bias.
+
+What are we up against?
+
+```{r bai density}
+obs |>
+  select(StandID, BAI_Srvy, BAI_Calb) |>
+  pivot_longer(
+    cols = c("BAI_Srvy", "BAI_Calb"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Basal Area Increment Projection")
+```
+
 ## Model BAI Bias
 
-```{r m5_bai}
-m5_bai <- lm(
+```{r m_timeless_bai}
+m_timeless_bai <- lm(
   data = obs,
   formula = BAI_Residual ~ ELEV + BALIVE_METRIC + FOREST_TYPE_GROUP
 )
-summary(m5_bai)
+summary(m_timeless_bai)
 print("-----")
-Anova(m5_bai)
+Anova(m_timeless_bai)
 ```
 
 
-```{r check m5_bai}
-check_model(m5_bai)
+```{r check m_timeless_bai}
+check_model(m_timeless_bai)
 ```
 
-## Apply BAI Bias Correction
 
-```{r apply m5_bai}
-bai_adjusted <- obs |>
-  select(-ends_with("_CTR")) |>
-  mutate(BAI_Bias = unname(predict(m5_bai, obs))) |>
-  mutate(
-    BAI_Adjusted = BAI_Calb - BAI_Bias,
-    BAI_BAR = BAI_Adjusted - BAI_Srvy,
-    BA_Calb_Adjusted = BA_Calb - BAI_Bias * ProjectionYears,
-    BA_Delta_Adjusted = BA_Calb_Adjusted - BA_Srvy
-  )
-```
-
-```{r plot apply m5_bai}
-bai_adjusted |>
-  select(c("FOREST_TYPE_GROUP", "BAI_Residual", "BAI_BAR")) |>
-  pivot_longer(cols = c("BAI_Residual", "BAI_BAR")) |>
-  ggplot(aes(value, fill = name)) +
+```{r m_timeless_bai density}
+obs |>
+  mutate(BAI_Adj = BAI_Calb - unname(predict(m_timeless_bai, obs))) |>
+  select(StandID, BAI_Srvy, BAI_Calb, BAI_Adj) |>
+  pivot_longer(
+    cols = c("BAI_Srvy", "BAI_Calb", "BAI_Adj"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_density(alpha = 0.5) +
   geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
-  geom_histogram(binwidth = 0.1, position = "dodge") +
-  scale_fill_brewer(name = "Series", labels = c("Adjusted", "Original"), palette="Set1") +
-  #coord_cartesian(xlim = c(-5, 5)) +
-  #facet_wrap("FOREST_TYPE_GROUP") +
   theme_bw() +
-  scale_x_continuous(name = bquote("BAI Residual" ~ (m^2 %.% hectare^-1 %.% year^-1))) +
-  scale_y_continuous(name = "Number of Plots") +
-  ggtitle("BAI Residuals with Correction")
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Basal Area Increment Projection")
+```
+
+## Forest Type
+
+What if we use Forest Type instead of Forest Type Group?
+
+```{r m_timeless_bai_forest_type}
+m_timeless_bai_forest_type <- lm(
+  data = obs,
+  formula = BAI_Residual ~ ELEV + BALIVE_METRIC + FOREST_TYPE
+)
+summary(m_timeless_bai_forest_type)
+print("-----")
+Anova(m_timeless_bai_forest_type)
+```
+
+```{r m_timeless_bai_forest_type density}
+obs |>
+  mutate(BAI_Adj = BAI_Calb - unname(predict(m_timeless_bai_forest_type, obs))) |>
+  select(StandID, BAI_Srvy, BAI_Calb, BAI_Adj) |>
+  pivot_longer(
+    cols = c("BAI_Srvy", "BAI_Calb", "BAI_Adj"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Basal Area Increment Projection")
+```
+
+Forest Type Group is a bit better.
+
+## Nik's Stupid Model
+
+```{r m_timeless_bai density}
+difference_in_means = mean(obs$BAI_Calb) - mean(obs$BAI_Srvy)
+ratio_of_sd = sd(obs$BAI_Srvy) / sd(obs$BAI_Calb)
+obs |>
+  mutate(BAI_Adj = (BAI_Calb - difference_in_means) * ratio_of_sd) |>
+  select(StandID, FOREST_TYPE_GROUP, BAI_Srvy, BAI_Calb, BAI_Adj) |>
+  pivot_longer(
+    cols = c("BAI_Srvy", "BAI_Calb", "BAI_Adj"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  facet_wrap("FOREST_TYPE_GROUP") +
+  theme_bw() +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Basal Area Increment Projection")
 ```
 
 ## Residual by Starting Stand BA
 
-```{r plot carbon flux residual vs balive, eval = FALSE}
-bai_adjusted |>
+```{r plot bai residual vs balive}
+obs |>
+  mutate(BAI_Adj = BAI_Calb - unname(predict(m_timeless_bai, obs))) |>
+  mutate(BAI_Adj_Residual = BAI_Srvy - BAI_Adj) |>
+  select(StandID, BALIVE_METRIC, BAI_Residual, BAI_Adj_Residual) |>
+  pivot_longer(
+    cols = c("BAI_Residual", "BAI_Adj_Residual"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
   mutate(BALIVE_METRIC = cut(BALIVE_METRIC, 0:19 * 5, include.lowest = TRUE)) |>
-  ggplot(aes(BALIVE_METRIC, BAI_BAR)) +
-  geom_point(size=0.25) +
-  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 1, color = "blue") +
-  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  ggplot(aes(BALIVE_METRIC, BAI, fill = Series)) +
+  geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.25) +
   theme_bw() +
   xlab(bquote("Starting Basal Area" ~ (m^2 %.% hectare^-1))) +
   ylab(bquote("BAI Residual" ~ (m^2 %.% hectare^-1 %.% year^-1))) +
   ggtitle("BAI Residual vs. Stand Starting Basal Area (with bias correction)") +
-  geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
-  coord_cartesian(ylim = c(-5, 5))
+  scale_fill_viridis_d()
+```
+
+
+```{r bai bias by starting ba}
+obs |>
+  group_by(FOREST_TYPE_GROUP) |>
+  mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
+  ungroup() |>
+  ggplot(aes(BALIVE_METRIC, BAI_Residual, color = FOREST_TYPE_GROUP)) +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.25) +
+  geom_point(aes(fill = FOREST_TYPE_GROUP), shape = 21, size = 1, color = "black") +
+  stat_poly_line(formula = y ~ x, se = FALSE) +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.25) +
+  scale_fill_viridis_d(name = "Forest Type Group") +
+  scale_color_viridis_d(name = "Forest Type Group") +
+  theme_bw() +
+  ggtitle("FVS BAI Residual vs Starting Stand BA") +
+  xlab(bquote("Starting Stand Basal Area" ~ (m^2 %.% hectare^-1))) +
+  ylab(bquote("Basal Area Increment Residual" ~ (m^2 %.% hectare^-1 %.% year^-1)))
+```
+
+```{r bai bias adjusted by starting ba}
+obs |>
+  group_by(FOREST_TYPE_GROUP) |>
+  mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
+  ungroup() |>
+  mutate(BAI_Adj = BAI_Calb - unname(predict(m_timeless_bai, obs))) |>
+  mutate(BAI_Adj_Residual = BAI_Srvy - BAI_Adj) |>
+  ggplot(aes(BALIVE_METRIC, BAI_Adj_Residual, color = FOREST_TYPE_GROUP)) +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.25) +
+  geom_point(aes(fill = FOREST_TYPE_GROUP), shape = 21, size = 1, color = "black") +
+  stat_poly_line(formula = y ~ x, se = FALSE) +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.25) +
+  scale_fill_viridis_d(name = "Forest Type Group") +
+  scale_color_viridis_d(name = "Forest Type Group") +
+  theme_bw() +
+  ggtitle("FVS BAI Residual vs Starting Stand BA (adjusted)") +
+  xlab(bquote("Starting Stand Basal Area" ~ (m^2 %.% hectare^-1))) +
+  ylab(bquote("Basal Area Increment Residual" ~ (m^2 %.% hectare^-1 %.% year^-1)))
 ```
 
 ```{r plot carbon flux residual vs balive, eval = FALSE}
@@ -590,9 +1058,19 @@ bai_adjusted |>
   #scale_y_continuous(limits = c(-5, 5))
 ```
 
+## RMSE
+
+```{r rmse}
+x <- obs |>
+  mutate(BAI_Adj = BAI_Calb - unname(predict(m_timeless_bai, obs))) |>
+  mutate(BAI_Adj_Residual = BAI_Srvy - BAI_Adj)
+Metrics::rmse(x$BAI_Srvy, x$BAI_Calb)
+Metrics::rmse(x$BAI_Srvy, x$BAI_Adj)
+```
+
 ## Quadratic BAI
 
-What happens if we fit a quadratic model just to startign BA?
+What happens if we fit a quadratic model just to starting BA?
 
 ```{r m6}
 m6 <- lm(
@@ -631,6 +1109,22 @@ bai_m6 |>
 
 So, no benefit to using the quadratic there.
 
+### WIthout elevation
+
+```{r m5_no_elev}
+m5_no_elev <- lm(
+  data = obs,
+  formula = BAI_Residual ~ BALIVE_METRIC + FOREST_TYPE_GROUP
+)
+bai_adjusted$no_elev <- unname(predict(m5_no_elev, obs))
+
+summary(m5_no_elev)
+print("-----")
+Anova(m5_no_elev)
+```
+
+
+
 ## BA Error with BAI Correction
 
 If we apply BAI correction, what does that do to BA error?
@@ -651,6 +1145,35 @@ bai_adjusted |>
   ylab("Number of Plots") +
   scale_fill_brewer(name = "Series", labels = c("Bias Corrected", "Original"), palette="Set1") +
   ggtitle("Basal Area Projection Error with Bias Correction")
+```
+
+Same, but a straight-up BAI distribution
+
+```{r ba distribution}
+bai_adjusted |>
+  select(StandID, BAI_Srvy, BAI_Calb, BAI_Adjusted, no_elev) |>
+  rename(
+    Observed = BAI_Srvy,
+    Projected = BAI_Calb,
+    Adjusted = BAI_Adjusted,
+    NoElev = no_elev
+  ) |>
+  pivot_longer(
+    cols = c("Observed", "Projected", "Adjusted", "NoElev"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  mutate(
+    Series = ordered(Series, levels = c("Observed", "Projected", "Adjusted", "NoElev"))
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(name = "Series", labels = c("Observed", "Projected", "Adjusted", "NoElev"), palette="Set1") +
+  ggtitle("Basal Area Increment Projection")
 ```
 
 How does this look on a map?
@@ -830,6 +1353,10 @@ within 1 year of a measurement.
 But I think I wouldn't want to do it this way. I'd want to do a run landing on
 each survey year where I can get a 10-year timestep in there.
 
+Proposal 0: (Jonathan's Proposal)
+- The model already incorporates BA by virtue of having many stands with different
+  BA; use the model as-is.
+
 Proposal 1:
 - Since our model of BAI bias is independent of projection years, we can assume
   that it's good up to 4 timesteps.
@@ -865,3 +1392,656 @@ Proposal 2:
   - Apply BA bias correction proportionately to each tree record
   - Set up the next 10-year timestep
 
+
+# Random Forest
+
+We need to filter the training data down to just what matters
+```{r obs narrow}
+obs_narrow <- obs |>
+  select(
+    BAI_Residual,
+    LAT, ELEV, SLOPE, ASPECT,
+    SITE_MOISTURE, PHYSIOGRAPHIC_CLASS,
+    FOREST_TYPE, FOREST_TYPE_GROUP, BALIVE_METRIC, TPA
+    #, QMD, SDI, STDAGE
+  )
+```
+```{r rf_perm}
+rf_perm <- ranger::ranger(
+  BAI_Residual ~ .,
+  data = obs_narrow,
+  num.trees = 10 * (ncol(obs_narrow) - 1),
+  mtry = floor((ncol(obs_narrow) - 1) / 3),
+  respect.unordered.factors = "order",
+  importance = "permutation",
+  seed = 123
+)
+obs |>
+  mutate(BAI_Adj = BAI_Calb - predict(rf_perm, obs_narrow)$predictions) |>
+  select(StandID, BAI_Srvy, BAI_Calb, BAI_Adj) |>
+  pivot_longer(
+    cols = c("BAI_Srvy", "BAI_Calb", "BAI_Adj"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Basal Area Increment Projection")
+
+```
+
+```{r rf_imp}
+rf_imp <- ranger::ranger(
+  BAI_Residual ~ .,
+  data = obs_narrow,
+  mtry = floor((ncol(obs_narrow) - 1) / 3),
+  respect.unordered.factors = "order",
+  importance = "impurity",
+  seed = 123
+)
+obs |>
+  mutate(BAI_Adj = BAI_Calb - predict(rf_imp, obs_narrow)$predictions) |>
+  select(StandID, BAI_Srvy, BAI_Calb, BAI_Adj) |>
+  pivot_longer(
+    cols = c("BAI_Srvy", "BAI_Calb", "BAI_Adj"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Basal Area Increment Projection")
+```
+
+```{r vip rf all}
+vip::vip(rf_perm, num_features = ncol(obs_narrow) - 1, geom = "point") +
+  ggtitle("Variable Importance (Permutation)") +
+  theme_bw()
+vip::vip(rf_imp, num_features = ncol(obs_narrow) - 1, geom = "point") +
+  ggtitle("Variable Importance (Impurity)") +
+  theme_bw()
+
+```
+
+```{r rf_min}
+rf_imp <- ranger::ranger(
+  BAI_Residual ~ .,
+  data = obs_narrow |> select(BAI_Residual, BALIVE_METRIC, LAT, TPA, FOREST_TYPE),
+  mtry = floor((ncol(obs_narrow) - 1) / 3),
+  respect.unordered.factors = "order",
+  importance = "impurity",
+  seed = 123
+)
+obs |>
+  mutate(BAI_Adj = BAI_Calb - predict(rf_imp, obs_narrow)$predictions) |>
+  select(StandID, BAI_Srvy, BAI_Calb, BAI_Adj) |>
+  pivot_longer(
+    cols = c("BAI_Srvy", "BAI_Calb", "BAI_Adj"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1", labels = c("Adjusted", "FVS", "FIA")) +
+  ggtitle("Basal Area Increment Projection")
+```
+
+Let's see how good we can do using caret.
+Caret apparently doesn't declare dependency on packages:
+- globals
+- listenv
+- parallelly
+
+```{r}
+rf_imp_opt <- caret::train(
+  BAI_Residual ~ .,
+  data = obs_narrow |> select(BAI_Residual, BALIVE_METRIC, LAT, TPA, FOREST_TYPE),
+  method = "ranger",
+  tuneGrid = expand.grid(
+    mtry = c(5, 10, 20, 30, 50),
+    splitrule = "variance",
+    min.node.size = c(5, 7, 10, 15)
+  ),
+  trControl = caret::trainControl(method = "cv", number = 5),
+  seed = 123
+)
+```
+
+```{r}
+obs |>
+  mutate(BAI_Adj = BAI_Calb - predict(rf_imp_opt, obs_narrow)) |>
+  select(StandID, BAI_Srvy, BAI_Calb, BAI_Adj) |>
+  pivot_longer(
+    cols = c("BAI_Srvy", "BAI_Calb", "BAI_Adj"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1", labels = c("Adjusted", "FVS", "FIA")) +
+  ggtitle("Basal Area Increment Projection")
+```
+
+huh i like the unonptimized one better... though i could be using the optimized
+one wrong
+
+# AIC
+
+Anderson DR, Burnham KP, Thompson WL (2000) Null hypothesis testing: problems, prevalence, and an alternative. J Wildl Manage 64:912–923
+
+Describe use of AIC (AICc) for model analysis.
+
+Let's put together some candidate models.
+
+## Candidate Models
+
+```{r models}
+models <- list()
+```
+
+### Everything Matters
+
+All the non-derived independent variables play a role in how FVS gets it wrong.
+
+```{r aic all}
+m_all <- obs |>
+  lm(
+    formula = BAI_Residual ~ 
+      # Physical Environment
+      LAT + ELEV + SLOPE + ASPECT +
+      # Environmental Conditions
+      SITE_MOISTURE +
+      # Forest Structure  
+      FOREST_TYPE_GROUP + BALIVE_METRIC + TPA + STDAGE
+  )
+models <- append(models, list("all" = m_all))
+```
+
+Plot these to see if the response variable needs adjustment
+
+```{r plot aic all}
+par(mfrow = c(2, 2))
+plot(m_all)
+```
+### Nothing Matters
+
+Nothing really matters: FVS is just wrong, and the way it's wrong doesn't depend on anything.
+
+```{r aic null}
+m_none <- obs |>
+  lm(
+    formula = BAI_Residual ~ 1
+  )
+models <- append(models, list("none" = m_none))
+```
+
+### Physical Site Characteristics
+
+Each of these tests the hypothesis that a particular site characteristic
+does not matter.
+
+```{r aic phys}
+m_phys_lat <- obs |> lm(
+    formula = BAI_Residual ~ LAT +
+      SITE_MOISTURE +
+      FOREST_TYPE_GROUP + BALIVE_METRIC + TPA + STDAGE
+  )
+m_phys_elev <- obs |> lm(
+    formula = BAI_Residual ~ ELEV +
+      SITE_MOISTURE +
+      FOREST_TYPE_GROUP + BALIVE_METRIC + TPA + STDAGE
+  )
+m_phys_slope <- obs |> lm(
+    formula = BAI_Residual ~ SLOPE +
+      SITE_MOISTURE +
+      FOREST_TYPE_GROUP + BALIVE_METRIC + TPA + STDAGE
+  )
+m_phys_aspect <- obs |> lm(
+    formula = BAI_Residual ~ ASPECT +
+      SITE_MOISTURE +
+      FOREST_TYPE_GROUP + BALIVE_METRIC + TPA + STDAGE
+  )
+m_phys_none <- obs |> lm(
+    formula = BAI_Residual ~
+      SITE_MOISTURE +
+      FOREST_TYPE_GROUP + BALIVE_METRIC + TPA + STDAGE
+  )
+models <- models |> append(list(
+  "phys_lat" = m_phys_lat,
+  "phys_elev" = m_phys_elev,
+  "phys_slope" = m_phys_slope,
+  "phys_aspect" = m_phys_aspect,
+  "phys_none" = m_phys_none
+))
+```
+
+### Environmental Conditions
+
+Test the hypothesis that we do not need environmental conditions
+
+```{r aic cond}
+m_cond_none <- obs |>
+  lm(
+    formula = BAI_Residual ~ 
+      # Physical Environment
+      LAT + ELEV + SLOPE + ASPECT +
+      # Forest Structure  
+      FOREST_TYPE_GROUP + BALIVE_METRIC + TPA + STDAGE
+  )
+models <- append(models, list("cond_none" = m_cond_none))
+```
+
+### Forest Structure
+
+Test the hypothesis that various aspects of forest structure don't matter
+
+```{r aic structure}
+m_struc_type <- obs |> lm(formula = BAI_Residual ~ 
+    LAT + ELEV + SLOPE + ASPECT +
+    SITE_MOISTURE +
+    BALIVE_METRIC + TPA + STDAGE
+  )
+m_struc_balive <- obs |> lm(formula = BAI_Residual ~ 
+    LAT + ELEV + SLOPE + ASPECT +
+    SITE_MOISTURE +
+    FOREST_TYPE_GROUP + TPA + STDAGE
+  )
+m_struc_tpa <- obs |> lm(formula = BAI_Residual ~ 
+    LAT + ELEV + SLOPE + ASPECT +
+    SITE_MOISTURE +
+    FOREST_TYPE_GROUP + BALIVE_METRIC + STDAGE
+  )
+m_struc_stdage <- obs |> lm(formula = BAI_Residual ~ 
+    LAT + ELEV + SLOPE + ASPECT +
+    SITE_MOISTURE +
+    FOREST_TYPE_GROUP + BALIVE_METRIC + TPA
+  )
+m_struc_none <- obs |> lm(formula = BAI_Residual ~
+    LAT + ELEV + SLOPE + ASPECT +
+    SITE_MOISTURE
+  )
+models <- models |> append(list(
+  "struc_type" = m_struc_type,
+  "struc_balive" = m_struc_balive,
+  "struc_tpa" = m_struc_tpa,
+  "struc_stdage" = m_struc_stdage,
+  "struc_none" = m_struc_none
+))
+```
+
+### Best from exploratory analysis
+
+The best model found via P values and residuals seemed to be balive + elevation + forest type.
+Throw that one in the pot.
+
+```{r aic bef}
+models <- models |> append(list(
+  "ba+elev+forest" = m_timeless_bai
+))
+```
+
+## Model AIC
+
+```{r aic}
+library(AICcmodavg)
+models_aic <- aictab(cand.set = models)
+knitr::kable(models_aic)
+```
+
+# MLR
+
+We need a dataset that doesn't include any extraneous variables.
+```{r fvs_bai_residual}
+fvs_bai_residual <- obs |>
+  select(
+    BAI_Residual,
+    LAT,
+    LON,
+    ELEV,
+    ECOCD,
+    ECOSUBCD,
+    BALIVE_METRIC,
+    # I dreamed last night (this is true) that I used BA_Calb and Tph_Calb,
+    # and it improved the model and model workflow a lot.
+    BA_Calb,
+    Tph_Calb,
+    FOREST_TYPE_GROUP,
+    FOREST_TYPE,
+    STDAGE,
+    SLOPE,
+    ASPECT,
+    PHYSIOGRAPHIC_CLASS
+  ) |>
+  rename(
+    BA_Start = BALIVE_METRIC,
+    BA_Proj = BA_Calb,
+    Tph_Proj = Tph_Calb
+  )
+tsk_fvs_bai_residual <- as_task_regr(
+  fvs_bai_residual,
+  target = "BAI_Residual"
+)
+```
+
+```{r}
+autoplot(tsk_fvs_bai_residual)
+```
+
+## Feature Importance
+
+### Importance Filters
+
+What models can tell us about feature importance?
+```{r}
+as.data.table(mlr_learners)[
+  sapply(properties, \(x) {"importance" %in% x})
+]
+```
+
+I wonder why `regr.ranger` isn't in there? :shrug:
+Ah, it's because `regr.ranger` isn't in `mlr3`, but is pulled in by `mlr3verse`.
+
+Let's keep going:
+```{r}
+lrn("regr.ranger")$
+  param_set$
+  levels$
+  importance
+```
+
+Cool, cool; let's use ranger to determine feature importance. The `caret` way
+is to run once using "impurity" and once using "permutation" and look at what's
+above the fold in both.
+
+```{r}
+lrn_ranger_imp = lrn("regr.ranger", importance = "impurity")
+lrn_ranger_prm = lrn("regr.ranger", importance = "permutation")
+```
+
+Do we have any incomplete rows?
+```{r}
+length(tsk_fvs_bai_residual$row_ids[!complete.cases(tsk_fvs_bai_residual$data())])
+```
+Yes, 12 of them. Remove those for the feature importance task.
+
+```{r}
+tsk_fi = tsk_fvs_bai_residual$clone()
+tsk_fi$filter(tsk_fi$row_ids[complete.cases(tsk_fi$data())])
+```
+
+First with impurity:
+```{r}
+flt_importance = flt("importance", learner = lrn_ranger_imp)
+flt_importance$calculate(tsk_fi)
+as.data.table(flt_importance)
+```
+
+But I don't like some of those; what if I remove them?
+```{r}
+tsk_fi_restricted <- tsk_fvs_bai_residual$clone()
+tsk_fi_restricted$select(
+  setdiff(
+    tsk_fvs_bai_residual$feature_names,
+    c("BA_Start", "LON", "STDAGE", "ECOCD", "FOREST_TYPE_GROUP")
+  )
+)
+tsk_fi_restricted$filter(tsk_fi_restricted$row_ids[complete.cases(tsk_fi_restricted$data())])
+flt_imp_rstr = flt("importance", learner = lrn_ranger_imp)
+flt_imp_rstr$calculate(tsk_fi_restricted)
+as.data.table(flt_imp_rstr)
+flt_prm_rstr = flt("importance", learner = lrn_ranger_prm)
+flt_prm_rstr$calculate(tsk_fi_restricted)
+as.data.table(flt_prm_rstr)
+
+```
+
+Tph_Proj, LAT, and BA_Proj are on top for both, followed by ELEV, FOREST_TYPE
+and ECOSUBCD. SLOPE, ASPECT and PHYSIOGRAPHIC_CLASS are bottom for both.
+
+### Embedded Importance
+
+Some models can tell us what features they use:
+
+```{r}
+as.data.table(mlr_learners)[
+  sapply(properties, function(x) "selected_features" %in% x)
+]
+```
+
+`regr.ranger` is in there again, so we'll use it again.
+
+```{r}
+lrn_ranger_imp$train(tsk_fi_restricted)
+lrn_ranger_imp$selected_features()
+```
+
+So, that gives an unranked list, which is less helpful.
+
+## Automated Feature Importance
+
+Of course, mlr3 can automate the process of identifying the features you need
+for a good model.
+
+To pick features, we need to know what we're trying to optimize:
+```{r}
+as.data.table(mlr_measures)[task_type == "regr",]
+```
+
+Without other guidance on what to select, i'll go for the familiar RMSE.
+
+We also need a termination condition:
+```{r}
+as.data.table(trm())
+```
+
+I have some time, so we'll look for stagnation.
+
+Combine the optimization variable and termination condition into a feature
+selection task:
+
+```{r}
+fs_tsk_fvs_bai <- fsi(
+  task = tsk_fi_restricted,
+  learner = lrn_ranger_imp,
+  resampling = rsmp("cv", folds = 3),
+  measure = msr("regr.rmse"),
+  terminator = trm("stagnation", threshold = 1)
+)
+```
+
+There are a variety of feature selection processes. Sequential, exhaustive
+search, etc.; the one that makes intuitive sense to me is "Recursive Feature
+Elimination" (rfe), which tries to find and remove low-importance features.
+
+```{r}
+fs_rfe <- fs("rfe")
+fs_rfe$optimize(fs_tsk_fvs_bai)
+as.data.table(fs_tsk_fvs_bai$result)[, .(features, regr.rmse, regr.sae)]
+```
+
+ha, it selected all features.
+
+But it was also fast; let's try an exhaustive search.
+
+```{r}
+fs_tsk_all <- fsi(
+  task = tsk_fi_restricted,
+  learner = lrn_ranger_imp,
+  resampling = rsmp("cv", folds = 3),
+  measure = msrs(c("regr.rmse", "regr.sae")),
+  terminator = trm("none")
+)
+fs_seq <- fs("exhaustive_search")
+fs_seq$optimize(fs_tsk_all)
+as.data.table(fs_tsk_all$result)[, c("features", "regr.rmse")]
+```
+This found one result that selects everything except ASPECT:
+
+"BA_Proj"     "ECOSUBCD"    "ELEV"        "FOREST_TYPE" "LAT"         "SLOPE"       "Tph_Proj"
+
+I believe that BA_Proj and Tph_Proj are correlated enough to create a principal component;
+ELEV, ECOSUBCD, and FOREST_TYPE probably are too.
+
+Let's see:
+
+```{r}
+as.data.table(tsk_fi_restricted) |>
+  select(-BAI_Residual, -ECOSUBCD, -FOREST_TYPE, -PHYSIOGRAPHIC_CLASS) |>
+  ggpairs()
+```
+
+Well that's unexpected - everything correlates with everything else!
+
+We can do PCA:
+```{r}
+fvs_bai_pca <- as.data.table(tsk_fi_restricted) |>
+  select(-BAI_Residual, -ECOSUBCD, -FOREST_TYPE, -PHYSIOGRAPHIC_CLASS) |>
+  prcomp(center = TRUE, scale. = TRUE)
+summary(fvs_bai_pca)
+fvs_bai_pca
+```
+
+PCA confirms that everything correlates with everything else.
+
+So PCA isn't going to get us anything, since random forest is already dealing
+with this. Also, doing PCA in mlr3 requires buy-in to their pipeline ops,
+and that's further than I'm prepared to go at the moment.
+
+So, let's wrap up and finalize this model.
+
+Now that we have a set of features, we need to do hyperparameter optimization.
+
+We've been using `regr.ranger`; let's keep with it.
+
+```{r}
+as.data.table(lrn("regr.ranger")$param_set)
+```
+
+I believe the ones we want to tune are:
+- importance ["none", "impurity", "permutation"]
+- max.depth [1-Inf] (0 for unlimited, 30 is deep)
+- min.node.size [1-Inf] (5 for regression)
+- mtry [1-Inf] (sqrt(# of variables); 2 or 3 for 7 vars) 
+- num.trees [1-Inf] (3, 5, other small integer is common; default is 500?!?!)
+
+```{r}
+fvs_bai_lrn <- lrn(
+  "regr.ranger",
+  importance = to_tune(c("impurity", "permutation")),
+  max.depth = to_tune(1, 100, logscale = TRUE),
+  min.node.size = to_tune(1:5 * 3 + 2),
+  mtry = to_tune(2:5),
+  num.trees = to_tune(1, 100, logscale = TRUE)
+)
+ti_lrn <- ti( # Section 4.2 says we should use train() or auto_tune() instead of ti()
+  task = tsk_fvs_bai_restricted,
+  learner = fvs_bai_lrn,
+  resampling = rsmp("cv", folds = 3),
+  measures = msr("regr.rmse"),
+  terminator = trm("stagnation", threshold = 1)
+)
+tnr_mbo <- tnr("mbo") # use defaults
+tnr_mbo$optimize(ti_lrn)
+```
+
+So:
+- importance: impurity
+- max.depth: 4.583559 (should be an integer, so 4)
+- min.node.size: 17
+- mtry: 2
+- num.trees: 4.067647 (should be an integer, so 4)
+
+Oh, max.depth and num.trees have log scale, so we need to fetch them from x_domain
+
+- max.depth: 97
+- num.trees: 58
+
+Now, create, train, and apply an optimized model:
+```{r}
+lrn_rngr_tuned = lrn("regr.ranger")
+lrn_rngr_tuned$param_set$values = ti_lrn$result_learner_param_vals
+lrn_rngr_tuned$train(tsk_fvs_bai_restricted)$model
+# use $predict_newdata() to predict using new data
+prediction <- lrn_rngr_tuned$predict(tsk_fvs_bai_restricted)
+autoplot(prediction)
+```
+
+a'ight, let's apply this as a correction, and see how it looks.
+
+```{r}
+obs |>
+  mutate(BAI_Adj = BAI_Calb - prediction$response) |>
+  select(StandID, BAI_Srvy, BAI_Calb, BAI_Adj) |>
+  rename(
+    FVS = BAI_Calb,
+    FIA = BAI_Srvy,
+    ADJ = BAI_Adj
+  ) |>
+  pivot_longer(
+    cols = c("FVS", "FIA", "ADJ"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Basal Area Increment Projection")
+
+```
+
+It really bugs me that the peaks of ADJ and FIA ore off by a skosh.
+
+```{r}
+obs |>
+  mutate(BAI_Adj = BAI_Calb - prediction$response) |>
+  group_by() |>
+  summarize(FIA = mean(BAI_Srvy), ADJ = mean(BAI_Adj)) |>
+  ungroup() |>
+  mutate(DLTA = FIA - ADJ)
+```
+
+```{r}
+obs |>
+  mutate(BAI_Adj = BAI_Calb - prediction$response + 0.05) |>
+  select(StandID, BAI_Srvy, BAI_Calb, BAI_Adj) |>
+  rename(
+    FVS = BAI_Calb,
+    FIA = BAI_Srvy,
+    ADJ = BAI_Adj
+  ) |>
+  pivot_longer(
+    cols = c("FVS", "FIA", "ADJ"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Basal Area Increment Projection")
+
+```

@@ -1,0 +1,21 @@
+Code,Site Type,Name,Description
+,Xeric,"Xeric sites","normally low or deficient in available moisture"
+11,Xeric,"Dry Tops","Ridge tops with thin rock outcrops and considerable exposure to sun and wind."
+12,Xeric,"Dry Slopes","Slopes with thin rock outcrops and considerable exposure to sun and wind. Includes most mountain/steep slopes with a southern or western exposure."
+13,Xeric,"Deep Sands","Sites with a deep, sandy surface subject to rapid loss of moisture following precipitation. Typical examples include sand hills, ridges, and flats in the South, sites along the beach and shores of lakes and streams."
+19,Xeric,"Other Xeric","All dry physiographic sites not described above."
+,Mesic,"Mesic sites","normally moderate but adequate available moisture"
+21,Mesic,"Flatwoods","Flat or fairly level sites outside of floodplains. Excludes deep sands and wet, swampy sites."
+22,Mesic,"Rolling Uplands","Hills and gently rolling, undulating terrain and associated small streams. Excludes deep sands, all hydric sites, and streams with associated floodplains."
+23,Mesic,"Moist Slopes and Coves","Moist slopes and coves with relatively deep, fertile soils. Often these sites have a northern or eastern exposure and are partially shielded from wind and sun. Includes moist mountain tops and saddles."
+24,Mesic,"Narrow floodplains/Bottomlands","Floodplains and bottomlands less than 1/4 mile in width along rivers and streams. These sites are normally well drained but are subjected to occasional flooding during periods of heavy or extended precipitation. Includes associated levees, benches, and terraces within a 1/4 mile limit. Excludes swamps, sloughs, and bogs."
+25,Mesic,"Broad Floodplains/Bottomlands","Floodplains and bottomlands 1/4-mile or wider along rivers and streams. These sites are normally well drained but are subjected to occasional flooding during periods of heavy or extended precipitation. Includes associated levees, benches, and terraces. Excludes swamps, sloughs, and bogs with year-round water problems."
+29,Mesic,"Other Mesic","All moderately moist physiographic sites not described above."
+,Hydric,"Hydric sites","normally abundant or overabundant moisture all year"
+31,Hydric,"Swamps/Bogs","Low, wet, flat, forested areas usually quite extensive that are flooded for long periods except during periods of extreme drought. Excludes cypress ponds and small drains."
+32,Hydric,"Small Drains","Narrow, stream-like, wet strands of forest land often without a well-defined stream channel. These areas are poorly drained or flooded throughout most of the year and drain the adjacent higher ground."
+33,Hydric,"Bays and wet pocosins","Low, wet, boggy sites characterized by peaty or organic soils. May be somewhat dry during periods of extended drought. Examples include sites in the Carolina bays in the Southeast United States."
+34,Hydric,"Beaver ponds",
+35,Hydric,"Cypress ponds",
+36,Hydric,"Forest or Nonforest over Permafrost","Low-lying, sometimes wet, flat areas, often characterized by a thick moss layered ground surface, sometimes comprised of tussocks that tend to form a waterlogged soils layer as the active layer thaws seasonally. Permafrost may be visible or detected with a soil probe. At later periods in the season when permafrost cannot be detected, waterlogged soils layered on top of deeper permafrost are possible"
+39,Hydric,"Other hydric","All other hydric physiographic sites."
