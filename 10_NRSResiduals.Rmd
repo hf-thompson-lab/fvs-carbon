@@ -218,7 +218,7 @@ obs |>
   ggtitle("Basal Area Increment Projection")
 ```
 
-### va Uncalibrated
+### vs Uncalibrated
 
 For giggles, let's look at how FVS does without calibration
 
@@ -1928,6 +1928,8 @@ This found one result that selects everything except ASPECT:
 
 "BA_Proj"     "ECOSUBCD"    "ELEV"        "FOREST_TYPE" "LAT"         "SLOPE"       "Tph_Proj"
 
+## PCA
+
 I believe that BA_Proj and Tph_Proj are correlated enough to create a principal component;
 ELEV, ECOSUBCD, and FOREST_TYPE probably are too.
 
@@ -1956,6 +1958,8 @@ So PCA isn't going to get us anything, since random forest is already dealing
 with this. Also, doing PCA in mlr3 requires buy-in to their pipeline ops,
 and that's further than I'm prepared to go at the moment.
 
+## Hyperparameters
+
 So, let's wrap up and finalize this model.
 
 Now that we have a set of features, we need to do hyperparameter optimization.
@@ -1983,7 +1987,7 @@ fvs_bai_lrn <- lrn(
   num.trees = to_tune(1, 100, logscale = TRUE)
 )
 ti_lrn <- ti( # Section 4.2 says we should use train() or auto_tune() instead of ti()
-  task = tsk_fvs_bai_restricted,
+  task = tsk_fi_restricted,
   learner = fvs_bai_lrn,
   resampling = rsmp("cv", folds = 3),
   measures = msr("regr.rmse"),
@@ -2005,13 +2009,15 @@ Oh, max.depth and num.trees have log scale, so we need to fetch them from x_doma
 - max.depth: 97
 - num.trees: 58
 
+## Train and Predict
+
 Now, create, train, and apply an optimized model:
 ```{r}
 lrn_rngr_tuned = lrn("regr.ranger")
 lrn_rngr_tuned$param_set$values = ti_lrn$result_learner_param_vals
-lrn_rngr_tuned$train(tsk_fvs_bai_restricted)$model
+lrn_rngr_tuned$train(tsk_fi_restricted)$model
 # use $predict_newdata() to predict using new data
-prediction <- lrn_rngr_tuned$predict(tsk_fvs_bai_restricted)
+prediction <- lrn_rngr_tuned$predict(tsk_fi_restricted)
 autoplot(prediction)
 ```
 
@@ -2036,13 +2042,15 @@ obs |>
   geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
   theme_bw() +
   xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
-  ylab("Density") +
-  scale_fill_brewer(palette="Set1") +
+  ylab("Kernel Density") +
+  scale_fill_brewer(palette="Set1", labels = c("Corrected", "FIA Observed", "FVS Calibrated")) +
   ggtitle("Basal Area Increment Projection")
 
 ```
 
-It really bugs me that the peaks of ADJ and FIA ore off by a skosh.
+## Residual Residuals
+
+How'd we do?
 
 ```{r}
 residual_residuals <- obs |>
@@ -2052,6 +2060,79 @@ residual_residuals <- obs |>
   ungroup()
 
 ```
+
+```{r}
+obs |>
+  mutate(BAI_Adj = BAI_Calb - prediction$response) |>
+  select(StandID, BAI_Srvy, BAI_Calb, BAI_Adj) |>
+  mutate(RR = BAI_Srvy - BAI_Adj) |>
+  ggplot(aes(RR)) +
+  geom_histogram(binwidth = 0.01) +
+  scale_x_continuous(name = bquote("Carbon Flux Residual" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  scale_y_continuous(name = "Number of Plots") +
+  theme_bw() +
+  ggtitle("Histogram of Carbon Flux Residuals after Correction")
+
+```
+
+
+```{r}
+obs |>
+  mutate(BAI_Adj = BAI_Calb - prediction$response) |>
+  select(StandID, BAI_Srvy, BAI_Calb, BAI_Adj) |>
+  mutate(
+    RR_Calb = BAI_Srvy - BAI_Calb,
+    RR_Pct_Calb = 100 * RR_Calb / BAI_Srvy,
+    RR_Adj = BAI_Srvy - BAI_Adj,
+    RR_Pct_Adj = 100 * RR_Adj / BAI_Srvy
+  ) |>
+  pivot_longer(
+    cols = c("RR_Pct_Calb", "RR_Pct_Adj"),
+    names_to = "Series",
+    values_to = "value"
+  ) |>
+  ggplot(aes(value, fill = Series)) +
+  geom_histogram(binwidth = 100, position = "dodge") +
+  coord_cartesian(xlim = c(-10000, 10000), ylim = c(0, 100)) +
+  scale_x_continuous(name = bquote("Carbon Flux Residual %")) +
+  scale_y_continuous(name = "Number of Plots") +
+  scale_fill_brewer(palette="Set1", labels = c("Adjusted", "Calibrated")) +
+  theme_bw() +
+  ggtitle("Histogram of Residual % Before and after Adjustment")
+
+```
+
+
+```{r}
+obs |>
+  mutate(BAI_Adj = BAI_Calb - prediction$response) |>
+  select(StandID, BAI_Srvy, BAI_Calb, BAI_Adj) |>
+  mutate(
+    RR_Calb = BAI_Srvy - BAI_Calb,
+    RR_Pct_Calb = 100 * RR_Calb / BAI_Srvy,
+    RR_Adj = BAI_Srvy - BAI_Adj,
+    RR_Pct_Adj = 100 * RR_Adj / BAI_Srvy
+  ) |>
+  pivot_longer(
+    cols = c("RR_Pct_Calb", "RR_Pct_Adj"),
+    names_to = "Series",
+    values_to = "value"
+  ) |>
+  ggplot(aes(value, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  coord_cartesian(xlim = c(-10000, 10000), ylim = c(0, 0.1)) +
+  scale_x_continuous(name = bquote("Carbon Flux Residual %")) +
+  scale_y_continuous(name = "Number of Plots") +
+  scale_fill_brewer(palette="Set1", labels = c("Adjusted", "Calibrated")) +
+  theme_bw() +
+  ggtitle("Histogram of Residual % Before and after Adjustment")
+
+```
+
+
+## Manually nudge
+
+It really bugs me that the peaks of ADJ and FIA ore off by a skosh.
 
 ```{r}
 obs |>
