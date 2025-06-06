@@ -80,7 +80,7 @@ tmp_plot_stats <- nrsgro_plot_stats |>
   # Here we use 1.605 as the exponent of Reineke's equation, as is commonly reported.
   mutate(SDI = 10^(log10(TPA) + 1.605*log10(QMD) - 1.605))
 
-FIADB_2_5_35_PHYSCLCD <- read_csv(
+fiadb_2_5_35_physclcd <- read_csv(
     "data/raw/FIADB_2.5.35_PHYSCLCD.csv",
     show_col_types = FALSE
   ) |>
@@ -112,11 +112,11 @@ tmp_cond_stats <- fia_conds(fiadb, nrsgro_plot) |>
   arrange(desc(CONDPROP_UNADJ)) |>
   filter(row_number() == 1) |>
   ungroup() |>
-  left_join(FIADB_2_5_35_PHYSCLCD, by = join_by(PHYSCLCD)) |>
+  left_join(fiadb_2_5_35_physclcd, by = join_by(PHYSCLCD)) |>
   filter_add_stand_id() |>
   select(STAND_ID, SLOPE, ASPECT, SITE_MOISTURE, PHYSIOGRAPHIC_CLASS) |>
   mutate(
-    ASPECT = cos(45 - ASPECT) + 1 # Beers Transformation
+    ASPECT = cos((45 - ASPECT)*pi/180) + 1 # Beers Transformation
   )
 
 independent_vars <- nrsgro_plot |>
@@ -171,7 +171,6 @@ Per tree:
 
 ```{r dependent variables}
 tar_load(nrsgro_ca10_proj_vs_meas)
-tar_load(nrsgro_none_summary)
 # We're only interested in the error of the final projection
 dependent_variables <- nrsgro_ca10_proj_vs_meas |>
   group_by(StandID) |>
@@ -216,6 +215,39 @@ obs |>
   xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
   ylab("Density") +
   scale_fill_brewer(palette="Set1") +
+  ggtitle("Basal Area Increment Projection")
+```
+
+### va Uncalibrated
+
+For giggles, let's look at how FVS does without calibration
+
+```{r}
+tar_load(nrsgro_none_proj_vs_meas)
+obs |>
+  select(StandID, BAI_Srvy, BAI_Calb) |>
+  left_join(
+    nrsgro_none_proj_vs_meas |>
+      group_by(StandID) |>
+      arrange(desc(Projection_Years)) |>
+      filter(row_number() == 1) |>
+      ungroup() |>
+      select(StandID, Projected_BAI) |>
+      rename(BAI_None = Projected_BAI),
+    by = join_by(StandID)
+  ) |>
+  pivot_longer(
+    cols = c("BAI_Srvy", "BAI_Calb", "BAI_None"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Kernel Density") +
+  scale_fill_brewer(palette="Set1", labels = c("FVS Calibrated", "FVS Default", "FIA Observed")) +
   ggtitle("Basal Area Increment Projection")
 ```
 
@@ -2013,12 +2045,12 @@ obs |>
 It really bugs me that the peaks of ADJ and FIA ore off by a skosh.
 
 ```{r}
-obs |>
+residual_residuals <- obs |>
   mutate(BAI_Adj = BAI_Calb - prediction$response) |>
-  group_by() |>
-  summarize(FIA = mean(BAI_Srvy), ADJ = mean(BAI_Adj)) |>
-  ungroup() |>
-  mutate(DLTA = FIA - ADJ)
+  group_by(FOREST_TYPE) |>
+  summarize(FIA = mean(BAI_Srvy), ADJ = mean(BAI_Adj), DLTA = FIA - ADJ) |>
+  ungroup()
+
 ```
 
 ```{r}
