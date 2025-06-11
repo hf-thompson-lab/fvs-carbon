@@ -34,7 +34,7 @@ In [@nunery2010, Table 1], 32 plots are listed, with the first column,
 subsequently changed, so these codes no longer align with the stand
 identifiers in the FVS tables in the published FIA data.
 
-```{targets nk_table1}
+```{targets nk_table_1}
 # tar_file_read is a tarchetypes meta-target, so can't use tar_simple
 tarchetypes::tar_file_read(
   nk_table_1,
