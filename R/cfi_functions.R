@@ -54,7 +54,42 @@ cfi_abp <- function(.data, cfiabp_trees) {
 # Output is plotvisittree records with logical PlotVisitHarvested and PlotHarvested columns appended.
 cfi_harvested <- function(.data) {
   .data |>
-    mutate(PlotHarvested = TRUE)
+    group_by(MasterTreeID) |>
+    arrange(VisitCycle) |>
+    mutate(
+      PreviousTreeStatusCode = lag(VisitTreeStatusCode),
+      PreviousStatusB = lag(StatusB),
+      PreviousTreeDIAM = lag(VisitTreeDIAM)
+    ) |>
+    ungroup() |>
+    filter(!is.na(PreviousTreeStatusCode) & !is.na(PreviousStatusB)) |>
+    group_by(MasterPlotID, VisitCycle) |>
+    summarize(
+      # Live AGB prior to cutting = sum of AGB of trees that were previously live
+      BA_Live = sum(if_else(
+        PreviousStatusB %in% c("R", "L"), # Live Tree
+        pi * (PreviousTreeDIAM / 2)^2,
+        0,
+      ), na.rm = TRUE),
+      # Cut AGB
+      BA_Cut = sum(if_else(
+        StatusB == "C",
+        pi * (PreviousTreeDIAM / 2)^2,
+        0
+      ), na.rm = TRUE),
+      Cut_Frac = BA_Cut / BA_Live,
+      PlotVisitHarvested = BA_Cut / BA_Live >= 0.1,
+      CutSinceLastVisit = any(CutSinceLastVisit, na.rm = TRUE),
+      .groups = "keep"
+    ) |>
+    ungroup() |>
+    group_by(MasterPlotID) |>
+    summarize(
+      FIAHarvested = any(PlotVisitHarvested, na.rm = TRUE),
+      CFIHarvested = any(CutSinceLastVisit, na.rm = TRUE),
+      .groups = "keep"
+    ) |>
+    ungroup()
 }
 
 # cfi_disturbed -----------------------------------------------------------
