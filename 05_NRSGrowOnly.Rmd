@@ -291,7 +291,8 @@ ggplot(fvsne_states_map, aes(long, lat, group = group)) +
   geom_polygon(fill = "white", color = "black") +
   geom_point(
     plot_location_tmp,
-    mapping = aes(long, lat, group = group, color = fct_reorder(group_name, desc(n)))
+    mapping = aes(long, lat, group = group, color = fct_reorder(group_name, desc(n))),
+    size = 0.5
   ) +
   coord_sf(crs = 4326) +
   annotation_scale(location = "br") +
@@ -302,9 +303,11 @@ ggplot(fvsne_states_map, aes(long, lat, group = group)) +
     pad_y = unit(0.5, "cm")
   ) +
   theme_bw() +
-  theme(legend.position = "bottom") +
-  scale_color_discrete(name = NULL) +
-  ggtitle("FIA Grow-Only Plots in the Northeast Region")
+  theme(legend.position = "right") +
+  scale_color_discrete(name = "Forest Type Group") +
+  ggtitle("FIA Grow-Only Plots in the Northeast Region") +
+  xlab("Longitude") +
+  ylab("Latitude")
 
 remove(plot_location_tmp)
 ```
