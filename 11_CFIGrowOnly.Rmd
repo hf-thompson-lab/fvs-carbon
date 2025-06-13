@@ -1,0 +1,730 @@
+---
+title: "11_CFIGrowOnly"
+output: html_document
+---
+
+# Setup
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(targets)
+  library(tarchetypes)
+  library(tidyverse)
+  library(readxl)
+  library(terra)
+  library(measurements)
+})
+tar_source()
+```
+
+# Stands
+
+Use the raw data from Department of Conservation & Recreation (DCR) Office of Watershed Management, Division of Water Supply Protection (DWSP)'s Continuous Forest Inventory (CFI).
+
+We need stands (plots), visits (inventories), disturbances, and the lookup
+table for disturbance codes.
+
+In addition, (A. Barker Plotkin, et al. 2025) did a thorough analysis of the CFI data,
+identifying 283 plots that were consistently surveyed and not relocated
+from 1970 - 2020. We follow ABP where possible for this analysis.
+
+```{targets cfiabp_trees}
+tarchetypes::tar_file_read(
+  cfiabp_trees,
+  "data/raw/DWSP_CFI/trees283-6-defpropasp.csv",
+  read_csv(!!.x)
+)
+```
+
+```{targets tblDWSPCFIPlotsComplete}
+tarchetypes::tar_file_read(
+  tblDWSPCFIPlotsComplete,
+  "data/raw/DWSP_CFI/tblDWSPCFIPlotsComplete.xlsx",
+  read_excel(!!.x)
+)
+```
+
+```{targets tblSuppPlotDisturbanceCodes}
+tarchetypes::tar_file_read(
+  tblSuppPlotDisturbanceCodes,
+  "data/raw/DWSP_CFI/tblSuppPlotDisturbanceCodes.xlsx",
+  read_excel(!!.x)
+)
+```
+
+```{targets tblDWSPCFIPlotVisitDisturbances}
+tarchetypes::tar_file_read(
+  tblDWSPCFIPlotVisitDisturbances,
+  "data/raw/DWSP_CFI/tblDWSPCFIPlotVisitDisturbances.xlsx",
+  read_excel(!!.x) |>
+    # Fix column name
+    rename(
+      PlotVisitDisturbanceYearCorrected = PlotVisitDisturbandYearCorrected
+    ) |>
+    left_join(
+      tblSuppPlotDisturbanceCodes |>
+        select(DisturbanceCode, DisturbanceDesc),
+      by = join_by(PlotVisitDisturbanceCode == DisturbanceCode)
+    ) |>
+    mutate(
+      DisturbanceDesc = as.factor(DisturbanceDesc)
+    )
+)
+```
+
+```{targets tblDWSPCFIPlotVisitsComplete}
+tarchetypes::tar_file_read(
+  tblDWSPCFIPlotVisitsComplete,
+  "data/raw/DWSP_CFI/tblDWSPCFIPlotVisitsComplete.xlsx",
+  read_excel(!!.x)
+)
+```
+
+```{targets tblSuppTreeStatusCodes}
+tarchetypes::tar_file_read(
+  tblSuppTreeStatusCodes,
+  "data/raw/DWSP_CFI/tblSuppTreeStatusCodes.xlsx",
+  read_excel(
+    !!.x,
+    col_types = c(
+      "numeric", "text", "numeric",
+      "numeric", "numeric", "numeric",
+      "numeric", "numeric", "numeric",
+      "numeric", "numeric", "numeric",
+      "numeric", "numeric", "numeric",
+      "numeric", "numeric", "numeric",
+      "numeric", "numeric"
+    )
+  )
+)
+
+```
+
+```{targets qryDWSPCFIPlotVisitTreeDetail}
+tarchetypes::tar_file_read(
+  qryDWSPCFIPlotVisitTreeDetail,
+  "data/raw/DWSP_CFI/qryDWSPCFIPlotVisitTreeDetail_Partial_HF.xlsx",
+  read_excel(!!.x) |>
+    # Fix column names
+    rename(
+      MasterTreeID = VisitMasterTreeID
+    ) |>
+    # Fix column types - giving read_excel the right types causes it to hang
+    mutate(
+      MasterTreeID = as.numeric(MasterTreeID),
+      VisitTreeNumberDetail = as.numeric(VisitTreeNumberDetail)
+    ) |>
+    left_join(
+      tblSuppTreeStatusCodes |>
+        select(StatusCode, TreeStatusDesc) |>
+        rename(VisitTreeStatusCode = StatusCode),
+      by = join_by(VisitTreeStatusCode)
+    )
+)
+```
+
+```{targets tblDWSPCFITreesComplete}
+tarchetypes::tar_file_read(
+  tblDWSPCFITreesComplete,
+  "data/raw/DWSP_CFI/tblDWSPCFITreesComplete.xlsx",
+  read_excel(!!.x)
+)
+```
+
+## Elevation
+
+LiDAR elevation maps are available from https://www.mass.gov/info-details/massgis-data-lidar-terrain-data#overview
+These are in ERDAS IMAGINE (IMG) format.
+
+Rather than download all tiles we can fetch the 31 tile index and determine
+which tiles the plots are in.
+
+```{r MassGIS DEM Tiles, eval=FALSE}
+massgis_dem_tile_index <- vect(
+  "data/raw/MassGIS/LIDARINDEX_DEMMOSTILES_POLY/LIDARINDEX_DEMMOSTILES_POLY.shp"
+)
+tblDWSPCFIPlotsComplete |>
+  # Remove rows without lat/lon
+  filter(!is.na(GPSLatitude) & !is.na(GPSLongitude)) |>
+  # select an arbitrary row with lat/lon for each plot
+  # we assume that lat/lon is consistent over time
+  group_by(MasterPlotID) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  # Reshape the data for terra::vect()
+  select(MasterPlotID, GPSLatitude, GPSLongitude) |>
+  rename(
+    lat = GPSLatitude,
+    lon = GPSLongitude
+  ) |>
+  vect(crs = "EPSG:4326") |>
+  # Re-project to match the tile index
+  project(massgis_dem_tile_index) |>
+  intersect(massgis_dem_tile_index) |>
+  as.data.frame() |>
+  distinct(TILE) |>
+  arrange(TILE)
+```
+
+So, we need tiles 4, 12, 13 and 14.
+Download those and unpack into data/raw/MassGIS.
+
+Use terra::extract() to extract the elevation in feet for each plot from
+the appropriate tile.
+
+```{targets cfigro_plot_elevft, tar_simple = TRUE}
+# Files for tile NN are named
+# MassGIS/LidarElevation_YYYYtoZZZZ_NN/Lidar_Elevation_YYYYtoZZZZ_NN.img
+# We'll keep this as a list and extract() each tile separately - this is
+# much, MUCH faster than merging tiles with terra::merge() or terra::m
+massgis_dem_tiles <- lapply(
+  list.files("data/raw/MassGIS", pattern = "Lidar_Elevation_*"),
+  \(tile) { rast(file.path("data/raw/MassGIS", tile, paste0(tile, ".img"))) }
+)
+
+tmp_plot_location <- tblDWSPCFIPlotsComplete |>
+  # Remove rows without lat/lon
+  filter(!is.na(GPSLatitude) & !is.na(GPSLongitude)) |>
+  # select an arbitrary row with lat/lon for each plot
+  # we assume that lat/lon is consistent over time
+  group_by(MasterPlotID) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  # Reshape the data for terra::vect()
+  select(MasterPlotID, GPSLatitude, GPSLongitude) |>
+  rename(
+    lat = GPSLatitude,
+    lon = GPSLongitude
+  ) |>
+  vect(crs = "EPSG:4326") |>
+  # Match the projection of the first tile
+  project(massgis_dem_tiles[[1]])
+
+# Build a dataframe with two columns:
+# MasterPlotID, ELEVFT
+# with one row per MasterPlotID
+as.data.frame(tmp_plot_location) |>
+  mutate(
+    # Call extract() on each available tile; for plots that overlap
+    # with that tile, we'll get back elevation, otherwise NA.
+    # Coalesce across tiles to get the non-NA elevation for
+    # each plot.
+    ELEVFT = do.call(
+      coalesce,
+      lapply(massgis_dem_tiles, \(x) extract(x, tmp_plot_location)$FEET)
+    )
+  )
+```
+
+## County
+
+MA county data is available from https://www.mass.gov/info-details/massgis-data-counties
+
+Download those and unpack into data/raw/MassGIS/counties.
+
+Use terra::intersect() to extract the county for each plot.
+
+
+```{targets cfigro_plot_county, tar_simple = TRUE}
+massgis_county <- vect("data/raw/MassGIS/counties/COUNTIES_POLY.shp")
+
+tblDWSPCFIPlotsComplete |>
+  # Remove rows without lat/lon
+  filter(!is.na(GPSLatitude) & !is.na(GPSLongitude)) |>
+  # select an arbitrary row with lat/lon for each plot
+  # we assume that lat/lon is consistent over time
+  group_by(MasterPlotID) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  # Reshape the data for terra::vect()
+  select(MasterPlotID, GPSLatitude, GPSLongitude) |>
+  rename(
+    lat = GPSLatitude,
+    lon = GPSLongitude
+  ) |>
+  vect(crs = "EPSG:4326") |>
+  # Match the projection of the first tile
+  project(massgis_county) |>
+  intersect(massgis_county) |>
+  as.data.frame() |>
+  select(MasterPlotID, COUNTY)
+```
+## Watershed
+
+The DCR Division of Water Supply Protection (DWSP) maintains CFI plots
+in the various reservoir watersheds as a means to manage water quality.
+
+The plots in the Quabbin watershed (Watershed == 1) have a particularly
+long history of high-quality data collection and responsible harvest, so
+we will focus on just this watershed.
+
+ABP plots are filtered to the Quabbin watershed.
+
+## Relocation
+
+Many plots were relocated prior to 1970, while retaining the same
+MasterPlotID. To avoid analysis across this disjunction in trees,
+we restrict analysis to 1970 and after.
+
+ABP trees are filtered to non-relocated plot visits.
+
+## Harvest
+
+We would like to follow the FIA definition of harvest:
+
+> 2.5.44 TRTCD1
+> ... The area affected by the treatment must be at least 1 acre in size.
+
+Sadly, we don't have access to the area affected.
+
+For each tree, however, we do have access to information on whether it was cut.
+
+FIA also defines harvest as:
+
+> Appendix H: Damage Agent Codes and Thresholds
+> 71000, Harvest, Removal of 10% cubic volume.
+
+We likewise do not have volume, but can approximate this.
+
+### FIA Observed
+
+Question: is "Harvest == removal of >= 10% of biomass" consistent with what
+is recorded in FIA? We have noted previously that FIA may mark a plot as
+harvested when no trees are cut, and may mark a plot as not harvested when
+many of its trees are cut, so cutting is an imperfect predictor of fia harvest.
+
+FIA doesn't record biomass, but does record carbon, which is a good proxy.
+
+```{r fia havest analysis, eval=FALSE}
+tar_load(fiadb)
+tar_load(nrshrv_plot)
+tar_load(nrshrv_plot_stats)
+
+# Sum the carbon of trees that were live pre-harvest
+pre_harvest_carbon <- fia_trees(
+    fiadb,
+    nrshrv_plot_stats |> filter(PRE_HARVEST == 1)
+  ) |>
+  filter(STATUSCD == 1) |>
+  filter_add_stand_id() |>
+  select(STAND_ID, CARBON_AG, DIA, TPA_UNADJ) |>
+  group_by(STAND_ID) |>
+  summarize(
+    CARBON_AG = sum(CARBON_AG, na.rm = TRUE),
+    BALIVE_AG = sum(pi * (DIA / 2)^2, na.rm = TRUE)
+  ) |>
+  ungroup()
+
+# Harvested trees don't get biomass, so we need to find their
+# previous selves and get the biomass from there.
+harvested_carbon <- fia_trees_by_cn(
+    fiadb,
+    fia_trees_filtered(
+      fiadb,
+      nrshrv_plot_stats |> filter(HARVEST == 1),
+      \(.data, con) {
+        .data |>
+          filter(STATUSCD == 3) |>
+          select(PREV_TRE_CN) |>
+          rename(CN = PREV_TRE_CN)
+      }
+    )
+  ) |>
+  filter_add_stand_id() |>
+  select(STAND_ID, CARBON_AG, DIA, TPA_UNADJ) |>
+  group_by(STAND_ID) |>
+  summarize(
+    CARBON_HRV = sum(CARBON_AG, na.rm = TRUE),
+    BALIVE_HRV = sum(pi * (DIA / 2)^2, na.rm = TRUE)
+  ) |>
+  ungroup()
+
+fia_harvest_intensity <- pre_harvest_carbon |>
+  inner_join(harvested_carbon, by = join_by(STAND_ID)) |>
+  mutate(
+    CARBON_PCT = 100 * CARBON_HRV / CARBON_AG,
+    BALIVE_PCT = 100 * BALIVE_HRV / BALIVE_AG
+  )
+
+fia_harvest_intensity |>
+  ggplot(aes(CARBON_PCT)) +
+  geom_histogram(binwidth = 5) +
+  geom_vline(xintercept = 10) +
+  theme_bw() +
+  ggtitle("Carbon Removal % in FIA harvested plots")
+
+fia_harvest_intensity |>
+  ggplot(aes(BALIVE_PCT)) +
+  geom_histogram(binwidth = 5) +
+  geom_vline(xintercept = 10) +
+  theme_bw() +
+  ggtitle("Basal Area Removal % in FIA harvested plots")
+
+```
+
+So, the vast majority of harvest is >= 10% of carbon. The distribution of
+removal of basal area is about the same, so we'll use %BA removed as a proxy.
+
+### DWSP CFI Tree Status
+
+Let's look at individual tree status to help understand plot status:
+
+```{r plot cfi tree status code, eval = FALSE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  mutate(TreeStatusDesc = ordered(
+    TreeStatusDesc,
+    levels = c("Live tree >=5.6\"", "standing dead", "fallen dead", "Out of population")
+  )) |>
+  ggplot(aes(VisitCycle, fill = fct_rev(TreeStatusDesc))) +
+  geom_bar(position = "stack") +
+  scale_fill_viridis_d(name = "Tree Status") +
+  theme_bw() +
+  ggtitle("DWSP CFI Tree Status by Visit Cycle") +
+  ylab("Number of Trees") +
+  xlab("Visit Cycle")
+```
+
+So TreeStatusDesc uses codes 1-4, back-propagated to prior visit cycles.
+
+### ABP 2025 Tree Status
+
+```{r plot abp tree status code, eval = FALSE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  mutate(
+    StatusB = if_else(is.na(StatusB), "X", StatusB),
+    StatusDesc = case_match(
+      StatusB,
+      "L" ~ "Live",
+      "R" ~ "Recruit",
+      "D" ~ "Dead",
+      "C" ~ "Cut",
+      "X" ~ "Out of Population"
+    ),
+    StatusDesc = ordered(
+      StatusDesc,
+      levels = c("Recruit", "Live", "Dead", "Cut", "Out of Population")
+    )
+  ) |>
+  ggplot(aes(VisitCycle, fill = fct_rev(StatusDesc))) +
+  geom_bar(position = "stack") +
+  scale_fill_viridis_d(name = "Tree Status") +
+  theme_bw() +
+  ggtitle("ABP 2025 Tree Status by Visit Cycle") +
+  ylab("Number of Trees") +
+  xlab("Visit Cycle")
+```
+
+### CFI vs. ABP Harvest
+
+CFI defines CutAnyTime, which presumably includes pre-1970 harvest.
+
+```{r plot cfi_harvested, eval=FALSE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  group_by(MasterTreeID) |>
+  arrange(VisitCycle) |>
+  mutate(
+    PreviousTreeStatusCode = lag(VisitTreeStatusCode),
+    PreviousStatusB = lag(StatusB),
+    PreviousTreeDIAM = lag(VisitTreeDIAM)
+  ) |>
+  ungroup() |>
+  filter(!is.na(PreviousTreeStatusCode) & !is.na(PreviousStatusB)) |>
+  group_by(MasterPlotID, VisitCycle) |>
+  summarize(
+    # Live AGB prior to cutting = sum of AGB of trees that were previously live
+    BA_Live = sum(if_else(
+      PreviousStatusB %in% c("R", "L"), # Live Tree
+      pi * (PreviousTreeDIAM / 2)^2,
+      0,
+    ), na.rm = TRUE),
+    # Cut AGB
+    BA_Cut = sum(if_else(
+      StatusB == "C",
+      pi * (PreviousTreeDIAM / 2)^2,
+      0
+    ), na.rm = TRUE),
+    Cut_Frac = BA_Cut / BA_Live,
+    PlotVisitHarvested = BA_Cut / BA_Live >= 0.1,
+    CutSinceLastVisit = any(CutSinceLastVisit, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  group_by(MasterPlotID) |>
+  summarize(
+    FIAHarvested = any(PlotVisitHarvested, na.rm = TRUE),
+    CFIHarvested = any(CutSinceLastVisit, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  mutate(
+    HarvestType = case_when(
+      FIAHarvested & CFIHarvested ~ "Both",
+      FIAHarvested ~ "FIA",
+      CFIHarvested ~ "CFI",
+      .default = "Neither"
+    )
+  ) |>
+  ggplot(aes(HarvestType)) +
+  geom_bar() +
+  geom_text(aes(y = after_stat(count + 5), label = after_stat(count)), stat = "count") +
+  theme_bw() +
+  ggtitle("FIA vs CFI Plot Harvest Status") +
+  ylab("Number of Plots")
+```
+
+TODO: Defined in cfi_harvested()
+
+## Disturbance
+
+We would like to follow the FIA definition of disturbance:
+
+> 2.5.38 DSTRBCD1
+>
+> The area affected by the disturbance must be at least 1 acre in size. A
+> significant level of disturbance (mortality or damage to 25 percent of the trees
+> in the condition) is required.
+
+Sadly, we don't have access to the area affected, or to damage separate from
+mortality.
+
+CFI does provide a disturbance flag, and starting in 2010 a disturbance
+intensity.
+
+Disturbance Severity code:
+
+- 1 - Light
+- 2 - Moderate
+- 3 - Severe
+
+Ignoring light disturbance seems in-line with FIA definition, so we will
+flag plots with Moderate to Severe disturbance.
+
+Notable disturbance codes:
+
+- 0: None
+- 10: Harvest Cut
+
+It looks like disturbances > 10 are not currently used. We also wish to
+distinguish between harvest and other disturbance, so we won't mark things
+with distrubance code 10 as disturbed.
+
+Note that we need PlotVisits to get from Disturbance to Plots.
+
+```{r cfi disturbance analysis, eval=FALSE}
+tblDWSPCFIPlotVisitsComplete |>
+  cfi_stable_location() |>
+  cfi_quabbin() |>
+  distinct(VisitCycle, MasterPlotVisitID, MasterPlotID, VisitYear) |>
+  rename(PlotVisitID = MasterPlotVisitID) |>
+  left_join(tblDWSPCFIPlotVisitDisturbances, by = join_by(PlotVisitID)) |>
+  mutate(
+    Disturbed = 
+      # > 0 means disturbed
+      PlotVisitDisturbanceCode > 0 &
+      # 10 means harvested; >10 is not currently used
+      PlotVisitDisturbanceCode < 10 &
+      # if severity is provided, only accept severity > 1
+      (is.na(PlotVisitDisturbanceSeverity) | PlotVisitDisturbanceSeverity > 1) &
+      # if the disturbance was prior to the previous visit, it is tracked there,
+      # so don't track it here.
+      (PlotVisitDisturbanceYearCorrected > VisitYear - 10) &
+      # Year 9999 is a flag value
+      (PlotVisitDisturbanceYearCorrected < 9999)
+  ) |>
+  group_by(MasterPlotID) |>
+  summarize(Disturbed = any(Disturbed, na.rm = TRUE)) |>
+  ungroup() |>
+  ggplot(aes(Disturbed)) +
+  geom_bar()
+```
+
+
+
+```{r}
+trees283_6_defpropasp <- trees283_6_defpropasp |>
+  cfi_disturbed()
+trees283_6_defpropasp |>
+  group_by(MasterPlotID) |>
+  summarize(PlotDisturbed = any(PlotDisturbed, na.rm = TRUE)) |>
+  ungroup() |>
+  ggplot(aes(PlotDisturbed)) +
+  geom_bar()
+```
+
+Cool, cool. So, how many plots are unharvested and undisturbed?
+
+```{r}
+trees283_6_defpropasp |>
+  group_by(MasterPlotID) |>
+  summarize(
+    PlotHarvested = any(PlotHarvested, na.rm = TRUE),
+    PlotDisturbed = any(PlotDisturbed, na.rm = TRUE)
+  ) |>
+  ungroup() |>
+  mutate(
+    Status = if_else(PlotHarvested & PlotDisturbed, "Harvested & Disturbed",
+                     if_else(PlotHarvested, "Harvested",
+                             if_else(PlotDisturbed, "Disturbed", "Neither"))),
+    Status = ordered(Status, levels = c("Harvested & Disturbed", "Disturbed", "Harvested", "Neither"))
+  ) |>
+  ggplot(aes(Status)) +
+  geom_bar() +
+  geom_text(aes(y = after_stat(count + 5), label = after_stat(count)), stat = "count") +
+  theme_bw() +
+  ggtitle("CFI Plots by Status")
+```
+
+
+
+So, Severity has only really been recorded since 2010.
+
+What if we look for any disturbance at all?
+
+```{r}
+plt_vst_rhs |>
+  filter(PlotVisitDisturbanceYear > VisitYear - 10 & PlotVisitDisturbanceYear < 9999) |>
+  filter(is.na(PlotVisitDisturbanceSeverity) | PlotVisitDisturbanceSeverity > 1) |>
+  ggplot(aes(PlotVisitDisturbanceYear, fill = DisturbanceDesc, group = DisturbanceDesc)) +
+  geom_bar(position = "stack") +
+  scale_fill_discrete(name = "Disturbance Type") + 
+  theme_bw() +
+  ggtitle("Disturbance prevalance in CFI Quabbin plots") +
+  xlab("Year of Disturbance") +
+  ylab("Number of Plots")
+
+```
+
+```{r}
+plt_vst_rhs |>
+  mutate(
+    Disturbed = (PlotVisitDisturbanceCode > 0) &
+      (is.na(PlotVisitDisturbanceSeverity) | (PlotVisitDisturbanceSeverity > 1))
+  ) |>
+  group_by(MasterPlotID) |>
+  summarize(Disturbed = any(Disturbed, na.rm = TRUE)) |>
+  ungroup() |>
+  filter(!Disturbed) |>
+  nrow()
+```
+
+This seems plausible.
+
+## Final Formatting
+
+put it in the right shape for FVS.
+When FVS processes a stand from FIA data, it says things like
+(omitting WAS IGNORED columns):
+
+```
+SELECT * FROM FVS_StandInit_Plot WHERE Stand_CN = '%Stand_CN%'
+
+STAND-LEVEL DATA BASE READ:
+  INV_YEAR:               2006 - VisitYear 
+  REGION:                    9 - Keep it 9
+  FOREST:                   20 - Nearest national forest / ranger district, 20 is Green Mountains
+   COMPOSITE LOC:          920 - - See FVSne_Overview 3.1 Location Codes
+  LOCATION:                920 - - See FVSne_Overview 3.1 Location Codes
+  LONGITUDE:          -73.3379 - GPSLatitude
+  LATITUDE:            41.2770 - GPSLongitude
+  AGE:                      74 - ??? No Age
+  ASPECT:                  6.0 - Aspect
+  SLOPE:                  5.00 - Slope; CFI is probably %; FVS wants percent
+  ELEVFT:                520.0 CONVERTED TO:    5.2 - join from MassGIS data
+  BASAL_AREA_FACTOR:     -24.0 - plot radius for fixed-radius plot; 52.7
+  INV_PLOT_SIZE:          300. - plot radius for fixed-size microplot; 6
+  BRK_DBH:                 5.0 - Sapling / Tree DBH break; 6 in Audrey's data, 5 in CFI
+  NUM_PLOTS:                 4 - Number of subplots; 1
+  SAM_WT:          6321.345703 - Sample Weight (acres) - not used by FVS
+  PHYSIO_REGION:            23 - maybe from fiadb 2.3.35 Physiographic Class; use forest type instead
+  STATE:                     9 - State - fill in properly - 25
+  COUNTY:                    1 - County - fill in properly - use MassGIS counties
+END OF DATA BASE READ.
+```
+
+From the manual:
+- Plots are 52.7' fixed-radius plots, which is 0.2 acre (0.2003011)
+- Four, six-foot radius subplots are taken on each CFI pot along the cardinal directions, 26' from plot center.
+- Size classes:
+  - 1 - less than one foot in height
+  - 2 - 1' to 4.5' in height
+  - 3 - 4.5' to 1.0" DBH
+  - 4 - 1" to 5" dbh
+- Seedlings less than one foot in height (class 1) and thos 1' to 4.5' in height
+  (class 2) are counted individually up to ten and in groups of ten (11 to 20 = 20, etc.)
+  when their number exceeds ten.
+- For the other sizes [sic] classes (3 and 4), individual stems are recorded.
+
+Site index is recorded.
+
+It looks like forest type / ecoregion will be used if present
+
+ForestTypeDesc might be available - see appendix.
+
+STAND_CN - MasterPlotVisitID
+STAND_ID - MasterPlotID
+VARIANT - NE
+INV_YEAR / INV_MONTH / INV_DAY - VisitMeasuredDate
+LATITUDE / LONGITUDE - GPSLatitude / GPSLongitude
+DATUM - NA
+REGION - 20
+FOREST - 920
+DISTRICT - ?
+ECOREGION - can maybe get this
+AGE - ?
+ASPECT - ASPECT
+SLOPE - SLOPE
+ELEVATION - ?
+ELEVFT - ELEVATION
+INV_PLOT_SIZE - -52.7
+BRK_DBH - 5
+NUM_PLOTS - 1
+SITE_SPECIES - ?
+SITE_INDEX - ?
+SITE_INDEX_BASE_AG - ?
+FOREST_TYPE_FIA - ?
+STATE - 25
+COUNTY - COUNTY
+
+
+# Trees
+
+
+We have a couple more tables to look at to see if we can find everything:
+
+
+```
+SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'
+  PLOT_ID            WAS USED - MasterPlotID
+  TREE_ID            WAS USED - MasterTreeID
+  TREE_COUNT         WAS USED - stemsha.L6
+  HISTORY            WAS USED - status.prior6
+  SPECIES            WAS USED - genusp
+  DIAMETER           WAS USED - dbh.cm
+  HT                 WAS USED - :-(
+  HTTOPK             WAS USED - :-(
+  CRRATIO            WAS USED - :-( - maybe in supplement; see appendix
+  DAMAGE1            WAS USED - X
+  SEVERITY1          WAS USED - X
+  DAMAGE2            WAS USED - X
+  SEVERITY2          WAS USED - X
+  DAMAGE3            WAS USED - X
+  SEVERITY3          WAS USED - X
+  TREEVALUE          WAS USED - X - tree removal priority
+  PRESCRIPTION       WAS USED - X - tree removal group
+  AGE                WAS USED - X
+  SLOPE              WAS USED - Slope
+  ASPECT             WAS USED - Aspect
+  PV_CODE            WAS USED - ecoregion? - not used
+  TOPOCODE           WAS USED - ?
+  SITEPREP           WAS USED - ?
+  DG                 WAS USED - Diameter growth - dbh.prior.cm
+  HTG                WAS USED - height growth - X
+NUMBER ROWS PROCESSED:   30
+```
