@@ -59,7 +59,8 @@ tarchetypes::tar_file_read(
   read_excel(!!.x) |>
     # Fix column name
     rename(
-      PlotVisitDisturbanceYearCorrected = PlotVisitDisturbandYearCorrected
+      PlotVisitDisturbanceYearCorrected = PlotVisitDisturbandYearCorrected,
+      MasterPlotVisitID = PlotVisitID
     ) |>
     left_join(
       tblSuppPlotDisturbanceCodes |>
@@ -107,7 +108,8 @@ tarchetypes::tar_file_read(
   read_excel(!!.x) |>
     # Fix column names
     rename(
-      MasterTreeID = VisitMasterTreeID
+      MasterTreeID = VisitMasterTreeID,
+      MasterPlotVisitID = VisitIDNumberDetail
     ) |>
     # Fix column types - giving read_excel the right types causes it to hang
     mutate(
@@ -418,9 +420,15 @@ qryDWSPCFIPlotVisitTreeDetail |>
   xlab("Visit Cycle")
 ```
 
-### CFI vs. ABP Harvest
+### FIA vs. CFI Harvest
 
 CFI defines CutAnyTime, which presumably includes pre-1970 harvest.
+CutAnyTime seems to mean CutAnyTimePreviously, since individual plots
+have multiple values.
+
+We compute two harvest indicators:
+- FIA Harvest - is more than 10% of the BA in "Cut" trees
+- CFI Harvest - is CutSinceLastVisit ever TRUE
 
 ```{targets cfigro_plot_harvested, tar_simple = TRUE}
 qryDWSPCFIPlotVisitTreeDetail |>
@@ -431,7 +439,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
 ```
 
 
-```{r plot cfigro_plot_harvested}
+```{r plot cfigro_plot_harvested, eval = FALSE}
 cfigro_plot_harvested |>
   mutate(
     HarvestType = case_when(
@@ -487,104 +495,88 @@ with distrubance code 10 as disturbed.
 
 Note that we need PlotVisits to get from Disturbance to Plots.
 
-```{r cfi disturbance analysis, eval=FALSE}
-tblDWSPCFIPlotVisitsComplete |>
-  cfi_stable_location() |>
-  cfi_quabbin() |>
-  distinct(VisitCycle, MasterPlotVisitID, MasterPlotID, VisitYear) |>
-  rename(PlotVisitID = MasterPlotVisitID) |>
-  left_join(tblDWSPCFIPlotVisitDisturbances, by = join_by(PlotVisitID)) |>
-  mutate(
-    Disturbed = 
-      # > 0 means disturbed
-      PlotVisitDisturbanceCode > 0 &
-      # 10 means harvested; >10 is not currently used
-      PlotVisitDisturbanceCode < 10 &
-      # if severity is provided, only accept severity > 1
-      (is.na(PlotVisitDisturbanceSeverity) | PlotVisitDisturbanceSeverity > 1) &
-      # if the disturbance was prior to the previous visit, it is tracked there,
-      # so don't track it here.
-      (PlotVisitDisturbanceYearCorrected > VisitYear - 10) &
-      # Year 9999 is a flag value
-      (PlotVisitDisturbanceYearCorrected < 9999)
+### Harvest vs. Non-Harvest Disturbance Types
+
+```{r disturbance types, eval = FALSE}
+tblSuppPlotDisturbanceCodes |>
+  mutate(DisturbanceCategory = case_when(
+    DisturbanceCode == 0 ~ "None",
+    DisturbanceCode %in% c(8, 9, 11, 12, 13, 14, 17, 18, 19, 20, 21, 22) ~
+      "Harvest Related",
+    .default = "Non-Harvest"
+    )
   ) |>
-  group_by(MasterPlotID) |>
-  summarize(Disturbed = any(Disturbed, na.rm = TRUE)) |>
-  ungroup() |>
-  ggplot(aes(Disturbed)) +
-  geom_bar()
+  select(DisturbanceCode, DisturbanceCategory, DisturbanceDesc)
 ```
 
+### Disturbance History
 
+```{r plot disturbance type, eval = FALSE}
+tblDWSPCFIPlotVisitDisturbances |>
+  left_join(
+    tblDWSPCFIPlotVisitsComplete |>
+      distinct(MasterPlotVisitID, MasterPlotID, VisitYear, VisitCycle),
+    by = join_by(MasterPlotVisitID)
+  ) |>
+  # Remove harvest and harvest-related disturbances
+  filter(!PlotVisitDisturbanceCode %in% c(0, 8, 9, 11, 12, 13, 14, 17, 18, 19, 20, 21, 22)) |>
+  filter(
+    PlotVisitDisturbanceYearCorrected >= VisitYear - 10 &
+      PlotVisitDisturbanceYearCorrected < 9999 &
+      (is.na(PlotVisitDisturbanceSeverity) | PlotVisitDisturbanceSeverity > 1)
+  ) |>
+  inner_join(
+    cfiabp_trees |> distinct(MasterPlotID, VisitCycle),
+    by = join_by(MasterPlotID, VisitCycle)
+  ) |>
+  mutate(DisturbanceDesc = factor(DisturbanceDesc)) |>
+  ggplot(aes(PlotVisitDisturbanceYearCorrected, fill = DisturbanceDesc)) +
+  geom_bar() +
+  ggtitle("CFI Plot Disturbance Type by Year") +
+  xlab("Year of Disturbance") +
+  ylab("Number of Plots") +
+  theme_bw()
+```
 
-```{r}
-trees283_6_defpropasp <- trees283_6_defpropasp |>
-  cfi_disturbed()
-trees283_6_defpropasp |>
-  group_by(MasterPlotID) |>
-  summarize(PlotDisturbed = any(PlotDisturbed, na.rm = TRUE)) |>
-  ungroup() |>
-  ggplot(aes(PlotDisturbed)) +
+### CFI Plot Disturbance
+
+```{targets cfigro_plot_disturbed, tar_simple = TRUE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  cfi_disturbed(tblDWSPCFIPlotVisitDisturbances)
+```
+
+```{r plot cfigro_plot_disturbed, eval = FALSE}
+cfigro_plot_disturbed |>
+  ggplot(aes(Disturbed)) +
   geom_bar()
 ```
 
 Cool, cool. So, how many plots are unharvested and undisturbed?
 
-```{r}
-trees283_6_defpropasp |>
-  group_by(MasterPlotID) |>
-  summarize(
-    PlotHarvested = any(PlotHarvested, na.rm = TRUE),
-    PlotDisturbed = any(PlotDisturbed, na.rm = TRUE)
-  ) |>
-  ungroup() |>
+```{r plot plot status, eval = FALSE}
+cfiabp_trees |>
+  distinct(MasterPlotID) |>
+  left_join(cfigro_plot_harvested, by = join_by(MasterPlotID)) |>
+  left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
   mutate(
-    Status = if_else(PlotHarvested & PlotDisturbed, "Harvested & Disturbed",
-                     if_else(PlotHarvested, "Harvested",
-                             if_else(PlotDisturbed, "Disturbed", "Neither"))),
-    Status = ordered(Status, levels = c("Harvested & Disturbed", "Disturbed", "Harvested", "Neither"))
+    Status = case_when(
+      FIAHarvested & Disturbed ~ "Harvested & Disturbed",
+      FIAHarvested ~ "Harvested",
+      Disturbed ~ "Disturbed",
+      .default = "Neither"
+    )
   ) |>
   ggplot(aes(Status)) +
   geom_bar() +
   geom_text(aes(y = after_stat(count + 5), label = after_stat(count)), stat = "count") +
   theme_bw() +
-  ggtitle("CFI Plots by Status")
-```
-
-
-
-So, Severity has only really been recorded since 2010.
-
-What if we look for any disturbance at all?
-
-```{r}
-plt_vst_rhs |>
-  filter(PlotVisitDisturbanceYear > VisitYear - 10 & PlotVisitDisturbanceYear < 9999) |>
-  filter(is.na(PlotVisitDisturbanceSeverity) | PlotVisitDisturbanceSeverity > 1) |>
-  ggplot(aes(PlotVisitDisturbanceYear, fill = DisturbanceDesc, group = DisturbanceDesc)) +
-  geom_bar(position = "stack") +
-  scale_fill_discrete(name = "Disturbance Type") + 
-  theme_bw() +
-  ggtitle("Disturbance prevalance in CFI Quabbin plots") +
-  xlab("Year of Disturbance") +
+  ggtitle("CFI Plots by Status") +
   ylab("Number of Plots")
-
 ```
 
-```{r}
-plt_vst_rhs |>
-  mutate(
-    Disturbed = (PlotVisitDisturbanceCode > 0) &
-      (is.na(PlotVisitDisturbanceSeverity) | (PlotVisitDisturbanceSeverity > 1))
-  ) |>
-  group_by(MasterPlotID) |>
-  summarize(Disturbed = any(Disturbed, na.rm = TRUE)) |>
-  ungroup() |>
-  filter(!Disturbed) |>
-  nrow()
-```
-
-This seems plausible.
 
 ## Final Formatting
 

@@ -4,9 +4,8 @@ cfi_with_visit_info <- function(.data, tblDWSPCFIPlotVisitsComplete) {
   .data |>
     left_join(
       tblDWSPCFIPlotVisitsComplete |>
-        select(MasterPlotVisitID, MasterPlotID, Watershed, VisitCycle, VisitYear) |>
-        rename(VisitIDNumberDetail = MasterPlotVisitID),
-      by = join_by(VisitIDNumberDetail)
+        select(MasterPlotVisitID, MasterPlotID, Watershed, VisitCycle, VisitYear),
+      by = join_by(MasterPlotVisitID)
     )
 }
 
@@ -93,30 +92,46 @@ cfi_harvested <- function(.data) {
 }
 
 # cfi_disturbed -----------------------------------------------------------
-# Mark rows as disturbed in each visit cycle, and the entire plot
-# if it is ever disturbed.
+# Return a data.frame of plots and whether they are dusturbed.
 #
-# Input is plotvisit or plotvisittree records with disturbance.
+# Input is plotvisit or plotvisittree records.
 #
-# Output is the same, with PlotVisitDisturbed and PlotDisturbed columns appended.
-cfi_disturbed <- function(.data) {
-  .data |>
-    group_by(MasterPlotID, VisitCycle) |>
+# Output is plots with Disturbed column appended.
+cfi_disturbed <- function(.data, tblDWSPCFIPlotVisitDisturbances) {
+  rhs_visitcycle <- .data |>
+    distinct(MasterPlotVisitID, VisitCycle, VisitYear)
+
+  rhs_dstrb <- tblDWSPCFIPlotVisitDisturbances |>
+    filter(
+      !PlotVisitDisturbanceCode %in% c(0, 8, 9, 11, 12, 13, 14, 17, 18, 19, 20, 21, 22)
+    ) |>
+    mutate(PlotVisitDisturbanceSeverity = if_else(
+      is.na(PlotVisitDisturbanceSeverity),
+      3, # If disturbance severity was not recorded, use "Severe"
+      PlotVisitDisturbanceSeverity
+    )) |>
+    inner_join(rhs_visitcycle, by = join_by(MasterPlotVisitID)) |>
+    filter(
+      PlotVisitDisturbanceYearCorrected > VisitYear - 10 &
+        PlotVisitDisturbanceYearCorrected < 9999
+    ) |>
+    group_by(MasterPlotVisitID, VisitCycle) |>
+    # disturbance severity 1 is lowest, 3 is highest
+    summarize(
+      PlotVisitDisturbanceSeverity = max(PlotVisitDisturbanceSeverity, na.rm = TRUE),
+      .groups = "keep"
+    ) |>
+    ungroup() |>
     mutate(
-      PlotVisitDisturbed =
-      # > 0 means disturbed
-        PlotVisitDisturbanceCode > 0 &
-          # 10 means harvested; >10 is not currently used
-          PlotVisitDisturbanceCode < 10 &
-          # if severity is provided, only count severity > 1
-          (is.na(PlotVisitDisturbanceSeverity) | PlotVisitDisturbanceSeverity > 1) &
-          # if the disturbance was prior to the previous visit, it is tracked there,
-          # so don't track it here.
-          (PlotVisitDisturbandYearCorrected > VisitYear - 10) &
-          # Year 9999 is a flag value
-          (PlotVisitDisturbandYearCorrected < 9999)
+      PlotVisitDisturbed = PlotVisitDisturbanceSeverity > 1
+    )
+
+  .data |>
+    left_join(
+      rhs_dstrb,
+      by = join_by(MasterPlotVisitID, VisitCycle)
     ) |>
     group_by(MasterPlotID) |>
-    mutate(PlotDisturbed = any(PlotVisitDisturbed, na.rm = TRUE)) |>
+    summarize(Disturbed = any(PlotVisitDisturbed, na.rm = TRUE)) |>
     ungroup()
 }
