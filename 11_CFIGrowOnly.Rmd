@@ -17,6 +17,30 @@ suppressPackageStartupMessages({
 tar_source()
 ```
 
+## Load targets results from other documents
+
+```{r load tar objects}
+tar_load(fiadb)
+tar_load(nrshrv_plot)
+tar_load(nrshrv_plot_stats)
+tar_load(species_crosswalk)
+tar_load(fvs_num_partitions)
+tar_load(fvs_partition)
+tar_load(fvs_randseed)
+```
+
+## Preload targets results from this document
+
+When tar_make() has already built the objects defined in this document,
+run this block to pre-load them. You can then skip running ```{targets} blocks.
+
+```{r load tar objects defined here, eval = FALSE}
+get_this_rmd_file() |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+```
+
+
 # Stands
 
 Use the raw data from Department of Conservation & Recreation (DCR) Office of Watershed Management, Division of Water Supply Protection (DWSP)'s Continuous Forest Inventory (CFI).
@@ -298,10 +322,6 @@ many of its trees are cut, so cutting is an imperfect predictor of fia harvest.
 FIA doesn't record biomass, but does record carbon, which is a good proxy.
 
 ```{r fia havest analysis, eval=FALSE}
-tar_load(fiadb)
-tar_load(nrshrv_plot)
-tar_load(nrshrv_plot_stats)
-
 # Sum the carbon of trees that were live pre-harvest
 pre_harvest_carbon <- fia_trees(
     fiadb,
