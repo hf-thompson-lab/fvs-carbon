@@ -1,3 +1,15 @@
+
+# cfi_with_plot_info ------------------------------------------------------
+
+cfi_with_plot_info <- function(.data, tblDWSPCFIPlotsComplete) {
+  .data |>
+    left_join(
+      tblDWSPCFIPlotsComplete |>
+        select(MasterPlotID, GPSLatitude, GPSLongitude, Slope, Aspect),
+      by = join_by(MasterPlotID)
+    )
+}
+
 # cfi_with_visit_info -----------------------------------------------------
 
 cfi_with_visit_info <- function(.data, tblDWSPCFIPlotVisitsComplete) {

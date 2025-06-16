@@ -1,6 +1,13 @@
 tar_target(cfigro_plot_county, {
   massgis_county <- vect("data/raw/MassGIS/counties/COUNTIES_POLY.shp")
   
+  tmp_countycd <- fia_tbl(fiadb, "COUNTY", \(.data, con) {
+    .data |>
+      filter(STATECD == 25) # Massachusetts has STATECD == 25
+  }) |>
+    mutate(COUNTY = toupper(COUNTYNM)) |>
+    select(COUNTY, COUNTYCD, STATECD)
+  
   tblDWSPCFIPlotsComplete |>
     # Remove rows without lat/lon
     filter(!is.na(GPSLatitude) & !is.na(GPSLongitude)) |>
@@ -20,5 +27,9 @@ tar_target(cfigro_plot_county, {
     project(massgis_county) |>
     intersect(massgis_county) |>
     as.data.frame() |>
-    select(MasterPlotID, COUNTY)
+    select(MasterPlotID, COUNTY) |>
+    left_join(
+      tmp_countycd,
+      by = join_by(COUNTY)
+    )
 })

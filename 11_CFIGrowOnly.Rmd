@@ -21,9 +21,10 @@ tar_source()
 
 ```{r load tar objects}
 tar_load(fiadb)
+tar_load(fvsne_states)
+tar_load(species_crosswalk)
 tar_load(nrshrv_plot)
 tar_load(nrshrv_plot_stats)
-tar_load(species_crosswalk)
 tar_load(fvs_num_partitions)
 tar_load(fvs_partition)
 tar_load(fvs_randseed)
@@ -254,6 +255,13 @@ Use terra::intersect() to extract the county for each plot.
 ```{targets cfigro_plot_county, tar_simple = TRUE}
 massgis_county <- vect("data/raw/MassGIS/counties/COUNTIES_POLY.shp")
 
+tmp_countycd <- fia_tbl(fiadb, "COUNTY", \(.data, con) {
+  .data |>
+    filter(STATECD == 25) # Massachusetts has STATECD == 25
+}) |>
+  mutate(COUNTY = toupper(COUNTYNM)) |>
+  select(COUNTY, COUNTYCD, STATECD)
+
 tblDWSPCFIPlotsComplete |>
   # Remove rows without lat/lon
   filter(!is.na(GPSLatitude) & !is.na(GPSLongitude)) |>
@@ -273,7 +281,11 @@ tblDWSPCFIPlotsComplete |>
   project(massgis_county) |>
   intersect(massgis_county) |>
   as.data.frame() |>
-  select(MasterPlotID, COUNTY)
+  select(MasterPlotID, COUNTY) |>
+  left_join(
+    tmp_countycd,
+    by = join_by(COUNTY)
+  )
 ```
 ## Watershed
 
@@ -686,6 +698,7 @@ cfiabp_trees |>
   ylab("Number of Plots")
 ```
 
+
 ## Final Formatting
 
 put it in the right shape for FVS.
@@ -731,7 +744,8 @@ From the manual:
   when their number exceeds ten.
 - For the other sizes [sic] classes (3 and 4), individual stems are recorded.
 
-Site index is recorded.
+Site index is recorded, but we don't seem to have it. We'll use the limited height
+info we have to calibrate FVS.
 
 It looks like forest type / ecoregion will be used if present
 
@@ -761,6 +775,50 @@ SITE_INDEX_BASE_AG - ?
 FOREST_TYPE_FIA - ?
 STATE - 25
 COUNTY - COUNTY
+
+```{targets cfigro_plot, tar_simple = TRUE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  group_by(MasterPlotID) |>
+  arrange(VisitCycle) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  left_join(
+    cfigro_plot_elevft,
+    by = join_by(MasterPlotID)
+  ) |>
+  left_join(
+    cfigro_plot_county,
+    by = join_by(MasterPlotID)
+  ) |>
+  mutate(
+    STAND_CN = MasterPlotID, # Could use MasterVisitPlotID, but why make life harder?
+    STAND_ID = MasterPlotID,
+    INV_YEAR = VisitYear,
+    REGION = 9,
+    FOREST = 20,
+    LONGITUDE = GPSLongitude,
+    LATITUDE = GPSLatitude,
+    AGE = NA,
+    ASPECT = Aspect,
+    SLOPE = Slope,
+    ELEVFT = ELEVFT,
+    BASAL_AREA_FACTOR = -52.7,
+    INV_PLOT_SIZE = conv_unit(1, "acre", "ft2") / (pi * 6^2),
+    BRK_DBH = 5.6,
+    NUM_PLOTS = 1,
+    STATE = STATECD,
+    COUNTY = COUNTYCD
+  ) |>
+  select(
+    STAND_CN, STAND_ID, INV_YEAR, REGION, STATE, COUNTY, FOREST,
+    LONGITUDE, LATITUDE, ASPECT, SLOPE, ELEVFT, AGE,
+    BASAL_AREA_FACTOR, INV_PLOT_SIZE, BRK_DBH, NUM_PLOTS
+  )
+```
 
 
 # Trees
