@@ -40,7 +40,7 @@ tar_target(cfigro_trees, {
       # PV_CODE            WAS USED - ecoregion? - not used
       TOPOCODE = TOPOCODE, # See EssentialFVS 5.4.1.2
       # SITEPREP           WAS USED - ?
-      DG = PreviousDbhCM,
+      DG = conv_unit(PreviousDbhCM, "cm", "in"),
       HTG = PreviousHeight
     ) |>
     select(
