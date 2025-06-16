@@ -101,8 +101,10 @@ cfi_disturbed <- function(.data, tblDWSPCFIPlotVisitDisturbances) {
   rhs_visitcycle <- .data |>
     distinct(MasterPlotVisitID, VisitCycle, VisitYear)
 
-  rhs_dstrb <- tblDWSPCFIPlotVisitDisturbances |>
+  rhs_cfi_dstrb <- tblDWSPCFIPlotVisitDisturbances |>
     filter(
+      # 0 - no disturbance
+      # Others are harvest or harvest-related
       !PlotVisitDisturbanceCode %in% c(0, 8, 9, 11, 12, 13, 14, 17, 18, 19, 20, 21, 22)
     ) |>
     mutate(PlotVisitDisturbanceSeverity = if_else(
@@ -112,7 +114,10 @@ cfi_disturbed <- function(.data, tblDWSPCFIPlotVisitDisturbances) {
     )) |>
     inner_join(rhs_visitcycle, by = join_by(MasterPlotVisitID)) |>
     filter(
+      # Visit cycles are 10 years; ignore disturbance that was recorded
+      # in the previous visit cycle.
       PlotVisitDisturbanceYearCorrected > VisitYear - 10 &
+        # 9999 is a flag value indicating NULL
         PlotVisitDisturbanceYearCorrected < 9999
     ) |>
     group_by(MasterPlotVisitID, VisitCycle) |>
@@ -123,15 +128,54 @@ cfi_disturbed <- function(.data, tblDWSPCFIPlotVisitDisturbances) {
     ) |>
     ungroup() |>
     mutate(
-      PlotVisitDisturbed = PlotVisitDisturbanceSeverity > 1
+      CFIPlotVisitDisturbed = PlotVisitDisturbanceSeverity > 1
     )
+
+  rhs_fia_dstrb <- .data |>
+    group_by(MasterTreeID) |>
+    arrange(VisitCycle) |>
+    mutate(
+      PreviousTreeStatusCode = lag(VisitTreeStatusCode),
+      PreviousStatusB = lag(StatusB),
+      PreviousTreeDIAM = lag(VisitTreeDIAM)
+    ) |>
+    ungroup() |>
+    filter(!is.na(PreviousTreeStatusCode) & !is.na(PreviousStatusB)) |>
+    group_by(MasterPlotID, VisitCycle) |>
+    summarize(
+      # Live Stems prior to cutting
+      Stems_Live = sum(if_else(
+        PreviousStatusB %in% c("R", "L"), # Live Tree
+        1,
+        0,
+      ), na.rm = TRUE),
+      # Dead Stems
+      Stems_Dead = sum(if_else(
+        StatusB == "D",
+        1,
+        0
+      ), na.rm = TRUE),
+      PlotVisitDisturbed = Stems_Dead / Stems_Live >= 0.25,
+      .groups = "keep"
+    ) |>
+    ungroup() |>
+    group_by(MasterPlotID) |>
+    summarize(
+      FIADisturbed = any(PlotVisitDisturbed, na.rm = TRUE),
+      .groups = "keep"
+    ) |>
+    ungroup()
 
   .data |>
     left_join(
-      rhs_dstrb,
+      rhs_cfi_dstrb,
       by = join_by(MasterPlotVisitID, VisitCycle)
     ) |>
     group_by(MasterPlotID) |>
-    summarize(Disturbed = any(PlotVisitDisturbed, na.rm = TRUE)) |>
-    ungroup()
+    summarize(CFIDisturbed = any(CFIPlotVisitDisturbed, na.rm = TRUE)) |>
+    ungroup() |>
+    left_join(
+      rhs_fia_dstrb,
+      by = join_by(MasterPlotID)
+    )
 }

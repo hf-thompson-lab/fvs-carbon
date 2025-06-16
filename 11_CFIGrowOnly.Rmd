@@ -558,6 +558,54 @@ tblDWSPCFIPlotVisitDisturbances |>
   theme_bw()
 ```
 
+```{r plot disturbance history, eval = FALSE}
+plotNum <- cfiabp_trees |>
+  distinct(MasterPlotID) |>
+  arrange(MasterPlotID) |>
+  mutate(plot_num = row_number())
+
+tblDWSPCFIPlotVisitDisturbances |>
+  left_join(
+    tblDWSPCFIPlotVisitsComplete |>
+      distinct(MasterPlotVisitID, MasterPlotID, VisitYear, VisitCycle),
+    by = join_by(MasterPlotVisitID)
+  ) |>
+  # Remove harvest and harvest-related disturbances
+  filter(!PlotVisitDisturbanceCode %in% c(0, 8, 9, 11, 12, 13, 14, 17, 18, 19, 20, 21, 22)) |>
+  filter(
+    PlotVisitDisturbanceYearCorrected >= VisitYear - 10 &
+      #PlotVisitDisturbanceYearCorrected >= 1970 &
+      PlotVisitDisturbanceYearCorrected < 9999 &
+      (is.na(PlotVisitDisturbanceSeverity) | PlotVisitDisturbanceSeverity > 1)
+  ) |>
+  inner_join(
+    cfiabp_trees |> distinct(MasterPlotID, VisitCycle),
+    by = join_by(MasterPlotID, VisitCycle)
+  ) |>
+  left_join(
+    plotNum,
+    by = join_by(MasterPlotID)
+  ) |>
+  mutate(DisturbanceDesc = factor(DisturbanceDesc)) |>
+  full_join(
+    expand_grid(plot_num = 1:283, PlotVisitDisturbanceYearCorrected = 1960:2021),
+    by = join_by(plot_num, PlotVisitDisturbanceYearCorrected)
+  ) |>
+  group_by(plot_num) |>
+  arrange(PlotVisitDisturbanceYearCorrected) |>
+  fill(DisturbanceDesc, .direction = "down") |>
+  ungroup() |>
+  filter(!is.na(DisturbanceDesc)) |>
+  ggplot(aes(PlotVisitDisturbanceYearCorrected, plot_num, color = DisturbanceDesc)) +
+  geom_point() +
+  scale_y_continuous(breaks = 0:6 * 50, minor_breaks = 1:30 * 10) +
+  scale_color_discrete(name = "Most Recent\nDisturbance") +
+  ggtitle("Quabbin Plots CFI Disturbance") +
+  xlab("Year") +
+  ylab("Plot") +
+  theme_bw()
+```
+
 ### CFI Plot Disturbance
 
 ```{targets cfigro_plot_disturbed, tar_simple = TRUE}
@@ -568,24 +616,24 @@ qryDWSPCFIPlotVisitTreeDetail |>
   cfi_disturbed(tblDWSPCFIPlotVisitDisturbances)
 ```
 
-```{r plot cfigro_plot_disturbed, eval = FALSE}
-cfigro_plot_disturbed |>
-  ggplot(aes(Disturbed)) +
+```{r plot cfi plot disturbance, eval = FALSE}
+cfi_disturb |>
+  ggplot(aes(CFIDisturbed)) +
   geom_bar()
 ```
 
-Cool, cool. So, how many plots are unharvested and undisturbed?
+So, how many plots are unharvested and undisturbed?
 
-```{r plot plot status, eval = FALSE}
+```{r plot cfi status, eval = FALSE}
 cfiabp_trees |>
   distinct(MasterPlotID) |>
   left_join(cfigro_plot_harvested, by = join_by(MasterPlotID)) |>
-  left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
+  left_join(cfi_disturb, by = join_by(MasterPlotID)) |>
   mutate(
     Status = case_when(
-      FIAHarvested & Disturbed ~ "Harvested & Disturbed",
+      FIAHarvested & CFIDisturbed ~ "Harvested & Disturbed",
       FIAHarvested ~ "Harvested",
-      Disturbed ~ "Disturbed",
+      CFIDisturbed ~ "Disturbed",
       .default = "Neither"
     )
   ) |>
@@ -597,6 +645,46 @@ cfiabp_trees |>
   ylab("Number of Plots")
 ```
 
+
+
+### FIA Disturbance
+
+FIA marks a plot as disturbed if more than an acre is impacted, and >25% of
+stems in that acre show damage or mortality.
+
+Using ">25% mortality", we get many fewer disturbed plots:
+
+```{r plot fia disturbance, eval = FALSE}
+cfi_disturb |>
+  ggplot(aes(FIADisturbed)) +
+  geom_bar()
+```
+
+
+Using this definition, how many plots are neither harvested nor disturbed?
+
+So, how many plots are unharvested and undisturbed by this metric?
+
+```{r plot fia status, eval = FALSE}
+cfiabp_trees |>
+  distinct(MasterPlotID) |>
+  left_join(cfigro_plot_harvested, by = join_by(MasterPlotID)) |>
+  left_join(cfi_disturb, by = join_by(MasterPlotID)) |>
+  mutate(
+    Status = case_when(
+      FIAHarvested & FIADisturbed ~ "Harvested & Disturbed",
+      FIAHarvested ~ "Harvested",
+      FIADisturbed ~ "Disturbed",
+      .default = "Neither"
+    )
+  ) |>
+  ggplot(aes(Status)) +
+  geom_bar() +
+  geom_text(aes(y = after_stat(count + 5), label = after_stat(count)), stat = "count") +
+  theme_bw() +
+  ggtitle("CFI Plots by Status") +
+  ylab("Number of Plots")
+```
 
 ## Final Formatting
 
