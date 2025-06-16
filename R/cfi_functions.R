@@ -88,6 +88,61 @@ cfi_topocode <- function(.data) {
 }
 
 
+# cfi_history -------------------------------------------------------------
+
+# Convert CFI Status + ABP Status to FVS History
+# CFI TreeStatusCode:
+# - 1 - Live
+# - 2-3 - Dead
+# - 4 - Out of Population
+# - 5-9 - Ingrowth
+# - 10 - Live
+# - 11 - Dead
+# - 12 - Cut
+# - 13-14 - Administrative
+# - 15 - Ingrowth
+# - 16 - Live
+# - 17-22 - Dead
+#
+# ABP Status:
+# - L = live now & at prior visit;
+# - R = grew into 6" diameter class since last visit & live now;
+# - D = live at prior visit but dead now;
+# - C = live at prior visit but cut since last visit;
+# - NA = tree that hadn't yet recruited into the 6" minimum or trees that were dead or cut in prior visit(s)
+#
+# FVS History:
+# - Tree history codes of 0-5 are used to represent live tree records that are proejcted by FVS. FVS does not distinguish between the various live tree codes.
+# - Tree history codes 6, 7, 8 and 9 indicates types of tree records that are not projected.
+# - The codes 6 and 7 trees are assumed to have died during the mortality observation period. FVS makes no distinction between tree records coded with a tree history of 6 or 7.
+# - The codes 8 and 9 represent trees that have been dead for longer periods of time. These records are included in the inventory list of trees but are not included in stand densities during calibration. FVS makes no distinction between tree records coded with a tree history of 8 or 9.
+#
+# (Essential FVS, 4.2.1 Sample Tree Data Description)
+
+cfi_history <- function(.data) {
+  cfi_status_live <- function(x) {
+    x %in% c(1, 5:10, 15, 16)
+  }
+  cfi_status_dead <- function(x) {
+    x %in% c(2, 3, 17:22)
+  }
+  .data |>
+    group_by(MasterTreeID) |>
+    arrange(VisitCycle) |>
+    mutate(PrevTreeStatusCode = lag(VisitTreeStatusCode)) |>
+    ungroup() |>
+    mutate(
+      HISTORY = case_when(
+        cfi_status_live(VisitTreeStatusCode) ~ 1, # Live
+        cfi_status_dead(VisitTreeStatusCode) &
+          cfi_status_live(PrevTreeStatusCode) ~ 6, # Newly Dead
+        cfi_status_dead(VisitTreeStatusCode) &
+          cfi_status_dead(PrevTreeStatusCode) ~ 8 # Oldly Dead
+      )
+    )
+}
+
+
 # cfi_harvested -----------------------------------------------------------
 # Try to follow the FIA definition of harvest:
 # 2.5.44 TRTCD1

@@ -886,13 +886,14 @@ qryDWSPCFIPlotVisitTreeDetail |>
   ) |>
   ungroup() |>
   cfi_topocode() |>
+  cfi_history() |>
   mutate(
     STAND_CN = MasterPlotID, # Could use MasterPlotVisitID, but why make life harder?
     STAND_ID = MasterPlotID,
     TREE_CN = MasterTreeID, # Could use VisitTreeNumberDetail, but why make life harder?
     TREE_ID = MasterTreeID,
     TREE_COUNT = conv_unit(stems.ha.All, "acre", "hectare"),
-    HISTORY = PreviousStatus6,
+    HISTORY = HISTORY,
     SPECIES = SpeciesCode, # appears to be FIA Species
     DIAMETER = conv_unit(dbhcm, "cm", "in"),
     HT = VisitTreeTotalHeight,
