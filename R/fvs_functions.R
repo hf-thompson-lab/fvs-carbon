@@ -22,7 +22,7 @@ fvs_TimeConfig <- function(FirstYear, LastYear, Timestep) {
       fvs_kwd("InvYear", FirstYear),
       fvs_kwd("TimeInt", 0, 1),
       fvs_kwd("NumCycle", 1)
-    )      
+    )
   } else {
     # LastYear must be the first year of the last cycle, so
     # add an extra cycle at the end
@@ -57,11 +57,11 @@ fvs_Estab <- function(rows) {
     species <- row["SPECIES"]
     density <- as.numeric(row["DENSITY"]) # TPA
     survival <- 100 # percent
-    age <- ''
+    age <- ""
     if ("HEIGHT" %in% names(row)) {
       height <- row["HEIGHT"]
     } else {
-      height <- ''
+      height <- ""
     }
     shade <- 0
     fvs_kwd("Natural", year, species, density, survival, age, height, shade)
@@ -73,7 +73,7 @@ fvs_Estab <- function(rows) {
     } else {
       rows$YEAR[is.na(rows$YEAR)] <- 0
     }
-    
+
     # FVS has a limit of 1000 trees per tree record. Each establishment
     # keyword creates one tree record, so if there are more than 1000 trees
     # split it into multiple records.
@@ -92,9 +92,9 @@ fvs_Estab <- function(rows) {
       ungroup() |>
       select(-any_of(c("ROW_NUMBER", "REPLICATES")))
     if (any(rows$YEAR > 0)) {
-      years <- rows|>
+      years <- rows |>
         filter(YEAR > 0) |>
-        distinct(YEAR) |> 
+        distinct(YEAR) |>
         _$YEAR
       scheduled <- lapply(years, \(year){
         c(
@@ -161,43 +161,47 @@ fvs_ThinPRSC <- function(rows) {
 fvs_fia_input <- function(
     fiadb,
     stands,
+    trees,
     calibration,
     calib_mort,
     harvest,
-    filename
-) {
-  fia <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
-  on.exit(DBI::dbDisconnect(fia), add = TRUE, after = FALSE)
-  
+    filename) {
   out <- DBI::dbConnect(RSQLite::SQLite(), filename, flags = RSQLite::SQLITE_RWC)
   on.exit(DBI::dbDisconnect(out), add = TRUE, after = FALSE)
-  
+
   stand_cns <- stands |> distinct(STAND_CN)
-  
-  # Right now, only Plot is supported.
-  # StandInit_Plot / TreeInit_Plot - Used when a stand is a plot.
-  # StandInit_Cond / TreeInit_Cond - Used when a stand is a condition.
-  # PlotInit_Plot / TreeInit_Plot - Used when a stand is a subplot.
-  # In theory, we could ATTACH the output database and do this copy
-  # internal to SQLite, but that is a bit tricky to manage so we
-  # pull it into R and write it back out.
+
+  if (is.null(fiadb)) {
+    # If the user provides the stands, do exactly as they say, except
+    # we made them add FIRST_YEAR and LAST_YEAR
+    standinit_plot <- stands |>
+      select(!any_of(c("FIRST_YEAR", "LAST_YEAR")))
+  } else {
+    # Right now, only Plot is supported.
+    # StandInit_Plot / TreeInit_Plot - Used when a stand is a plot.
+    # StandInit_Cond / TreeInit_Cond - Used when a stand is a condition.
+    # PlotInit_Plot / TreeInit_Plot - Used when a stand is a subplot.
+    # In theory, we could ATTACH the output database and do this copy
+    # internal to SQLite, but that is a bit tricky to manage so we
+    # pull it into R and write it back out.
+    standinit_plot <- fia_tbl(fiadb, "FVS_StandInit_Plot", \(.data, con) {
+      .data |> inner_join(stand_cns, by = join_by(STAND_CN), copy = TRUE)
+    })
+  }
+
   DBI::dbWriteTable(
     out,
     "FVS_StandInit_Plot",
-    tbl(fia, "FVS_StandInit_Plot") |>
-      inner_join(
-        stand_cns,
-        by = join_by(STAND_CN),
-        copy = TRUE
-      ) |>
-      collect(),
+    standinit_plot,
     overwrite = TRUE
   )
-  
-  swizzle_growth <- if (is.null(calibration)) {
-    function(.data) { .data }
+
+  if (is.null(calibration)) {
+    swizzle_growth <- function(.data) {
+      .data
+    }
   } else {
-    function(.data) {
+    swizzle_growth <- function(.data) {
       .data |>
         select(-any_of(c("DG", "HTG"))) |>
         left_join(
@@ -207,10 +211,12 @@ fvs_fia_input <- function(
     }
   }
 
-  append_prescription <- if (is.null(harvest)) {
-    function(.data) { .data }
+  if (is.null(harvest)) {
+    append_prescription <- function(.data) {
+      .data
+    }
   } else {
-    function(.data) {
+    append_prescription <- function(.data) {
       .data |>
         select(-PRESCRIPTION) |>
         left_join(
@@ -219,44 +225,48 @@ fvs_fia_input <- function(
         )
     }
   }
-  
+
   check_baf <- function(.data) {
     stopifnot(!any(.data$BASAL_AREA_FACTOR > 0, na.rm = TRUE))
     .data
   }
-  
-  filter_mort <- function(.data) { .data }
-  if (!is.null(calib_mort)) {
-    # Filter down to just the relevant mortality
-    calib_mort <- calib_mort |>
-      inner_join(stand_cns, by = join_by(STAND_CN))
+
+  if (is.null(calib_mort)) {
+    filter_mort <- function(.data) {
+      .data
+    }
+  } else {
     # filter_mort() will filter out the FIA provided mortality
     # and sub in the user provided mortality
     filter_mort <- function(.data) {
       bind_rows(
         .data |> filter(!HISTORY %in% 6:9),
-        calib_mort
+        # Filter down to just the relevant mortality
+        calib_mort |> inner_join(stand_cns, by = join_by(STAND_CN))
       )
     }
   }
-  
+
+  if (is.null(fiadb)) {
+    treeinit_plot <- trees
+  } else {
+    treeinit_plot <- fia_tbl(fiadb, "FVS_TreeInit_Plot", \(.data, con) {
+      .data |>
+        inner_join(stand_cns, by = join_by(STAND_CN), copy = TRUE) |>
+        # Graft on TPA information
+        left_join(
+          tbl(con, "FVS_StandInit_Plot") |>
+            select(STAND_CN, BRK_DBH, BASAL_AREA_FACTOR, INV_PLOT_SIZE),
+          by = join_by(STAND_CN)
+        )
+    })
+  }
+
   DBI::dbWriteTable(
     out,
     "FVS_TreeInit_Plot",
     # Read the FIA trees
-    tbl(fia, "FVS_TreeInit_Plot") |>
-      inner_join(
-        stand_cns |> select(STAND_CN),
-        by = join_by(STAND_CN),
-        copy = TRUE
-      ) |>
-      # Graft on TPA information
-      left_join(
-        tbl(fia, "FVS_StandInit_Plot") |>
-          select(STAND_CN, BRK_DBH, BASAL_AREA_FACTOR, INV_PLOT_SIZE),
-        by = join_by(STAND_CN)
-      ) |>
-      collect() |>
+    treeinit_plot |>
       # If calibration data is provided, replace the default growth data
       swizzle_growth() |>
       filter_mort() |>
@@ -305,7 +315,7 @@ fvs_fia_input <- function(
       select(-any_of(c("BRK_DBH", "BASAL_AREA_FACTOR", "INV_PLOT_SIZE", "REPLICATES"))),
     overwrite = TRUE
   )
- 
+
   # Return the name of the file created / modified
   filename
 }
@@ -325,8 +335,7 @@ fvs_keywordfile_section <- function(
     regen,
     harvest,
     carb_calc,
-    random_seed
-) {
+    random_seed) {
   stand_table <- "FVS_StandInit_Plot"
   tree_table <- "FVS_TreeInit_Plot"
   # for cond, we would use:
@@ -337,7 +346,7 @@ fvs_keywordfile_section <- function(
   #   stand_table <- "FVS_PlotInit_Plot"
   #   tree_table <- "FVS_TreeInit_Plot"
   # but need to match StandPlot_CN instead of STAND_CN
-  
+
   # If calibration data is provided, we assume it is taken
   # from subsequent FIA measurement 5 years after the initial
   # stand inventory.
@@ -353,10 +362,14 @@ fvs_keywordfile_section <- function(
   } else {
     growth <- c()
   }
-  
-  if (carb_calc == "FFE") { cc_code = 0 }
-  else if (carb_calc == "Jenkins") { cc_code = 1 }
-  else { stop(paste0("Unknown carbon calculation method: ", carb_calc)) }
+
+  if (carb_calc == "FFE") {
+    cc_code <- 0
+  } else if (carb_calc == "Jenkins") {
+    cc_code <- 1
+  } else {
+    stop(paste0("Unknown carbon calculation method: ", carb_calc))
+  }
 
   # Remove any regen destined for other plots
   if (!is.null(regen) & ("STAND_CN" %in% names(regen))) {
@@ -365,7 +378,7 @@ fvs_keywordfile_section <- function(
       regen |> filter(is.na(STAND_CN)) # regen for all stands
     )
   }
-  
+
   # Set up thinning
   if (!is.null(harvest) & ("STAND_CN" %in% names(harvest))) {
     harvest <- bind_rows(
@@ -373,13 +386,13 @@ fvs_keywordfile_section <- function(
       harvest |> filter(is.na(STAND_CN)) # harvest for all stands
     )
   }
-  
+
   if (!is.null(random_seed)) {
     RannSeed <- fvs_kwd("RanNSeed", random_seed)
   } else {
     RannSeed <- c()
   }
-  
+
   c(
     fvs_kwd("StdIdent"),
     paste0(stand_id, " ", title),
@@ -407,10 +420,10 @@ fvs_keywordfile_section <- function(
     fvs_kwd("DSNIn"),
     input_db,
     fvs_kwd("StandSQL"),
-    paste0("SELECT * FROM ", stand_table," WHERE Stand_CN = '%Stand_CN%'"),
+    paste0("SELECT * FROM ", stand_table, " WHERE Stand_CN = '%Stand_CN%'"),
     fvs_kwd("EndSQL"), # StandSQL
     fvs_kwd("TreeSQL"),
-    paste0("SELECT * FROM ", tree_table," WHERE Stand_CN = '%Stand_CN%'"),
+    paste0("SELECT * FROM ", tree_table, " WHERE Stand_CN = '%Stand_CN%'"),
     fvs_kwd("EndSQL"), # TreeSQL
     fvs_kwd("DSNOut"),
     output_db,
@@ -418,13 +431,13 @@ fvs_keywordfile_section <- function(
     fvs_kwd("CalbStDb", 2),
     fvs_kwd("CarbReDB", 2),
     fvs_kwd("Computdb", 0, 1),
-    fvs_kwd("CutLiDB",  2),
+    fvs_kwd("CutLiDB", 2),
     fvs_kwd("FuelReDB", 2),
     fvs_kwd("FuelsOut", 2),
     fvs_kwd("InvStats", 2),
-    fvs_kwd("MisRpts",  2),
+    fvs_kwd("MisRpts", 2),
     fvs_kwd("RegRepts"),
-    fvs_kwd("Summary",  2),
+    fvs_kwd("Summary", 2),
     fvs_kwd("TreeLiDB", 2),
     fvs_kwd("End"), # Database
     fvs_ThinPRSC(harvest),
@@ -435,21 +448,20 @@ fvs_keywordfile_section <- function(
 
 
 fvs_write_keyword_file <- function(
-  keyword_filename,
-  input_db,
-  output_db,
-  stand_type,
-  title,
-  mgmt_id,
-  stands,
-  calibration,
-  calib_mort,
-  calib_years,
-  regen,
-  harvest,
-  carb_calc,
-  random_seed
-) {
+    keyword_filename,
+    input_db,
+    output_db,
+    stand_type,
+    title,
+    mgmt_id,
+    stands,
+    calibration,
+    calib_mort,
+    calib_years,
+    regen,
+    harvest,
+    carb_calc,
+    random_seed) {
   unlink(keyword_filename)
   apply(stands, 1, \(row) {
     write_lines(
@@ -492,12 +504,12 @@ fvs_run <- function(
     calib_mort = NULL,
     calib_years = 5,
     harvest = NULL,
+    trees = NULL,
     regen = NULL,
     carb_calc = "Jenkins",
     num_partitions = NULL,
     partition = NULL,
-    random_seed = NULL
-) {
+    random_seed = NULL) {
   # We need to separate inputs and outputs for each partition and each replica
   # Each partition will process a different subset of records;
   # Each replica will process using a different random seed
@@ -511,25 +523,26 @@ fvs_run <- function(
       paste0("_R", random_seed)
     }
   )
-  
+
   fvs_keyword_filename <- file.path(project_dir, paste0(file_basename, ".key"))
   if (file.exists(fvs_keyword_filename)) {
     unlink(fvs_keyword_filename)
   }
-  
+
   if (!is.null(partition)) {
     stands <- stands |>
       filter((digest::digest2int(STAND_CN) %% num_partitions) == (partition - 1))
   }
-  
+
   if (!is.null(harvest)) {
     harvest <- harvest |>
       filter((digest::digest2int(STAND_CN) %% num_partitions) == (partition - 1))
   }
-  
+
   fvs_input_db <- fvs_fia_input(
     fiadb,
     stands,
+    trees,
     calibration,
     calib_mort,
     harvest,
@@ -540,14 +553,14 @@ fvs_run <- function(
   if (file.exists(fvs_output_db)) {
     unlink(fvs_output_db)
   }
-  
+
   # FVS will generate its output in a file with the same name as the keyword
   # file, but with the extension ".out"
   fvs_output_filename <- sub("\\.key$", ".out", fvs_keyword_filename)
   if (file.exists(fvs_output_filename)) {
     unlink(fvs_output_filename)
   }
-  
+
   fvs_write_keyword_file(
     keyword_filename = fvs_keyword_filename,
     input_db = basename(fvs_input_db), # FVS will run in the same directory
@@ -563,7 +576,7 @@ fvs_run <- function(
     carb_calc = carb_calc,
     random_seed = random_seed
   )
-  
+
   # Return the name of the keyword file and output database
   fvs <- processx::process$new(
     file.path(fvsbin_dir, fvs_variant),
@@ -575,9 +588,21 @@ fvs_run <- function(
   tibble::tibble(
     title = title,
     mgmt_id = mgmt_id,
-    num_partitions = if (!is.null(num_partitions)) {num_partitions} else {NA},
-    partition = if (!is.null(partition)) {partition} else {NA},
-    random_seed = if (!is.null(random_seed)) {random_seed} else {NA},
+    num_partitions = if (!is.null(num_partitions)) {
+      num_partitions
+    } else {
+      NA
+    },
+    partition = if (!is.null(partition)) {
+      partition
+    } else {
+      NA
+    },
+    random_seed = if (!is.null(random_seed)) {
+      random_seed
+    } else {
+      NA
+    },
     exit_status = fvs$get_exit_status(),
     output = fvs_output_filename,
     keyword_file = fvs_keyword_filename,
@@ -589,11 +614,11 @@ fvs_run <- function(
 fvs_read_output <- function(fvs_output, table) {
   bind_rows(
     lapply(1:nrow(fvs_output), \(n) {
-      row <- fvs_output[n,]
+      row <- fvs_output[n, ]
       output_db <- row[["output_db"]]
       con <- DBI::dbConnect(RSQLite::SQLite(), output_db, flags = RSQLite::SQLITE_RO)
       on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
-      
+
       tbl(con, table) |>
         collect() |>
         cross_join(row) # Attach all the run metadata to each row
@@ -604,11 +629,11 @@ fvs_read_output <- function(fvs_output, table) {
 fvs_read_input <- function(fvs_output, table) {
   bind_rows(
     lapply(1:nrow(fvs_output), \(n) {
-      row <- fvs_output[n,]
+      row <- fvs_output[n, ]
       input_db <- row[["input_db"]]
       con <- DBI::dbConnect(RSQLite::SQLite(), input_db, flags = RSQLite::SQLITE_RO)
       on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
-      
+
       tbl(con, table) |>
         collect() |>
         cross_join(row)

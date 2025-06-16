@@ -5,6 +5,10 @@ tar_target(cfigro_plot, {
     cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
     cfi_abp(cfiabp_trees) |>
     group_by(MasterPlotID) |>
+    mutate(
+      FIRST_YEAR = min(VisitYear, na.rm = TRUE),
+      LAST_YEAR = max(VisitYear, na.rm = TRUE)
+    ) |>
     arrange(VisitCycle) |>
     filter(row_number() == 1) |>
     ungroup() |>
@@ -38,6 +42,7 @@ tar_target(cfigro_plot, {
     select(
       STAND_CN, STAND_ID, INV_YEAR, REGION, STATE, COUNTY, FOREST,
       LONGITUDE, LATITUDE, ASPECT, SLOPE, ELEVFT, AGE,
-      BASAL_AREA_FACTOR, INV_PLOT_SIZE, BRK_DBH, NUM_PLOTS
+      BASAL_AREA_FACTOR, INV_PLOT_SIZE, BRK_DBH, NUM_PLOTS,
+      FIRST_YEAR, LAST_YEAR
     )
 })
