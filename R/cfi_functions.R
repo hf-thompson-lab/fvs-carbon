@@ -1,11 +1,13 @@
-
 # cfi_with_plot_info ------------------------------------------------------
 
 cfi_with_plot_info <- function(.data, tblDWSPCFIPlotsComplete) {
   .data |>
     left_join(
       tblDWSPCFIPlotsComplete |>
-        select(MasterPlotID, GPSLatitude, GPSLongitude, Slope, Aspect),
+        select(
+          MasterPlotID, GPSLatitude, GPSLongitude,
+          Slope, Aspect, TerrainPosition
+        ),
       by = join_by(MasterPlotID)
     )
 }
@@ -45,11 +47,46 @@ cfi_abp <- function(.data, cfiabp_trees) {
       cfiabp_trees |>
         select(
           MasterPlotID, VisitCycle, MasterTreeID,
-          StatusB, stems.ha.All, CutAnyTime, CutSinceLastVisit
+          StatusB, Status6, dbhcm, stems.ha.All, CutAnyTime, CutSinceLastVisit,
+          Status.prior6, dbh_prior
         ),
       by = join_by(MasterPlotID, VisitCycle, MasterTreeID)
     )
 }
+
+
+# cfi_topocode ------------------------------------------------------------
+
+# Convert CFI terrain position to FVS topocode
+#
+# CFI Terrain Position:
+#  1 = Top of slope; convex region.
+#  2 = Upper slope; convex region at upper edge of slope.
+#  3 = Mid-slope; uniform, fairly straight region.
+#  4 = Bench; area of level land with slopes above and below.
+#  5 = Lower slope; concave region at the lower edge of slope.
+#  6 = Bottomland; horizontal region in low-lying areas, may be subject to occasional flooding.
+#  7 = Flatland; regions not part of or related to slopes; may have minimal elevation changes - less than 5% slope.
+# FVS TOPOCODE, See EssentialFVS 5.4.1.2:
+#  1 = bottom
+#  2 = lower slope
+#  3 = mid-slope
+#  4 = upper slope
+#  5 = ridge top
+cfi_topocode <- function(.data) {
+  .data |>
+    mutate(TOPOCODE = case_match(
+      TerrainPosition,
+      1 ~ 5, # top of slope
+      2 ~ 4, # upper slope
+      3 ~ 3, # mid-slope
+      4 ~ 3, # translate bench to mid-slope
+      5 ~ 2, # lower slope
+      6 ~ 1, # bottom
+      7 ~ 1 # translate flatland to bottom
+    ))
+}
+
 
 # cfi_harvested -----------------------------------------------------------
 # Try to follow the FIA definition of harvest:
@@ -69,23 +106,24 @@ cfi_harvested <- function(.data) {
     arrange(VisitCycle) |>
     mutate(
       PreviousTreeStatusCode = lag(VisitTreeStatusCode),
-      PreviousStatusB = lag(StatusB),
-      PreviousTreeDIAM = lag(VisitTreeDIAM)
+      PreviousStatus6 = lag(Status6),
+      PreviousTreeDIAM = lag(VisitTreeDIAM),
+      PreviousDbhCM = lag(dbhcm)
     ) |>
     ungroup() |>
-    filter(!is.na(PreviousTreeStatusCode) & !is.na(PreviousStatusB)) |>
+    filter(!is.na(PreviousTreeStatusCode) & !is.na(PreviousStatus6)) |>
     group_by(MasterPlotID, VisitCycle) |>
     summarize(
       # Live AGB prior to cutting = sum of AGB of trees that were previously live
       BA_Live = sum(if_else(
-        PreviousStatusB %in% c("R", "L"), # Live Tree
-        pi * (PreviousTreeDIAM / 2)^2,
+        PreviousStatus6 %in% c("R", "L"), # Live Tree
+        pi * (PreviousDbhCM / 2)^2,
         0,
       ), na.rm = TRUE),
       # Cut AGB
       BA_Cut = sum(if_else(
         StatusB == "C",
-        pi * (PreviousTreeDIAM / 2)^2,
+        pi * (PreviousDbhCM / 2)^2,
         0
       ), na.rm = TRUE),
       Cut_Frac = BA_Cut / BA_Live,
@@ -149,21 +187,23 @@ cfi_disturbed <- function(.data, tblDWSPCFIPlotVisitDisturbances) {
     mutate(
       PreviousTreeStatusCode = lag(VisitTreeStatusCode),
       PreviousStatusB = lag(StatusB),
-      PreviousTreeDIAM = lag(VisitTreeDIAM)
+      PreviousTreeDIAM = lag(VisitTreeDIAM),
+      PreviousStatus6 = lag(Status6),
+      PreviousDbhCm = lag(dbhcm)
     ) |>
     ungroup() |>
-    filter(!is.na(PreviousTreeStatusCode) & !is.na(PreviousStatusB)) |>
+    filter(!is.na(PreviousTreeStatusCode) & !is.na(PreviousStatus6)) |>
     group_by(MasterPlotID, VisitCycle) |>
     summarize(
       # Live Stems prior to cutting
       Stems_Live = sum(if_else(
-        PreviousStatusB %in% c("R", "L"), # Live Tree
+        PreviousStatus6 %in% c("R", "L"), # Live Tree
         1,
         0,
       ), na.rm = TRUE),
       # Dead Stems
       Stems_Dead = sum(if_else(
-        StatusB == "D",
+        Status6 == "D",
         1,
         0
       ), na.rm = TRUE),

@@ -429,9 +429,9 @@ qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_abp(cfiabp_trees) |>
   mutate(
-    StatusB = if_else(is.na(StatusB), "X", StatusB),
+    Status6 = if_else(is.na(Status6), "X", Status6),
     StatusDesc = case_match(
-      StatusB,
+      Status6,
       "L" ~ "Live",
       "R" ~ "Recruit",
       "D" ~ "Dead",
@@ -795,7 +795,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
     by = join_by(MasterPlotID)
   ) |>
   mutate(
-    STAND_CN = MasterPlotID, # Could use MasterVisitPlotID, but why make life harder?
+    STAND_CN = MasterPlotID, # Could use MasterPlotVisitID, but why make life harder?
     STAND_ID = MasterPlotID,
     INV_YEAR = VisitYear,
     REGION = 9,
@@ -820,12 +820,9 @@ qryDWSPCFIPlotVisitTreeDetail |>
   )
 ```
 
-
 # Trees
 
-
-We have a couple more tables to look at to see if we can find everything:
-
+It looks like pretty much everything is in the ABP table:
 
 ```
 SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'
@@ -833,9 +830,9 @@ SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'
   TREE_ID            WAS USED - MasterTreeID
   TREE_COUNT         WAS USED - stemsha.L6
   HISTORY            WAS USED - status.prior6
-  SPECIES            WAS USED - genusp
-  DIAMETER           WAS USED - dbh.cm
-  HT                 WAS USED - :-(
+  SPECIES            WAS USED - genusp - swizzle through crosswalk
+  DIAMETER           WAS USED - dbhcm
+  HT                 WAS USED - VisitTreeTotalHeight
   HTTOPK             WAS USED - :-(
   CRRATIO            WAS USED - :-( - maybe in supplement; see appendix
   DAMAGE1            WAS USED - X
@@ -853,6 +850,82 @@ SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'
   TOPOCODE           WAS USED - ?
   SITEPREP           WAS USED - ?
   DG                 WAS USED - Diameter growth - dbh.prior.cm
-  HTG                WAS USED - height growth - X
+  HTG                WAS USED - height growth - lag(VisitTreeTotalHeight)
 NUMBER ROWS PROCESSED:   30
 ```
+
+FVS TOPOCODE:
+1 = bottom
+2 = lower slope
+3 = mid-slope
+4 = upper slope
+5 = ridge top
+
+CFI Terrain Position:
+1 = Top of slope; convex region.
+2 = Upper slope; convex region at upper edge of slope.
+3 = Mid-slope; uniform, fairly straight region.
+4 = Bench; area of level land with slopes above and below.
+5 = Lower slope; concave region at the lower edge of slope.
+6 = Bottomland; horizontal region in low-lying areas, may be subject to occasional flooding.
+7 = Flatland; regions not part of or related to slopes; may have minimal elevation changes - less than 5% slope.
+
+```{targets cfigro_trees, tar_simple = TRUE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  group_by(MasterPlotID, MasterTreeID) |>
+  arrange(VisitCycle) |>
+  mutate(
+    PreviousStatus6 = lag(Status6),
+    PreviousDbhCM = lag(dbhcm),
+    PreviousStemsHa = lag(stems.ha.All),
+    PreviousHeight = lag(VisitTreeTotalHeight)
+  ) |>
+  ungroup() |>
+  cfi_topocode() |>
+  mutate(
+    STAND_CN = MasterPlotID, # Could use MasterPlotVisitID, but why make life harder?
+    STAND_ID = MasterPlotID,
+    TREE_CN = MasterTreeID, # Could use VisitTreeNumberDetail, but why make life harder?
+    TREE_ID = MasterTreeID,
+    TREE_COUNT = conv_unit(stems.ha.All, "acre", "hectare"),
+    HISTORY = PreviousStatus6,
+    SPECIES = SpeciesCode, # appears to be FIA Species
+    DIAMETER = conv_unit(dbhcm, "cm", "in"),
+    HT = VisitTreeTotalHeight,
+    # HTTOPK = VisitTreeTotalHeight, # Height to top kill; we don't ahve that
+    # CRRATIO            WAS USED - not available
+    # DAMAGE1            WAS USED - not available
+    # SEVERITY1          WAS USED - not available
+    # DAMAGE2            WAS USED - not available
+    # SEVERITY2          WAS USED - not available
+    # DAMAGE3            WAS USED - not available
+    # SEVERITY3          WAS USED - not avialable
+    # TREEVALUE          WAS USED - X - tree removal priority
+    # PRESCRIPTION       WAS USED - X - tree removal group
+    # AGE                WAS USED - X
+    SLOPE = Slope,
+    ASPECT = Aspect,
+    # PV_CODE            WAS USED - ecoregion? - not used
+    TOPOCODE = TOPOCODE, # See EssentialFVS 5.4.1.2
+    # SITEPREP           WAS USED - ?
+    DG = PreviousDbhCM,
+    HTG = PreviousHeight
+  ) |>
+  select(
+    STAND_CN, STAND_ID, TREE_CN, TREE_ID,
+    TREE_COUNT, HISTORY, SPECIES, DIAMETER, HT,
+    SLOPE, ASPECT, TOPOCODE, DG, HTG
+  )
+```
+
+# Regeneration
+
+TBD
+
+# Run FVS
+
+
