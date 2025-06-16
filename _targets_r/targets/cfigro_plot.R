@@ -30,7 +30,7 @@ tar_target(cfigro_plot, {
       ELEVFT = ELEVFT,
       BASAL_AREA_FACTOR = -52.7,
       INV_PLOT_SIZE = conv_unit(1, "acre", "ft2") / (pi * 6^2),
-      BRK_DBH = 5.6,
+      BRK_DBH = 6, # ABP uses 6" for break diameter; see ABP 2025
       NUM_PLOTS = 1,
       STATE = STATECD,
       COUNTY = COUNTYCD
