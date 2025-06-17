@@ -12,17 +12,24 @@ tar_target(cfigro_trees, {
       PreviousStemsHa = lag(stems.ha.All),
       PreviousHeight = lag(VisitTreeTotalHeight)
     ) |>
+    filter(VisitCycle == min(VisitCycle, na.rm = TRUE)) |>
     ungroup() |>
     cfi_topocode() |>
     cfi_history() |>
+    left_join(
+      species_crosswalk |> select(SPCD, FVS_SPCD),
+      by = join_by(SpeciesCode == SPCD)
+    ) |>
     mutate(
-      STAND_CN = MasterPlotID, # Could use MasterPlotVisitID, but why make life harder?
+      STAND_CN = MasterPlotVisitID,
       STAND_ID = MasterPlotID,
-      TREE_CN = MasterTreeID, # Could use VisitTreeNumberDetail, but why make life harder?
+      TREE_CN = VisitTreeNumberDetail,
       TREE_ID = MasterTreeID,
+      PLOT_ID = 1, # CFI does not use subplots, so all PLOT_IDs are 1
+      INV_YEAR = VisitYear,
       TREE_COUNT = conv_unit(stems.ha.All, "acre", "hectare"),
       HISTORY = HISTORY,
-      SPECIES = SpeciesCode, # appears to be FIA Species
+      SPECIES = FVS_SPCD,
       DIAMETER = conv_unit(dbhcm, "cm", "in"),
       HT = VisitTreeTotalHeight,
       # HTTOPK = VisitTreeTotalHeight, # Height to top kill; we don't ahve that
@@ -45,7 +52,7 @@ tar_target(cfigro_trees, {
       HTG = PreviousHeight
     ) |>
     select(
-      STAND_CN, STAND_ID, TREE_CN, TREE_ID,
+      STAND_CN, STAND_ID, TREE_CN, TREE_ID, PLOT_ID,
       TREE_COUNT, HISTORY, SPECIES, DIAMETER, HT,
       SLOPE, ASPECT, TOPOCODE, DG, HTG
     )

@@ -251,7 +251,6 @@ Download those and unpack into data/raw/MassGIS/counties.
 
 Use terra::intersect() to extract the county for each plot.
 
-
 ```{targets cfigro_plot_county, tar_simple = TRUE}
 massgis_county <- vect("data/raw/MassGIS/counties/COUNTIES_POLY.shp")
 
@@ -287,6 +286,60 @@ tblDWSPCFIPlotsComplete |>
     by = join_by(COUNTY)
   )
 ```
+
+### FVS_LOCATION
+
+While we're here, FVS wants a location, which is the nearest national forest.
+
+We do this by:
+1. Finding the geographic center of the Quabbin plots;
+2. Finding the FIA plot closest to that geographic center;
+3. Looking up the FVS_LOC_CD from that plot.
+
+FVS national forests are far apart, so all the Quabbin plots will have
+the same national forest.
+
+```{r fvs location, eval = FALSE}
+geo_ctr <- cfigro_plot |>
+  group_by() |>
+  summarize(
+    lat_ctr = mean(LATITUDE, na.rm = TRUE),
+    lon_ctr = mean(LONGITUDE, na.rm = TRUE)
+  ) |>
+  ungroup()
+lat_ctr <- as.numeric(geo_ctr[["lat_ctr"]])
+lon_ctr <- as.numeric(geo_ctr[["lon_ctr"]])
+
+fia_tbl(fiadb, "PLOTGEOM", \(.data, con) {
+  .data |>
+    # We only need the first instance of each plot
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    filter(row_number() == 1) |>
+    ungroup() |>
+    mutate(
+      LAT_DELTA = abs(LAT - lat_ctr),
+      LON_DELTA = abs(LON - lon_ctr),
+      MANHATTAN = LAT_DELTA + LON_DELTA
+    ) |>
+    # The point with the shortest Euclidean distance will have Manhattan
+    # distance less than twice the minimum Manhattan distance. We could
+    # find a tighter upper bound, but there won't be many within 2 so
+    # this is fine.
+    filter(MANHATTAN < 2 * min(MANHATTAN, na.rm = TRUE)) |>
+    mutate(DIST = sqrt(LAT_DELTA^2 + LON_DELTA^2)) |>
+    arrange(DIST) |>
+    head(1) |>
+    left_join(
+      tbl(con, "REF_FVS_LOC_NAME") |>
+        select(FVS_LOC_CD, FVS_LOC_CD_NAME),
+      by = join_by(FVS_LOC_CD)
+    ) |>
+    select(FVS_LOC_CD, FVS_LOC_CD_NAME)
+})
+```
+
+FVS location 922, White Mountain National Forest
+
 ## Watershed
 
 The DCR Division of Water Supply Protection (DWSP) maintains CFI plots
@@ -629,7 +682,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
 ```
 
 ```{r plot cfi plot disturbance, eval = FALSE}
-cfi_disturb |>
+cfigro_plot_disturbed |>
   ggplot(aes(CFIDisturbed)) +
   geom_bar()
 ```
@@ -640,7 +693,7 @@ So, how many plots are unharvested and undisturbed?
 cfiabp_trees |>
   distinct(MasterPlotID) |>
   left_join(cfigro_plot_harvested, by = join_by(MasterPlotID)) |>
-  left_join(cfi_disturb, by = join_by(MasterPlotID)) |>
+  left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
   mutate(
     Status = case_when(
       FIAHarvested & CFIDisturbed ~ "Harvested & Disturbed",
@@ -667,7 +720,7 @@ stems in that acre show damage or mortality.
 Using ">25% mortality", we get many fewer disturbed plots:
 
 ```{r plot fia disturbance, eval = FALSE}
-cfi_disturb |>
+cfigro_plot_disturbed |>
   ggplot(aes(FIADisturbed)) +
   geom_bar()
 ```
@@ -681,7 +734,7 @@ So, how many plots are unharvested and undisturbed by this metric?
 cfiabp_trees |>
   distinct(MasterPlotID) |>
   left_join(cfigro_plot_harvested, by = join_by(MasterPlotID)) |>
-  left_join(cfi_disturb, by = join_by(MasterPlotID)) |>
+  left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
   mutate(
     Status = case_when(
       FIAHarvested & FIADisturbed ~ "Harvested & Disturbed",
@@ -784,7 +837,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
   cfi_abp(cfiabp_trees) |>
   group_by(MasterPlotID) |>
   mutate(
-    FIRST_YEAR = min(VisitYear, na.rm = TRUE),
+    FIRST_YEAR = VisitYear,
     LAST_YEAR = max(VisitYear, na.rm = TRUE)
   ) |>
   arrange(VisitCycle) |>
@@ -799,18 +852,18 @@ qryDWSPCFIPlotVisitTreeDetail |>
     by = join_by(MasterPlotID)
   ) |>
   mutate(
-    STAND_CN = MasterPlotID, # Could use MasterPlotVisitID, but why make life harder?
+    STAND_CN = MasterPlotVisitID,
     STAND_ID = MasterPlotID,
     INV_YEAR = VisitYear,
     REGION = 9,
-    FOREST = 20,
+    FOREST = 22,
     LONGITUDE = GPSLongitude,
     LATITUDE = GPSLatitude,
     AGE = NA,
     ASPECT = Aspect,
     SLOPE = Slope,
     ELEVFT = ELEVFT,
-    BASAL_AREA_FACTOR = -52.7,
+    BASAL_AREA_FACTOR = 0 - conv_unit(1, "acre", "ft2") / (pi * 52.7^2),
     INV_PLOT_SIZE = conv_unit(1, "acre", "ft2") / (pi * 6^2),
     BRK_DBH = 6, # ABP uses 6" for break diameter; see ABP 2025
     NUM_PLOTS = 1,
@@ -889,17 +942,24 @@ qryDWSPCFIPlotVisitTreeDetail |>
     PreviousStemsHa = lag(stems.ha.All),
     PreviousHeight = lag(VisitTreeTotalHeight)
   ) |>
+  filter(VisitCycle == min(VisitCycle, na.rm = TRUE)) |>
   ungroup() |>
   cfi_topocode() |>
   cfi_history() |>
+  left_join(
+    species_crosswalk |> select(SPCD, FVS_SPCD),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
   mutate(
-    STAND_CN = MasterPlotID, # Could use MasterPlotVisitID, but why make life harder?
+    STAND_CN = MasterPlotVisitID,
     STAND_ID = MasterPlotID,
-    TREE_CN = MasterTreeID, # Could use VisitTreeNumberDetail, but why make life harder?
+    TREE_CN = VisitTreeNumberDetail,
     TREE_ID = MasterTreeID,
+    PLOT_ID = 1, # CFI does not use subplots, so all PLOT_IDs are 1
+    INV_YEAR = VisitYear,
     TREE_COUNT = conv_unit(stems.ha.All, "acre", "hectare"),
     HISTORY = HISTORY,
-    SPECIES = SpeciesCode, # appears to be FIA Species
+    SPECIES = FVS_SPCD,
     DIAMETER = conv_unit(dbhcm, "cm", "in"),
     HT = VisitTreeTotalHeight,
     # HTTOPK = VisitTreeTotalHeight, # Height to top kill; we don't ahve that
@@ -922,7 +982,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
     HTG = PreviousHeight
   ) |>
   select(
-    STAND_CN, STAND_ID, TREE_CN, TREE_ID,
+    STAND_CN, STAND_ID, TREE_CN, TREE_ID, PLOT_ID,
     TREE_COUNT, HISTORY, SPECIES, DIAMETER, HT,
     SLOPE, ASPECT, TOPOCODE, DG, HTG
   )
@@ -932,7 +992,8 @@ qryDWSPCFIPlotVisitTreeDetail |>
 
 TBD
 
-# Run FVS
+# FVS CFIGRO NONE
+
 
 ```{targets cfigro_none}
 tar_target(
@@ -964,13 +1025,10 @@ tar_target(
       title = title,
       mgmt_id = mgmt_id,
       stands = cfigro_plot |>
-        left_join(cfigro_plot_harvested, by = join_by(MasterPlotID)) |>
-        left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
+        left_join(cfigro_plot_harvested, by = join_by(STAND_ID == MasterPlotID)) |>
+        left_join(cfigro_plot_disturbed, by = join_by(STAND_ID == MasterPlotID)) |>
         filter(!CFIHarvested & !CFIDisturbed),
-      trees = cfigro_trees,
-      num_partitions = fvs_num_partitions,
-      partition = fvs_partition,
-      random_seed = fvs_randseed
+      trees = cfigro_trees
     )
   },
   # iteration = "vector" branches execution for each partition value (see below)
@@ -983,5 +1041,6 @@ tar_target(
   pattern = cross(fvs_randseed, map(fvs_partition))
 )
 ```
+
 
 
