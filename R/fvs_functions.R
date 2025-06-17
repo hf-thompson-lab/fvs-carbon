@@ -248,7 +248,14 @@ fvs_fia_input <- function(
   }
 
   if (is.null(fiadb)) {
-    treeinit_plot <- trees
+    treeinit_plot <- trees |>
+      left_join(
+        standinit_plot |>
+          group_by(STAND_CN) |>
+          filter(row_number() == 1) |>
+          select(STAND_CN, BRK_DBH, BASAL_AREA_FACTOR, INV_PLOT_SIZE),
+        by = join_by(STAND_CN)
+      )
   } else {
     treeinit_plot <- fia_tbl(fiadb, "FVS_TreeInit_Plot", \(.data, con) {
       .data |>
