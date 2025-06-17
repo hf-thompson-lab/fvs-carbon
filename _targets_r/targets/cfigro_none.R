@@ -30,7 +30,10 @@ tar_target(
         left_join(cfigro_plot_harvested, by = join_by(STAND_ID == MasterPlotID)) |>
         left_join(cfigro_plot_disturbed, by = join_by(STAND_ID == MasterPlotID)) |>
         filter(!CFIHarvested & !CFIDisturbed),
-      trees = cfigro_trees
+      trees = cfigro_trees,
+      num_partitions = fvs_num_partitions,
+      partition = fvs_partition,
+      random_seed = fvs_randseed
     )
   },
   # iteration = "vector" branches execution for each partition value (see below)

@@ -21,7 +21,7 @@ tar_target(cfigro_plot, {
       by = join_by(MasterPlotID)
     ) |>
     mutate(
-      STAND_CN = MasterPlotVisitID,
+      STAND_CN = as.character(MasterPlotVisitID),
       STAND_ID = MasterPlotID,
       INV_YEAR = VisitYear,
       REGION = 9,

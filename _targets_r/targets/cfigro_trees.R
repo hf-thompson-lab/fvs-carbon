@@ -12,7 +12,6 @@ tar_target(cfigro_trees, {
       PreviousStemsHa = lag(stems.ha.All),
       PreviousHeight = lag(VisitTreeTotalHeight)
     ) |>
-    filter(VisitCycle == min(VisitCycle, na.rm = TRUE)) |>
     ungroup() |>
     cfi_topocode() |>
     cfi_history() |>
@@ -21,9 +20,9 @@ tar_target(cfigro_trees, {
       by = join_by(SpeciesCode == SPCD)
     ) |>
     mutate(
-      STAND_CN = MasterPlotVisitID,
+      STAND_CN = as.character(MasterPlotVisitID),
       STAND_ID = MasterPlotID,
-      TREE_CN = VisitTreeNumberDetail,
+      TREE_CN = as.character(VisitTreeNumberDetail),
       TREE_ID = MasterTreeID,
       PLOT_ID = 1, # CFI does not use subplots, so all PLOT_IDs are 1
       INV_YEAR = VisitYear,

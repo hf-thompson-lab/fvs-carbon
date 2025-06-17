@@ -852,7 +852,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
     by = join_by(MasterPlotID)
   ) |>
   mutate(
-    STAND_CN = MasterPlotVisitID,
+    STAND_CN = as.character(MasterPlotVisitID),
     STAND_ID = MasterPlotID,
     INV_YEAR = VisitYear,
     REGION = 9,
@@ -942,7 +942,6 @@ qryDWSPCFIPlotVisitTreeDetail |>
     PreviousStemsHa = lag(stems.ha.All),
     PreviousHeight = lag(VisitTreeTotalHeight)
   ) |>
-  filter(VisitCycle == min(VisitCycle, na.rm = TRUE)) |>
   ungroup() |>
   cfi_topocode() |>
   cfi_history() |>
@@ -951,9 +950,9 @@ qryDWSPCFIPlotVisitTreeDetail |>
     by = join_by(SpeciesCode == SPCD)
   ) |>
   mutate(
-    STAND_CN = MasterPlotVisitID,
+    STAND_CN = as.character(MasterPlotVisitID),
     STAND_ID = MasterPlotID,
-    TREE_CN = VisitTreeNumberDetail,
+    TREE_CN = as.character(VisitTreeNumberDetail),
     TREE_ID = MasterTreeID,
     PLOT_ID = 1, # CFI does not use subplots, so all PLOT_IDs are 1
     INV_YEAR = VisitYear,
@@ -992,7 +991,9 @@ qryDWSPCFIPlotVisitTreeDetail |>
 
 TBD
 
-# FVS CFIGRO NONE
+# Run FVS
+
+## FVS CFIGRO NONE
 
 
 ```{targets cfigro_none}
@@ -1028,7 +1029,10 @@ tar_target(
         left_join(cfigro_plot_harvested, by = join_by(STAND_ID == MasterPlotID)) |>
         left_join(cfigro_plot_disturbed, by = join_by(STAND_ID == MasterPlotID)) |>
         filter(!CFIHarvested & !CFIDisturbed),
-      trees = cfigro_trees
+      trees = cfigro_trees,
+      num_partitions = fvs_num_partitions,
+      partition = fvs_partition,
+      random_seed = fvs_randseed
     )
   },
   # iteration = "vector" branches execution for each partition value (see below)
@@ -1042,5 +1046,172 @@ tar_target(
 )
 ```
 
+## FVS CFIGRO SRVY
 
+```{targets cfigro_srvy}
+tar_target(
+  cfigro_srvy,
+  {
+    # Find all the VisitYears for each plot,
+    # and expand the plots to visit in each year
+    visits <- cfiabp_trees |>
+      left_join(cfigro_plot_harvested, by = join_by(MasterPlotID)) |>
+      left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
+      filter(!CFIHarvested & !CFIDisturbed) |>
+      distinct(MasterPlotID, VisitCycle) |>
+      left_join(
+        tblDWSPCFIPlotVisitsComplete |>
+          select(MasterPlotID, VisitCycle, MasterPlotVisitID, VisitYear),
+        by = join_by(MasterPlotID, VisitCycle)
+      ) |>
+      mutate(MasterPlotVisitID = as.character(MasterPlotVisitID)) |>
+      select(
+        STAND_CN = MasterPlotVisitID,
+        STAND_ID = MasterPlotID,
+        INV_YEAR = VisitYear
+      )
+    
+    plots_for_fvs <- cfigro_plot |>
+      left_join(cfigro_plot_harvested, by = join_by(STAND_ID == MasterPlotID)) |>
+      left_join(cfigro_plot_disturbed, by = join_by(STAND_ID == MasterPlotID)) |>
+      filter(!CFIHarvested & !CFIDisturbed) |>
+      select(-STAND_CN, -INV_YEAR) |>
+      full_join(visits, by = join_by(STAND_ID)) |>
+      mutate(FIRST_YEAR = INV_YEAR, LAST_YEAR = INV_YEAR)
+
+    # No establishment for survey runs
+
+    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
+    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    data_dir <- "data/fvs"
+    title <- "CFIGrowOnly"
+    mgmt_id <- "SRVY"
+
+    # We communicate with FVS through files. FVSOnline shows a model in which
+    # a "project" (the inputs and outputs of a single FVS run) live in a
+    # single directory; we follow that model.
+    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+    if (!dir.exists(project_dir)) {
+      dir.create(project_dir)
+    }
+    
+    fvs_run(
+      fvsbin_dir = fvsbin_dir,
+      fvs_variant = fvs_variant,
+      project_dir = project_dir,
+      fiadb = NULL,
+      title = title,
+      mgmt_id = mgmt_id,
+      stands = plots_for_fvs,
+      trees = cfigro_trees,
+      num_partitions = fvs_num_partitions,
+      partition = fvs_partition
+    )
+  },
+  iteration = "vector",
+  # cross() and map() are unparsed targets:: functions here:
+  pattern = map(fvs_partition)
+)
+```
+
+
+# Results
+
+## Load Results
+
+Load the output from all FVS partitions into a single dataframe
+
+Consolidate outputs that use multiple random seeds;
+average the multiple runs with different random seeds.
+
+### CFI GrowOnly NONE
+
+Carbon
+
+```{targets cfigro_none_carbon, tar_simple = TRUE}
+fvs_read_output(cfigro_none, "FVS_Carbon") |>
+  group_by(StandID, Year) |> # Combine results from different random seeds
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    .groups = "keep"
+  ) |>
+  ungroup()
+```
+
+Summary
+
+```{targets cfigro_none_summary, tar_simple = TRUE}
+fvs_read_output(cfigro_none, "FVS_Summary2_East") |>
+  group_by(StandID, Year) |>
+  summarize(
+    BA = mean(BA),
+    Tpa = mean(Tpa),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+```
+
+
+## Load Results
+
+Load the output from all FVS partitions into a single dataframe
+
+Consolidate outputs that use multiple random seeds;
+average the multiple runs with different random seeds.
+
+### CFI GrowOnly SRVY
+
+Carbon
+
+```{targets cfigro_srvy_carbon, tar_simple = TRUE}
+fvs_read_output(cfigro_srvy, "FVS_Carbon") |>
+  select(StandID, Year, Aboveground_Total_Live)
+```
+
+Summary
+
+```{targets cfigro_srvy_summary, tar_simple = TRUE}
+fvs_read_output(cfigro_srvy, "FVS_Summary2_East") |>
+  select(StandID, Year, BA, Tpa)
+```
+
+## Is it sane?
+
+```{r sanity srvy}
+cfigro_srvy_summary |>
+  filter(Year %% 10 == 0) |>
+  mutate(BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
+  ggplot(aes(Year, BA_METRIC, color = StandID)) +
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  ggtitle("Quabbin Grow-Only Plots Observed BA") +
+  ylab(bquote("BA" ~ (m^2 %.% hectare^-1)))
+```
+
+```{r sanity srvy}
+nrsgro_srvy_summary |>
+  filter(Year %% 10 == 0) |>
+  mutate(BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
+  ggplot(aes(Year, BA_METRIC, color = StandID)) +
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  theme(legend.position = "none") +
+  ggtitle("NRS Grow-Only Plots Observed BA") +
+  ylab(bquote("BA" ~ (m^2 %.% hectare^-1)))
+```
+
+
+```{r sanity none}
+cfigro_none_summary |>
+  mutate(BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
+  ggplot(aes(Year, BA_METRIC, color = StandID)) +
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  theme(legend.position = "none") +
+  ggtitle("Quabbin Grow-Only Plots Projected BA") +
+  ylab(bquote("BA" ~ (m^2 %.% hectare^-1)))
+```
 
