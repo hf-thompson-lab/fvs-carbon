@@ -863,10 +863,11 @@ qryDWSPCFIPlotVisitTreeDetail |>
     ASPECT = Aspect,
     SLOPE = Slope,
     ELEVFT = ELEVFT,
-    BASAL_AREA_FACTOR = 0 - conv_unit(1, "acre", "ft2") / (pi * 52.7^2),
-    INV_PLOT_SIZE = conv_unit(1, "acre", "ft2") / (pi * 6^2),
+    BASAL_AREA_FACTOR = -5, # 52.7' = 1/5 acre; negative means fixed radius
+    INV_PLOT_SIZE = 385, # Microplot area, in inverse fraction of an acre
     BRK_DBH = 6, # ABP uses 6" for break diameter; see ABP 2025
     NUM_PLOTS = 1,
+    SAM_WT = 0.2,
     STATE = STATECD,
     COUNTY = COUNTYCD
   ) |>
@@ -938,8 +939,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
   arrange(VisitCycle) |>
   mutate(
     PreviousStatus6 = lag(Status6),
-    PreviousDbhCM = lag(dbhcm),
-    PreviousStemsHa = lag(stems.ha.All),
+    PreviousDIAM = lag(VisitTreeDIAM),
     PreviousHeight = lag(VisitTreeTotalHeight)
   ) |>
   ungroup() |>
@@ -956,10 +956,10 @@ qryDWSPCFIPlotVisitTreeDetail |>
     TREE_ID = MasterTreeID,
     PLOT_ID = 1, # CFI does not use subplots, so all PLOT_IDs are 1
     INV_YEAR = VisitYear,
-    TREE_COUNT = conv_unit(stems.ha.All, "acre", "hectare"),
+    TREE_COUNT = 1, #conv_unit(1, "acre", "ft2") / (pi * 52.7^2),
     HISTORY = HISTORY,
     SPECIES = FVS_SPCD,
-    DIAMETER = conv_unit(dbhcm, "cm", "in"),
+    DIAMETER = VisitTreeDIAM,
     HT = VisitTreeTotalHeight,
     # HTTOPK = VisitTreeTotalHeight, # Height to top kill; we don't ahve that
     # CRRATIO            WAS USED - not available
@@ -977,7 +977,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
     # PV_CODE            WAS USED - ecoregion? - not used
     TOPOCODE = TOPOCODE, # See EssentialFVS 5.4.1.2
     # SITEPREP           WAS USED - ?
-    DG = conv_unit(PreviousDbhCM, "cm", "in"),
+    DG = PreviousDIAM,
     HTG = PreviousHeight
   ) |>
   select(
@@ -986,6 +986,67 @@ qryDWSPCFIPlotVisitTreeDetail |>
     SLOPE, ASPECT, TOPOCODE, DG, HTG
   )
 ```
+
+
+## DWSCFI Observations
+
+Where does that land us in terms of growth?
+
+```{r plot dwscfi ba, eval = FALSE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  left_join(cfigro_plot_harvested, by = join_by(MasterPlotID)) |>
+  left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
+  filter(!CFIHarvested & !CFIDisturbed) |>
+  group_by(MasterPlotID, VisitYear) |>
+  summarize(BA = sum(pi * (VisitTreeDIAM/24)^2, na.rm = TRUE)) |>
+  ungroup() |>
+  mutate(
+    MasterPlotID = factor(MasterPlotID),
+    BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")
+  ) |>
+  ggplot(aes(VisitYear, BA_METRIC, color = MasterPlotID)) +
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  theme(legend.position = "none") +
+  ggtitle("DCR CFI Quabbin Grow-Only Plots Observed BA") +
+  ylab(bquote("BA" ~ (m^2 %.% hectare^-1)))
+
+```
+
+
+Where does that land us in terms of growth?
+
+```{r plot dwscfi tpa, eval = FALSE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  left_join(cfigro_plot_harvested, by = join_by(MasterPlotID)) |>
+  left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
+  filter(!CFIHarvested & !CFIDisturbed) |>
+  group_by(MasterPlotID, VisitYear) |>
+  summarize(TPA = n() * conv_unit(1, "acre", "ft2") / (pi * 52.7^2)) |>
+  ungroup() |>
+  mutate(
+    MasterPlotID = factor(MasterPlotID)
+  ) |>
+  filter(MasterPlotID == 10464) |>
+  ggplot(aes(VisitYear, TPA, color = MasterPlotID)) +
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+#  theme(legend.position = "none") +
+  ggtitle("DCR CFI Quabbin Grow-Only Plots Observed TPA") +
+  ylab("TPA")
+
+```
+
 
 # Regeneration
 
@@ -1175,12 +1236,15 @@ fvs_read_output(cfigro_srvy, "FVS_Summary2_East") |>
   select(StandID, Year, BA, Tpa)
 ```
 
-## Is it sane?
+# Is it sane?
 
-```{r sanity srvy}
+## SRVY Basal Area
+
+```{r sanity cfigro srvy, eval = FALSE}
 cfigro_srvy_summary |>
-  filter(Year %% 10 == 0) |>
+  #filter(Year %% 10 == 0) |>
   mutate(BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
+  filter(StandID == "10464") |>
   ggplot(aes(Year, BA_METRIC, color = StandID)) +
   geom_line() +
   geom_point() +
@@ -1189,7 +1253,48 @@ cfigro_srvy_summary |>
   ylab(bquote("BA" ~ (m^2 %.% hectare^-1)))
 ```
 
-```{r sanity srvy}
+### The Fate of Plot 10464
+
+```{r plot 10464 ba, eval = FALSE}
+cfi_raw <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  filter(MasterPlotID == 10464) |>
+  filter(VisitTreeStatusCode == 1) |>
+  group_by(MasterPlotID, VisitYear) |>
+  summarize(
+    BA = sum(pi * (VisitTreeDIAM/2)^2, na.rm = TRUE),
+    Tpa = n() * 5,
+  ) |>
+  ungroup() |>
+  mutate(
+    StandID = factor(MasterPlotID),
+    Year = VisitYear,
+    Series = "CFI"
+  )
+
+cfi_fvs <- cfigro_srvy_summary |>
+  filter(StandID == "10464") |>
+  filter(Year %% 10 == 0) |>
+  mutate(
+    Series = "FVS"
+  )
+
+bind_rows(cfi_raw, cfi_fvs) |>
+  ggplot(aes(Year, Tpa, color = Series)) +
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  ggtitle("CFI vs. FVS reported TPA for plot 10464") +
+  ylab(bquote("TPA" ~ (trees %.% acre^-1)))
+```
+
+## NRSGRO SRVY Basal Area
+
+Not really; compare to NRSGrowOnly:
+
+```{r sanity nrsgro srvy, eval = FALSE}
 nrsgro_srvy_summary |>
   filter(Year %% 10 == 0) |>
   mutate(BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
@@ -1202,8 +1307,33 @@ nrsgro_srvy_summary |>
   ylab(bquote("BA" ~ (m^2 %.% hectare^-1)))
 ```
 
+## ABP Tree BA
 
-```{r sanity none}
+What do we see if we just sum the BA in these plots?
+```{r plot ba, eval = FALSE}
+cfiabp_trees |>
+  left_join(cfigro_plot_harvested, by = join_by(MasterPlotID)) |>
+  left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
+  filter(!CFIHarvested & !CFIDisturbed) |>
+  left_join(
+    tblDWSPCFIPlotVisitsComplete |>
+      select(MasterPlotID, VisitCycle, MasterPlotVisitID, VisitYear),
+    by = join_by(MasterPlotID, VisitCycle)
+  ) |>
+  group_by(MasterPlotID, VisitYear) |>
+  summarize(BA = sum(pi * (dbhcm / 2)^2)) |>
+  ungroup() |>
+    View()
+
+#  ggplot(aes(VisitYear, BA, color = MasterPlotID)) +
+#  geom_line() +
+#  geom_point()
+  
+```
+
+## CFIGRO NONE BA
+
+```{r sanity none, eval = FALSE}
 cfigro_none_summary |>
   mutate(BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
   ggplot(aes(Year, BA_METRIC, color = StandID)) +

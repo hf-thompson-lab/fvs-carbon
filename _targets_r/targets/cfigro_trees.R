@@ -8,8 +8,7 @@ tar_target(cfigro_trees, {
     arrange(VisitCycle) |>
     mutate(
       PreviousStatus6 = lag(Status6),
-      PreviousDbhCM = lag(dbhcm),
-      PreviousStemsHa = lag(stems.ha.All),
+      PreviousDIAM = lag(VisitTreeDIAM),
       PreviousHeight = lag(VisitTreeTotalHeight)
     ) |>
     ungroup() |>
@@ -26,10 +25,10 @@ tar_target(cfigro_trees, {
       TREE_ID = MasterTreeID,
       PLOT_ID = 1, # CFI does not use subplots, so all PLOT_IDs are 1
       INV_YEAR = VisitYear,
-      TREE_COUNT = conv_unit(stems.ha.All, "acre", "hectare"),
+      TREE_COUNT = 1, #conv_unit(1, "acre", "ft2") / (pi * 52.7^2),
       HISTORY = HISTORY,
       SPECIES = FVS_SPCD,
-      DIAMETER = conv_unit(dbhcm, "cm", "in"),
+      DIAMETER = VisitTreeDIAM,
       HT = VisitTreeTotalHeight,
       # HTTOPK = VisitTreeTotalHeight, # Height to top kill; we don't ahve that
       # CRRATIO            WAS USED - not available
@@ -47,7 +46,7 @@ tar_target(cfigro_trees, {
       # PV_CODE            WAS USED - ecoregion? - not used
       TOPOCODE = TOPOCODE, # See EssentialFVS 5.4.1.2
       # SITEPREP           WAS USED - ?
-      DG = conv_unit(PreviousDbhCM, "cm", "in"),
+      DG = PreviousDIAM,
       HTG = PreviousHeight
     ) |>
     select(
