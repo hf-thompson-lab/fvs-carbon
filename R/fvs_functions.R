@@ -595,6 +595,7 @@ fvs_run <- function(
   tibble::tibble(
     title = title,
     mgmt_id = mgmt_id,
+    timestamp = Sys.time(),
     num_partitions = if (!is.null(num_partitions)) {
       num_partitions
     } else {
