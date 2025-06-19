@@ -865,7 +865,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
     ELEVFT = ELEVFT,
     BASAL_AREA_FACTOR = -5, # 52.7' = 1/5 acre; negative means fixed radius
     INV_PLOT_SIZE = 385, # Microplot area, in inverse fraction of an acre
-    BRK_DBH = 6, # ABP uses 6" for break diameter; see ABP 2025
+    BRK_DBH = 5, # ABP uses 6" for break diameter; see ABP 2025
     NUM_PLOTS = 1,
     SAM_WT = 0.2,
     STATE = STATECD,
@@ -875,7 +875,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
     STAND_CN, STAND_ID, INV_YEAR, REGION, STATE, COUNTY, FOREST,
     LONGITUDE, LATITUDE, ASPECT, SLOPE, ELEVFT, AGE,
     BASAL_AREA_FACTOR, INV_PLOT_SIZE, BRK_DBH, NUM_PLOTS,
-    FIRST_YEAR, LAST_YEAR
+    SAM_WT, FIRST_YEAR, LAST_YEAR
   )
 ```
 
@@ -934,6 +934,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
   cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  filter(VisitTreeStatusCode != 4) |> # Skip missing trees
   cfi_abp(cfiabp_trees) |>
   group_by(MasterPlotID, MasterTreeID) |>
   arrange(VisitCycle) |>
@@ -1242,9 +1243,9 @@ fvs_read_output(cfigro_srvy, "FVS_Summary2_East") |>
 
 ```{r sanity cfigro srvy, eval = FALSE}
 cfigro_srvy_summary |>
-  #filter(Year %% 10 == 0) |>
+  filter(Year %% 10 == 0) |>
   mutate(BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
-  filter(StandID == "10464") |>
+#  filter(StandID == "10464") |>
   ggplot(aes(Year, BA_METRIC, color = StandID)) +
   geom_line() +
   geom_point() +
@@ -1282,12 +1283,12 @@ cfi_fvs <- cfigro_srvy_summary |>
   )
 
 bind_rows(cfi_raw, cfi_fvs) |>
-  ggplot(aes(Year, Tpa, color = Series)) +
-  geom_line() +
-  geom_point() +
+  ggplot(aes(Year, Tpa, fill = Series)) +
+  geom_col(position = "dodge") +
   theme_bw() +
   ggtitle("CFI vs. FVS reported TPA for plot 10464") +
-  ylab(bquote("TPA" ~ (trees %.% acre^-1)))
+  ylab(bquote("TPA" ~ (trees %.% acre^-1))) +
+  coord_cartesian(ylim = c(0, NA))
 ```
 
 ## NRSGRO SRVY Basal Area
@@ -1323,11 +1324,10 @@ cfiabp_trees |>
   group_by(MasterPlotID, VisitYear) |>
   summarize(BA = sum(pi * (dbhcm / 2)^2)) |>
   ungroup() |>
-    View()
-
-#  ggplot(aes(VisitYear, BA, color = MasterPlotID)) +
-#  geom_line() +
-#  geom_point()
+  mutate(MasterPlotID = factor(MasterPlotID)) |>
+  ggplot(aes(VisitYear, BA, color = MasterPlotID)) +
+  geom_line() +
+  geom_point()
   
 ```
 

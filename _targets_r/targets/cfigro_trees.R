@@ -3,6 +3,7 @@ tar_target(cfigro_trees, {
     cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
     cfi_with_tree_info(tblDWSPCFITreesComplete) |>
     cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+    filter(VisitTreeStatusCode != 4) |> # Skip missing trees
     cfi_abp(cfiabp_trees) |>
     group_by(MasterPlotID, MasterTreeID) |>
     arrange(VisitCycle) |>

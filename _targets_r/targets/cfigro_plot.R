@@ -34,7 +34,7 @@ tar_target(cfigro_plot, {
       ELEVFT = ELEVFT,
       BASAL_AREA_FACTOR = -5, # 52.7' = 1/5 acre; negative means fixed radius
       INV_PLOT_SIZE = 385, # Microplot area, in inverse fraction of an acre
-      BRK_DBH = 6, # ABP uses 6" for break diameter; see ABP 2025
+      BRK_DBH = 5, # ABP uses 6" for break diameter; see ABP 2025
       NUM_PLOTS = 1,
       SAM_WT = 0.2,
       STATE = STATECD,
@@ -44,6 +44,6 @@ tar_target(cfigro_plot, {
       STAND_CN, STAND_ID, INV_YEAR, REGION, STATE, COUNTY, FOREST,
       LONGITUDE, LATITUDE, ASPECT, SLOPE, ELEVFT, AGE,
       BASAL_AREA_FACTOR, INV_PLOT_SIZE, BRK_DBH, NUM_PLOTS,
-      FIRST_YEAR, LAST_YEAR
+      SAM_WT, FIRST_YEAR, LAST_YEAR
     )
 })
