@@ -315,7 +315,7 @@ fvs_fia_input <- function(
       ) |>
       ungroup() |>
       # Create new TREE_IDs. We can try to be clever, but it's really not worth it.
-      group_by(STAND_ID, PLOT_ID) |>
+      group_by(STAND_CN, PLOT_ID) |>
       arrange(TREE_ID, TREE_COUNT) |> # Maintain the same order
       mutate(TREE_ID = row_number()) |>
       ungroup() |>
