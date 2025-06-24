@@ -23,6 +23,7 @@ tar_source()
 tar_load(fiadb)
 tar_load(fvsne_states)
 tar_load(species_crosswalk)
+tar_load(nrsgro_srvy_summary)
 tar_load(nrshrv_plot)
 tar_load(nrshrv_plot_stats)
 tar_load(fvs_num_partitions)
@@ -748,7 +749,7 @@ cfiabp_trees |>
   geom_bar() +
   geom_text(aes(y = after_stat(count + 5), label = after_stat(count)), stat = "count") +
   theme_bw() +
-  ggtitle("CFI Plots by Status") +
+  ggtitle("CFI Plots by FIA Status") +
   ylab("Number of Plots")
 ```
 
@@ -780,8 +781,7 @@ tblDWSPCFIPlotVisitDisturbances |>
   ) |>
   mutate(PlotVisitDisturbanceCode = replace_na(PlotVisitDisturbanceCode, 0)) |>
   group_by(MasterPlotID, VisitCycle) |>
-  summarize(PlotVisitDisturbanceCode = max(PlotVisitDisturbanceCode, na.rm = TRUE)) |>
-  ungroup() |>
+  summarize(PlotVisitDisturbanceCode = max(PlotVisitDisturbanceCode, na.rm = TRUE), .groups = "drop") |>
   mutate(
     undisturbed_interval = if_else(
       PlotVisitDisturbanceCode > 0, 0,
@@ -824,8 +824,8 @@ tblDWSPCFIPlotVisitDisturbances |>
   ) |>
   ungroup() |>
   group_by(MasterPlotID) |>
-  summarize(MaxUndisturbInterval = max(undisturbed_interval)) |>
-  ungroup() |>
+  summarize(MaxUndisturbInterval = max(undisturbed_interval), .groups = "drop") |>
+  filter(!is.na(MaxUndisturbInterval)) |>
   ggplot(aes(MaxUndisturbInterval)) +
   geom_bar() +
   theme_bw() +
@@ -878,8 +878,6 @@ From 1970 - 2020, only 2 trees establish on grow-only plots with DIAM < 5.6".
 We will use 5" as BRK_DBH, and filter out trees with diameter < 5.
 
 ## Grow-Only vs. Harvested vs. Disturbed
-
-- Add Species
 
 How distinct are grow-only, disturbed, harvested and harvested/disturbed plots?
 
@@ -1242,8 +1240,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
   left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
   filter(!CFIHarvested & !CFIDisturbed) |>
   group_by(MasterPlotID, VisitYear) |>
-  summarize(BA = sum(pi * (VisitTreeDIAM/24)^2, na.rm = TRUE)) |>
-  ungroup() |>
+  summarize(BA = sum(pi * (VisitTreeDIAM/24)^2, na.rm = TRUE), .groups = "drop") |>
   mutate(
     MasterPlotID = factor(MasterPlotID),
     BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")
@@ -1271,8 +1268,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
   left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
   filter(!CFIHarvested & !CFIDisturbed) |>
   group_by(MasterPlotID, VisitYear) |>
-  summarize(TPA = n() * conv_unit(1, "acre", "ft2") / (pi * 52.7^2)) |>
-  ungroup() |>
+  summarize(TPA = n() * conv_unit(1, "acre", "ft2") / (pi * 52.7^2), .groups = "drop") |>
   mutate(
     MasterPlotID = factor(MasterPlotID)
   ) |>
@@ -1505,6 +1501,7 @@ cfi_raw <- qryDWSPCFIPlotVisitTreeDetail |>
   summarize(
     BA = sum(pi * (VisitTreeDIAM/2)^2, na.rm = TRUE),
     Tpa = n() * 5,
+    .groups = "drop"
   ) |>
   ungroup() |>
   mutate(
@@ -1531,7 +1528,7 @@ bind_rows(cfi_raw, cfi_fvs) |>
 
 ## NRSGRO SRVY BAI
 
-Not really; compare to NRSGrowOnly:
+Compare to NRSGrowOnly:
 
 ```{r sanity nrsgro srvy, eval = FALSE}
 nrsgro_srvy_summary |>
@@ -1546,33 +1543,11 @@ nrsgro_srvy_summary |>
   ylab(bquote("BA" ~ (m^2 %.% hectare^-1)))
 ```
 
-## CFIABP BAI
-
-What do we see if we just sum the BA in these plots?
-```{r plot ba, eval = FALSE}
-cfiabp_trees |>
-  left_join(cfigro_plot_harvested, by = join_by(MasterPlotID)) |>
-  left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
-  filter(!CFIHarvested & !CFIDisturbed) |>
-  left_join(
-    tblDWSPCFIPlotVisitsComplete |>
-      select(MasterPlotID, VisitCycle, MasterPlotVisitID, VisitYear),
-    by = join_by(MasterPlotID, VisitCycle)
-  ) |>
-  group_by(MasterPlotID, VisitYear) |>
-  summarize(BA = sum(pi * (dbhcm / 2)^2)) |>
-  ungroup() |>
-  mutate(MasterPlotID = factor(MasterPlotID)) |>
-  ggplot(aes(VisitYear, BA, color = MasterPlotID)) +
-  geom_line() +
-  geom_point()
-  
-```
-
 ## CFIGRO NONE BA
 
 ```{r sanity none, eval = FALSE}
 cfigro_none_summary |>
+  filter(Year < 2021) |>
   mutate(BA_METRIC = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
   ggplot(aes(Year, BA_METRIC, color = StandID)) +
   geom_line() +
@@ -1593,55 +1568,77 @@ projected_carbon_tmp <- cfigro_none_carbon |>
   rename(Projected_Carbon = Aboveground_Total_Live)
 
 projected_ba_tmp <- cfigro_none_summary |>
-  select(StandID, Year, BA, Tpa) |>
   mutate(Projected_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
-  rename(Projected_Tpa = Tpa)
+  mutate(Projected_Tph = conv_unit(Tpa, "hectare", "acre")) |>
+  select(StandID, Year, Projected_BA, Projected_Tph)
 
 projected_tmp <- projected_carbon_tmp |>
   full_join(projected_ba_tmp, by = join_by(StandID, Year)) |>
-  select(StandID, Year, Projected_Carbon, Projected_BA, Projected_Tpa)
+  select(StandID, Year, Projected_Carbon, Projected_BA, Projected_Tph)
 
 surveyed_carbon_tmp <- cfigro_srvy_carbon |>
   select(StandID, Year, Aboveground_Total_Live) |>
   rename(Measured_Carbon = Aboveground_Total_Live)
 
 surveyed_ba_tmp <- cfigro_srvy_summary |>
-  select(StandID, Year, BA, Tpa) |>
   mutate(Measured_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
-  rename(Measured_Tpa = Tpa)
+  mutate(Measured_Tph = conv_unit(Tpa, "hectare", "acre")) |>
+  select(StandID, Year, Measured_BA, Measured_Tph)
 
 surveyed_tmp <- surveyed_carbon_tmp |>
   full_join(surveyed_ba_tmp, by = join_by(StandID, Year)) |>
   filter(!is.na(Measured_Carbon)) |> # other metrics get an extra year
-  select(StandID, Year, Measured_Carbon, Measured_BA, Measured_Tpa)
+  select(StandID, Year, Measured_Carbon, Measured_BA, Measured_Tph)
 
-cfigro_none_proj_vs_meas <- qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  filter(VisitTreeStatusCode != 4) |> # Skip missing trees
-  cfi_abp(cfiabp_trees) |>
-  mutate(StandID = as.character(MasterPlotID)) |>
-  select(
-    StandID,
-    Year = VisitYear
-  ) |>
+#cfigro_none_proj_vs_meas <- qryDWSPCFIPlotVisitTreeDetail |>
+#  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+#  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+#  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+#  filter(VisitTreeStatusCode != 4) |> # Skip missing trees
+#  cfi_abp(cfiabp_trees) |>
+#  mutate(StandID = as.character(MasterPlotID)) |>
+#  select(
+#    StandID,
+#    Year = VisitYear
+#  ) |>
+#  left_join(surveyed_tmp, by = join_by(StandID, Year)) |>
+cfigro_none_proj_vs_meas <- surveyed_tmp |>
   left_join(projected_tmp, by = join_by(StandID, Year)) |>
-  left_join(surveyed_tmp, by = join_by(StandID, Year)) |>
   group_by(StandID) |>
   mutate(
     First_Year = min(Year, na.rm = TRUE),
     Last_Year = max(Year, na.rm = TRUE),
-    Starting_Carbon = min(if_else(Year == First_Year, Measured_Carbon, NA), na.rm = TRUE),
+    Starting_Carbon = min(
+      if_else(Year == First_Year, Measured_Carbon, NA),
+      na.rm = TRUE
+    ),
     Projected_Carbon_Delta = Projected_Carbon - Starting_Carbon,
-    Projected_Carbon_Flux = if_else(Year == First_Year, 0, -(Projected_Carbon_Delta / (Year - First_Year))),
+    Projected_Carbon_Flux = if_else(
+      Year == First_Year,
+      0,
+      -(Projected_Carbon_Delta / (Year - First_Year))
+    ),
     Measured_Carbon_Delta = Measured_Carbon - Starting_Carbon,
-    Measured_Carbon_Flux = if_else(Year == First_Year, 0, -(Measured_Carbon_Delta / (Year - First_Year))),
-    Starting_BA = min(if_else(Year == First_Year, Measured_BA, NA), na.rm = TRUE),
+    Measured_Carbon_Flux = if_else(
+      Year == First_Year,
+      0,
+      -(Measured_Carbon_Delta / (Year - First_Year))
+    ),
+    Starting_BA = min(
+      if_else(Year == First_Year, Measured_BA, NA),
+      na.rm = TRUE
+    ),
     Projected_BA_Delta = Projected_BA - Starting_BA,
-    Projected_BAI = if_else(Year == First_Year, 0, Projected_BA_Delta / (Year - First_Year)),
+    Projected_BAI = if_else(
+      Year == First_Year,
+      0,
+      Projected_BA_Delta / (Year - First_Year)
+    ),
     Measured_BA_Delta = Measured_BA - Starting_BA,
-    Measured_BAI = if_else(Year == First_Year, 0, Measured_BA_Delta / (Year - First_Year))
+    Measured_BAI = if_else(
+      Year == First_Year,
+      0,
+      Measured_BA_Delta / (Year - First_Year))
   ) |>
   ungroup() |>
   filter(Year == First_Year | Year == Last_Year) |>
@@ -1660,6 +1657,7 @@ cfigro_none_proj_vs_meas <- qryDWSPCFIPlotVisitTreeDetail |>
 
 ```{r plot bai density, eval = FALSE}
 cfigro_none_proj_vs_meas |>
+  filter(Projection_Years > 0) |>
   select(
     StandID,
     Projected_BAI,
@@ -1683,6 +1681,7 @@ cfigro_none_proj_vs_meas |>
 
 ```{r plot carbon flux density, eval = FALSE}
 cfigro_none_proj_vs_meas |>
+  filter(Projection_Years > 0) |>
   select(
     StandID,
     Projected_Carbon_Flux,
