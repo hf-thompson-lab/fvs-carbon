@@ -88,9 +88,12 @@ cfi_topocode <- function(.data) {
 }
 
 
-# cfi_history -------------------------------------------------------------
+# cfi_status_live ---------------------------------------------------------
+# Convert a VisitTreeStatusCode to a boolean, TRUE if the status means alive
+#
+# Tree status can be alive, dead, administrative, unknown, NA
 
-# Convert CFI Status + ABP Status to FVS History
+
 # CFI TreeStatusCode:
 # - 1 - Live
 # - 2-3 - Dead
@@ -103,6 +106,26 @@ cfi_topocode <- function(.data) {
 # - 15 - Ingrowth
 # - 16 - Live
 # - 17-22 - Dead
+
+cfi_status_live <- function(x) {
+  x %in% c(1, 5:10, 15, 16)
+}
+
+
+# cfi_status_dead ---------------------------------------------------------
+
+# Convert a VisitTreeStatusCode to a boolean, TRUE if the status means dead
+# See cfi_status_live
+
+cfi_status_dead <- function(x) {
+  x %in% c(2, 3, 17:22)
+}
+
+
+
+# cfi_history -------------------------------------------------------------
+
+# Convert CFI Status + ABP Status to FVS History
 #
 # ABP Status:
 # - L = live now & at prior visit;
@@ -120,12 +143,6 @@ cfi_topocode <- function(.data) {
 # (Essential FVS, 4.2.1 Sample Tree Data Description)
 
 cfi_history <- function(.data) {
-  cfi_status_live <- function(x) {
-    x %in% c(1, 5:10, 15, 16)
-  }
-  cfi_status_dead <- function(x) {
-    x %in% c(2, 3, 17:22)
-  }
   .data |>
     group_by(MasterTreeID) |>
     arrange(VisitCycle) |>

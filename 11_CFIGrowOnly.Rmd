@@ -635,8 +635,9 @@ tblDWSPCFIPlotVisitDisturbances |>
       distinct(MasterPlotVisitID, MasterPlotID, VisitYear, VisitCycle),
     by = join_by(MasterPlotVisitID)
   ) |>
+  filter(PlotVisitDisturbanceCode != 0) |>
   # Remove harvest and harvest-related disturbances
-  filter(!PlotVisitDisturbanceCode %in% c(0, 8, 9, 11, 12, 13, 14, 17, 18, 19, 20, 21, 22)) |>
+  #mutate(PlotVisitDisturbanceCode = if_else(PlotVisitDisturbanceCode %in% c(8, 9, 11, 12, 13, 14, 17, 18, 19, 20, 21, 22), 9, PlotVisitDisturbanceCode)) |>
   filter(
     PlotVisitDisturbanceYearCorrected >= VisitYear - 10 &
       #PlotVisitDisturbanceYearCorrected >= 1970 &
@@ -753,6 +754,196 @@ cfiabp_trees |>
 
 ### Longest Undisturbed Period
 
+
+```{r plot disturbance history, eval = FALSE}
+tblDWSPCFIPlotVisitDisturbances |>
+  left_join(
+    tblDWSPCFIPlotVisitsComplete |>
+      distinct(MasterPlotVisitID, MasterPlotID, VisitYear, VisitCycle),
+    by = join_by(MasterPlotVisitID)
+  ) |>
+  # Remove harvest and harvest-related disturbances
+  # filter(!PlotVisitDisturbanceCode %in% c(8, 9, 11, 12, 13, 14, 17, 18, 19, 20, 21, 22)) |>
+  filter(
+    PlotVisitDisturbanceYearCorrected >= VisitYear - 10 &
+      PlotVisitDisturbanceYearCorrected >= 1970 &
+      PlotVisitDisturbanceYearCorrected < 9999 &
+      (is.na(PlotVisitDisturbanceSeverity) | PlotVisitDisturbanceSeverity > 1)
+  ) |>
+  full_join(
+    cfiabp_trees |> distinct(MasterPlotID, VisitCycle),
+    by = join_by(MasterPlotID, VisitCycle)
+  ) |>
+  inner_join(
+    cfiabp_trees |> distinct(MasterPlotID, VisitCycle),
+    by = join_by(MasterPlotID, VisitCycle)
+  ) |>
+  mutate(PlotVisitDisturbanceCode = replace_na(PlotVisitDisturbanceCode, 0)) |>
+  group_by(MasterPlotID, VisitCycle) |>
+  summarize(PlotVisitDisturbanceCode = max(PlotVisitDisturbanceCode, na.rm = TRUE)) |>
+  ungroup() |>
+  mutate(
+    undisturbed_interval = if_else(
+      PlotVisitDisturbanceCode > 0, 0,
+      if_else(
+        VisitCycle == 1970, 1, NA
+      )
+    )
+  ) |>
+  group_by(MasterPlotID) |>
+  arrange(VisitCycle) |>
+  mutate(
+    undisturbed_interval = case_when(
+      !is.na(undisturbed_interval) ~ undisturbed_interval,
+      VisitCycle == 1980 ~ lag(undisturbed_interval) + 1
+    )
+  ) |>
+  mutate(
+    undisturbed_interval = case_when(
+      !is.na(undisturbed_interval) ~ undisturbed_interval,
+      VisitCycle == 1990 ~ lag(undisturbed_interval) + 1
+    )
+  ) |>
+  mutate(
+    undisturbed_interval = case_when(
+      !is.na(undisturbed_interval) ~ undisturbed_interval,
+      VisitCycle == 2000 ~ lag(undisturbed_interval) + 1
+    )
+  ) |>
+  mutate(
+    undisturbed_interval = case_when(
+      !is.na(undisturbed_interval) ~ undisturbed_interval,
+      VisitCycle == 2010 ~ lag(undisturbed_interval) + 1
+    )
+  ) |>
+    mutate(
+    undisturbed_interval = case_when(
+      !is.na(undisturbed_interval) ~ undisturbed_interval,
+      VisitCycle == 2020 ~ lag(undisturbed_interval) + 1
+    )
+  ) |>
+  ungroup() |>
+  group_by(MasterPlotID) |>
+  summarize(MaxUndisturbInterval = max(undisturbed_interval)) |>
+  ungroup() |>
+  ggplot(aes(MaxUndisturbInterval)) +
+  geom_bar() +
+  theme_bw() +
+  ggtitle("Number of Plots by Undisturbed Interval") +
+  ylab("Number of Plots") +
+  xlab("Visits witout disturbance")
+
+```
+
+## Grow-Only vs. Harvested vs. Disturbed
+
+- Add Species
+
+How distinct are grow-only, disturbed, harvested and harvested/disturbed plots?
+
+```{r}
+tmp_trees <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  filter(VisitCycle == 1970) |>
+  filter(cfi_status_live(VisitTreeStatusCode)) |> # Only Live Trees
+  left_join(
+    species_crosswalk |> select(SPCD, SCIENTIFIC_NAME),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  mutate(
+    TPA = 1,
+    BA = pi * (VisitTreeDIAM / 2)^2
+  )
+
+tmp_by_quabbin <- tmp_trees |>
+  group_by() |>
+  summarize(
+    TPA = sum(TPA, na.rm = TRUE),
+    BA = sum(BA, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+tmp_by_species <- tmp_trees |>
+  group_by(SCIENTIFIC_NAME) |>
+  summarize(
+    TPA = sum(TPA, na.rm = TRUE),
+    BA = sum(BA, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+tmp_by_plot <- tmp_trees |>
+  group_by(MasterPlotID) |>
+  summarize(
+    TPA = sum(TPA, na.rm = TRUE),
+    BA = sum(BA, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+tmp_top_species <- tmp_by_species |>
+  cross_join(tmp_by_quabbin |> select(BA_Total = BA)) |>
+  mutate(BA_Frac = BA / BA_Total) |>
+  filter(BA_Frac > 0.1)
+
+tmp_plot_species <- tmp_trees |>
+  left_join(
+    tmp_by_plot |>
+      select(MasterPlotID, BA_Plot = BA),
+    by = join_by(MasterPlotID)
+  ) |>
+  group_by(MasterPlotID, SCIENTIFIC_NAME) |>
+  mutate(BA_Frac = sum(BA, na.rm = TRUE) / BA_Plot) |>
+  ungroup() |>
+  filter(BA_Frac > 0.1) |>
+  filter(SCIENTIFIC_NAME %in% tmp_top_species$SCIENTIFIC_NAME) |>
+  distinct(MasterPlotID, SCIENTIFIC_NAME) |>
+  group_by(MasterPlotID) |>
+  summarize(
+    Species = do.call(
+      paste,
+      append(sort(SCIENTIFIC_NAME), list(sep = ", "))
+    ),
+    .groups = "drop"
+  )
+
+tmp_trees |>
+  group_by(MasterPlotID) |>
+  summarize(
+    TPA = sum(TPA, na.rm = TRUE),
+    BA = sum(BA, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  ungroup() |>
+  left_join(cfigro_plot_harvested, by = join_by(MasterPlotID)) |>
+  left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
+  left_join(tmp_plot_species, by = join_by(MasterPlotID)) |>
+  mutate(
+    Species = if_else(is.na(Species), "Other", Species),
+    Status = case_when(
+      CFIHarvested & CFIDisturbed ~ "Harvested & Disturbed",
+      CFIHarvested ~ "Harvested",
+      CFIDisturbed ~ "Disturbed",
+      .default = "Grow-Only"
+    )
+  ) |>
+  ggplot(aes(BA, TPA, color = Status)) +
+  geom_point() +
+  scale_color_manual( values = c(
+    "Grow-Only" = "black",
+    "Harvested" = "red",
+    "Disturbed" = "royalblue",
+    "Harvested & Disturbed" = "orange"
+  )) +
+  scale_x_continuous(transform = "log10") +
+  scale_y_continuous(transform = "log10") +
+  theme_bw() +
+  ggtitle("CFI Plot Overview") +
+  xlab(bquote("Basal Area" ~ (ft^2))) +
+  ylab(bquote("Population" ~ (stems))) +
+  facet_wrap("Species")
+```
 
 ## Final Formatting
 
@@ -883,16 +1074,19 @@ qryDWSPCFIPlotVisitTreeDetail |>
 
 # Trees
 
-It looks like pretty much everything is in the ABP table:
+It looks like pretty much everything is in the ABP table.
+When comparing current to previous status, and for diameter and 
+height growth, the VisitTree* values are more densely populated
+which works better for change-over-time calculations.
 
 ```
 SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'
   PLOT_ID            WAS USED - MasterPlotID
   TREE_ID            WAS USED - MasterTreeID
   TREE_COUNT         WAS USED - stemsha.L6
-  HISTORY            WAS USED - status.prior6
+  HISTORY            WAS USED - status.prior6 - no, use VisitTreeStatusCode, except for harvest
   SPECIES            WAS USED - genusp - swizzle through crosswalk
-  DIAMETER           WAS USED - dbhcm
+  DIAMETER           WAS USED - dbhcm - no, use VisitTreeDIAM
   HT                 WAS USED - VisitTreeTotalHeight
   HTTOPK             WAS USED - :-(
   CRRATIO            WAS USED - :-( - maybe in supplement; see appendix
@@ -910,7 +1104,7 @@ SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'
   PV_CODE            WAS USED - ecoregion? - not used
   TOPOCODE           WAS USED - ?
   SITEPREP           WAS USED - ?
-  DG                 WAS USED - Diameter growth - dbh.prior.cm
+  DG                 WAS USED - Diameter growth - dbh.prior.cm; no, use lag(VisitTreeDIAM)
   HTG                WAS USED - height growth - lag(VisitTreeTotalHeight)
 NUMBER ROWS PROCESSED:   30
 ```
@@ -995,6 +1189,8 @@ qryDWSPCFIPlotVisitTreeDetail |>
 
 Where does that land us in terms of growth?
 
+Look at stand-level BA over time:
+
 ```{r plot dwscfi ba, eval = FALSE}
 qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
@@ -1022,7 +1218,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
 ```
 
 
-Where does that land us in terms of growth?
+And stand-level stem density over time:
 
 ```{r plot dwscfi tpa, eval = FALSE}
 qryDWSPCFIPlotVisitTreeDetail |>
@@ -1039,12 +1235,11 @@ qryDWSPCFIPlotVisitTreeDetail |>
   mutate(
     MasterPlotID = factor(MasterPlotID)
   ) |>
-  filter(MasterPlotID == 10464) |>
   ggplot(aes(VisitYear, TPA, color = MasterPlotID)) +
   geom_line() +
   geom_point() +
   theme_bw() +
-#  theme(legend.position = "none") +
+  theme(legend.position = "none") +
   ggtitle("DCR CFI Quabbin Grow-Only Plots Observed TPA") +
   ylab("TPA")
 
@@ -1053,12 +1248,52 @@ qryDWSPCFIPlotVisitTreeDetail |>
 
 # Regeneration
 
-TBD
+## Break Diameter
+
+At what diameter do trees ingrow?
+
+DSWP_CFI_METADATA_Appendix_Final, table 22B Tree Status Codes, shows the
+varied history of break diameter:
+- >= 5.6"
+- > 4.9" (>= 5.0")
+- > 5.5" (>= 5.6")
+- > 5.9" (>= 6.0")
+
+
+```{r}
+qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  left_join(cfigro_plot_harvested, by = join_by(MasterPlotID)) |>
+  left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
+  #filter(!CFIHarvested & !CFIDisturbed & VisitTreeDIAM > 0) |>
+  #group_by(VisitCycle) |>
+  mutate(BreakDiameter = case_when(
+    VisitTreeDIAM < 5 ~ "< 5\"",
+    VisitTreeDIAM < 5.6 ~ "< 5.6\"",
+    VisitTreeDIAM < 6.0 ~ "< 6\""
+  )) |>
+  filter(!is.na(BreakDiameter)) |>
+  group_by(BreakDiameter) |>
+  summarize(
+    MinDiam = min(VisitTreeDIAM, na.rm = TRUE),
+    SmallTrees = sum(if_else(VisitTreeDIAM < 5.6, 1, 0), na.rm = TRUE),
+    AllTrees = n()
+    )
+```
+
+Minimum diameter is 5.3" - this is important for BRK_DBH - trees smaller
+than BRK_DBH will be on the microplot, and will get the microplot TPA
+multiplier (385), rather than the plot multiplier (5). There is a history
+of using different diameters in different CFI inventories.
+
+From 1970 - 2020, only 2 trees ingrow on undisturbed, non-harvested plots with DIAM < 5.6"
 
 # Run FVS
 
 ## FVS CFIGRO NONE
-
 
 ```{targets cfigro_none}
 tar_target(
@@ -1239,9 +1474,9 @@ fvs_read_output(cfigro_srvy, "FVS_Summary2_East") |>
   select(StandID, Year, BA, Tpa)
 ```
 
-# Is it sane?
+# Basal Area Increment
 
-## SRVY Basal Area
+## CFIGRO SRVY BAI
 
 ```{r sanity cfigro srvy, eval = FALSE}
 cfigro_srvy_summary |>
@@ -1252,6 +1487,7 @@ cfigro_srvy_summary |>
   geom_line() +
   geom_point() +
   theme_bw() +
+  theme(legend.position = "none") +
   ggtitle("Quabbin Grow-Only Plots Observed BA") +
   ylab(bquote("BA" ~ (m^2 %.% hectare^-1)))
 ```
@@ -1293,7 +1529,7 @@ bind_rows(cfi_raw, cfi_fvs) |>
   coord_cartesian(ylim = c(0, NA))
 ```
 
-## NRSGRO SRVY Basal Area
+## NRSGRO SRVY BAI
 
 Not really; compare to NRSGrowOnly:
 
@@ -1310,7 +1546,7 @@ nrsgro_srvy_summary |>
   ylab(bquote("BA" ~ (m^2 %.% hectare^-1)))
 ```
 
-## ABP Tree BA
+## CFIABP BAI
 
 What do we see if we just sum the BA in these plots?
 ```{r plot ba, eval = FALSE}
@@ -1421,6 +1657,30 @@ cfigro_none_proj_vs_meas <- qryDWSPCFIPlotVisitTreeDetail |>
   mutate(Carbon_Flux_Residual = Projected_Carbon_Flux - Measured_Carbon_Flux)
 ```
 
+
+```{r plot bai density, eval = FALSE}
+cfigro_none_proj_vs_meas |>
+  select(
+    StandID,
+    Projected_BAI,
+    Measured_BAI) |>
+  pivot_longer(
+    cols = c("Projected_BAI", "Measured_BAI"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Basal Area Increment Projection") #+
+  #coord_cartesian(xlim = c(-2.5, 0))
+```
+
+
 ```{r plot carbon flux density, eval = FALSE}
 cfigro_none_proj_vs_meas |>
   select(
@@ -1440,5 +1700,5 @@ cfigro_none_proj_vs_meas |>
   ylab("Density") +
   scale_fill_brewer(palette="Set1") +
   ggtitle("Carbon Flux Projection") +
-  coord_cartesian(xlim = c(-10, 0))
+  coord_cartesian(xlim = c(-2.5, 0))
 ```
