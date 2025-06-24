@@ -623,7 +623,7 @@ tblDWSPCFIPlotVisitDisturbances |>
   theme_bw()
 ```
 
-```{r plot disturbance history, eval = FALSE}
+```{r cfi plot disturbance history, eval = FALSE}
 plotNum <- cfiabp_trees |>
   distinct(MasterPlotID) |>
   arrange(MasterPlotID) |>
@@ -755,7 +755,7 @@ cfiabp_trees |>
 ### Longest Undisturbed Period
 
 
-```{r plot disturbance history, eval = FALSE}
+```{r fia plot disturbance history, eval = FALSE}
 tblDWSPCFIPlotVisitDisturbances |>
   left_join(
     tblDWSPCFIPlotVisitsComplete |>
@@ -835,13 +835,55 @@ tblDWSPCFIPlotVisitDisturbances |>
 
 ```
 
+## Break Diameter
+
+At what diameter do trees ingrow?
+
+DSWP_CFI_METADATA_Appendix_Final, table 22B Tree Status Codes, shows the
+varied history of break diameter:
+- >= 5.6"
+- > 4.9" (>= 5.0")
+- > 5.5" (>= 5.6")
+- > 5.9" (>= 6.0")
+
+
+```{r ingrowth diameter over time, eval = FALSE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  filter(VisitTreeDIAM > 0) |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  left_join(cfigro_plot_harvested, by = join_by(MasterPlotID)) |>
+  left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
+  mutate(IngrowthClass = case_when(
+    VisitTreeDIAM < 5 ~ "< 5\"",
+    VisitTreeDIAM < 5.6 ~ "< 5.6\"",
+    VisitTreeDIAM < 6.0 ~ "< 6\""
+  )) |>
+  filter(!is.na(IngrowthClass)) |>
+  ggplot(aes(VisitTreeDIAM)) +
+  geom_histogram(binwidth = 0.1) +
+  scale_y_continuous(transform = "log10") +
+  coord_cartesian(xlim = c(4.5, 6.0))
+```
+
+Minimum diameter is 4.5" - this is important for BRK_DBH - trees smaller
+than BRK_DBH will be on the microplot, and will get the microplot TPA
+multiplier (385), rather than the plot multiplier (5). There is a history
+of using different diameters in different CFI inventories.
+
+From 1970 - 2020, only 2 trees establish on grow-only plots with DIAM < 5.6".
+
+We will use 5" as BRK_DBH, and filter out trees with diameter < 5.
+
 ## Grow-Only vs. Harvested vs. Disturbed
 
 - Add Species
 
 How distinct are grow-only, disturbed, harvested and harvested/disturbed plots?
 
-```{r}
+```{r plot comparison by status, eval = FALSE}
 tmp_trees <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
@@ -968,7 +1010,7 @@ STAND-LEVEL DATA BASE READ:
   ELEVFT:                520.0 CONVERTED TO:    5.2 - join from MassGIS data
   BASAL_AREA_FACTOR:     -24.0 - plot radius for fixed-radius plot; 52.7
   INV_PLOT_SIZE:          300. - plot radius for fixed-size microplot; 6
-  BRK_DBH:                 5.0 - Sapling / Tree DBH break; 6 in Audrey's data, 5 in CFI
+  BRK_DBH:                 5.0 - Sapling / Tree DBH break; see above
   NUM_PLOTS:                 4 - Number of subplots; 1
   SAM_WT:          6321.345703 - Sample Weight (acres) - not used by FVS
   PHYSIO_REGION:            23 - maybe from fiadb 2.3.35 Physiographic Class; use forest type instead
@@ -1184,7 +1226,6 @@ qryDWSPCFIPlotVisitTreeDetail |>
   )
 ```
 
-
 ## DWSCFI Observations
 
 Where does that land us in terms of growth?
@@ -1248,48 +1289,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
 
 # Regeneration
 
-## Break Diameter
-
-At what diameter do trees ingrow?
-
-DSWP_CFI_METADATA_Appendix_Final, table 22B Tree Status Codes, shows the
-varied history of break diameter:
-- >= 5.6"
-- > 4.9" (>= 5.0")
-- > 5.5" (>= 5.6")
-- > 5.9" (>= 6.0")
-
-
-```{r}
-qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  left_join(cfigro_plot_harvested, by = join_by(MasterPlotID)) |>
-  left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
-  #filter(!CFIHarvested & !CFIDisturbed & VisitTreeDIAM > 0) |>
-  #group_by(VisitCycle) |>
-  mutate(BreakDiameter = case_when(
-    VisitTreeDIAM < 5 ~ "< 5\"",
-    VisitTreeDIAM < 5.6 ~ "< 5.6\"",
-    VisitTreeDIAM < 6.0 ~ "< 6\""
-  )) |>
-  filter(!is.na(BreakDiameter)) |>
-  group_by(BreakDiameter) |>
-  summarize(
-    MinDiam = min(VisitTreeDIAM, na.rm = TRUE),
-    SmallTrees = sum(if_else(VisitTreeDIAM < 5.6, 1, 0), na.rm = TRUE),
-    AllTrees = n()
-    )
-```
-
-Minimum diameter is 5.3" - this is important for BRK_DBH - trees smaller
-than BRK_DBH will be on the microplot, and will get the microplot TPA
-multiplier (385), rather than the plot multiplier (5). There is a history
-of using different diameters in different CFI inventories.
-
-From 1970 - 2020, only 2 trees ingrow on undisturbed, non-harvested plots with DIAM < 5.6"
+TBD
 
 # Run FVS
 
