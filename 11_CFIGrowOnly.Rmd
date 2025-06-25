@@ -130,17 +130,12 @@ tarchetypes::tar_file_read(
 ```{targets qryDWSPCFIPlotVisitTreeDetail}
 tarchetypes::tar_file_read(
   qryDWSPCFIPlotVisitTreeDetail,
-  "data/raw/DWSP_CFI/qryDWSPCFIPlotVisitTreeDetail_Partial_HF.xlsx",
-  read_excel(!!.x) |>
+  "data/raw/DWSP_CFI/qryDWSPCFIPlotVisitTreeDetail_Partial_HF.csv",
+  read_csv(!!.x, col_types = list(.default = col_double())) |>
     # Fix column names
     rename(
       MasterTreeID = VisitMasterTreeID,
       MasterPlotVisitID = VisitIDNumberDetail
-    ) |>
-    # Fix column types - giving read_excel the right types causes it to hang
-    mutate(
-      MasterTreeID = as.numeric(MasterTreeID),
-      VisitTreeNumberDetail = as.numeric(VisitTreeNumberDetail)
     ) |>
     left_join(
       tblSuppTreeStatusCodes |>
