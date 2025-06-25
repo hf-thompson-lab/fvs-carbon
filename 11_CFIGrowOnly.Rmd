@@ -19,7 +19,7 @@ tar_source()
 
 ## Load targets results from other documents
 
-```{r load tar objects}
+```{r load tar objects, eval = FALSE}
 tar_load(fiadb)
 tar_load(fvsne_states)
 tar_load(species_crosswalk)
@@ -894,8 +894,8 @@ tmp_trees <- qryDWSPCFIPlotVisitTreeDetail |>
     by = join_by(SpeciesCode == SPCD)
   ) |>
   mutate(
-    TPA = 1,
-    BA = pi * (VisitTreeDIAM / 2)^2
+    TPA = conv_unit(5, "hectare", "acre"),
+    BA = TPA * pi * conv_unit(VisitTreeDIAM / 2, "in", "m")^2,
   )
 
 tmp_by_quabbin <- tmp_trees |>
@@ -980,10 +980,13 @@ tmp_trees |>
   scale_y_continuous(transform = "log10") +
   theme_bw() +
   ggtitle("CFI Plot Overview") +
-  xlab(bquote("Basal Area" ~ (ft^2))) +
-  ylab(bquote("Population" ~ (stems))) +
+  xlab(bquote("Basal Area" ~ (m^2 %.% hectare^-1))) +
+  ylab(bquote("Population" ~ (stems %.% hectare^-1))) +
   facet_wrap("Species")
 ```
+
+It looks like there is hope for matching most disrupted plots to
+grow-only plots; 
 
 ## Final Formatting
 
