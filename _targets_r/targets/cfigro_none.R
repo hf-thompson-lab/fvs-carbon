@@ -31,6 +31,7 @@ tar_target(
         left_join(cfigro_plot_disturbed, by = join_by(STAND_ID == MasterPlotID)) |>
         filter(!CFIHarvested & !CFIDisturbed),
       trees = cfigro_trees,
+      regen = cfigro_estab,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
       random_seed = fvs_randseed

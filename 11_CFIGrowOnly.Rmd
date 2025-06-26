@@ -1281,9 +1281,162 @@ qryDWSPCFIPlotVisitTreeDetail |>
 ```
 
 
-# Regeneration
+# Regeneration & Calibration
 
-TBD
+We can build the tables for regeneration and calibration from CFI data for FVS
+
+## Regeneration
+
+We need two things:
+- For each plot, for each species, how many trees ingrow from 1970 to 2020?
+- For each of those trees, what is its height at the time of ingrowth?
+
+We'll give FVS data in the form of:
+- STAND_CN (MasterPlotVisitID)
+- SPECIES (FVS_SPCD)
+- DENSITY (TPA)
+- HEIGHT (FT)
+
+Let's make sure we don't have meaningful height information:
+
+```{r cfi height availability, eval = FALSE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  filter(VisitTreeDIAM >= 5) |> # There are a few <5"
+  filter(!is.na(VisitTreeTotalHeight)) |>
+  # We need MasterPlotID and VisitCycle to join with ABP trees
+  left_join(
+    tblDWSPCFIPlotVisitsComplete |>
+      select(MasterPlotID, VisitCycle, MasterPlotVisitID),
+    by = join_by(MasterPlotVisitID)
+  ) |>
+  # Filter to ABP trees
+  inner_join(
+    cfiabp_trees |> distinct(MasterPlotID, VisitCycle, MasterTreeID, StatusB, dbhcm),
+    by = join_by(MasterPlotID, VisitCycle, MasterTreeID)
+  ) |>
+  group_by(MasterPlotID, MasterTreeID) |>
+  arrange(VisitCycle) |>
+  mutate(PreviousTreeStatusCode = lag(VisitTreeStatusCode)) |>
+  ungroup() |>
+  mutate(Recruit = if_else(
+    is.na(PreviousTreeStatusCode),
+    "Recruit",
+    "Existing")
+  ) |>
+  filter(VisitCycle > 1970 & VisitTreeStatusCode == 1) |>
+  select(VisitTreeDIAM, VisitTreeTotalHeight, Recruit, StatusB) |>
+  ggplot(aes(VisitTreeDIAM)) +
+  geom_histogram(binwidth = 1) +
+  facet_wrap("StatusB") +
+  theme_bw() +
+  ggtitle("DBH at time of height measurement") +
+  xlab("Diameter (in)") +
+  ylab("Number of Trees")
+```
+
+Amazing! It looks like we have heights for lots of trees in the 5-6" DBH
+range! And lots of those are recruits.
+
+For how many recruits do we _not_ have height?
+
+```{r cfi height for recruites, eval = FALSE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  # We need MasterPlotID and VisitCycle to join with ABP trees
+  left_join(
+    tblDWSPCFIPlotVisitsComplete |>
+      select(MasterPlotID, VisitCycle, MasterPlotVisitID),
+    by = join_by(MasterPlotVisitID)
+  ) |>
+  # Filter to ABP trees
+  inner_join(
+    cfiabp_trees |> distinct(MasterPlotID, VisitCycle, MasterTreeID),
+    by = join_by(MasterPlotID, VisitCycle, MasterTreeID)
+  ) |>
+  group_by(MasterPlotID, MasterTreeID) |>
+  arrange(VisitCycle) |>
+  mutate(PreviousTreeStatusCode = lag(VisitTreeStatusCode)) |>
+  ungroup() |>
+  # We are interested in trees that establish after 1970
+  filter(VisitCycle > 1970 & !is.na(PreviousTreeStatusCode) & PreviousTreeStatusCode == 1) |>
+  mutate(HasHeight = if_else(
+      is.na(VisitTreeTotalHeight),
+      "No Height",
+      "Height"
+    )
+  ) |>
+  select(VisitTreeDIAM, HasHeight) |>
+  ggplot(aes(HasHeight)) +
+  geom_bar() +
+  theme_bw() +
+  ggtitle("Do CFI recruits have height") +
+  ylab("Number of Trees")
+```
+
+Most recruits do not have height.
+
+So, we'll attempt to use observed heights, and supplement with plot and
+regional heights when necessary.
+
+Most ingrowth is recorded at 5.6" DBH; some is at 5.4", and some at 5.9".
+We'll use 5.6" as the target diameter for height estimation, then adjust
+for individual trees in the regen table.
+
+```{targets cfigro_estab, tar_simple = TRUE}
+cycle_length <- 10
+plots_per_acre <- 5
+survey_period <- 50
+minimum_sane_height_for_a_5inch_dbh_tree <- 10
+
+# Trees to use for modeling height estimation
+qryDWSPCFIPlotVisitTreeDetail |>
+  filter(VisitTreeStatusCode == 1) |>
+  left_join(
+    tblDWSPCFIPlotVisitsComplete |>
+      select(MasterPlotID, VisitCycle, MasterPlotVisitID),
+    by = join_by(MasterPlotVisitID)
+  ) |>
+  left_join( 
+    tblDWSPCFITreesComplete |> select(MasterTreeID, SpeciesCode),
+    by = join_by(MasterTreeID)
+  ) |>
+  inner_join(
+    cfiabp_trees |> distinct(MasterPlotID, VisitCycle, MasterTreeID, StatusB),
+    by = join_by(MasterPlotID, VisitCycle, MasterTreeID)
+  ) |>
+  filter(VisitCycle >= 1970) |>
+  filter(StatusB == "R") |> 
+  # Remove suspicious heights
+  mutate(VisitTreeTotalHeight = if_else(VisitTreeTotalHeight < 10, NA, VisitTreeTotalHeight)) |>
+  group_by(SpeciesCode) |>
+  mutate(SPECIES_MIN_HT = min(VisitTreeTotalHeight, na.rm = TRUE), .groups = "keep") |>
+  ungroup() |>
+  group_by(MasterPlotID, SpeciesCode) |>
+  summarize(
+    DENSITY = n() * plots_per_acre * cycle_length / survey_period, # Stems per acre per 10-year interval
+    HEIGHT = min(VisitTreeTotalHeight, na.rm = TRUE),
+    SPECIES_MIN_HT = min(SPECIES_MIN_HT)
+  ) |>
+  ungroup() |>
+  mutate(HEIGHT = if_else(is.infinite(HEIGHT), SPECIES_MIN_HT, HEIGHT)) |>
+  filter(!is.na(HEIGHT) & !is.infinite(HEIGHT)) |>
+  left_join(
+    tblDWSPCFIPlotVisitsComplete |>
+      filter(VisitCycle == 1970) |>
+      select(MasterPlotID, STAND_CN = MasterPlotVisitID),
+    by = join_by(MasterPlotID)
+  ) |>
+  left_join(
+    species_crosswalk |> select(SPCD, FVS_SPCD),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  filter(!is.na(FVS_SPCD)) |>
+  select(
+    STAND_CN,
+    SPECIES = FVS_SPCD,
+    DENSITY,
+    HEIGHT
+  )
+```
 
 # Run FVS
 
@@ -1323,6 +1476,7 @@ tar_target(
         left_join(cfigro_plot_disturbed, by = join_by(STAND_ID == MasterPlotID)) |>
         filter(!CFIHarvested & !CFIDisturbed),
       trees = cfigro_trees,
+      regen = cfigro_estab,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
       random_seed = fvs_randseed
