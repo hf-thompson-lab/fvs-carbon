@@ -1982,8 +1982,7 @@ cfigro_none_proj_vs_meas |>
   xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
   ylab("Density") +
   scale_fill_brewer(palette="Set1") +
-  ggtitle("Basal Area Increment Projection") #+
-  #coord_cartesian(xlim = c(-2.5, 0))
+  ggtitle("Basal Area Increment Projection")
 ```
 
 
