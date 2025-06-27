@@ -32,6 +32,9 @@ tar_target(
         filter(!CFIHarvested & !CFIDisturbed),
       trees = cfigro_trees,
       regen = cfigro_estab,
+      calibration = cfigro_none_growth,
+      calib_mort = cfigro_none_death,
+      calib_years = 10,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
       random_seed = fvs_randseed
