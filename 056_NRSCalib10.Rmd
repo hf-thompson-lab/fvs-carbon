@@ -837,6 +837,8 @@ nrsgro_ca10_proj_vs_meas <- ca10_carbon_tmp |>
   )
 ```
 
+## Carbon Flux
+
 ```{r plot nrsgro_ca10_proj_vs_meas flux, eval = FALSE}
 nrsgro_ca10_proj_vs_meas |>
   ggplot(aes(Carbon_Flux_Srvy, Carbon_Flux_Calb)) +
@@ -855,6 +857,8 @@ nrsgro_ca10_proj_vs_meas |>
   labs(caption = "With 10-Year Calibration")
 ```
 
+## Carbon Flux Residual
+
 ```{r plot carbon flux residual vs balive, eval = FALSE}
 nrsgro_ca10_proj_vs_meas |>
   ggplot(aes(BALIVE_METRIC, Carbon_Flux_Residual)) +
@@ -871,6 +875,33 @@ nrsgro_ca10_proj_vs_meas |>
 ```
 
 
+## BAI
+
+```{r plot bai density, eval = FALSE}
+nrsgro_ca10_proj_vs_meas |>
+  filter(ProjectionYears > 0) |>
+  select(
+    StandID,
+    Projected_BAI = BAI_Calb,
+    Measured_BAI = BAI_Srvy) |>
+  pivot_longer(
+    cols = c("Projected_BAI", "Measured_BAI"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Basal Area Increment Projection (10-year Calibration)") #+
+  #coord_cartesian(xlim = c(-2.5, 0))
+```
+
+## BAI Residual
+
 ```{r plot bai residual vs balive, eval = FALSE}
 nrsgro_ca10_proj_vs_meas |>
   ggplot(aes(BALIVE_METRIC, BAI_Residual)) +
@@ -886,6 +917,7 @@ nrsgro_ca10_proj_vs_meas |>
   #scale_y_continuous(limits = c(-10, 5))
 ```
 
+## BAI vs. Starting BA
 
 ```{r basal_area_trend, eval = FALSE}
 ggplot(
