@@ -6,7 +6,7 @@ cfi_with_plot_info <- function(.data, tblDWSPCFIPlotsComplete) {
       tblDWSPCFIPlotsComplete |>
         select(
           MasterPlotID, GPSLatitude, GPSLongitude,
-          Slope, Aspect, TerrainPosition
+          Slope, Aspect, TerrainPosition, DWSPForestrySubWatershed
         ),
       by = join_by(MasterPlotID)
     )
