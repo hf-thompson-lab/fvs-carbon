@@ -10,8 +10,8 @@ tar_target(nrsres_bai_task, {
   #    BALIVE_METRIC,
       BA_Proj = BA_Calb,
       Tph_Proj = Tph_Calb,
-      FOREST_TYPE_GROUP,
-  #    FOREST_TYPE,
+  #    FOREST_TYPE_GROUP,
+      FOREST_TYPE,
   #    STDAGE,
       SLOPE,
       ASPECT,
@@ -24,5 +24,7 @@ tar_target(nrsres_bai_task, {
   )
   
   # Remove incomplete rows from training data
-  nrsres_bai_task$filter(nrsres_bai_task$row_ids[complete.cases(nrsres_bai_task$data())])
+  nrsres_bai_task$filter(
+    nrsres_bai_task$row_ids[complete.cases(nrsres_bai_task$data())]
+  )
 })
