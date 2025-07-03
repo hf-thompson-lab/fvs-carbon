@@ -2024,6 +2024,31 @@ cfigro_none_proj_vs_meas |>
   ggtitle("Basal Area Increment Projection")
 ```
 
+Same, but as a histogram:
+
+
+```{r plot bai density histogram, eval = FALSE}
+cfigro_none_proj_vs_meas |>
+  filter(Projection_Years > 0) |>
+  select(
+    StandID,
+    Projected_BAI,
+    Measured_BAI) |>
+  pivot_longer(
+    cols = c("Projected_BAI", "Measured_BAI"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_histogram(binwidth = 0.05, position = "dodge") +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Number of Plots") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Basal Area Increment Projection")
+```
+
 
 ```{r plot carbon flux density, eval = FALSE}
 cfigro_none_proj_vs_meas |>
