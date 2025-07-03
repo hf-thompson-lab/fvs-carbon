@@ -7,6 +7,7 @@ tar_option_set(
     "RSQLite",
     "measurements",
     "reshape2",
+    "mlr3verse",
     "maps",
     "pbapply",
     "digest",
