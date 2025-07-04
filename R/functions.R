@@ -134,3 +134,30 @@ fia_tpa_for_state <- function(fiadb, statecd) {
       BAH = conv_multiunit(BAA, "ft2 / acre", "m2 / hectare")
     )
 }
+
+
+#' beers_transformation
+#'
+#' Apply Beers' transfrmation to the aspect of a plot.
+#' Aspect is the decimal degrees angle of slope, with 0 being north.
+#'
+#' @param ASPECT decimal degrees aspect
+#'
+#' @returns float in the range [0, 2]
+#' @export
+#'
+#' @examples
+#' 
+#' > beers_transformation(0)
+#' [1] 1.707107
+#' > beers_transformation(45)
+#' [1] 2
+#' > beers_transformation(180)
+#' [1] 0.2928932
+#' > beers_transformation(225)
+#' [1] 0
+#' > beers_transformation(c(0, 45, 180, 225))
+#' [1] 1.7071068 2.0000000 0.2928932 0.0000000
+beers_transformation <- function(ASPECT) {
+  cos((45 - ASPECT)*pi/180) + 1
+}
