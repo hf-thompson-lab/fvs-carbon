@@ -2097,12 +2097,16 @@ We can get these from:
 
 ### Forest Type
 
-FOREST_TYPE - we will use wo-v9-3_sep2023_fg_nfi_natl.pdf
+CFI documents their cover type in `tblSuppPlotForestTypeCodes`, but there are
+two issues with using this:
+1. Some CFI Cover types don't align with FIA forest types, e.g. CFI
+   cover type 3,	"White pine - Pitch pine"
+2. For cover types whose names align between CFI and FIA, there's no assurance
+   that the forest composition is actually aligned.
 
-> FOREST INVENTORY AND ANALYSIS
-> NATIONAL CORE FIELD GUIDE
-> FOR THE NATIONWIDE FOREST INVENTORY
-> Version 9.3
+The FIA process for determining Forest Type is described in
+wo-v9-3_sep2023_fg_nfi_natl.pdf, the Forest Inventory and Analysis National
+Core Field Guid for the Nationwide Forest Inventory, version 9.3.
 
 Forest types, and how to determine them, is described in:
 
@@ -2113,7 +2117,8 @@ plot; stocking is described in:
 
 > Appendix 5. Determination of Stocking Values for Land Use Classification
 
-We can use table 5f:
+We can use Table 5f:
+
 > Table 5f. Stocking values for all trees 5.0 inches and greater observed on one acre
 
 This allows us to tally trees, look them up in the table, and derive stocking
@@ -2128,7 +2133,8 @@ tarchetypes::tar_file_read(
 ```
 Turn Table 5f into a lookup table, and apply that across plots.
 
-From Appendix 2:
+Derivation of Forest Type from plot/species stocking level is described in
+Appendix 2:
 
 >  Unless otherwise stated, forest types are named for the predominant species (or
 >  group of species) on the condition. In order to determine if the type should be
