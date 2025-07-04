@@ -2089,7 +2089,7 @@ nrsres_model$selected_features()
 We can get these from:
 - ASPECT - cfigro_plot$ASPECT - need to apply Beers' transformation
 - ELEV - cfigro_plot$ELEVFT - correct, elevation above sea level in feet
-- FOREST_TYPE - TBD
+- FOREST_TYPE - need to fill this in
 - LAT - cfigro_plot$LATITUDE - decimal degrees
 - SLOPE - cfigro_plot$SLOPE - percent
 - BA_Proj - metric; cfigro_proj_vs_meas$Projected_BA is metric
@@ -2262,3 +2262,60 @@ qryDWSPCFIPlotVisitTreeDetail |>
       by = join_by(FORTYPCD)
   )
 ```
+
+## Apply Model
+
+```{r}
+tmp_obs <-cfigro_plot |>
+  select(STAND_ID, ASPECT, ELEV = ELEVFT, LAT = LATITUDE, SLOPE) |>
+  mutate(ASPECT = beers_transformation(ASPECT)) |>
+  left_join(
+    cfigro_forest_type |>
+      select(MasterPlotID, FOREST_TYPE),
+    by = join_by(STAND_ID == MasterPlotID)
+  ) |>
+  mutate(STAND_ID = as.character(STAND_ID)) |>
+  inner_join(
+    cfigro_none_proj_vs_meas |>
+      filter(Projection_Years > 0) |>
+      select(
+        StandID,
+        BA_Proj = Projected_BA,
+        Tph_Proj = Projected_Tph,
+        BA_Srvy = Measured_BA,
+        Tph_Srvy = Measured_Tph,
+        Projection_Years
+      ),
+    by = join_by(STAND_ID == StandID)
+  ) |>
+  left_join(
+    cfigro_none_proj_vs_meas |>
+      filter(Projection_Years == 0) |>
+      select(StandID, BA_Start = Measured_BA, Tph_Start = Measured_Tph),
+    by = join_by(STAND_ID == StandID)
+  ) |>
+  mutate(
+    BAI_Proj = (BA_Proj - BA_Start) / Projection_Years,
+    BAI_Srvy = (BA_Srvy - BA_Start) / Projection_Years,
+    BAI_Error = nrsres_model$predict_newdata(pick(everything()))$response,
+    BAI_Adj = BAI_Proj - BAI_Error
+  )
+```
+
+```{r}
+tmp_obs |>
+  rename(
+    `FVS Projected` = BAI_Proj,
+    `FIA Observed` = BAI_Srvy,
+    `Corrected` = BAI_Adj
+  ) |>
+  pivot_longer(c("FVS Projected", "FIA Observed", "Corrected")) |>
+  ggplot(aes(value, fill = name)) +
+  geom_density(alpha = 0.5) +
+  theme_bw() +
+  scale_fill_discrete(name = "Series") +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% hectare^-1 %.% year^-1))) +
+  ylab("Density") +
+  ggtitle("CFI Quabbin Grow-Only Plots 50 year BAI Prediction")
+```
+
