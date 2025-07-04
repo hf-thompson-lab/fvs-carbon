@@ -1989,7 +1989,7 @@ cfigro_none_proj_vs_meas <- surveyed_tmp |>
       Measured_BA_Delta / (Year - First_Year))
   ) |>
   ungroup() |>
-  filter(Year == First_Year | Year == Last_Year) |>
+#  filter(Year == First_Year | Year == Last_Year) |>
   filter(!is.na(Projected_Carbon) & !is.na(Measured_Carbon)) |>
   mutate(Projection_Years = Year - First_Year) |>
   mutate(BA_Residual = Projected_BA - Measured_BA) |>
@@ -2005,7 +2005,7 @@ cfigro_none_proj_vs_meas <- surveyed_tmp |>
 
 ```{r plot bai density, eval = FALSE}
 cfigro_none_proj_vs_meas |>
-  filter(Projection_Years > 0) |>
+  filter(Projection_Years == 50) |>
   select(
     StandID,
     Projected_BAI,
@@ -2030,7 +2030,7 @@ Same, but as a histogram:
 
 ```{r plot bai density histogram, eval = FALSE}
 cfigro_none_proj_vs_meas |>
-  filter(Projection_Years > 0) |>
+  filter(Projection_Years == 50) |>
   select(
     StandID,
     Projected_BAI,
@@ -2053,7 +2053,7 @@ cfigro_none_proj_vs_meas |>
 
 ```{r plot carbon flux density, eval = FALSE}
 cfigro_none_proj_vs_meas |>
-  filter(Projection_Years > 0) |>
+  filter(Projection_Years == 50) |>
   select(
     StandID,
     Projected_Carbon_Flux,
@@ -2265,8 +2265,8 @@ qryDWSPCFIPlotVisitTreeDetail |>
 
 ## Apply Model
 
-```{r}
-tmp_obs <-cfigro_plot |>
+```{r projection_50, eval = FALSE}
+projection_50 <-cfigro_plot |>
   select(STAND_ID, ASPECT, ELEV = ELEVFT, LAT = LATITUDE, SLOPE) |>
   mutate(ASPECT = beers_transformation(ASPECT)) |>
   left_join(
@@ -2277,7 +2277,7 @@ tmp_obs <-cfigro_plot |>
   mutate(STAND_ID = as.character(STAND_ID)) |>
   inner_join(
     cfigro_none_proj_vs_meas |>
-      filter(Projection_Years > 0) |>
+      filter(Projection_Years == 50) |>
       select(
         StandID,
         BA_Proj = Projected_BA,
@@ -2302,14 +2302,14 @@ tmp_obs <-cfigro_plot |>
   )
 ```
 
-```{r}
-tmp_obs |>
+```{r plot projection_50, eval = FALSE}
+projection_50 |>
   rename(
     `FVS Projected` = BAI_Proj,
-    `FIA Observed` = BAI_Srvy,
+    `CFI Observed` = BAI_Srvy,
     `Corrected` = BAI_Adj
   ) |>
-  pivot_longer(c("FVS Projected", "FIA Observed", "Corrected")) |>
+  pivot_longer(c("FVS Projected", "CFI Observed", "Corrected")) |>
   ggplot(aes(value, fill = name)) +
   geom_density(alpha = 0.5) +
   theme_bw() +
@@ -2319,3 +2319,59 @@ tmp_obs |>
   ggtitle("CFI Quabbin Grow-Only Plots 50 year BAI Prediction")
 ```
 
+What if we do 20 year projections instead?
+
+```{r projection_20, eval = FALSE}
+projection_20 <-cfigro_plot |>
+  select(STAND_ID, ASPECT, ELEV = ELEVFT, LAT = LATITUDE, SLOPE) |>
+  mutate(ASPECT = beers_transformation(ASPECT)) |>
+  left_join(
+    cfigro_forest_type |>
+      select(MasterPlotID, FOREST_TYPE),
+    by = join_by(STAND_ID == MasterPlotID)
+  ) |>
+  mutate(STAND_ID = as.character(STAND_ID)) |>
+  inner_join(
+    cfigro_none_proj_vs_meas |>
+      filter(Projection_Years == 20) |>
+      select(
+        StandID,
+        BA_Proj = Projected_BA,
+        Tph_Proj = Projected_Tph,
+        BA_Srvy = Measured_BA,
+        Tph_Srvy = Measured_Tph,
+        Projection_Years
+      ),
+    by = join_by(STAND_ID == StandID)
+  ) |>
+  left_join(
+    cfigro_none_proj_vs_meas |>
+      filter(Projection_Years == 0) |>
+      select(StandID, BA_Start = Measured_BA, Tph_Start = Measured_Tph),
+    by = join_by(STAND_ID == StandID)
+  ) |>
+  mutate(
+    BAI_Proj = (BA_Proj - BA_Start) / Projection_Years,
+    BAI_Srvy = (BA_Srvy - BA_Start) / Projection_Years,
+    BAI_Error = nrsres_model$predict_newdata(pick(everything()))$response,
+    BAI_Adj = BAI_Proj - BAI_Error
+  )
+```
+
+
+```{r plot projection_20, eval = FALSE}
+projection_20 |>
+  rename(
+    `FVS Projected` = BAI_Proj,
+    `CFI Observed` = BAI_Srvy,
+    `Corrected` = BAI_Adj
+  ) |>
+  pivot_longer(c("FVS Projected", "CFI Observed", "Corrected")) |>
+  ggplot(aes(value, fill = name)) +
+  geom_density(alpha = 0.5) +
+  theme_bw() +
+  scale_fill_discrete(name = "Series") +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% hectare^-1 %.% year^-1))) +
+  ylab("Density") +
+  ggtitle("CFI Quabbin Grow-Only Plots 20 year BAI Prediction")
+```
