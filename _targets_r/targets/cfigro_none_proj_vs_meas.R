@@ -77,7 +77,7 @@ tar_target(cfigro_none_proj_vs_meas, {
         Measured_BA_Delta / (Year - First_Year))
     ) |>
     ungroup() |>
-    filter(Year == First_Year | Year == Last_Year) |>
+  #  filter(Year == First_Year | Year == Last_Year) |>
     filter(!is.na(Projected_Carbon) & !is.na(Measured_Carbon)) |>
     mutate(Projection_Years = Year - First_Year) |>
     mutate(BA_Residual = Projected_BA - Measured_BA) |>

@@ -2074,7 +2074,7 @@ cfigro_none_proj_vs_meas |>
   coord_cartesian(xlim = c(-2.5, 0))
 ```
 
-# Projection Error
+# Projection Error from FIA
 
 We have a model of FVS projection error; how accurate is it?
 
@@ -2381,3 +2381,233 @@ projection_20 |>
   ylab("Density") +
   ggtitle("CFI Quabbin Grow-Only Plots 20 year BAI Prediction")
 ```
+
+# CFI-Specific Modeled Error
+
+Applying the model derived from FIA data doesn't work well on the CFI plots.
+Let's try building a CFI-specific model.
+
+## Training Data
+
+One of the things we need is species composition, since e.g. eastern white pine
+grows very different from red oak.
+
+From above, we observe that the three dominant species in the Quabbin (more
+than 10% of BA in the watershed) are:
+- Acer rubrum
+- Pinus strobus
+- Quercus rubra
+
+Let's create profiles of each CFI plot, indicating whether >= 10% of its BA
+consisted of each of these species in 1970.
+
+The rest of the training data follows the same model as for nrsgro.
+
+```{targets cfigro_training_data, tar_simple = TRUE}
+tmp_top_species <- c("Acer rubrum", "Pinus strobus", "Quercus rubra")
+
+tmp_trees <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  filter(VisitCycle == 1970) |>
+  filter(cfi_status_live(VisitTreeStatusCode)) |> # Only Live Trees
+  left_join(
+    species_crosswalk |> select(SPCD, SCIENTIFIC_NAME),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  mutate(
+    TPA = conv_unit(5, "hectare", "acre"),
+    BA = TPA * pi * conv_unit(VisitTreeDIAM / 2, "in", "m")^2,
+  )
+
+tmp_by_plot <- tmp_trees |>
+  group_by(MasterPlotID) |>
+  summarize(
+    TPA = sum(TPA, na.rm = TRUE),
+    BA = sum(BA, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Top species by plot
+# (only considering top plots)
+tmp_plot_species <- tmp_trees |>
+  group_by(MasterPlotID, SCIENTIFIC_NAME) |>
+  summarize(BA = sum(BA, na.rm = TRUE), .groups = "keep") |>
+  ungroup() |>
+  left_join(
+    tmp_by_plot |>
+      select(MasterPlotID, BA_Plot = BA),
+    by = join_by(MasterPlotID)
+  ) |>
+  mutate(BA_Frac = BA / BA_Plot) |>
+  filter(SCIENTIFIC_NAME %in% tmp_top_species) |>
+  mutate(
+    SCIENTIFIC_NAME = sub(" ", "_", SCIENTIFIC_NAME)
+  ) |>
+  pivot_wider(
+    id_cols = MasterPlotID,
+    names_from = SCIENTIFIC_NAME,
+    values_from = BA_Frac,
+    values_fill = 0
+  ) |>
+  mutate(MasterPlotID = as.character(MasterPlotID))
+
+cfigro_none_proj_vs_meas |>
+  filter(Year == 2020) |>
+  select(MasterPlotID = StandID, BAI_Residual, Projected_BA, Projected_Tph) |>
+  left_join(
+    cfigro_plot |>
+      filter(INV_YEAR == 1970) |>
+      mutate(MasterPlotID = as.character(STAND_ID)) |>
+      select(MasterPlotID, LAT = LATITUDE, ASPECT, SLOPE, ELEV = ELEVFT),
+    by = join_by(MasterPlotID)
+  ) |>
+  left_join(
+    tmp_plot_species,
+    by = join_by(MasterPlotID)
+  )
+```
+
+## Feature Selection
+
+previous experience shows that doing an exhaustive search for the best combination
+of features works fine.
+
+Try it using fselect:
+```{r feature selection, eval = FALSE}
+cfigro_bai_task <- as_task_regr(
+  cfigro_training_data,
+  target = "BAI_Residual"
+)
+cfigro_bai_fs_task <- fselect(
+  fselector = fs("sequential"),
+  task = cfigro_bai_task,
+  learner = lrn("regr.ranger"),
+  # mlr3 section on resampling suggests repeated cv with 10/10 for small training sets
+  # https://mlr3book.mlr-org.com/chapters/chapter3/evaluation_and_benchmarking.html#sec-resampling
+  resampling = rsmp("repeated_cv", repeats = 10, folds = 10),
+  measure = msrs("regr.rmse")
+)
+View(cfigro_bai_fs_task$archive$data |> arrange(regr.rmse))
+```
+
+
+```{r selected features, eval = FALSE}
+cfigro_bai_fs_task$result |>
+  pivot_longer(cols = -any_of(c("features", "n_features", "regr.rmse"))) |>
+  filter(value) |>
+  pull(name)
+```
+[1] "Acer_rubrum"   "LAT" Projected_BA"  "Projected_Tph" "Quercus_rubra"
+
+It seems to select the two projected quantities, and two of the three species
+selectors, and LAT. Interesting that it omits elevation, but ok.
+
+## Hyperparameters
+
+```{r optimize hyperparameters, eval = FALSE}
+cfigro_bai_task$select(c("Acer_rubrum", "LAT", "Projected_BA", "Projected_Tph", "Quercus_rubra"))
+
+lrn_regr_ranger <- lrn(
+  "regr.ranger",
+  importance = to_tune(c("impurity", "permutation")),
+  max.depth = to_tune(1, 100, logscale = TRUE),
+  min.node.size = to_tune(1:5 * 3 + 2), # minimum 5 for regression
+  mtry = to_tune(2:ceiling(sqrt(length(names(cfigro_bai_task$data()))))),
+  num.trees = to_tune(1, 100, logscale = TRUE)
+)
+
+nrsres_bai_hp_task <- tune(
+  tuner = tnr("mbo"),
+  task = cfigro_bai_task,
+  learner = lrn_regr_ranger,
+  resampling = rsmp("repeated_cv", repeats = 10, folds = 10),
+  measures = msr("regr.rmse"),
+  terminator = trm("stagnation", threshold = 0.1)
+)
+
+unlist(nrsres_bai_hp_task$result_x_domain)
+```
+
+```
+> unlist(nrsres_bai_hp_task$result_x_domain)
+   importance     max.depth min.node.size          mtry     num.trees 
+   "impurity"          "16"          "11"           "2"          "68" 
+> unlist(nrsres_bai_hp_task$result_x_domain)
+   importance     max.depth min.node.size          mtry     num.trees 
+"permutation"           "3"          "11"           "2"          "38" 
+> unlist(nrsres_bai_hp_task$result_x_domain)
+   importance     max.depth min.node.size          mtry     num.trees 
+"permutation"          "24"           "8"           "2"          "84" 
+> unlist(nrsres_bai_hp_task$result_x_domain)
+   importance     max.depth min.node.size          mtry     num.trees 
+   "impurity"           "4"           "8"           "2"          "51" 
+> unlist(nrsres_bai_hp_task$result_x_domain)
+   importance     max.depth min.node.size          mtry     num.trees 
+   "impurity"          "24"          "17"           "2"          "71" 
+```
+
+So, that's kind of all over the map. The first result seems representative:
+   importance     max.depth min.node.size          mtry     num.trees 
+   "impurity"          "16"          "11"           "2"          "68" 
+
+## Train and Predict
+
+```{targets cfigro_bai_model, tar_simple = TRUE}
+#cfigro_bai_model <- lrn(
+#  "regr.ranger",
+#  importance = "permutation",
+#  max.depth = 30,
+#  min.node.size = 17,
+#  mtry = 2,
+#  num.trees = 31
+#)
+cfigro_bai_model <- lrn(
+  "regr.ranger",
+  importance = "impurity",
+  max.depth = 16,
+  min.node.size = 11,
+  mtry = 2,
+  num.trees = 68
+)
+
+cfigro_bai_model$train(cfigro_bai_task)
+
+cfigro_bai_model
+```
+
+
+```{r plot cfigro_bai_model, eval = FALSE}
+autoplot(cfigro_bai_model$predict(cfigro_bai_task)) +
+  xlab("Predicted BAI Residual") +
+  ylab("Actual BAI Residual") +
+  ggtitle("Modeled FVS BAI Residual on CFI Grow-Only Plots")
+```
+
+```{r plot cfigro_bai_model density, eval = FALSE}
+cfigro_none_proj_vs_meas |>
+  filter(Year == 2020) |>
+  mutate(Adjusted_BAI = Projected_BAI - cfigro_bai_model$predict(cfigro_bai_task)$response) |>
+  select(
+    StandID,
+    Adjusted_BAI,
+    Projected_BAI,
+    Measured_BAI) |>
+
+  pivot_longer(
+    cols = c("Adjusted_BAI", "Projected_BAI", "Measured_BAI"),
+    names_to = "Series",
+    values_to = "BAI"
+  ) |>
+  ggplot(aes(BAI, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Basal Area Increment Projection")
+```
+
