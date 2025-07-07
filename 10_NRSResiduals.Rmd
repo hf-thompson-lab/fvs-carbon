@@ -215,9 +215,9 @@ Which hints at what we're trying to fix:
 
 ```{r plot density, eval = FALSE}
 nrsres_obs |>
-  select(StandID, BAI_Srvy, BAI_Calb) |>
+  select(StandID, BAI_Srvy, BAI_Calb, BAI_Residual) |>
   pivot_longer(
-    cols = c("BAI_Srvy", "BAI_Calb"),
+    cols = c("BAI_Srvy", "BAI_Calb", "BAI_Residual"),
     names_to = "Series",
     values_to = "BAI"
   ) |>
