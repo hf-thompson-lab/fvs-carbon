@@ -13,6 +13,7 @@ suppressPackageStartupMessages({
   library(readxl)
   library(terra)
   library(measurements)
+  library(mlr3verse) # Machine Learning in R framework, larger universe
 })
 tar_source()
 ```
@@ -2610,4 +2611,5 @@ cfigro_none_proj_vs_meas |>
   scale_fill_brewer(palette="Set1") +
   ggtitle("Basal Area Increment Projection")
 ```
+
 
