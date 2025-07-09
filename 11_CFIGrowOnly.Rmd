@@ -109,10 +109,10 @@ tarchetypes::tar_file_read(
 )
 ```
 
-```{targets tblSuppPlotForestrySubbasins}
+```{targets tblSuppPlotForestrySubBasins}
 tarchetypes::tar_file_read(
-  tblSuppPlotForestrySubbasins,
-  "data/raw/DWSP_CFI/tblSuppPlotForestrySubbasins.xlsx",
+  tblSuppPlotForestrySubBasins,
+  "data/raw/DWSP_CFI/tblSuppPlotForestrySubBasins.xlsx",
   read_excel(!!.x)
 )
 ```
@@ -376,7 +376,7 @@ x <- qryDWSPCFIPlotVisitTreeDetail |>
   filter(row_number() == 1) |>
   ungroup() |>
   left_join(
-    tblSuppPlotForestrySubbasins,
+    tblSuppPlotForestrySubBasins,
     by = join_by(DWSPForestrySubWatershed == MasterForestryBasinID)
   ) |>
   group_by(EQDISTRICT, EQSUBDISTRICT) |>
