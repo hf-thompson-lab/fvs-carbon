@@ -1,4 +1,12 @@
 tar_target(cfigro_bai_model, {
+  cfigro_bai_task <- as_task_regr(
+    cfigro_training_data,
+    target = "BAI_Residual"
+  )
+  cfigro_bai_task$select(
+    c("Acer_rubrum", "LAT", "Projected_BA", "Projected_Tph", "Quercus_rubra")
+  )
+  
   #cfigro_bai_model <- lrn(
   #  "regr.ranger",
   #  importance = "permutation",

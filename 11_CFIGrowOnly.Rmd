@@ -2557,6 +2557,14 @@ So, that's kind of all over the map. The first result seems representative:
 ## Train and Predict
 
 ```{targets cfigro_bai_model, tar_simple = TRUE}
+cfigro_bai_task <- as_task_regr(
+  cfigro_training_data,
+  target = "BAI_Residual"
+)
+cfigro_bai_task$select(
+  c("Acer_rubrum", "LAT", "Projected_BA", "Projected_Tph", "Quercus_rubra")
+)
+
 #cfigro_bai_model <- lrn(
 #  "regr.ranger",
 #  importance = "permutation",
