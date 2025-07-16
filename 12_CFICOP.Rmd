@@ -74,7 +74,7 @@ cfigro_tree has trees for all 283 plots.
 
 We ignored harvest in CFIGRO; can we continue to ignore it?
 
-```{r}
+```{r plot establishment rate, eval = FALSE}
 cfigro_estab |>
   mutate(STAND_CN = as.character(STAND_CN)) |>
   group_by(STAND_CN) |>
@@ -137,7 +137,7 @@ tmp_by_plot <- tmp_trees |>
   select(MasterPlotID, TPA_Plot, BA_Plot)
 
 tmp_top_species <- c(
-  "Acer rubrum", "Quercus rubra", "Pinus strobus"
+  "Acer rubrum", "Quercus rubra", "Quercus velutina", "Pinus strobus"
 )
 
 tmp_plot_fingerprint <- tmp_trees |>
@@ -154,7 +154,7 @@ tmp_plot_fingerprint <- tmp_trees |>
     BA_Frac = BA_Species / BA_Plot
   ) |>
   select(-ends_with("_Species")) |>
-  filter(BA_Frac > 0.1) |>
+#  filter(BA_Frac > 0.1) |>
   filter(SCIENTIFIC_NAME %in% tmp_top_species) |>
   group_by(MasterPlotID) |>
   mutate(
@@ -182,7 +182,8 @@ most_similar_plot <- function(target_plots) {
     replace_na(list(
       BA_Frac_Pinus_strobus = -1,
       BA_Frac_Acer_rubrum = -1,
-      BA_Frac_Quercus_rubra = -1
+      BA_Frac_Quercus_rubra = -1,
+      BA_Frac_Quercus_velutina = -1
     ))
 
   lapply(1:nrow(target_plots), \(n) {
@@ -191,19 +192,22 @@ most_similar_plot <- function(target_plots) {
     ba_pist <- target_plots[[n, "BA_Frac_Pinus_strobus"]]
     ba_acru <- target_plots[[n, "BA_Frac_Acer_rubrum"]]
     ba_quru <- target_plots[[n, "BA_Frac_Quercus_rubra"]]
+    ba_quve <- target_plots[[n, "BA_Frac_Quercus_velutina"]]
     tmp_plot_fingerprint |>
       inner_join(tmp_plots_grow_only, by = join_by(MasterPlotID)) |>
       replace_na(list(
         BA_Frac_Pinus_strobus = -1,
         BA_Frac_Acer_rubrum = -1,
-        BA_Frac_Quercus_rubra = -1
+        BA_Frac_Quercus_rubra = -1,
+        BA_Frac_Quercus_velutina = -1
       )) |>
       mutate(
         BA_RMSE = sqrt(
           ((BA_Plot - ba_plot) / (BA_Plot + ba_plot))^2 +
             (BA_Frac_Pinus_strobus - ba_pist)^2 +
             (BA_Frac_Acer_rubrum - ba_acru)^2 +
-            (BA_Frac_Quercus_rubra - ba_quru)^2
+            (BA_Frac_Quercus_rubra - ba_quru)^2 +
+            (BA_Frac_Quercus_velutina - ba_quve)^2
         )
       ) |>
       arrange(BA_RMSE) |>
@@ -218,9 +222,9 @@ tmp_plot_fingerprint |>
   select(MasterPlotID, sibling_plot)
 ```
 
-How's that looks:
+How's that look:
 
-```{r}
+```{r plot sibling plots, eval = FALSE}
  matched_plots <- cfigro_plot_sibling |>
   mutate(
     status = if_else(MasterPlotID == sibling_plot, "reference", "matched")
