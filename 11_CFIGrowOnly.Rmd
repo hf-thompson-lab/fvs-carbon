@@ -357,37 +357,6 @@ we will focus on just this watershed.
 
 ABP plots are filtered to the Quabbin watershed.
 
-### Watershed Area
-
-I think I need to get a polygon for the watershed / districts, then use
-land cover to find the forested area ... in 1970. Which I can't. Unless
-they have literature that tells me.
-
-But we can start with, what if it's 100% forested.
-
-```{r area represented, eval = FALSE}
-x <- qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  group_by(MasterPlotID) |>
-  arrange(VisitCycle, MasterTreeID) |>
-  filter(row_number() == 1) |>
-  ungroup() |>
-  left_join(
-    tblSuppPlotForestrySubBasins,
-    by = join_by(DWSPForestrySubWatershed == MasterForestryBasinID)
-  ) |>
-  group_by(EQDISTRICT, EQSUBDISTRICT) |>
-  summarize(
-    TotalAcres = max(DWSPOwnedAcres, na.rm = TRUE),
-    NumPlots = n(),
-    AcresPerPlot = TotalAcres / NumPlots
-  ) |>
-  ggplot(aes(EQSUBDISTRICT))
-```
-
 ## Relocation
 
 Many plots were relocated prior to 1970, while retaining the same

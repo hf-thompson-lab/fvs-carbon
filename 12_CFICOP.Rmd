@@ -1,0 +1,299 @@
+---
+title: "12_CFICOP"
+output: html_document
+---
+
+# Setup
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(targets)
+  library(tarchetypes)
+  library(tidyverse)
+  library(readxl)
+  library(terra)
+  library(measurements)
+  library(mlr3verse) # Machine Learning in R framework, larger universe
+})
+tar_source()
+```
+
+## Load targets results from other documents
+
+```{r load tar objects, eval = FALSE}
+tar_load(fiadb)
+tar_load(species_crosswalk)
+tar_load(fvs_num_partitions)
+tar_load(fvs_partition)
+tar_load(fvs_randseed)
+tar_load(fvsne_states)
+tar_load(cfigro_bai_model)
+```
+
+## Preload everything from 11_CFIGrowOnly.Rmd
+
+```{r load 11 cfigrowonly, eval = FALSE}
+get_this_rmd_file() |>
+  str_replace(basename(get_this_rmd_file()), "11_CFIGrowOnly.Rmd") |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+```
+
+## Preload targets results from this document
+
+When tar_make() has already built the objects defined in this document,
+run this block to pre-load them. You can then skip running ```{targets} blocks.
+
+```{r load tar objects defined here, eval = FALSE}
+get_this_rmd_file() |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+```
+
+# MODEL ALL* THE PLOTS!!!
+
+We want to:
+- Model all the plots grow-only
+- Apply the model of residuals to get an idea of how much FVS might have over-projected
+- Look at harvest, and how much carbon is actually on the landscape
+- Multiply by area to get an idea of what COP would be, etc.
+
+* We don't have harvest information except on Audrey's plots, so we'll actually
+just use her 283 plots. So it's not _all_ of all the plots, but it's all the
+plots for which we have good data.
+
+## Plots
+
+cfigro_plot has all 283 plots.
+
+## Trees
+
+cfigro_tree has trees for all 283 plots.
+
+## Regeneration
+
+We ignored harvest in CFIGRO; can we continue to ignore it?
+
+```{r}
+cfigro_estab |>
+  mutate(STAND_CN = as.character(STAND_CN)) |>
+  group_by(STAND_CN) |>
+  summarize(DENSITY = sum(DENSITY), .groups = "keep") |>
+  left_join(cfigro_plot |> select(STAND_CN, STAND_ID), by = join_by(STAND_CN)) |>
+  mutate(MasterPlotID = as.numeric(STAND_ID)) |>
+  left_join(cfigro_plot_harvested, by = join_by(MasterPlotID)) |>
+  left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
+  mutate(Status = case_when(
+    CFIDisturbed & CFIHarvested ~ "Disturbed & Harvested",
+    CFIDisturbed ~ "Disturbed",
+    CFIHarvested ~ "Harvested",
+    .default = "Grow-Only"
+  )) |>
+  group_by(Status) |>
+  mutate(Status = paste0(Status, ", n=", n())) |>
+  ggplot(aes(Status, DENSITY)) +
+  geom_boxplot() +
+  theme_bw() +
+  ggtitle("Establishment rate by plot status") +
+  ylab(bquote("Establishment rate" ~ (stems %.% acre^-1 %.% year^-1)))
+#  scale_y_continuous(transform = "log10")
+  
+```
+
+non-Grow-Only plots show double and more the establishment rate of grow-only
+plots.
+
+Let's match by BA of the major species for establishment rate instead.
+
+### Plot Matching
+
+Start simple - minimize the delta in the three major species. We can leave "Other" alone.
+
+```{targets cfigro_plot_sibling, tar_simple = TRUE}
+tmp_trees <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  filter(VisitCycle == 1970) |>
+  filter(cfi_status_live(VisitTreeStatusCode)) |> # Only Live Trees
+  left_join(
+    species_crosswalk |> select(SPCD, SCIENTIFIC_NAME),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  mutate(
+    TPA = 5,
+    BA = VisitTreeDIAM
+  )
+
+tmp_by_plot <- tmp_trees |>
+  group_by(MasterPlotID) |>
+  summarize(
+    TPA_Plot = sum(TPA, na.rm = TRUE),
+    BA_Plot = sum(BA, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  ungroup() |>
+  select(MasterPlotID, TPA_Plot, BA_Plot)
+
+tmp_top_species <- c(
+  "Acer rubrum", "Quercus rubra", "Pinus strobus"
+)
+
+tmp_plot_fingerprint <- tmp_trees |>
+  group_by(MasterPlotID, SCIENTIFIC_NAME) |>
+  summarize(
+    TPA_Species = sum(TPA, na.rm = TRUE),
+    BA_Species = sum(BA, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  left_join(tmp_by_plot, by = join_by(MasterPlotID)) |>
+  mutate(
+    TPA_Frac = TPA_Species / TPA_Plot,
+    BA_Frac = BA_Species / BA_Plot
+  ) |>
+  select(-ends_with("_Species")) |>
+  filter(BA_Frac > 0.1) |>
+  filter(SCIENTIFIC_NAME %in% tmp_top_species) |>
+  group_by(MasterPlotID) |>
+  mutate(
+    Species = do.call(
+      paste,
+      append(sort(SCIENTIFIC_NAME), list(sep = ", "))
+    )
+  ) |>
+  ungroup() |>
+  mutate(SCIENTIFIC_NAME = gsub(" ", "_", SCIENTIFIC_NAME)) |>
+  pivot_wider(names_from = "SCIENTIFIC_NAME", values_from = c("TPA_Frac", "BA_Frac"))
+
+tmp_plots_grow_only <- cfigro_plot_harvested |>
+  filter(!CFIHarvested) |>
+  inner_join(
+    cfigro_plot_disturbed |> filter(!CFIDisturbed),
+    by = join_by(MasterPlotID)
+  ) |>
+  select(MasterPlotID)
+
+most_similar_plot <- function(target_plots) {
+  target_plots <- target_plots |>
+    # Penalize things that differ on whether they have
+    # a species on the landscape
+    replace_na(list(
+      BA_Frac_Pinus_strobus = -1,
+      BA_Frac_Acer_rubrum = -1,
+      BA_Frac_Quercus_rubra = -1
+    ))
+
+  lapply(1:nrow(target_plots), \(n) {
+    # Minimize RMS difference in BA
+    ba_plot <- target_plots[[n, "BA_Plot"]]
+    ba_pist <- target_plots[[n, "BA_Frac_Pinus_strobus"]]
+    ba_acru <- target_plots[[n, "BA_Frac_Acer_rubrum"]]
+    ba_quru <- target_plots[[n, "BA_Frac_Quercus_rubra"]]
+    tmp_plot_fingerprint |>
+      inner_join(tmp_plots_grow_only, by = join_by(MasterPlotID)) |>
+      replace_na(list(
+        BA_Frac_Pinus_strobus = -1,
+        BA_Frac_Acer_rubrum = -1,
+        BA_Frac_Quercus_rubra = -1
+      )) |>
+      mutate(
+        BA_RMSE = sqrt(
+          ((BA_Plot - ba_plot) / (BA_Plot + ba_plot))^2 +
+            (BA_Frac_Pinus_strobus - ba_pist)^2 +
+            (BA_Frac_Acer_rubrum - ba_acru)^2 +
+            (BA_Frac_Quercus_rubra - ba_quru)^2
+        )
+      ) |>
+      arrange(BA_RMSE) |>
+      head(1) |>
+      pull(MasterPlotID)    
+  }) |>
+    unlist()
+}
+
+tmp_plot_fingerprint |>
+  mutate(sibling_plot = most_similar_plot(tmp_plot_fingerprint)) |>
+  select(MasterPlotID, sibling_plot)
+```
+
+How's that looks:
+
+```{r}
+ matched_plots <- cfigro_plot_sibling |>
+  mutate(
+    status = if_else(MasterPlotID == sibling_plot, "reference", "matched")
+  ) |>
+  left_join(
+    cfigro_plot,
+    by = join_by(MasterPlotID == STAND_ID)
+  ) |>
+  rename(
+    lat = LATITUDE,
+    long = LONGITUDE
+  ) |>
+  mutate(
+    group = as.character(sibling_plot)
+  ) |>
+  select(
+    MasterPlotID, status, lat, long, group
+  )
+
+fvsne_states |>
+  filter(STATE_NAME == "Massachusetts") |>
+  rename(region = STATE_NAME) |>
+  _$region |>
+  map_data("state", region = _, group = "group") |>
+  ggplot(aes(long, lat, group = group)) +
+  geom_polygon(fill = "white", color = "black") +
+  geom_point(data = matched_plots, aes(color = group, shape = status)) +
+  scale_color_discrete(name = "Matched Plot") +
+  scale_shape_manual(values = list(reference = 17, matched = 16)) +
+#  coord_sf(crs = 4326) +
+#  annotation_scale(location = "br") +
+#  annotation_north_arrow(
+#    location = "tl",
+#    width = unit(1, "cm"),
+#    pad_x = unit(0.75, "cm"),
+#    pad_y = unit(0.5, "cm")
+#  ) +
+  theme_bw() +
+  coord_cartesian(xlim = c(-72.5, -72.1), ylim = c(42.25, 42.6)) +
+  ggtitle("Matching harvested and disturbed CFI plots to grow-only plots")
+```
+
+
+### 
+
+## Watershed Area
+
+I think I need to get a polygon for the watershed / districts, then use
+land cover to find the forested area ... in 1970. Which I can't. Unless
+they have literature that tells me.
+
+But we can start with, what if it's 100% forested.
+
+```{r area represented, eval = FALSE}
+x <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  group_by(MasterPlotID) |>
+  arrange(VisitCycle, MasterTreeID) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  left_join(
+    tblSuppPlotForestrySubBasins,
+    by = join_by(DWSPForestrySubWatershed == MasterForestryBasinID)
+  ) |>
+  group_by(EQDISTRICT, EQSUBDISTRICT) |>
+  summarize(
+    TotalAcres = max(DWSPOwnedAcres, na.rm = TRUE),
+    NumPlots = n(),
+    AcresPerPlot = TotalAcres / NumPlots
+  ) |>
+  ggplot(aes(EQSUBDISTRICT))
+```
+
