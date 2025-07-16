@@ -14,6 +14,7 @@ suppressPackageStartupMessages({
   library(terra)
   library(measurements)
   library(mlr3verse) # Machine Learning in R framework, larger universe
+  library(ggspatial) # annotation_scale, annotation_north_arrow
 })
 tar_source()
 ```
@@ -29,6 +30,7 @@ tar_load(fvs_randseed)
 tar_load(fvsne_states)
 tar_load(cfigro_bai_model)
 tar_load(cfigro_estab)
+tar_load(cfigro_none_growth)
 ```
 
 ## Preload everything from 11_CFIGrowOnly.Rmd
@@ -273,10 +275,10 @@ fvsne_states |>
 
 We'll duplicate cfigro_estab from the reference plots to their sibling plots.
 
-```{r cficop_estab}
+```{targets cficop_estab, tar_simple = TRUE}
 # Each plot has a sibling plot;
 # find the estab associated with the sibling plot.
-cficop_estab <- cfigro_plot_sibling |>
+cfigro_plot_sibling |>
   left_join(
     cfigro_plot |> select(STAND_CN, MasterPlotID = STAND_ID),
     by = join_by(sibling_plot == MasterPlotID)
@@ -299,6 +301,16 @@ cficop_estab <- cfigro_plot_sibling |>
   )
 ```
 
+### Growth
+
+cfigro_none_growth is tree-specific; for each tree within a plot, provide the diameter
+and height 10 years from the simulation start time.
+
+### Mortality
+
+cfigro_none_death is tree-specific; for each tree within a plot, provide the status
+at simulation start time.
+
 ## Watershed Area
 
 I think I need to get a polygon for the watershed / districts, then use
@@ -307,8 +319,8 @@ they have literature that tells me.
 
 But we can start with, what if it's 100% forested.
 
-```{r area represented, eval = FALSE}
-x <- qryDWSPCFIPlotVisitTreeDetail |>
+```{targets cficop_sam_wt, tar_simple = TRUE}
+qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
   cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
@@ -322,11 +334,60 @@ x <- qryDWSPCFIPlotVisitTreeDetail |>
     by = join_by(DWSPForestrySubWatershed == MasterForestryBasinID)
   ) |>
   group_by(EQDISTRICT, EQSUBDISTRICT) |>
-  summarize(
+  mutate(
     TotalAcres = max(DWSPOwnedAcres, na.rm = TRUE),
     NumPlots = n(),
-    AcresPerPlot = TotalAcres / NumPlots
+    AcresPerPlot = TotalAcres / NumPlots,
+    .groups = "keep"
   ) |>
-  ggplot(aes(EQSUBDISTRICT))
+  ungroup() |>
+  select(
+    EQDISTRICT,
+    EQSUBDISTRICT,
+    MasterPlotID,
+    TotalAcres,
+    NumPlots,
+    AcresPerPlot
+  )
 ```
+
+```{r plot scaling cfi plots to watershed, eval = FALSE}
+cficop_sam_wt |>
+  group_by(EQSUBDISTRICT) |>
+  filter(row_number() == 1) |>
+  ggplot(aes(EQSUBDISTRICT, NumPlots, size = AcresPerPlot)) +
+  geom_point() +
+  coord_cartesian(ylim = c(0, 80)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = -15, hjust = 0, vjust = 1)) +
+  ggtitle("Scaling CFI plots to the Watershed") +
+  xlab("Subwatershed") +
+  ylab("Number of Plots")
+```
+
+```{r map cfi plot scaling to watershed, eval = FALSE}
+tmp_state_map <- fvsne_states |>
+  filter(STATE_NAME == "Massachusetts") |>
+  rename(region = STATE_NAME) |>
+  _$region |>
+  map_data("state", region = _)
+
+tmp_plot_loc <- cfigro_plot |>
+  rename(lat = LATITUDE, long = LONGITUDE, group = STAND_CN) |>
+  left_join(
+    cficop_sam_wt |> select(MasterPlotID, EQSUBDISTRICT, AcresPerPlot),
+    by = join_by(STAND_ID == MasterPlotID)
+  )
+
+ggplot(tmp_state_map, aes(long, lat, group = group)) +
+  geom_polygon(fill = "white", color = "black") +
+  geom_point(
+    data = tmp_plot_loc,
+    aes(size = AcresPerPlot, color = EQSUBDISTRICT)
+  ) +
+  coord_cartesian(xlim = c(-72.45, -72.15), ylim = c(42.25, 42.55)) +
+  theme_bw()
+```
+
+
 
