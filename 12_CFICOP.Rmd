@@ -228,7 +228,7 @@ tmp_plot_fingerprint |>
 How's that look:
 
 ```{r plot sibling plots, eval = FALSE}
- matched_plots <- cficop_plot_sibling |>
+matched_plots <- cficop_plot_sibling |>
   mutate(
     status = if_else(MasterPlotID == sibling_plot, "reference", "matched")
   ) |>
@@ -245,28 +245,47 @@ How's that look:
   ) |>
   select(
     MasterPlotID, status, lat, long, group
-  )
-
-fvsne_states |>
-  filter(STATE_NAME == "Massachusetts") |>
-  rename(region = STATE_NAME) |>
-  _$region |>
-  map_data("state", region = _, group = "group") |>
-  ggplot(aes(long, lat, group = group)) +
-  geom_polygon(fill = "white", color = "black") +
-  geom_point(data = matched_plots, aes(color = group, shape = status)) +
+  ) |>
+  group_by(group) |>
+  mutate(n = n(), group = paste0(group, ", n=", n())) |>
+  ungroup()
+cfi_bbox <- st_as_sfc(
+  st_bbox(vect(matched_plots, geom = c("long", "lat")))
+)
+st_crs(cfi_bbox) <- "WGS84"
+lakes_north_america <- ne_download(
+  scale = 10, type = "lakes_north_america", category = "physical"
+)
+lakes <- lakes_north_america[
+  st_intersects(lakes_north_america, cfi_bbox, sparse = FALSE),
+]
+rivers_north_america <- ne_download(
+  scale = 10, type = "rivers_north_america", category = "physical"
+)
+rivers <- rivers_north_america[
+  st_intersects(rivers_north_america, cfi_bbox, sparse = FALSE),
+]
+ggplot() +
+  geom_sf(data = lakes, fill = "blue", inherit.aes = FALSE) +
+#  geom_sf(data = rivers, fill = "blue", inherit.aes = FALSE) +
+  geom_point(
+    data = matched_plots |> filter(status == "reference"),
+    aes(long, lat, color = fct_reorder(group, desc(n)), shape = status), size = 2.5
+  ) +
+  geom_point(
+    data = matched_plots |> filter(status == "matched"),
+    aes(long, lat, color = fct_reorder(group, desc(n)), shape = status), size = 1.75
+  ) +
   scale_color_discrete(name = "Matched Plot") +
   scale_shape_manual(values = list(reference = 17, matched = 16)) +
-#  coord_sf(crs = 4326) +
-#  annotation_scale(location = "br") +
-#  annotation_north_arrow(
-#    location = "tl",
-#    width = unit(1, "cm"),
-#    pad_x = unit(0.75, "cm"),
-#    pad_y = unit(0.5, "cm")
-#  ) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(
+    location = "tl",
+    width = unit(1, "cm"),
+    pad_x = unit(0.75, "cm"),
+    pad_y = unit(0.5, "cm")
+  ) +
   theme_bw() +
-  coord_cartesian(xlim = c(-72.5, -72.1), ylim = c(42.25, 42.6)) +
   ggtitle("Matching harvested and disturbed CFI plots to grow-only plots")
 ```
 
@@ -389,9 +408,9 @@ ggplot(tmp_state_map, aes(long, lat, group = group)) +
   theme_bw()
 ```
 
-# Run FVS
+# CFICOP_NONE
 
-## CFICOP_NONE
+## Run FVS
 
 ```{targets cficop_none}
 tar_target(
@@ -415,11 +434,11 @@ tar_target(
       fiadb = NULL,
       title = title,
       mgmt_id = mgmt_id,
-      stands = cfigro_plot |>
-        left_join(
-          cficop_sam_wt |> select(STAND_ID = MasterPlotID, SAM_WT = AcresPerPlot),
-          by = join_by(STAND_ID)
-        ),
+      stands = cfigro_plot, # |>
+#        left_join(
+#          cficop_sam_wt |> select(STAND_ID = MasterPlotID, SAM_WT = AcresPerPlot),
+#          by = join_by(STAND_ID)
+#        ),
       trees = cfigro_trees,
       regen = cficop_estab,
 #      calibration = cfigro_none_growth,
@@ -441,4 +460,92 @@ tar_target(
 )
 ```
 
+## Load Results
 
+Carbon
+
+```{targets cficop_none_carbon, tar_simple = TRUE}
+fvs_read_output(cficop_none, "FVS_Carbon") |>
+  group_by(StandID, Year) |> # Combine results from different random seeds
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    .groups = "keep"
+  ) |>
+  ungroup()
+```
+
+Summary
+
+```{targets cficop_none_summary, tar_simple = TRUE}
+fvs_read_output(cficop_none, "FVS_Summary2_East") |>
+  group_by(StandID, Year) |>
+  summarize(
+    BA = mean(BA),
+    Tpa = mean(Tpa),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+```
+
+## BA Over Time
+
+```{r plot ba over time, eval = FALSE}
+cficop_none_summary |>
+  filter(Year %% 10 == 0) |>
+#  group_by(Year) |>
+#  summarize(BA = sum(BA) / n()) |>
+#  ungroup() |>
+  mutate(Series = "Projected") |>
+  union_all(
+    cfigro_srvy_summary |>
+      filter(Year %% 10 == 0) |>
+#      group_by(Year) |>
+#      summarize(BA = sum(BA) / n()) |>
+#      ungroup() |>
+      mutate(Series = "Grow-Only")
+  ) |>
+  mutate(Year = as.character(Year)) |>
+  ggplot(aes(Year, BA, color = Series)) +
+  geom_boxplot()
+```
+
+## Carbon Over Time
+
+```{r plot carbon over time, eval = FALSE}
+cficop_none_carbon |>
+#  group_by(Year) |>
+#  summarize(Aboveground_Total_Live = sum(Aboveground_Total_Live) / n()) |>
+#  ungroup() |>
+  mutate(Series = "Projection") |>
+  union_all(
+    cfigro_srvy_carbon |>
+#      group_by(Year) |>
+#      summarize(Aboveground_Total_Live = sum(Aboveground_Total_Live) / n()) |>
+#      ungroup() |>
+      mutate(Series = "Reference")
+  ) |>
+  mutate(Year = as.character(Year)) |>
+  ggplot(aes(Year, Aboveground_Total_Live, fill = Series)) +
+  geom_boxplot(outlier.size = 0.5) +
+  theme_bw() +
+  ggtitle("CFI Grow-Only Projection") +
+  ylab(bquote("Aboveground Live Carbon " ~ (`Mg C` %.% hectare^-1)))
+```
+
+## Zero-Growth Outliers
+
+There's a handful of plotat that FVS won't grow. Let's see what's up with them.
+
+```{r zero growth outliers, eval = FALSE}
+cfigro_trees |>
+  semi_join(
+    cficop_none_carbon |>
+      filter(Year == 2020) |>
+      filter(Aboveground_Total_Live < 25) |>
+      mutate(STAND_ID = as.numeric(StandID)),
+    by = join_by(STAND_ID)
+  ) |>
+  View()
+```
+
+Looks like some trees are not getting HISTORY filled in.

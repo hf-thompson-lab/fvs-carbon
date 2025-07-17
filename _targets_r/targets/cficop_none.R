@@ -19,11 +19,11 @@ tar_target(
       fiadb = NULL,
       title = title,
       mgmt_id = mgmt_id,
-      stands = cfigro_plot |>
-        left_join(
-          cficop_sam_wt |> select(STAND_ID = MasterPlotID, SAM_WT = AcresPerPlot),
-          by = join_by(STAND_ID)
-        ),
+      stands = cfigro_plot, # |>
+#        left_join(
+#          cficop_sam_wt |> select(STAND_ID = MasterPlotID, SAM_WT = AcresPerPlot),
+#          by = join_by(STAND_ID)
+#        ),
       trees = cfigro_trees,
       regen = cficop_estab,
 #      calibration = cfigro_none_growth,
