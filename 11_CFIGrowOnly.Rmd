@@ -930,7 +930,7 @@ tmp_by_plot <- tmp_trees |>
 tmp_top_species <- tmp_by_species |>
   cross_join(tmp_by_quabbin |> select(BA_Total = BA)) |>
   mutate(BA_Frac = BA / BA_Total) |>
-  filter(BA_Frac > 0.1)
+  filter(BA_Frac > 0.1) # Use 0.075 to catch Quercus velutina, 0.07 for Tsuga canadensis
 
 tmp_plot_species <- tmp_trees |>
   left_join(
@@ -984,9 +984,9 @@ tmp_trees |>
   scale_x_continuous(transform = "log10") +
   scale_y_continuous(transform = "log10") +
   theme_bw() +
-  ggtitle("CFI Plot Overview") +
+  ggtitle("CFI Plot Species Composition (1970)") +
   xlab(bquote("Basal Area" ~ (m^2 %.% hectare^-1))) +
-  ylab(bquote("Population" ~ (stems %.% hectare^-1))) +
+  ylab(bquote("Density" ~ (stems %.% hectare^-1))) +
   facet_wrap("Species")
 ```
 
