@@ -154,7 +154,8 @@ cfi_history <- function(.data) {
         cfi_status_dead(VisitTreeStatusCode) &
           cfi_status_live(PrevTreeStatusCode) ~ 6, # Newly Dead
         cfi_status_dead(VisitTreeStatusCode) &
-          cfi_status_dead(PrevTreeStatusCode) ~ 8 # Oldly Dead
+          cfi_status_dead(PrevTreeStatusCode) ~ 8, # Oldly Dead
+        .default = 6 # Dead, and previous status can't be determined
       )
     )
 }
