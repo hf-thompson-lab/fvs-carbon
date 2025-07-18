@@ -178,6 +178,10 @@ tmp_plots_grow_only <- cfigro_plot_harvested |>
   ) |>
   select(MasterPlotID)
 
+pct_diff <- function(a, b) {
+  abs(a - b) / ((a + b) / 2)
+}
+
 most_similar_plot <- function(target_plots) {
   target_plots <- target_plots |>
     # Penalize things that differ on whether they have
@@ -206,7 +210,7 @@ most_similar_plot <- function(target_plots) {
       )) |>
       mutate(
         BA_RMSE = sqrt(
-          ((BA_Plot - ba_plot) / (BA_Plot + ba_plot))^2 +
+          pct_diff(BA_Plot, ba_plot)^2 +
             (BA_Frac_Pinus_strobus - ba_pist)^2 +
             (BA_Frac_Acer_rubrum - ba_acru)^2 +
             (BA_Frac_Quercus_rubra - ba_quru)^2 +
