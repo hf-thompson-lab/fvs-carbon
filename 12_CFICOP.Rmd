@@ -12,6 +12,8 @@ suppressPackageStartupMessages({
   library(tidyverse)
   library(readxl)
   library(terra)
+  library(sf)
+  library(rnaturalearth)
   library(measurements)
   library(mlr3verse) # Machine Learning in R framework, larger universe
   library(ggspatial) # annotation_scale, annotation_north_arrow
@@ -120,6 +122,13 @@ tmp_trees <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_abp(cfiabp_trees) |>
   filter(VisitCycle == 1970) |>
   filter(cfi_status_live(VisitTreeStatusCode)) |> # Only Live Trees
+  # Quercus rubra and Quercus velutina are often conflated in surveys; instead
+  # of treating them as two separate important species, combine them into one and
+  # treat them as a single species.
+  # Replace Quercus velutina (837) with Quercus rubra (833)
+  mutate(
+    SpeciesCode = if_else(SpeciesCode == 837, 833, SpeciesCode)
+  ) |>
   left_join(
     species_crosswalk |> select(SPCD, SCIENTIFIC_NAME),
     by = join_by(SpeciesCode == SPCD)
@@ -140,7 +149,7 @@ tmp_by_plot <- tmp_trees |>
   select(MasterPlotID, TPA_Plot, BA_Plot)
 
 tmp_top_species <- c(
-  "Acer rubrum", "Quercus rubra", "Quercus velutina", "Pinus strobus"
+  "Acer rubrum", "Quercus rubra", "Pinus strobus"
 )
 
 tmp_plot_fingerprint <- tmp_trees |>
@@ -189,8 +198,7 @@ most_similar_plot <- function(target_plots) {
     replace_na(list(
       BA_Frac_Pinus_strobus = -1,
       BA_Frac_Acer_rubrum = -1,
-      BA_Frac_Quercus_rubra = -1,
-      BA_Frac_Quercus_velutina = -1
+      BA_Frac_Quercus_rubra = -1
     ))
 
   lapply(1:nrow(target_plots), \(n) {
@@ -199,22 +207,19 @@ most_similar_plot <- function(target_plots) {
     ba_pist <- target_plots[[n, "BA_Frac_Pinus_strobus"]]
     ba_acru <- target_plots[[n, "BA_Frac_Acer_rubrum"]]
     ba_quru <- target_plots[[n, "BA_Frac_Quercus_rubra"]]
-    ba_quve <- target_plots[[n, "BA_Frac_Quercus_velutina"]]
     tmp_plot_fingerprint |>
       inner_join(tmp_plots_grow_only, by = join_by(MasterPlotID)) |>
       replace_na(list(
         BA_Frac_Pinus_strobus = -1,
         BA_Frac_Acer_rubrum = -1,
-        BA_Frac_Quercus_rubra = -1,
-        BA_Frac_Quercus_velutina = -1
+        BA_Frac_Quercus_rubra = -1
       )) |>
       mutate(
         BA_RMSE = sqrt(
           pct_diff(BA_Plot, ba_plot)^2 +
             (BA_Frac_Pinus_strobus - ba_pist)^2 +
             (BA_Frac_Acer_rubrum - ba_acru)^2 +
-            (BA_Frac_Quercus_rubra - ba_quru)^2 +
-            (BA_Frac_Quercus_velutina - ba_quve)^2
+            (BA_Frac_Quercus_rubra - ba_quru)^2
         )
       ) |>
       arrange(BA_RMSE) |>
@@ -229,9 +234,39 @@ tmp_plot_fingerprint |>
   select(MasterPlotID, sibling_plot)
 ```
 
-How's that look:
+How's that looks:
 
 ```{r plot sibling plots, eval = FALSE}
+tmp_top_species <- c(
+  "Acer rubrum", "Quercus rubra", "Pinus strobus"
+)
+
+tmp_species <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  filter(VisitCycle == 1970) |>
+  filter(cfi_status_live(VisitTreeStatusCode)) |> # Only Live Trees
+  mutate(
+    SpeciesCode = if_else(SpeciesCode == 837, 833, SpeciesCode)
+  ) |>
+  left_join(
+    species_crosswalk |> select(SPCD, SCIENTIFIC_NAME),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  filter(SCIENTIFIC_NAME %in% tmp_top_species) |>
+  distinct(MasterPlotID, SCIENTIFIC_NAME) |>
+  group_by(MasterPlotID) |>
+  summarize(
+    Species = do.call(
+      paste,
+      append(sort(SCIENTIFIC_NAME), list(sep = ", "))
+    ),
+    .groups = "drop"
+  ) |>
+  select(MasterPlotID, Species)
+
 matched_plots <- cficop_plot_sibling |>
   mutate(
     status = if_else(MasterPlotID == sibling_plot, "reference", "matched")
@@ -250,12 +285,24 @@ matched_plots <- cficop_plot_sibling |>
   select(
     MasterPlotID, status, lat, long, group
   ) |>
+  left_join(
+    tmp_species, by = join_by(MasterPlotID)
+  ) |>
   group_by(group) |>
   mutate(n = n(), group = paste0(group, ", n=", n())) |>
-  ungroup()
+  ungroup() |>
+  filter(n > 6)
+
+matched_plot_group_order <- matched_plots |>
+  distinct(group, n) |>
+  arrange(desc(n))
+
+matched_plots$group <- ordered(matched_plots$group, levels = matched_plot_group_order$group)
+
 cfi_bbox <- st_as_sfc(
   st_bbox(vect(matched_plots, geom = c("long", "lat")))
 )
+sf_use_s2(FALSE)
 st_crs(cfi_bbox) <- "WGS84"
 lakes_north_america <- ne_download(
   scale = 10, type = "lakes_north_america", category = "physical"
@@ -274,22 +321,24 @@ ggplot() +
 #  geom_sf(data = rivers, fill = "blue", inherit.aes = FALSE) +
   geom_point(
     data = matched_plots |> filter(status == "reference"),
-    aes(long, lat, color = fct_reorder(group, desc(n)), shape = status), size = 2.5
+    aes(long, lat, color = Species, shape = status), size = 2.5
   ) +
   geom_point(
     data = matched_plots |> filter(status == "matched"),
-    aes(long, lat, color = fct_reorder(group, desc(n)), shape = status), size = 1.75
+    aes(long, lat, color = Species, shape = status), size = 1.75
   ) +
-  scale_color_discrete(name = "Matched Plot") +
+  facet_wrap("group") +
+#  scale_color_discrete(guide = "none") +
   scale_shape_manual(values = list(reference = 17, matched = 16)) +
-  annotation_scale(location = "br") +
-  annotation_north_arrow(
-    location = "tl",
-    width = unit(1, "cm"),
-    pad_x = unit(0.75, "cm"),
-    pad_y = unit(0.5, "cm")
-  ) +
+#  annotation_scale(location = "br") +
+#  annotation_north_arrow(
+#    location = "tl",
+#    width = unit(1, "cm"),
+#    pad_x = unit(0.75, "cm"),
+#    pad_y = unit(0.5, "cm")
+#  ) +
   theme_bw() +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
   ggtitle("Matching harvested and disturbed CFI plots to grow-only plots")
 ```
 
