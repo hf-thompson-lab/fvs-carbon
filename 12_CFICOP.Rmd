@@ -487,7 +487,12 @@ tar_target(
       fiadb = NULL,
       title = title,
       mgmt_id = mgmt_id,
-      stands = cfigro_plot, # |>
+      stands = cfigro_plot |>
+        # Filter out the 6 plots that do not get a sibling
+        semi_join(
+          cficop_plot_sibling,
+          by = join_by(STAND_ID == MasterPlotID)
+        )
 #        left_join(
 #          cficop_sam_wt |> select(STAND_ID = MasterPlotID, SAM_WT = AcresPerPlot),
 #          by = join_by(STAND_ID)
@@ -587,11 +592,11 @@ cficop_none_carbon |>
 
 ## Zero-Growth Outliers
 
-There's a handful of plotat that FVS won't grow. Let's see what's up with them.
+There's a handful of plots that FVS won't grow. Let's see what's up with them.
 
 ```{r zero growth outliers, eval = FALSE}
 cfigro_trees |>
-  semi_join(
+  inner_join(
     cficop_none_carbon |>
       filter(Year == 2020) |>
       filter(Aboveground_Total_Live < 25) |>
@@ -601,4 +606,149 @@ cfigro_trees |>
   View()
 ```
 
-Looks like some trees are not getting HISTORY filled in.
+Stand 10353 has live trees on it (all WP) in 1970, but 0 biomass in 2020. Why?
+
+
+```{r plot 10353 ba over time, eval = FALSE}
+cficop_none_summary |>
+  filter(StandID == 10353) |>
+  mutate(Series = "Projected") |>
+  mutate(Year = as.character(Year)) |>
+  ggplot(aes(Year, BA, color = Series)) +
+  geom_point()
+```
+
+a'ight, it has 0 biomass in all years. Why?
+
+Did we get any warnings?
+
+```{r fvs warnings, eval = FALSE}
+title <- "CFICarbonOffsetProgram"
+mgmt_id <- "NONE"
+fvs_warnings <- lapply(1:fvs_num_partitions, \(partition) {
+  # Just read the first random seed
+  rand_seed <- fvs_randseed[[1]]
+  filename <- file.path(
+    "data/fvs",
+    paste0("FVS_", title, "_", mgmt_id),
+    paste0("FVS_", title, "_", mgmt_id, "_P", partition, "_R", rand_seed, ".out")
+  )
+  read_lines(filename) |>
+    as.data.frame(nm = "text") |>
+    # Filter to just initial STAND ID and WARNING lines
+    filter(
+      grepl("^ +STAND ID=", text) |
+        grepl("WARNING:", text) |
+        grepl("ERROR:", text)
+    ) |>
+    # Parse out the STAND ID and fill it into the following lines
+    mutate(
+      STAND_ID = case_when(
+        grepl("^ +STAND ID=", text) ~ sub("^ +STAND ID= *([^ ]+) .*$", "\\1", text)
+      )
+    ) |>
+    fill(STAND_ID) |>
+    # Remove everything but warnings (which now have STAND_ID)
+    filter(
+      grepl("WARNING:", text) |
+        grepl("ERROR:", text)
+    ) |>
+    mutate(
+      filename = filename
+    )
+}) |>
+  do.call(bind_rows, args = _)
+
+```
+
+Find the warnings for plot 10353
+```{r plot 10353 fvs warnings, eval = FALSE}
+fvs_warnings_10353 <- fvs_warnings |>
+  # Warnings have some leading text, the tag WARNING:,
+  # then descriptive text; if there's a number in the descriptive text,
+  # it's probably pulled from the data, so we chop off the descriptive
+  # text starting at the first number to find the truly distinct warnings
+  filter(STAND_ID == 10353)
+```
+
+It says:
+> FFE MODEL WARNING: NO INITIAL BASAL AREA
+
+So, that's wrong.
+
+From the log:
+> TREESQL    TREESQL COMMAND FOR INPUT DATA BASE: FVS_CFICarbonOffsetProgram_NONE_P7_R43517_Input.db
+>           SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'
+>           NUMBER ROWS PROCESSED:    0
+
+So we're missing trees for some reason.
+
+```{r}
+cfigro_trees |> filter(STAND_ID == 10353) |> distinct(STAND_CN)
+```
+
+There are 4 STAND_CN for this plot. They all have live biomass, but there should
+only be 1.
+
+What do we have in plots?
+
+```{r}
+cfigro_plot |> filter(STAND_ID == 10353) |> distinct(STAND_CN)
+```
+one STAND_CN, which does not match any of those of the trees. That would be
+why we start with zero biomass.
+
+```{r}
+tblDWSPCFIPlotVisitsComplete |>
+  filter(MasterPlotID == 10353) |>
+  distinct(MasterPlotVisitID, VisitCycle)
+```
+
+Looks like MasterPlotVisitID is sprintf("%d%d%04d", trunc(MasterPlotID/1000), VisitCycle, MasterPlotID%1000)
+
+```{r}
+qryDWSPCFIPlotVisitTreeDetail |>
+  filter(MasterPlotVisitID == 119700353)
+```
+
+So, in 1970, this plot had no live trees.
+
+What about regen?
+```{r}
+cficop_none_summary |>
+  filter(Year == 2020) |>
+  arrange(BA) |>
+  head(4)
+```
+
+This particular plot is clearly a problem child when it comes to regen as well.
+Not that plots 10361 and 10462 are doing great, but at least they get something.
+
+```{r}
+digest::digest2int(as.character(119700353)) %% fvs_num_partitions + 1
+```
+
+So, partition 7.
+
+Looking at the keyword file, it gets no regeneration.
+
+Why?
+
+Who is its sibling plot?
+```{r}
+cficop_plot_sibling |>
+  filter(MasterPlotID == 10353)
+```
+
+it has no sibling.
+
+Does this happen often?
+
+```{r}
+cfigro_plot |>
+  anti_join(cficop_plot_sibling, by = join_by(STAND_ID == MasterPlotID)) |>
+  select(STAND_ID)
+```
+
+6 times, which is probably 6 too many.
+
