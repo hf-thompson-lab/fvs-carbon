@@ -683,7 +683,7 @@ From the log:
 
 So we're missing trees for some reason.
 
-```{r}
+```{r trees for plot 10353, eval = FALSE}
 cfigro_trees |> filter(STAND_ID == 10353) |> distinct(STAND_CN)
 ```
 
@@ -692,13 +692,13 @@ only be 1.
 
 What do we have in plots?
 
-```{r}
+```{r stand_cns for plot 10353, eval = FALSE}
 cfigro_plot |> filter(STAND_ID == 10353) |> distinct(STAND_CN)
 ```
 one STAND_CN, which does not match any of those of the trees. That would be
 why we start with zero biomass.
 
-```{r}
+```{r plot 10353 visits, eval = FALSE}
 tblDWSPCFIPlotVisitsComplete |>
   filter(MasterPlotID == 10353) |>
   distinct(MasterPlotVisitID, VisitCycle)
@@ -706,7 +706,7 @@ tblDWSPCFIPlotVisitsComplete |>
 
 Looks like MasterPlotVisitID is sprintf("%d%d%04d", trunc(MasterPlotID/1000), VisitCycle, MasterPlotID%1000)
 
-```{r}
+```{r stand_cn for plot 10353 in 1970, eval = FALSE}
 qryDWSPCFIPlotVisitTreeDetail |>
   filter(MasterPlotVisitID == 119700353)
 ```
@@ -714,7 +714,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
 So, in 1970, this plot had no live trees.
 
 What about regen?
-```{r}
+```{r stands without regen, eval = FALSE}
 cficop_none_summary |>
   filter(Year == 2020) |>
   arrange(BA) |>
@@ -724,7 +724,7 @@ cficop_none_summary |>
 This particular plot is clearly a problem child when it comes to regen as well.
 Not that plots 10361 and 10462 are doing great, but at least they get something.
 
-```{r}
+```{r which partition stand 10353, eval = FALSE}
 digest::digest2int(as.character(119700353)) %% fvs_num_partitions + 1
 ```
 
@@ -735,7 +735,7 @@ Looking at the keyword file, it gets no regeneration.
 Why?
 
 Who is its sibling plot?
-```{r}
+```{r stand 10353 sibling, eval = FALSE}
 cficop_plot_sibling |>
   filter(MasterPlotID == 10353)
 ```
@@ -744,7 +744,7 @@ it has no sibling.
 
 Does this happen often?
 
-```{r}
+```{r stands without siblings, eval = FALSE}
 cfigro_plot |>
   anti_join(cficop_plot_sibling, by = join_by(STAND_ID == MasterPlotID)) |>
   select(STAND_ID)

@@ -6,6 +6,13 @@ tar_target(cficop_plot_sibling, {
     cfi_abp(cfiabp_trees) |>
     filter(VisitCycle == 1970) |>
     filter(cfi_status_live(VisitTreeStatusCode)) |> # Only Live Trees
+    # Quercus rubra and Quercus velutina are often conflated in surveys; instead
+    # of treating them as two separate important species, combine them into one and
+    # treat them as a single species.
+    # Replace Quercus velutina (837) with Quercus rubra (833)
+    mutate(
+      SpeciesCode = if_else(SpeciesCode == 837, 833, SpeciesCode)
+    ) |>
     left_join(
       species_crosswalk |> select(SPCD, SCIENTIFIC_NAME),
       by = join_by(SpeciesCode == SPCD)
@@ -26,7 +33,7 @@ tar_target(cficop_plot_sibling, {
     select(MasterPlotID, TPA_Plot, BA_Plot)
   
   tmp_top_species <- c(
-    "Acer rubrum", "Quercus rubra", "Quercus velutina", "Pinus strobus"
+    "Acer rubrum", "Quercus rubra", "Pinus strobus"
   )
   
   tmp_plot_fingerprint <- tmp_trees |>
@@ -64,6 +71,10 @@ tar_target(cficop_plot_sibling, {
     ) |>
     select(MasterPlotID)
   
+  pct_diff <- function(a, b) {
+    abs(a - b) / ((a + b) / 2)
+  }
+  
   most_similar_plot <- function(target_plots) {
     target_plots <- target_plots |>
       # Penalize things that differ on whether they have
@@ -71,8 +82,7 @@ tar_target(cficop_plot_sibling, {
       replace_na(list(
         BA_Frac_Pinus_strobus = -1,
         BA_Frac_Acer_rubrum = -1,
-        BA_Frac_Quercus_rubra = -1,
-        BA_Frac_Quercus_velutina = -1
+        BA_Frac_Quercus_rubra = -1
       ))
   
     lapply(1:nrow(target_plots), \(n) {
@@ -81,22 +91,19 @@ tar_target(cficop_plot_sibling, {
       ba_pist <- target_plots[[n, "BA_Frac_Pinus_strobus"]]
       ba_acru <- target_plots[[n, "BA_Frac_Acer_rubrum"]]
       ba_quru <- target_plots[[n, "BA_Frac_Quercus_rubra"]]
-      ba_quve <- target_plots[[n, "BA_Frac_Quercus_velutina"]]
       tmp_plot_fingerprint |>
         inner_join(tmp_plots_grow_only, by = join_by(MasterPlotID)) |>
         replace_na(list(
           BA_Frac_Pinus_strobus = -1,
           BA_Frac_Acer_rubrum = -1,
-          BA_Frac_Quercus_rubra = -1,
-          BA_Frac_Quercus_velutina = -1
+          BA_Frac_Quercus_rubra = -1
         )) |>
         mutate(
           BA_RMSE = sqrt(
-            ((BA_Plot - ba_plot) / (BA_Plot + ba_plot))^2 +
+            pct_diff(BA_Plot, ba_plot)^2 +
               (BA_Frac_Pinus_strobus - ba_pist)^2 +
               (BA_Frac_Acer_rubrum - ba_acru)^2 +
-              (BA_Frac_Quercus_rubra - ba_quru)^2 +
-              (BA_Frac_Quercus_velutina - ba_quve)^2
+              (BA_Frac_Quercus_rubra - ba_quru)^2
           )
         ) |>
         arrange(BA_RMSE) |>

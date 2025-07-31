@@ -19,7 +19,12 @@ tar_target(
       fiadb = NULL,
       title = title,
       mgmt_id = mgmt_id,
-      stands = cfigro_plot, # |>
+      stands = cfigro_plot |>
+        # Filter out the 6 plots that do not get a sibling
+        semi_join(
+          cficop_plot_sibling,
+          by = join_by(STAND_ID == MasterPlotID)
+        )
 #        left_join(
 #          cficop_sam_wt |> select(STAND_ID = MasterPlotID, SAM_WT = AcresPerPlot),
 #          by = join_by(STAND_ID)
