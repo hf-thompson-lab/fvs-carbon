@@ -24,7 +24,7 @@ tar_target(
         semi_join(
           cficop_plot_sibling,
           by = join_by(STAND_ID == MasterPlotID)
-        )
+        ),
 #        left_join(
 #          cficop_sam_wt |> select(STAND_ID = MasterPlotID, SAM_WT = AcresPerPlot),
 #          by = join_by(STAND_ID)
