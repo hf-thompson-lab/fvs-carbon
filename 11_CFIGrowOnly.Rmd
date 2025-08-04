@@ -2386,6 +2386,9 @@ tmp_trees <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_abp(cfiabp_trees) |>
   filter(VisitCycle == 1970) |>
   filter(cfi_status_live(VisitTreeStatusCode)) |> # Only Live Trees
+  mutate(
+    SpeciesCode = if_else(SpeciesCode == 837, 833, SpeciesCode)
+  ) |>
   left_join(
     species_crosswalk |> select(SPCD, SCIENTIFIC_NAME),
     by = join_by(SpeciesCode == SPCD)
@@ -2475,13 +2478,20 @@ cfigro_bai_fs_task$result |>
 ```
 [1] "Acer_rubrum"   "LAT" Projected_BA"  "Projected_Tph" "Quercus_rubra"
 
-It seems to select the two projected quantities, and two of the three species
-selectors, and LAT. Interesting that it omits elevation, but ok.
+Without folding black oak into red oak, it selected the two projected
+quantities, and two of the three species selectors, and LAT.
+
+With folding black oak into red oak, the RMSE for the top 5 combinations
+was all within 1%, so it looks like we can pick any convenient blend of
+species, projected quantities, and ELEV and LAT.
 
 ## Hyperparameters
 
 ```{r optimize hyperparameters, eval = FALSE}
-cfigro_bai_task$select(c("Acer_rubrum", "LAT", "Projected_BA", "Projected_Tph", "Quercus_rubra"))
+cfigro_bai_task$select(c(
+  "Acer_rubrum", "ELEV", "LAT",
+  "Projected_BA", "Projected_Tph", "Pinus_strobus"
+))
 
 lrn_regr_ranger <- lrn(
   "regr.ranger",
@@ -2507,6 +2517,19 @@ unlist(nrsres_bai_hp_task$result_x_domain)
 ```
 > unlist(nrsres_bai_hp_task$result_x_domain)
    importance     max.depth min.node.size          mtry     num.trees 
+   "impurity"           "9"          "11"           "2"          "63" 
+> unlist(nrsres_bai_hp_task$result_x_domain)
+   importance     max.depth min.node.size          mtry     num.trees 
+   "impurity"          "52"           "8"           "2"          "83" 
+> unlist(nrsres_bai_hp_task$result_x_domain)
+   importance     max.depth min.node.size          mtry     num.trees 
+"permutation"           "6"           "8"           "3"          "45" 
+
+  
+
+# Without folding red oak into black oak
+> unlist(nrsres_bai_hp_task$result_x_domain)
+   importance     max.depth min.node.size          mtry     num.trees 
    "impurity"          "16"          "11"           "2"          "68" 
 > unlist(nrsres_bai_hp_task$result_x_domain)
    importance     max.depth min.node.size          mtry     num.trees 
@@ -2524,7 +2547,7 @@ unlist(nrsres_bai_hp_task$result_x_domain)
 
 So, that's kind of all over the map. The first result seems representative:
    importance     max.depth min.node.size          mtry     num.trees 
-   "impurity"          "16"          "11"           "2"          "68" 
+   "impurity"          "9"          "11"           "2"          "63" 
 
 ## Train and Predict
 
@@ -2534,7 +2557,7 @@ cfigro_bai_task <- as_task_regr(
   target = "BAI_Residual"
 )
 cfigro_bai_task$select(
-  c("Acer_rubrum", "LAT", "Projected_BA", "Projected_Tph", "Quercus_rubra")
+  c("Acer_rubrum", "ELEV", "LAT", "Projected_BA", "Projected_Tph", "Pinus_strobus")
 )
 
 #cfigro_bai_model <- lrn(
@@ -2548,17 +2571,16 @@ cfigro_bai_task$select(
 cfigro_bai_model <- lrn(
   "regr.ranger",
   importance = "impurity",
-  max.depth = 16,
+  max.depth = 9,
   min.node.size = 11,
   mtry = 2,
-  num.trees = 68
+  num.trees = 63
 )
 
 cfigro_bai_model$train(cfigro_bai_task)
 
 cfigro_bai_model
 ```
-
 
 ```{r plot cfigro_bai_model, eval = FALSE}
 autoplot(cfigro_bai_model$predict(cfigro_bai_task)) +

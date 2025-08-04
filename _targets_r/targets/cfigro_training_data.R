@@ -8,6 +8,9 @@ tar_target(cfigro_training_data, {
     cfi_abp(cfiabp_trees) |>
     filter(VisitCycle == 1970) |>
     filter(cfi_status_live(VisitTreeStatusCode)) |> # Only Live Trees
+    mutate(
+      SpeciesCode = if_else(SpeciesCode == 837, 833, SpeciesCode)
+    ) |>
     left_join(
       species_crosswalk |> select(SPCD, SCIENTIFIC_NAME),
       by = join_by(SpeciesCode == SPCD)
