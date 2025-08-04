@@ -52,13 +52,13 @@ tar_target(cfigro_none_proj_vs_meas, {
       Projected_Carbon_Flux = if_else(
         Year == First_Year,
         0,
-        -(Projected_Carbon_Delta / (Year - First_Year))
+        Projected_Carbon_Delta / (Year - First_Year)
       ),
       Measured_Carbon_Delta = Measured_Carbon - Starting_Carbon,
       Measured_Carbon_Flux = if_else(
         Year == First_Year,
         0,
-        -(Measured_Carbon_Delta / (Year - First_Year))
+        Measured_Carbon_Delta / (Year - First_Year)
       ),
       Starting_BA = min(
         if_else(Year == First_Year, Measured_BA, NA),

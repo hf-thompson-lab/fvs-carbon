@@ -55,7 +55,7 @@ tar_target(cfigro_training_data, {
   
   cfigro_none_proj_vs_meas |>
     filter(Year == 2020) |>
-    select(StandID, BAI_Residual, Projected_BA, Projected_Tph) |>
+    select(StandID, Carbon_Flux_Residual, BAI_Residual, Projected_BA, Projected_Tph) |>
     left_join(
       cfigro_plot |>
         filter(INV_YEAR == 1970) |>

@@ -14,6 +14,7 @@ suppressPackageStartupMessages({
   library(terra)
   library(measurements)
   library(mlr3verse) # Machine Learning in R framework, larger universe
+  library(ggpmisc) # for stat_poly_eq
 })
 tar_source()
 ```
@@ -1937,13 +1938,13 @@ cfigro_none_proj_vs_meas <- surveyed_tmp |>
     Projected_Carbon_Flux = if_else(
       Year == First_Year,
       0,
-      -(Projected_Carbon_Delta / (Year - First_Year))
+      Projected_Carbon_Delta / (Year - First_Year)
     ),
     Measured_Carbon_Delta = Measured_Carbon - Starting_Carbon,
     Measured_Carbon_Flux = if_else(
       Year == First_Year,
       0,
-      -(Measured_Carbon_Delta / (Year - First_Year))
+      Measured_Carbon_Delta / (Year - First_Year)
     ),
     Starting_BA = min(
       if_else(Year == First_Year, Measured_BA, NA),
@@ -2355,7 +2356,7 @@ projection_20 |>
   ggtitle("CFI Quabbin Grow-Only Plots 20 year BAI Prediction")
 ```
 
-# CFI-Specific Modeled Error
+# CFI-Specific Modeled BAI Residual Error
 
 Applying the model derived from FIA data doesn't work well on the CFI plots.
 Let's try building a CFI-specific model.
@@ -2433,7 +2434,7 @@ tmp_plot_species <- tmp_species_cmp |>
 
 cfigro_none_proj_vs_meas |>
   filter(Year == 2020) |>
-  select(StandID, BAI_Residual, Projected_BA, Projected_Tph) |>
+  select(StandID, Carbon_Flux_Residual, BAI_Residual, Projected_BA, Projected_Tph) |>
   left_join(
     cfigro_plot |>
       filter(INV_YEAR == 1970) |>
@@ -2458,6 +2459,10 @@ cfigro_bai_task <- as_task_regr(
   cfigro_training_data,
   target = "BAI_Residual"
 )
+# for BAI, ignore Carbon Flux
+cfigro_bai_task$select(
+   cfigro_bai_task$feature_names[cfigro_bai_task$feature_names != "Carbon_Flux_Residual"]
+)
 cfigro_bai_fs_task <- fselect(
   fselector = fs("sequential"),
   task = cfigro_bai_task,
@@ -2473,7 +2478,7 @@ View(cfigro_bai_fs_task$archive$data |> arrange(regr.rmse))
 
 ```{r selected features, eval = FALSE}
 cfigro_bai_fs_task$result |>
-  pivot_longer(cols = -any_of(c("features", "n_features", "regr.rmse"))) |>
+  pivot_longer(cols = -any_of(c("Carbon_Flux_Residual", "features", "n_features", "regr.rmse"))) |>
   filter(value) |>
   pull(name)
 ```
@@ -2488,7 +2493,7 @@ cfigro_bai_task$select(c(
   "Acer_rubrum", "LAT", "Projected_BA", "Projected_Tph", "Quercus_rubra"
 ))
 
-lrn_regr_ranger <- lrn(
+cfigro_bai_lrn_regr_ranger <- lrn(
   "regr.ranger",
   importance = to_tune(c("impurity", "permutation")),
   max.depth = to_tune(1, 100, logscale = TRUE),
@@ -2497,16 +2502,16 @@ lrn_regr_ranger <- lrn(
   num.trees = to_tune(1, 100, logscale = TRUE)
 )
 
-nrsres_bai_hp_task <- tune(
+cfigro_bai_hp_task <- tune(
   tuner = tnr("mbo"),
   task = cfigro_bai_task,
-  learner = lrn_regr_ranger,
+  learner = cfigro_bai_lrn_regr_ranger,
   resampling = rsmp("repeated_cv", repeats = 10, folds = 10),
   measures = msr("regr.rmse"),
   terminator = trm("stagnation", threshold = 0.1)
 )
 
-unlist(nrsres_bai_hp_task$result_x_domain)
+unlist(cfigro_bai_hp_task$result_x_domain)
 ```
 
 ```
@@ -2590,6 +2595,85 @@ cfigro_none_proj_vs_meas |>
   ylab("Density") +
   scale_fill_brewer(palette="Set1") +
   ggtitle("Basal Area Increment Projection")
+```
+
+# CFI-Specific Modeled Aboveground Live Carbon Flux Residual Error
+
+How does carbon flux residual look compared to BAI residual?
+
+```{r aglcf vs bai, eval = FALSE}
+cfigro_training_data |>
+  ggplot(aes(BAI_Residual, Carbon_Flux_Residual)) +
+  geom_point() +
+  stat_poly_line(
+    formula = y ~ x,
+    fullrange = TRUE,
+    se = FALSE,
+    color = "darkblue",
+    linetype = "dashed",
+    linewidth = 0.5
+  ) +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, size = 3)
+
+```
+
+They are very highly correlated, so predicting above ground live carbon flux
+residual should be similar to predicting basal area increment residual.
+
+## Train & Predict
+
+```{targets cfigro_aglcf_model, tar_simple = TRUE}
+cfigro_aglcf_task <- as_task_regr(
+  cfigro_training_data,
+  target = "Carbon_Flux_Residual"
+)
+cfigro_aglcf_task$select(
+  c("Acer_rubrum", "LAT", "Projected_BA", "Projected_Tph", "Quercus_rubra")
+)
+cfigro_aglcf_model <- lrn(
+  "regr.ranger",
+  importance = "impurity",
+  max.depth = 28,
+  min.node.size = 11,
+  mtry = 2,
+  num.trees = 70
+)
+
+cfigro_aglcf_model$train(cfigro_aglcf_task)
+
+cfigro_aglcf_model
+```
+
+```{r plot cfigro_aglcf_model, eval = FALSE}
+autoplot(cfigro_aglcf_model$predict(cfigro_aglcf_task)) +
+  xlab("Predicted Aboveground Live Carbon Flux Residual") +
+  ylab("Actual Aboveground Live Carbon Flux Residual") +
+  ggtitle("Modeled FVS Aboveground Live Carbon Flux Residual on CFI Grow-Only Plots")
+```
+
+```{r plot cfigro_aglcf_model density, eval = FALSE}
+cfigro_none_proj_vs_meas |>
+  filter(Year == 2020) |>
+  mutate(Adjusted_Carbon_Flux = Projected_Carbon_Flux - cfigro_aglcf_model$predict(cfigro_aglcf_task)$response) |>
+  select(
+    StandID,
+    Adjusted_Carbon_Flux,
+    Projected_Carbon_Flux,
+    Measured_Carbon_Flux) |>
+
+  pivot_longer(
+    cols = c("Adjusted_Carbon_Flux", "Projected_Carbon_Flux", "Measured_Carbon_Flux"),
+    names_to = "Series",
+    values_to = "Carbon_Flux"
+  ) |>
+  ggplot(aes(Carbon_Flux, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Aboveground Live Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Aboveground Live Carbon Flux Projection")
 ```
 
 
