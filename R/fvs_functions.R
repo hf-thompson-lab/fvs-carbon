@@ -648,3 +648,34 @@ fvs_read_input <- function(fvs_output, table) {
     })
   )
 }
+
+
+#' fvs_species_composition
+#'
+#' Retrieve the species composition (BA, TPA) of a stand over time.
+#'
+#' Output is square feet per acre / trees per acre.
+#'
+#' @param fvs_output
+#'
+#' @returns a data frame with StandID, Year, SpeciesFIA, BA, TPA
+#' @export
+#'
+#' @examples
+fvs_species_composition <- function(fvs_output) {
+  bind_rows(
+    lapply(1:nrow(fvs_output), \(n) {
+      row <- fvs_output[n, ]
+      output_db <- row[["output_db"]]
+      con <- DBI::dbConnect(RSQLite::SQLite(), output_db, flags = RSQLite::SQLITE_RO)
+      on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
+
+      tbl(con, "FVS_TreeList_East") |>
+        mutate(BA = TPA * pi * (DBH / 12 / 2)^2) |>
+        group_by(StandID, Year, SpeciesFIA) |>
+        summarize(BA = sum(BA, na.rm = TRUE), TPA = sum(TPA, na.rm = TRUE), .groups = "drop") |>
+        collect() |>
+        cross_join(row) # Attach all the run metadata to each row
+    })
+  )
+}

@@ -2379,43 +2379,45 @@ The rest of the training data follows the same model as for nrsgro.
 ```{targets cfigro_training_data, tar_simple = TRUE}
 tmp_top_species <- c("Acer rubrum", "Pinus strobus", "Quercus rubra")
 
-tmp_trees <- qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  filter(VisitCycle == 1970) |>
-  filter(cfi_status_live(VisitTreeStatusCode)) |> # Only Live Trees
+tmp_species_cmp <- fvs_species_composition(cfigro_none) |>
+  filter(Year == 2020) |>
+  mutate(SpeciesCode = as.numeric(SpeciesFIA)) |>
+  # Average across random seeds
+  group_by(StandID, Year, SpeciesCode) |>
+  summarize(BA = mean(BA), TPA = mean(TPA), .groups = "drop") |>
+  # Combine black oak and red oak
   mutate(
     SpeciesCode = if_else(SpeciesCode == 837, 833, SpeciesCode)
   ) |>
+  group_by(StandID, Year, SpeciesCode) |>
+  summarize(BA = sum(BA), TPA = sum(TPA), .groups = "drop") |>
   left_join(
     species_crosswalk |> select(SPCD, SCIENTIFIC_NAME),
     by = join_by(SpeciesCode == SPCD)
   ) |>
   mutate(
-    TPA = conv_unit(5, "hectare", "acre"),
-    BA = TPA * pi * conv_unit(VisitTreeDIAM / 2, "in", "m")^2,
+    TPH = conv_unit(TPA, "hectare", "acre"),
+    BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare"),
   )
 
-tmp_by_plot <- tmp_trees |>
-  group_by(MasterPlotID) |>
+tmp_by_plot <- tmp_species_cmp |>
+  group_by(StandID) |>
   summarize(
-    TPA = sum(TPA, na.rm = TRUE),
-    BA = sum(BA, na.rm = TRUE),
+    TPA = sum(TPA),
+    BA = sum(BA),
     .groups = "drop"
   )
 
 # Top species by plot
 # (only considering top plots)
-tmp_plot_species <- tmp_trees |>
-  group_by(MasterPlotID, SCIENTIFIC_NAME) |>
-  summarize(BA = sum(BA, na.rm = TRUE), .groups = "keep") |>
+tmp_plot_species <- tmp_species_cmp |>
+  group_by(StandID, SCIENTIFIC_NAME) |>
+  summarize(BA = sum(BA), .groups = "drop") |>
   ungroup() |>
   left_join(
     tmp_by_plot |>
-      select(MasterPlotID, BA_Plot = BA),
-    by = join_by(MasterPlotID)
+      select(StandID, BA_Plot = BA),
+    by = join_by(StandID)
   ) |>
   mutate(BA_Frac = BA / BA_Plot) |>
   filter(SCIENTIFIC_NAME %in% tmp_top_species) |>
@@ -2423,26 +2425,25 @@ tmp_plot_species <- tmp_trees |>
     SCIENTIFIC_NAME = sub(" ", "_", SCIENTIFIC_NAME)
   ) |>
   pivot_wider(
-    id_cols = MasterPlotID,
+    id_cols = StandID,
     names_from = SCIENTIFIC_NAME,
     values_from = BA_Frac,
     values_fill = 0
-  ) |>
-  mutate(MasterPlotID = as.character(MasterPlotID))
+  )
 
 cfigro_none_proj_vs_meas |>
   filter(Year == 2020) |>
-  select(MasterPlotID = StandID, BAI_Residual, Projected_BA, Projected_Tph) |>
+  select(StandID, BAI_Residual, Projected_BA, Projected_Tph) |>
   left_join(
     cfigro_plot |>
       filter(INV_YEAR == 1970) |>
-      mutate(MasterPlotID = as.character(STAND_ID)) |>
-      select(MasterPlotID, LAT = LATITUDE, ASPECT, SLOPE, ELEV = ELEVFT),
-    by = join_by(MasterPlotID)
+      mutate(StandID = as.character(STAND_ID)) |>
+      select(StandID, LAT = LATITUDE, ASPECT, SLOPE, ELEV = ELEVFT),
+    by = join_by(StandID)
   ) |>
   left_join(
     tmp_plot_species,
-    by = join_by(MasterPlotID)
+    by = join_by(StandID)
   )
 ```
 
@@ -2478,19 +2479,13 @@ cfigro_bai_fs_task$result |>
 ```
 [1] "Acer_rubrum"   "LAT" Projected_BA"  "Projected_Tph" "Quercus_rubra"
 
-Without folding black oak into red oak, it selected the two projected
-quantities, and two of the three species selectors, and LAT.
-
-With folding black oak into red oak, the RMSE for the top 5 combinations
-was all within 1%, so it looks like we can pick any convenient blend of
-species, projected quantities, and ELEV and LAT.
+It selected the two projected quantities, and two of the three species selectors, and LAT.
 
 ## Hyperparameters
 
 ```{r optimize hyperparameters, eval = FALSE}
 cfigro_bai_task$select(c(
-  "Acer_rubrum", "ELEV", "LAT",
-  "Projected_BA", "Projected_Tph", "Pinus_strobus"
+  "Acer_rubrum", "LAT", "Projected_BA", "Projected_Tph", "Quercus_rubra"
 ))
 
 lrn_regr_ranger <- lrn(
@@ -2517,37 +2512,28 @@ unlist(nrsres_bai_hp_task$result_x_domain)
 ```
 > unlist(nrsres_bai_hp_task$result_x_domain)
    importance     max.depth min.node.size          mtry     num.trees 
-   "impurity"           "9"          "11"           "2"          "63" 
-> unlist(nrsres_bai_hp_task$result_x_domain)
-   importance     max.depth min.node.size          mtry     num.trees 
-   "impurity"          "52"           "8"           "2"          "83" 
-> unlist(nrsres_bai_hp_task$result_x_domain)
-   importance     max.depth min.node.size          mtry     num.trees 
-"permutation"           "6"           "8"           "3"          "45" 
+"permutation"          "58"          "11"           "2"          "21"
 
-  
+> unlist(nrsres_bai_hp_task$result_x_domain)
+   importance     max.depth min.node.size          mtry     num.trees 
+   "impurity"           "3"          "14"           "3"          "48" 
+   
+> unlist(nrsres_bai_hp_task$result_x_domain)
+   importance     max.depth min.node.size          mtry     num.trees 
+"permutation"          "99"          "17"           "2"          "85"
 
-# Without folding red oak into black oak
 > unlist(nrsres_bai_hp_task$result_x_domain)
    importance     max.depth min.node.size          mtry     num.trees 
-   "impurity"          "16"          "11"           "2"          "68" 
+   "impurity"           "4"           "5"           "2"          "39"
+
 > unlist(nrsres_bai_hp_task$result_x_domain)
    importance     max.depth min.node.size          mtry     num.trees 
-"permutation"           "3"          "11"           "2"          "38" 
-> unlist(nrsres_bai_hp_task$result_x_domain)
-   importance     max.depth min.node.size          mtry     num.trees 
-"permutation"          "24"           "8"           "2"          "84" 
-> unlist(nrsres_bai_hp_task$result_x_domain)
-   importance     max.depth min.node.size          mtry     num.trees 
-   "impurity"           "4"           "8"           "2"          "51" 
-> unlist(nrsres_bai_hp_task$result_x_domain)
-   importance     max.depth min.node.size          mtry     num.trees 
-   "impurity"          "24"          "17"           "2"          "71" 
+   "impurity"          "28"          "11"           "2"          "70" 
 ```
 
-So, that's kind of all over the map. The first result seems representative:
+So, that's kind of all over the map. The last result seems representative:
    importance     max.depth min.node.size          mtry     num.trees 
-   "impurity"          "9"          "11"           "2"          "63" 
+   "impurity"          "28"          "11"           "2"          "70" 
 
 ## Train and Predict
 
@@ -2557,24 +2543,16 @@ cfigro_bai_task <- as_task_regr(
   target = "BAI_Residual"
 )
 cfigro_bai_task$select(
-  c("Acer_rubrum", "ELEV", "LAT", "Projected_BA", "Projected_Tph", "Pinus_strobus")
+  c("Acer_rubrum", "LAT", "Projected_BA", "Projected_Tph", "Quercus_rubra")
 )
 
-#cfigro_bai_model <- lrn(
-#  "regr.ranger",
-#  importance = "permutation",
-#  max.depth = 30,
-#  min.node.size = 17,
-#  mtry = 2,
-#  num.trees = 31
-#)
 cfigro_bai_model <- lrn(
   "regr.ranger",
   importance = "impurity",
-  max.depth = 9,
+  max.depth = 28,
   min.node.size = 11,
   mtry = 2,
-  num.trees = 63
+  num.trees = 70
 )
 
 cfigro_bai_model$train(cfigro_bai_task)
