@@ -31,7 +31,7 @@ tar_target(nrshrv_plot_stats_all, {
         inner_join(plots, by = plots_join_by) |>
         select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, CONDPROP_UNADJ, FORTYPCD) |>
         group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
-        # QMD = sqrt(sum(DIA^2) / n)
+        # QMD = sqrt(sum((DIA/2)^2) / n)
         # Which is equivalent to
         # QMD = sqrt(sum(BALIVE * TPA_UNADJ) / (n * k)), where n is number of trees,
         # and k is π/576 ≅ 0.005454 for B in square feet and QMD in inches;

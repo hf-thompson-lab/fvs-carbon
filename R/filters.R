@@ -410,12 +410,12 @@ filter_plots_ba_frac <- function(.data, con, spcds, frac) {
     # Only consider the most recent survey of the plot
     group_by(STATECD, COUNTYCD, PLOT) |>
     filter(INVYR == max(INVYR, na.rm = TRUE)) |>
-    mutate(BA_TOTAL = sum(6 * pi * DIA^2, na.rm = TRUE)) |>
+    mutate(BA_TOTAL = sum(6 * pi * (DIA/12/2)^2, na.rm = TRUE)) |>
     ungroup() |>
     inner_join(spcds |> distinct(SPCD), by = join_by(SPCD), copy = TRUE) |>
     group_by(STATECD, COUNTYCD, PLOT) |>
     summarize(
-      BA_FVS = sum(6 * pi * DIA^2, na.rm = TRUE),
+      BA_FVS = sum(6 * pi * (DIA/12/2)^2, na.rm = TRUE),
       BA_TOTAL = max(BA_TOTAL, na.rm = TRUE),
       .groups = "keep"
     ) |>

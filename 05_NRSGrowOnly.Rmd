@@ -219,7 +219,7 @@ fia_plots_filtered(fiadb, nrsgro_plot, \(.data, con) {
       inner_join(plots |> select(STATECD, COUNTYCD, PLOT, INVYR), by = plots_join_by) |>
       select(STATECD, COUNTYCD, PLOT, INVYR, STDAGE, BALIVE, CONDPROP_UNADJ, FORTYPCD) |>
       group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
-      # QMD = sqrt(sum(DIA^2) / n)
+      # QMD = sqrt(sum((DIA/2)^2) / n)
       # Which is equivalent to
       # QMD = sqrt(sum(BALIVE * TPA_UNADJ) / (n * k)), where n is number of trees,
       # and k is π/576 ≅ 0.005454 for B in square feet and QMD in inches;
@@ -1658,7 +1658,7 @@ fvsne_unhandled_trees <- nrsgro_tree_spcd |>
   arrange(desc(MEASYEAR)) |>
   filter(row_number() == 1) |>
   ungroup() |>
-  mutate(BA = conv_multiunit(6 * pi * DIA^2, "ft2 / acre", "m2 / hectare")) |>
+  mutate(BA = conv_multiunit(6 * pi * (DIA/12/2)^2, "ft2 / acre", "m2 / hectare")) |>
   group_by(STATECD, COUNTYCD, PLOT) |>
   mutate(TOTAL_STAND_BA = sum(BA, na.rm = TRUE)) |>
   ungroup() |>
@@ -2267,7 +2267,7 @@ Note that FIA establishes at 5" DBH, whereas FVS establishes at 3" DBH,
 and FVS puts an upper bound on height based on expectations for 3" DBH trees.
 We can follow PREV_TRE_CN backward to find when the tree was 3" DBH; note
 that this might be a long time ago. As an alternative, we could multiply TPA
-by DIA^2 / 3^2 and set the height to (3/DIA)*HT - this would give us the same
+by (DIA/2)^2 / 3^2 and set the height to (3/DIA)*HT - this would give us the same
 total basal area in trees of reduced height.
 
 Because of the way time is set up in FVS, establishment is scheduled for the
