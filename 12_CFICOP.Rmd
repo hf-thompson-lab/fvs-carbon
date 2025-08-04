@@ -669,10 +669,28 @@ tmp_plot_starting_ba <- cficop_none_summary |>
     .groups = "drop"
   )
 
+tmp_plot_starting_carbon <- cficop_none_carbon |>
+  filter(Year == 1970) |>
+  group_by(StandID) |>
+  summarize(
+    Starting_Carbon = sum(Aboveground_Total_Live),
+    .groups = "drop"
+  )
+
+tmp_plot_projected_carbon <- cficop_none_carbon |>
+  filter(Year == 2020) |>
+  group_by(StandID) |>
+  summarize(
+    Projected_Carbon = sum(Aboveground_Total_Live),
+    .groups = "drop"
+  )
+
 cficop_none_bai <- cficop_none_summary |>
   filter(Year == 2020) |>
-  mutate(Projected_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
-  mutate(Projected_Tph = conv_unit(Tpa, "hectare", "acre")) |>
+  mutate(
+    Projected_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare"),
+    Projected_Tph = conv_unit(Tpa, "hectare", "acre")
+  ) |>
   select(StandID, Projected_BA, Projected_Tph) |>
   left_join(
     cfigro_plot |>
@@ -686,15 +704,26 @@ cficop_none_bai <- cficop_none_summary |>
     by = join_by(StandID)
   ) |>
   mutate(
-    BAI_Error = cfigro_bai_model$predict_newdata(pick(everything()))$response
+    BAI_Error = cfigro_bai_model$predict_newdata(pick(everything()))$response,
+    Carbon_Flux_Error = cfigro_aglcf_model$predict_newdata(pick(everything()))$response
   ) |>
   left_join(
     tmp_plot_starting_ba,
     by = join_by(StandID)
   ) |>
+  left_join(
+    tmp_plot_starting_carbon,
+    by = join_by(StandID)
+  ) |>
+  left_join(
+    tmp_plot_projected_carbon,
+    by = join_by(StandID)
+  ) |>
   mutate(
     Projected_BAI = (Projected_BA - Starting_BA) / (2020 - 1970),
-    Adjusted_BAI = Projected_BAI - BAI_Error
+    Adjusted_BAI = Projected_BAI - BAI_Error,
+    Projected_AGLCF = (Projected_Carbon - Starting_Carbon) / (2020 - 1970),
+    Adjusted_AGLCF = Projected_AGLCF - Carbon_Flux_Error
   )
 ```
 
@@ -713,6 +742,26 @@ cficop_none_bai |>
   scale_fill_discrete(name = "Series") +
   xlab(bquote("Basal Area Increment" ~ (m^2 %.% hectare^-1 %.% year^-1))) +
   ylab("Density") +
-  ggtitle("CFI Quabbin All Plots 50 year BAI Prediction")
+  ggtitle("CFI Quabbin All Plots 50 year BAI Projection")
 ```
+
+```{r plot cficop none aglcf, eval = FALSE}
+cficop_none_bai |>
+  rename(
+    `FVS Projected` = Projected_AGLCF,
+    `Corrected` = Adjusted_AGLCF
+  ) |>
+  pivot_longer(c("FVS Projected", "Corrected")) |>
+  ggplot(aes(value, fill = name)) +
+  geom_density(alpha = 0.5) +
+  theme_bw() +
+  scale_fill_discrete(name = "Series") +
+  xlab(bquote("Aboveground Live Carbon Flux" ~ (`Mg C` %.% hectare^-1 %.% year^-1))) +
+  ylab("Density") +
+  ggtitle("CFI Quabbin All Plots 50 year Aboveground Live Carbon Flux Projection")
+```
+
+## Carbon on the Landscape
+
+What does this mean for total carbon on the landscape?
 
