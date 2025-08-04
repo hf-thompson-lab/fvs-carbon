@@ -291,7 +291,8 @@ matched_plots <- cficop_plot_sibling |>
   group_by(group) |>
   mutate(n = n(), group = paste0(group, ", n=", n())) |>
   ungroup() |>
-  filter(n > 6)
+  filter(n > 12)
+#  filter(n > 6)
 
 matched_plot_group_order <- matched_plots |>
   distinct(group, n) |>
@@ -560,11 +561,18 @@ cficop_none_summary |>
 #      group_by(Year) |>
 #      summarize(BA = sum(BA) / n()) |>
 #      ungroup() |>
-      mutate(Series = "Grow-Only")
+      mutate(Series = "Observed")
   ) |>
-  mutate(Year = as.character(Year)) |>
-  ggplot(aes(Year, BA, color = Series)) +
-  geom_boxplot()
+  mutate(
+    Year = as.character(Year),
+    BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")
+  ) |>
+  ggplot(aes(Year, BA, fill = Series)) +
+  geom_boxplot(outlier.size = 0.5) +
+  theme_bw() +
+  ggtitle("CFI Grow-Only Projection") +
+  ylab(bquote("Basal Area " ~ (m^2 %.% hectare^-1)))
+
 ```
 
 ## Carbon Over Time
@@ -590,165 +598,121 @@ cficop_none_carbon |>
   ylab(bquote("Aboveground Live Carbon " ~ (`Mg C` %.% hectare^-1)))
 ```
 
-## Zero-Growth Outliers
+## Error Model
 
-There's a handful of plots that FVS won't grow. Let's see what's up with them.
+We need:
+cfigro_bai_task$select(
+  c("Acer_rubrum", "LAT", "Projected_BA", "Projected_Tph", "Pinus_strobus")
+)
 
-```{r zero growth outliers, eval = FALSE}
-cfigro_trees |>
-  inner_join(
-    cficop_none_carbon |>
-      filter(Year == 2020) |>
-      filter(Aboveground_Total_Live < 25) |>
-      mutate(STAND_ID = as.numeric(StandID)),
-    by = join_by(STAND_ID)
-  ) |>
-  View()
-```
+```{r cficop modeled error, eval = FALSE}
+tmp_top_species <- c("Acer rubrum", "Pinus strobus", "Quercus rubra")
 
-Stand 10353 has live trees on it (all WP) in 1970, but 0 biomass in 2020. Why?
-
-
-```{r plot 10353 ba over time, eval = FALSE}
-cficop_none_summary |>
-  filter(StandID == 10353) |>
-  mutate(Series = "Projected") |>
-  mutate(Year = as.character(Year)) |>
-  ggplot(aes(Year, BA, color = Series)) +
-  geom_point()
-```
-
-a'ight, it has 0 biomass in all years. Why?
-
-Did we get any warnings?
-
-```{r fvs warnings, eval = FALSE}
-title <- "CFICarbonOffsetProgram"
-mgmt_id <- "NONE"
-fvs_warnings <- lapply(1:fvs_num_partitions, \(partition) {
-  # Just read the first random seed
-  rand_seed <- fvs_randseed[[1]]
-  filename <- file.path(
-    "data/fvs",
-    paste0("FVS_", title, "_", mgmt_id),
-    paste0("FVS_", title, "_", mgmt_id, "_P", partition, "_R", rand_seed, ".out")
-  )
-  read_lines(filename) |>
-    as.data.frame(nm = "text") |>
-    # Filter to just initial STAND ID and WARNING lines
-    filter(
-      grepl("^ +STAND ID=", text) |
-        grepl("WARNING:", text) |
-        grepl("ERROR:", text)
-    ) |>
-    # Parse out the STAND ID and fill it into the following lines
-    mutate(
-      STAND_ID = case_when(
-        grepl("^ +STAND ID=", text) ~ sub("^ +STAND ID= *([^ ]+) .*$", "\\1", text)
-      )
-    ) |>
-    fill(STAND_ID) |>
-    # Remove everything but warnings (which now have STAND_ID)
-    filter(
-      grepl("WARNING:", text) |
-        grepl("ERROR:", text)
-    ) |>
-    mutate(
-      filename = filename
-    )
-}) |>
-  do.call(bind_rows, args = _)
-
-```
-
-Find the warnings for plot 10353
-```{r plot 10353 fvs warnings, eval = FALSE}
-fvs_warnings_10353 <- fvs_warnings |>
-  # Warnings have some leading text, the tag WARNING:,
-  # then descriptive text; if there's a number in the descriptive text,
-  # it's probably pulled from the data, so we chop off the descriptive
-  # text starting at the first number to find the truly distinct warnings
-  filter(STAND_ID == 10353)
-```
-
-It says:
-> FFE MODEL WARNING: NO INITIAL BASAL AREA
-
-So, that's wrong.
-
-From the log:
-> TREESQL    TREESQL COMMAND FOR INPUT DATA BASE: FVS_CFICarbonOffsetProgram_NONE_P7_R43517_Input.db
->           SELECT * FROM FVS_TreeInit_Plot WHERE Stand_CN = '%Stand_CN%'
->           NUMBER ROWS PROCESSED:    0
-
-So we're missing trees for some reason.
-
-```{r trees for plot 10353, eval = FALSE}
-cfigro_trees |> filter(STAND_ID == 10353) |> distinct(STAND_CN)
-```
-
-There are 4 STAND_CN for this plot. They all have live biomass, but there should
-only be 1.
-
-What do we have in plots?
-
-```{r stand_cns for plot 10353, eval = FALSE}
-cfigro_plot |> filter(STAND_ID == 10353) |> distinct(STAND_CN)
-```
-one STAND_CN, which does not match any of those of the trees. That would be
-why we start with zero biomass.
-
-```{r plot 10353 visits, eval = FALSE}
-tblDWSPCFIPlotVisitsComplete |>
-  filter(MasterPlotID == 10353) |>
-  distinct(MasterPlotVisitID, VisitCycle)
-```
-
-Looks like MasterPlotVisitID is sprintf("%d%d%04d", trunc(MasterPlotID/1000), VisitCycle, MasterPlotID%1000)
-
-```{r stand_cn for plot 10353 in 1970, eval = FALSE}
-qryDWSPCFIPlotVisitTreeDetail |>
-  filter(MasterPlotVisitID == 119700353)
-```
-
-So, in 1970, this plot had no live trees.
-
-What about regen?
-```{r stands without regen, eval = FALSE}
-cficop_none_summary |>
+tmp_species_cmp <- fvs_species_composition(cficop_none) |>
   filter(Year == 2020) |>
-  arrange(BA) |>
-  head(4)
+  mutate(SpeciesCode = as.numeric(SpeciesFIA)) |>
+  # Average across random seeds
+  group_by(StandID, Year, SpeciesCode) |>
+  summarize(BA = mean(BA), TPA = mean(TPA), .groups = "drop") |>
+  # Combine black oak and red oak
+  mutate(
+    SpeciesCode = if_else(SpeciesCode == 837, 833, SpeciesCode)
+  ) |>
+  group_by(StandID, Year, SpeciesCode) |>
+  summarize(BA = sum(BA), TPA = sum(TPA), .groups = "drop") |>
+  left_join(
+    species_crosswalk |> select(SPCD, SCIENTIFIC_NAME),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  mutate(
+    TPH = conv_unit(TPA, "hectare", "acre"),
+    BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare"),
+  )
+
+tmp_by_plot <- tmp_species_cmp |>
+  group_by(StandID) |>
+  summarize(
+    TPA = sum(TPA),
+    BA = sum(BA),
+    .groups = "drop"
+  )
+
+# Top species by plot
+# (only considering top plots)
+tmp_plot_species <- tmp_species_cmp |>
+  group_by(StandID, SCIENTIFIC_NAME) |>
+  summarize(BA = sum(BA), .groups = "drop") |>
+  ungroup() |>
+  left_join(
+    tmp_by_plot |>
+      select(StandID, BA_Plot = BA),
+    by = join_by(StandID)
+  ) |>
+  mutate(BA_Frac = BA / BA_Plot) |>
+  filter(SCIENTIFIC_NAME %in% tmp_top_species) |>
+  mutate(
+    SCIENTIFIC_NAME = sub(" ", "_", SCIENTIFIC_NAME)
+  ) |>
+  pivot_wider(
+    id_cols = StandID,
+    names_from = SCIENTIFIC_NAME,
+    values_from = BA_Frac,
+    values_fill = 0
+  )
+
+tmp_plot_starting_ba <- cficop_none_summary |>
+  filter(Year == 1970) |>
+  mutate(Projected_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
+  group_by(StandID) |>
+  summarize(
+    Starting_BA = sum(Projected_BA),
+    .groups = "drop"
+  )
+
+cficop_none_bai <- cficop_none_summary |>
+  filter(Year == 2020) |>
+  mutate(Projected_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
+  mutate(Projected_Tph = conv_unit(Tpa, "hectare", "acre")) |>
+  select(StandID, Projected_BA, Projected_Tph) |>
+  left_join(
+    cfigro_plot |>
+      filter(INV_YEAR == 1970) |>
+      mutate(StandID = as.character(STAND_ID)) |>
+      select(StandID, LAT = LATITUDE, ASPECT, SLOPE, ELEV = ELEVFT),
+    by = join_by(StandID)
+  ) |>
+  left_join(
+    tmp_plot_species,
+    by = join_by(StandID)
+  ) |>
+  mutate(
+    BAI_Error = cfigro_bai_model$predict_newdata(pick(everything()))$response
+  ) |>
+  left_join(
+    tmp_plot_starting_ba,
+    by = join_by(StandID)
+  ) |>
+  mutate(
+    Projected_BAI = (Projected_BA - Starting_BA) / (2020 - 1970),
+    Adjusted_BAI = Projected_BAI - BAI_Error
+  )
 ```
 
-This particular plot is clearly a problem child when it comes to regen as well.
-Not that plots 10361 and 10462 are doing great, but at least they get something.
+Plot it:
 
-```{r which partition stand 10353, eval = FALSE}
-digest::digest2int(as.character(119700353)) %% fvs_num_partitions + 1
+```{r plot cficop none bai, eval = FALSE}
+cficop_none_bai |>
+  rename(
+    `FVS Projected` = Projected_BAI,
+    `Corrected` = Adjusted_BAI
+  ) |>
+  pivot_longer(c("FVS Projected", "Corrected")) |>
+  ggplot(aes(value, fill = name)) +
+  geom_density(alpha = 0.5) +
+  theme_bw() +
+  scale_fill_discrete(name = "Series") +
+  xlab(bquote("Basal Area Increment" ~ (m^2 %.% hectare^-1 %.% year^-1))) +
+  ylab("Density") +
+  ggtitle("CFI Quabbin All Plots 50 year BAI Prediction")
 ```
-
-So, partition 7.
-
-Looking at the keyword file, it gets no regeneration.
-
-Why?
-
-Who is its sibling plot?
-```{r stand 10353 sibling, eval = FALSE}
-cficop_plot_sibling |>
-  filter(MasterPlotID == 10353)
-```
-
-it has no sibling.
-
-Does this happen often?
-
-```{r stands without siblings, eval = FALSE}
-cfigro_plot |>
-  anti_join(cficop_plot_sibling, by = join_by(STAND_ID == MasterPlotID)) |>
-  select(STAND_ID)
-```
-
-6 times, which is probably 6 too many.
 
