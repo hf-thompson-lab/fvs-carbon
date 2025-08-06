@@ -108,7 +108,11 @@ cfigro_estab |>
 non-Grow-Only plots show double and more the establishment rate of grow-only
 plots.
 
-Let's match by BA of the major species for establishment rate instead.
+Establishment comes from saplings / seedlings, which come from seeds, which
+either come into the plot from outside or come from mature trees on the plot.
+All of these plots are co-located, so they can trade seeds with each other.
+For available seeds from trees on the plot, we can match plots by BA of the
+major species, then use the establishment from the matched / sibling plot.
 
 ### Plot Matching
 
@@ -582,13 +586,13 @@ cficop_none_carbon |>
 #  group_by(Year) |>
 #  summarize(Aboveground_Total_Live = sum(Aboveground_Total_Live) / n()) |>
 #  ungroup() |>
-  mutate(Series = "Projection") |>
+  mutate(Series = paste0("Projection, n=", n_distinct(StandID))) |>
   union_all(
     cfigro_srvy_carbon |>
 #      group_by(Year) |>
 #      summarize(Aboveground_Total_Live = sum(Aboveground_Total_Live) / n()) |>
 #      ungroup() |>
-      mutate(Series = "Reference")
+      mutate(Series = paste0("Reference, n=", n_distinct(StandID)))
   ) |>
   mutate(Year = as.character(Year)) |>
   ggplot(aes(Year, Aboveground_Total_Live, fill = Series)) +
@@ -602,7 +606,7 @@ cficop_none_carbon |>
 
 We need:
 cfigro_bai_task$select(
-  c("Acer_rubrum", "LAT", "Projected_BA", "Projected_Tph", "Pinus_strobus")
+  c("Acer_rubrum", "LAT", "Pinus_strobus", "Projected_BA", "Projected_Tph", "Quercus_rubra", "SLOPE")
 )
 
 ```{r cficop modeled error, eval = FALSE}
@@ -611,14 +615,11 @@ tmp_top_species <- c("Acer rubrum", "Pinus strobus", "Quercus rubra")
 tmp_species_cmp <- fvs_species_composition(cficop_none) |>
   filter(Year == 2020) |>
   mutate(SpeciesCode = as.numeric(SpeciesFIA)) |>
-  # Average across random seeds
-  group_by(StandID, Year, SpeciesCode) |>
-  summarize(BA = mean(BA), TPA = mean(TPA), .groups = "drop") |>
   # Combine black oak and red oak
   mutate(
     SpeciesCode = if_else(SpeciesCode == 837, 833, SpeciesCode)
   ) |>
-  group_by(StandID, Year, SpeciesCode) |>
+  group_by(StandID, Year, SpeciesCode, random_seed) |>
   summarize(BA = sum(BA), TPA = sum(TPA), .groups = "drop") |>
   left_join(
     species_crosswalk |> select(SPCD, SCIENTIFIC_NAME),
@@ -630,7 +631,7 @@ tmp_species_cmp <- fvs_species_composition(cficop_none) |>
   )
 
 tmp_by_plot <- tmp_species_cmp |>
-  group_by(StandID) |>
+  group_by(StandID, random_seed) |>
   summarize(
     TPA = sum(TPA),
     BA = sum(BA),
@@ -638,15 +639,15 @@ tmp_by_plot <- tmp_species_cmp |>
   )
 
 # Top species by plot
-# (only considering top plots)
+# (only considering tmp_top_species)
 tmp_plot_species <- tmp_species_cmp |>
-  group_by(StandID, SCIENTIFIC_NAME) |>
+  group_by(StandID, SCIENTIFIC_NAME, random_seed) |>
   summarize(BA = sum(BA), .groups = "drop") |>
   ungroup() |>
   left_join(
     tmp_by_plot |>
-      select(StandID, BA_Plot = BA),
-    by = join_by(StandID)
+      select(StandID, random_seed, BA_Plot = BA),
+    by = join_by(StandID, random_seed)
   ) |>
   mutate(BA_Frac = BA / BA_Plot) |>
   filter(SCIENTIFIC_NAME %in% tmp_top_species) |>
@@ -654,44 +655,47 @@ tmp_plot_species <- tmp_species_cmp |>
     SCIENTIFIC_NAME = sub(" ", "_", SCIENTIFIC_NAME)
   ) |>
   pivot_wider(
-    id_cols = StandID,
+    id_cols = c("StandID", "random_seed"),
     names_from = SCIENTIFIC_NAME,
     values_from = BA_Frac,
     values_fill = 0
   )
 
-tmp_plot_starting_ba <- cficop_none_summary |>
+# cficop_none_summary aggregates over random_seed; we need random_seed
+# in the output.
+tmp_none_summary <- fvs_read_output(cficop_none, "FVS_Summary2_East")
+
+tmp_plot_starting_ba <- tmp_none_summary |>
   filter(Year == 1970) |>
-  mutate(Projected_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare")) |>
-  group_by(StandID) |>
-  summarize(
-    Starting_BA = sum(Projected_BA),
-    .groups = "drop"
-  )
+  mutate(
+    Starting_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare"),
+    Starting_Tph = conv_unit(Tpa, "hectare", "acre")
+  ) |>
+  select(StandID, random_seed, Starting_BA, Starting_Tph)
 
-tmp_plot_starting_carbon <- cficop_none_carbon |>
-  filter(Year == 1970) |>
-  group_by(StandID) |>
-  summarize(
-    Starting_Carbon = sum(Aboveground_Total_Live),
-    .groups = "drop"
-  )
-
-tmp_plot_projected_carbon <- cficop_none_carbon |>
-  filter(Year == 2020) |>
-  group_by(StandID) |>
-  summarize(
-    Projected_Carbon = sum(Aboveground_Total_Live),
-    .groups = "drop"
-  )
-
-cficop_none_bai <- cficop_none_summary |>
+tmp_plot_projected_ba <- tmp_none_summary |>
   filter(Year == 2020) |>
   mutate(
     Projected_BA = conv_multiunit(BA, "ft2 / acre", "m2 / hectare"),
     Projected_Tph = conv_unit(Tpa, "hectare", "acre")
   ) |>
-  select(StandID, Projected_BA, Projected_Tph) |>
+  select(StandID, random_seed, Projected_BA, Projected_Tph)
+
+# cficop_none_carbon aggregates over random_seed; we need random_seed
+# in the output.
+tmp_none_carbon <- fvs_read_output(cficop_none, "FVS_Carbon")
+
+tmp_plot_starting_carbon <- tmp_none_carbon |>
+  filter(Year == 1970) |>
+  rename(Starting_Carbon = Aboveground_Total_Live) |>
+  select(StandID, random_seed, Starting_Carbon)
+
+tmp_plot_projected_carbon <- tmp_none_carbon |>
+  filter(Year == 2020) |>
+  rename(Projected_Carbon = Aboveground_Total_Live) |>
+  select(StandID, random_seed, Projected_Carbon)
+
+cficop_none_bai <- tmp_plot_species |>
   left_join(
     cfigro_plot |>
       filter(INV_YEAR == 1970) |>
@@ -700,24 +704,24 @@ cficop_none_bai <- cficop_none_summary |>
     by = join_by(StandID)
   ) |>
   left_join(
-    tmp_plot_species,
-    by = join_by(StandID)
+    tmp_plot_starting_ba,
+    by = join_by(StandID, random_seed)
+  ) |>
+  left_join(
+    tmp_plot_projected_ba,
+    by = join_by(StandID, random_seed)
+  ) |>
+  left_join(
+    tmp_plot_starting_carbon,
+    by = join_by(StandID, random_seed)
+  ) |>
+  left_join(
+    tmp_plot_projected_carbon,
+    by = join_by(StandID, random_seed)
   ) |>
   mutate(
     BAI_Error = cfigro_bai_model$predict_newdata(pick(everything()))$response,
     Carbon_Flux_Error = cfigro_aglcf_model$predict_newdata(pick(everything()))$response
-  ) |>
-  left_join(
-    tmp_plot_starting_ba,
-    by = join_by(StandID)
-  ) |>
-  left_join(
-    tmp_plot_starting_carbon,
-    by = join_by(StandID)
-  ) |>
-  left_join(
-    tmp_plot_projected_carbon,
-    by = join_by(StandID)
   ) |>
   mutate(
     Projected_BAI = (Projected_BA - Starting_BA) / (2020 - 1970),
@@ -764,4 +768,47 @@ cficop_none_bai |>
 ## Carbon on the Landscape
 
 What does this mean for total carbon on the landscape?
+
+I think we just multiply the FVS projected vs. corrected AGLCF times years
+times acres (converted to hectares).
+
+```{r projected vs corrected carbon, eval = FALSE}
+projected_vs_corrected_carbon <- cficop_none_bai |>
+  left_join(
+    cficop_sam_wt |> mutate(StandID = as.character(MasterPlotID)),
+    by = join_by(StandID)
+  ) |>
+  mutate(
+    HectaresPerPlot = conv_unit(AcresPerPlot, "acre", "hectare"),
+    StartingCarbon = Starting_Carbon * HectaresPerPlot,
+    ProjectedCarbon = Projected_AGLCF * (2020 - 1970) * HectaresPerPlot,
+    CorrectedCarbon = Adjusted_AGLCF * (2020 - 1970) * HectaresPerPlot
+  ) |>
+  group_by(random_seed) |>
+  summarize(
+    StartingCarbon = sum(StartingCarbon),
+    ProjectedCarbon = sum(ProjectedCarbon),
+    CorrectedCarbon = sum(CorrectedCarbon),
+    CarbonError = (ProjectedCarbon - CorrectedCarbon) / ((ProjectedCarbon + CorrectedCarbon) / 2),
+    CarbonGrowthError = (ProjectedCarbon - CorrectedCarbon) / (ProjectedCarbon - StartingCarbon)
+  )
+
+projected_vs_corrected_carbon
+```
+
+```{r plot projected vs corrected carbon, eval = FALSE}
+projected_vs_corrected_carbon |>
+  pivot_longer(c("StartingCarbon", "ProjectedCarbon", "CorrectedCarbon")) |>
+  mutate(name = ordered(name, levels = c("StartingCarbon", "ProjectedCarbon", "CorrectedCarbon"))) |>
+  ggplot(aes(name, value)) +
+  geom_boxplot() +
+  theme_bw() +
+  ggtitle("CFI Quabbin Plots 50-year Grow-Only Carbon Projection") +
+  xlab(label = NULL) +
+  ylab(bquote("Aboveground Live Carbon" ~ (`Mg C`))) +
+  scale_fill_viridis_d() +
+  scale_y_continuous(limits = c(0, NA), n.breaks = 6)
+```
+
+So, it over-projects by 22.2+-0.3%
 
