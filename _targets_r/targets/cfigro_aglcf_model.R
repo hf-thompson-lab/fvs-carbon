@@ -4,15 +4,15 @@ tar_target(cfigro_aglcf_model, {
     target = "Carbon_Flux_Residual"
   )
   cfigro_aglcf_task$select(
-    c("Acer_rubrum", "LAT", "Projected_BA", "Projected_Tph", "Quercus_rubra")
+    c("Acer_rubrum", "LAT", "Pinus_strobus", "Projected_BA", "Projected_Tph", "Quercus_rubra", "SLOPE")
   )
   cfigro_aglcf_model <- lrn(
     "regr.ranger",
-    importance = "impurity",
-    max.depth = 28,
-    min.node.size = 11,
-    mtry = 2,
-    num.trees = 70
+    importance = "permutation",
+    max.depth = 16,
+    min.node.size = 5,
+    mtry = 3,
+    num.trees = 22
   )
   
   cfigro_aglcf_model$train(cfigro_aglcf_task)
