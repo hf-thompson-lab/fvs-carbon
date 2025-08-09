@@ -466,6 +466,48 @@ ggplot(tmp_state_map, aes(long, lat, group = group)) +
   theme_bw()
 ```
 
+It looks, however, like we want to treat the entire area as one thing.
+What's the total area?
+
+```{r}
+print(277*0.2)
+tblSuppPlotForestrySubBasins |>
+  filter(Watershed == 1) |>
+  summarize(acres = sum(DWSPOwnedAcres)) |>
+  pull(acres)
+```
+
+So, by area, we've sampled 277*0.2 = 55.4 acres out of 58657 acres, or about 0.1%.
+
+Oh, but probably we only want the subwatersheds that plots are actually present
+on, so:
+
+```{r}
+cficop_sam_wt |>
+  group_by(EQSUBDISTRICT) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  summarize(acres = sum(TotalAcres)) |>
+  pull(acres)
+```
+
+so 19522, or roughly 20,000 acres, or less than half the total.
+
+Or maybe we want not just ABP plots, but all Quabbin plots
+
+```{r}
+tblSuppPlotForestrySubBasins |>
+  filter(Watershed == 1) |>
+  semi_join(
+    tblDWSPCFIPlotsComplete |> distinct(DWSPForestrySubWatershed),
+    by = join_by(MasterForestryBasinID == DWSPForestrySubWatershed)
+  ) |>
+  summarize(acres = sum(DWSPOwnedAcres)) |>
+  pull(acres)
+```
+
+56816 acres.
+
 # CFICOP_NONE
 
 ## Run FVS
@@ -765,12 +807,113 @@ cficop_none_bai |>
   ggtitle("CFI Quabbin All Plots 50 year Aboveground Live Carbon Flux Projection")
 ```
 
+## Error Distribution
+
+```{r plot cficop error distribution, eval = FALSE}
+cficop_none_bai |>
+  mutate(Series = "Modeled") |>
+  ggplot(aes(Carbon_Flux_Error, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Aboveground Live Carbon Flux Residual" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Modeled AGL Carbon Flux Residual")
+```
+
 ## Carbon on the Landscape
+
+> TODO Nik:
+> - Treat the 277 plots as a sample (by area?)
+> - For the sample, we can compute the Standard Error of the Mean (SEM) as:
+>   - SEM = s / sqrt(n)
+>     where s = sample standard deviation
+>     and   n = number of points in the sample
+>   - Note that if sample size > 5% of the population size, also apply
+>     Finite Population Correction (FPC), which says
+>   - SEM = s / sqrt(n) * (N - n) / (N - 1)
+>     where N = population size
+> - Then a 95% CI for the population mean is
+>   x_bar +/- (1.96 * SEM)
+>   where x_bar is the sample mean
 
 What does this mean for total carbon on the landscape?
 
 I think we just multiply the FVS projected vs. corrected AGLCF times years
 times acres (converted to hectares).
+
+from above, estimated 56816 forested acres; we have 277 * 0.2 = 55.4 acres,
+so 0.1%
+
+So, let's look at distribution of biomass in our 277 plot sample:
+
+```{r}
+hectares <- conv_unit(56816, "acre", "hectare")
+
+starting_carbon <- cficop_none_bai |>
+  # Remove random seed
+  group_by(StandID) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  mutate(
+#    Projected_Carbon = Starting_Carbon + (Projected_AGLCF) * (2020-1970),
+    Adjusted_Carbon = Starting_Carbon + (Projected_AGLCF - Carbon_Flux_Error) * (2020 - 1970)
+  ) |>
+  summarize(
+    starting_carbon_mean = mean(Starting_Carbon),
+    starting_carbon_sd = sd(Starting_Carbon),
+    projected_carbon_mean = mean(Projected_Carbon),
+    projected_carbon_sd = sd(Projected_Carbon),
+    adjusted_carbon_mean = mean(Adjusted_Carbon),
+    adjusted_carbon_sd = sd(Adjusted_Carbon),
+    n = n(),
+    .groups = "drop"
+  ) |>
+  mutate(
+    starting_carbon = starting_carbon_mean,
+    # since we multiply by hectares later, convert sd to ci via 1.96 / sqrt(n)
+    starting_carbon_min = starting_carbon - 1.96 * starting_carbon_sd / sqrt(n),
+    starting_carbon_max = starting_carbon + 1.96 * starting_carbon_sd / sqrt(n),
+    projected_carbon = projected_carbon_mean,
+    projected_carbon_min = projected_carbon - 1.96 * projected_carbon_sd / sqrt(n),
+    projected_carbon_max = projected_carbon + 1.96 * projected_carbon_sd / sqrt(n),
+    adjusted_carbon = adjusted_carbon_mean,
+    adjusted_carbon_min = adjusted_carbon - 1.96 * adjusted_carbon_sd / sqrt(n),
+    adjusted_carbon_max = adjusted_carbon + 1.96 * adjusted_carbon_sd / sqrt(n)
+  ) |>
+  select(
+    starting_carbon, starting_carbon_min, starting_carbon_max,
+    projected_carbon, projected_carbon_min, projected_carbon_max,
+    adjusted_carbon, adjusted_carbon_min, adjusted_carbon_max
+  ) |>
+  pivot_longer(everything()) |>
+  mutate(
+    value = value * hectares,
+    group = if_else(grepl("starting", name), "starting", if_else(grepl("projected", name), "projected", "adjusted")),
+    kind  = if_else(grepl("_min", name), "min", if_else(grepl("_max", name), "max", "mean"))
+  ) |>
+  pivot_wider(id_cols = "group", names_from = "kind")
+```
+
+Plot it:
+```{r}
+starting_carbon |>
+  mutate(group = ordered(group, levels = c("starting", "projected", "adjusted"))) |>
+  ggplot(aes(group, mean)) +
+  geom_col(aes(fill = group)) +
+  geom_errorbar(aes(ymin = min, ymax = max), width = 0.25) +
+  theme_bw()
+```
+
+So, starting carbon is 50.89+/-2.49 Mg C / hectare, times hectares
+
+To plot this, can use
+- geom_bar
+- geom_rect - set all positions by hand
+- geom_linerange - set ymax and ymin, with a big size
+- waterfall (in waterfall package)
+- geom_errorbar for +/- CI
 
 ```{r projected vs corrected carbon, eval = FALSE}
 projected_vs_corrected_carbon <- cficop_none_bai |>
@@ -786,29 +929,40 @@ projected_vs_corrected_carbon <- cficop_none_bai |>
   ) |>
   group_by(random_seed) |>
   summarize(
-    StartingCarbon = sum(StartingCarbon),
-    ProjectedCarbon = sum(ProjectedCarbon),
-    CorrectedCarbon = sum(CorrectedCarbon),
-    CarbonError = (ProjectedCarbon - CorrectedCarbon) / ((ProjectedCarbon + CorrectedCarbon) / 2),
-    CarbonGrowthError = (ProjectedCarbon - CorrectedCarbon) / (ProjectedCarbon - StartingCarbon)
+    Starting = sum(StartingCarbon),
+    FVS = sum(ProjectedCarbon),
+    `FVS Adjusted` = sum(CorrectedCarbon),
+    Error = (FVS - `FVS Adjusted`) / ((FVS + `FVS Adjusted`) / 2),
+    GrowthError = (FVS - `FVS Adjusted`) / (FVS - Starting)
   )
 
-projected_vs_corrected_carbon
+knitr::kable(projected_vs_corrected_carbon, padding = 5)
 ```
 
 ```{r plot projected vs corrected carbon, eval = FALSE}
 projected_vs_corrected_carbon |>
-  pivot_longer(c("StartingCarbon", "ProjectedCarbon", "CorrectedCarbon")) |>
-  mutate(name = ordered(name, levels = c("StartingCarbon", "ProjectedCarbon", "CorrectedCarbon"))) |>
+  select(
+    Starting = StartingCarbon,
+    FVS = ProjectedCarbon,
+    `FVS Adjusted` = CorrectedCarbon
+  ) |>
+  pivot_longer(c("Starting", "FVS", "FVS Adjusted")) |>
+  mutate(name = ordered(name, levels = c("Starting", "FVS", "FVS Adjusted"))) |>
   ggplot(aes(name, value)) +
   geom_boxplot() +
   theme_bw() +
-  ggtitle("CFI Quabbin Plots 50-year Grow-Only Carbon Projection") +
+  ggtitle("Modeled AGL Carbon") +
   xlab(label = NULL) +
   ylab(bquote("Aboveground Live Carbon" ~ (`Mg C`))) +
-  scale_fill_viridis_d() +
-  scale_y_continuous(limits = c(0, NA), n.breaks = 6)
+  scale_fill_viridis_d()# +
+  #scale_y_continuous(limits = c(0, NA), n.breaks = 6)
 ```
 
 So, it over-projects by 22.2+-0.3%
+
+# Harvest
+
+Let's look at the distribution of harvest, and what we'll need to model.
+
+## Observed Harvest
 
