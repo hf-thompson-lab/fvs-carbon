@@ -2664,14 +2664,17 @@ cfigro_training_data |>
   mutate(Adjusted_Carbon_Flux = Projected_Carbon_Flux - cfigro_aglcf_model$predict(cfigro_aglcf_task)$response) |>
   select(
     StandID,
-    Adjusted_Carbon_Flux,
-    Projected_Carbon_Flux,
-    Measured_Carbon_Flux
+    `FVS Adjusted` = Adjusted_Carbon_Flux,
+    FVS = Projected_Carbon_Flux,
+    Observed = Measured_Carbon_Flux
   ) |>
   pivot_longer(
-    cols = c("Adjusted_Carbon_Flux", "Projected_Carbon_Flux", "Measured_Carbon_Flux"),
+    cols = c("FVS Adjusted", "FVS", "Observed"),
     names_to = "Series",
     values_to = "Carbon_Flux"
+  ) |>
+  mutate(
+    Series = ordered(Series, levels = c("Observed", "FVS", "FVS Adjusted"))
   ) |>
   ggplot(aes(Carbon_Flux, fill = Series)) +
   geom_density(alpha = 0.5) +
@@ -2680,7 +2683,37 @@ cfigro_training_data |>
   xlab(bquote("Aboveground Live Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
   ylab("Density") +
   scale_fill_brewer(palette="Set1") +
-  ggtitle("Aboveground Live Carbon Flux Projection")
+  ggtitle("Modeled vs. Observed AGL Carbon Flux")
+```
+
+## Error Distribution
+
+```{r plot cfigro_aglcf_model density, eval = FALSE}
+cfigro_training_data |>
+  mutate(
+    Modeled_Residual = cfigro_aglcf_model$predict(cfigro_aglcf_task)$response
+  ) |>
+  select(
+    StandID,
+    Observed = Carbon_Flux_Residual,
+    Modeled = Modeled_Residual
+  ) |>
+  pivot_longer(
+    cols = c("Observed", "Modeled"),
+    names_to = "Series",
+    values_to = "Carbon_Flux_Residual"
+  ) |>
+  mutate(
+    Series = ordered(Series, levels = c("Observed", "Modeled"))
+  ) |>
+  ggplot(aes(Carbon_Flux_Residual, fill = Series)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  xlab(bquote("Aboveground Live Carbon Flux Residual" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
+  ylab("Density") +
+  scale_fill_brewer(palette="Set1") +
+  ggtitle("Modeled vs Observed AGL Carbon Flux Residual")
 ```
 
 
