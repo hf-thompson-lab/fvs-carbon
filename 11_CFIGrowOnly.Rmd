@@ -2716,4 +2716,174 @@ cfigro_training_data |>
   ggtitle("Modeled vs Observed AGL Carbon Flux Residual")
 ```
 
+# Plots as Sample
+
+When looking at CFICOP, we treat the plots as a sample from the landscape
+(the forest), and compute a 95% confidence interval for the population
+mean.
+
+Let's do the same thing here.
+
+- Treat the 31 plots as a sample (by area?)
+- For the sample, we can compute the Standard Error of the Mean (SEM) as:
+  - SEM = s / sqrt(n)
+    where s = sample standard deviation
+    and   n = number of points in the sample
+  - Note that if sample size > 5% of the population size, also apply
+    Finite Population Correction (FPC), which says
+  - SEM = s / sqrt(n) * (N - n) / (N - 1)
+    where N = population size
+- Then a 95% CI for the population mean is
+  x_bar +/- (1.96 * SEM)
+  where x_bar is the sample mean
+
+What does this mean for total carbon on the landscape?
+
+I think we just multiply the FVS projected vs. corrected AGLCF times years
+times acres (converted to hectares).
+
+from above, estimated 56816 forested acres; we have 31 * 0.2 = 6.2 acres,
+so 0.011%
+
+So, let's look at distribution of biomass in our 277 plot sample:
+
+```{r population mean}
+hectares <- conv_unit(56816, "acre", "hectare")
+
+population_mean <- cfigro_none_proj_vs_meas |>
+  group_by(Year) |>
+  summarize(
+    measured_carbon_mean = mean(Measured_Carbon),
+    measured_carbon_sd = sd(Measured_Carbon),
+    projected_carbon_mean = mean(Projected_Carbon),
+    projected_carbon_sd = sd(Projected_Carbon),
+    n = n(),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  mutate(
+    # since we multiply by hectares later, convert sd to ci via 1.96 / sqrt(n)
+    measured_carbon_min = measured_carbon_mean - 1.96 * measured_carbon_sd / sqrt(n),
+    measured_carbon_max = measured_carbon_mean + 1.96 * measured_carbon_sd / sqrt(n),
+    projected_carbon_min = projected_carbon_mean - 1.96 * projected_carbon_sd / sqrt(n),
+    projected_carbon_max = projected_carbon_mean + 1.96 * projected_carbon_sd / sqrt(n)  ) |>
+  select(
+    Year,
+    measured_carbon_mean, measured_carbon_min, measured_carbon_max,
+    projected_carbon_mean, projected_carbon_min, projected_carbon_max
+  ) |>
+  pivot_longer(-Year) |>
+  mutate(
+    value = value * hectares,
+    group = if_else(grepl("measured", name), "measured", "projected"),
+    kind  = if_else(grepl("_min", name), "min", if_else(grepl("_max", name), "max", "mean"))
+  ) |>
+  pivot_wider(id_cols = c("group", "Year"), names_from = "kind")
+```
+
+Plot it:
+```{r plot population mean}
+population_mean |>
+  mutate(group = ordered(group, levels = c("measured", "projected"))) |>
+  ggplot(aes(Year, mean)) +
+  geom_ribbon(aes(ymin = min, ymax = max, fill = group), alpha = 0.25) +
+  geom_line(aes(color = group)) +
+  coord_cartesian(ylim = c(0, NA)) +
+  theme_bw() +
+  ggtitle("Projected vs. Measured Total Carbon, 0.01% sample") +
+  ylab(bquote("Total Carbon" ~(`Mg C`))) +
+  scale_color_discrete(name = "Estimated\nPopulation\nMean") +
+  scale_fill_discrete(name = "95% CI")
+```
+
+```{r adjusted_population_mean}
+# These definitions need to match what's used in the target to build the model
+cfigro_aglcf_task <- as_task_regr(
+  cfigro_training_data,
+  target = "Carbon_Flux_Residual"
+)
+cfigro_aglcf_task$select(
+  c("Acer_rubrum", "LAT", "Pinus_strobus", "Projected_BA", "Projected_Tph", "Quercus_rubra", "SLOPE")
+)
+
+adjusted_population_mean <- cfigro_training_data |>
+  mutate(
+    Modeled_Residual = cfigro_aglcf_model$predict(cfigro_aglcf_task)$response,
+    Adjusted_Carbon_Flux = Projected_Carbon_Flux - Modeled_Residual
+  ) |>
+  select(
+    StandID,
+    Adjusted_Carbon_Flux
+  ) |>
+  cross_join(
+    cfigro_none_proj_vs_meas |> distinct(Year)
+  ) |>
+  left_join(
+    cfigro_none_proj_vs_meas,
+    by = join_by(StandID, Year)
+  ) |>
+  mutate(
+    Adjusted_Carbon = Starting_Carbon + (Adjusted_Carbon_Flux * (Year - 1970))
+  ) |>
+  select(
+    StandID, Year, Measured_Carbon, Projected_Carbon, Adjusted_Carbon
+  ) |>
+  group_by(Year) |>
+  summarize(
+    measured_carbon_mean = mean(Measured_Carbon),
+    measured_carbon_sd = sd(Measured_Carbon),
+    projected_carbon_mean = mean(Projected_Carbon),
+    projected_carbon_sd = sd(Projected_Carbon),
+    adjusted_carbon_mean = mean(Adjusted_Carbon),
+    adjusted_carbon_sd = sd(Adjusted_Carbon),
+    n = n(),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  mutate(
+    # since we multiply by hectares later, convert sd to ci via 1.96 / sqrt(n)
+    measured_carbon_min = measured_carbon_mean - 1.96 * measured_carbon_sd / sqrt(n),
+    measured_carbon_max = measured_carbon_mean + 1.96 * measured_carbon_sd / sqrt(n),
+    projected_carbon_min = projected_carbon_mean - 1.96 * projected_carbon_sd / sqrt(n),
+    projected_carbon_max = projected_carbon_mean + 1.96 * projected_carbon_sd / sqrt(n),
+    adjusted_carbon_min = adjusted_carbon_mean - 1.96 * adjusted_carbon_sd / sqrt(n),
+    adjusted_carbon_max = adjusted_carbon_mean + 1.96 * adjusted_carbon_sd / sqrt(n)
+    ) |>
+  select(
+    Year,
+    measured_carbon_mean, measured_carbon_min, measured_carbon_max,
+    projected_carbon_mean, projected_carbon_min, projected_carbon_max,
+    adjusted_carbon_mean, adjusted_carbon_min, adjusted_carbon_max
+  ) |>
+  pivot_longer(-Year) |>
+  mutate(
+    value = value * hectares,
+    group = if_else(
+      grepl("measured", name), "measured",
+      if_else(grepl("adjusted", name), "adjusted",
+              "projected")
+    ),
+    kind  = if_else(
+      grepl("_min", name), "min",
+      if_else(grepl("_max", name), "max", "mean")
+    )
+  ) |>
+  pivot_wider(id_cols = c("group", "Year"), names_from = "kind")
+
+```
+
+```{r plot adjusted population mean}
+adjusted_population_mean |>
+  mutate(group = ordered(group, levels = c("measured", "projected", "adjusted"))) |>
+  ggplot(aes(Year, mean)) +
+  geom_ribbon(aes(ymin = min, ymax = max, fill = group), alpha = 0.25) +
+  geom_line(aes(color = group)) +
+  coord_cartesian(ylim = c(0, NA)) +
+  theme_bw() +
+  ggtitle("Projected vs. Measured Total Carbon, 0.01% sample") +
+  ylab(bquote("Total Carbon" ~(`Mg C`))) +
+  scale_color_discrete(name = "Estimated\nPopulation\nMean") +
+  scale_fill_discrete(name = "95% CI")
+```
+
 
