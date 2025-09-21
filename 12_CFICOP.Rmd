@@ -75,6 +75,31 @@ cfigro_plot has all 283 plots.
 
 cfigro_tree has trees for all 283 plots.
 
+### All the plots?
+
+We only need trees in 1970; can we use all the plots?
+
+```{r all the plots, eval = FALSE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+#  cfi_abp(cfiabp_trees) |>
+  filter(VisitCycle == 1970) |>
+  filter(cfi_status_live(VisitTreeStatusCode)) |> # Only Live Trees
+  distinct(MasterPlotID) |>
+  nrow()
+```
+
+There are 337 plots with trees in 1970; the 65 additional plots dont's seem
+worth the extra effort.
+
+For the manuscript, "Many plot locations in the Quabbin watershed were adjusted
+in 1970, creating a discontinuity in observed data. This study exampines the
+period from 1970 - 2020, during which plot location is consistent. There were
+337 plots with trees in 1970; of these, detailed information on harvest and
+disturbance is available on 277 [Barker-Plotkin 2024]."
+
 ## Regeneration
 
 We ignored harvest in CFIGRO; can we continue to ignore it?
@@ -469,7 +494,7 @@ ggplot(tmp_state_map, aes(long, lat, group = group)) +
 It looks, however, like we want to treat the entire area as one thing.
 What's the total area?
 
-```{r}
+```{r total acres, eval = FALSE}
 print(277*0.2)
 tblSuppPlotForestrySubBasins |>
   filter(Watershed == 1) |>
@@ -482,7 +507,7 @@ So, by area, we've sampled 277*0.2 = 55.4 acres out of 58657 acres, or about 0.1
 Oh, but probably we only want the subwatersheds that plots are actually present
 on, so:
 
-```{r}
+```{r sample weight, eval = FALSE}
 cficop_sam_wt |>
   group_by(EQSUBDISTRICT) |>
   filter(row_number() == 1) |>
@@ -495,7 +520,7 @@ so 19522, or roughly 20,000 acres, or less than half the total.
 
 Or maybe we want not just ABP plots, but all Quabbin plots
 
-```{r}
+```{r total acres another way, eval = FALSE}
 tblSuppPlotForestrySubBasins |>
   filter(Watershed == 1) |>
   semi_join(
@@ -651,7 +676,7 @@ cfigro_bai_task$select(
   c("Acer_rubrum", "LAT", "Pinus_strobus", "Projected_BA", "Projected_Tph", "Quercus_rubra", "SLOPE")
 )
 
-```{r cficop modeled error, eval = FALSE}
+```{targets cficop_none_bai, tar_simple = TRUE}
 tmp_top_species <- c("Acer rubrum", "Pinus strobus", "Quercus rubra")
 
 tmp_species_cmp <- fvs_species_composition(cficop_none) |>
@@ -824,19 +849,18 @@ cficop_none_bai |>
 
 ## Carbon on the Landscape
 
-> TODO Nik:
-> - Treat the 277 plots as a sample (by area?)
-> - For the sample, we can compute the Standard Error of the Mean (SEM) as:
->   - SEM = s / sqrt(n)
->     where s = sample standard deviation
->     and   n = number of points in the sample
->   - Note that if sample size > 5% of the population size, also apply
->     Finite Population Correction (FPC), which says
->   - SEM = s / sqrt(n) * (N - n) / (N - 1)
->     where N = population size
-> - Then a 95% CI for the population mean is
->   x_bar +/- (1.96 * SEM)
->   where x_bar is the sample mean
+- Treat the 277 plots as a sample (by area?)
+- For the sample, we can compute the Standard Error of the Mean (SEM) as:
+  - SEM = s / sqrt(n)
+    where s = sample standard deviation
+    and   n = number of points in the sample
+  - Note that if sample size > 5% of the population size, also apply
+    Finite Population Correction (FPC), which says
+  - SEM = s / sqrt(n) * (N - n) / (N - 1)
+    where N = population size
+- Then a 95% CI for the population mean is
+  x_bar +/- (1.96 * SEM)
+  where x_bar is the sample mean
 
 What does this mean for total carbon on the landscape?
 
@@ -848,121 +872,482 @@ so 0.1%
 
 So, let's look at distribution of biomass in our 277 plot sample:
 
-```{r}
+```{r population_mean, eval = FALSE}
 hectares <- conv_unit(56816, "acre", "hectare")
 
-starting_carbon <- cficop_none_bai |>
-  # Remove random seed
-  group_by(StandID) |>
-  filter(row_number() == 1) |>
-  ungroup() |>
-  mutate(
-#    Projected_Carbon = Starting_Carbon + (Projected_AGLCF) * (2020-1970),
-    Adjusted_Carbon = Starting_Carbon + (Projected_AGLCF - Carbon_Flux_Error) * (2020 - 1970)
+population_mean <- cficop_none_carbon |>
+  rename(
+    Projected_Carbon = Aboveground_Total_Live
   ) |>
+  left_join(
+    cficop_none_bai |>
+      select(StandID, Starting_Carbon, Projected_Carbon, Adjusted_AGLCF) |>
+      group_by(StandID) |>
+      summarize(
+        Starting_Carbon = min(Starting_Carbon),
+        Adjusted_AGLCF = mean(Adjusted_AGLCF),
+        .groups = "keep"
+      ) |>
+      ungroup(),
+    by = join_by(StandID)
+  ) |>
+  mutate(
+    Adjusted_Carbon = Starting_Carbon + Adjusted_AGLCF * (Year - 1970)
+  ) |>
+  group_by(Year) |>
   summarize(
-    starting_carbon_mean = mean(Starting_Carbon),
-    starting_carbon_sd = sd(Starting_Carbon),
     projected_carbon_mean = mean(Projected_Carbon),
     projected_carbon_sd = sd(Projected_Carbon),
     adjusted_carbon_mean = mean(Adjusted_Carbon),
     adjusted_carbon_sd = sd(Adjusted_Carbon),
     n = n(),
-    .groups = "drop"
+    .groups = "keep"
   ) |>
+  ungroup() |>
   mutate(
-    starting_carbon = starting_carbon_mean,
-    # since we multiply by hectares later, convert sd to ci via 1.96 / sqrt(n)
-    starting_carbon_min = starting_carbon - 1.96 * starting_carbon_sd / sqrt(n),
-    starting_carbon_max = starting_carbon + 1.96 * starting_carbon_sd / sqrt(n),
+    # convert sd to ci via 1.96 / sqrt(n)
     projected_carbon = projected_carbon_mean,
-    projected_carbon_min = projected_carbon - 1.96 * projected_carbon_sd / sqrt(n),
-    projected_carbon_max = projected_carbon + 1.96 * projected_carbon_sd / sqrt(n),
+    projected_carbon_min = projected_carbon - projected_carbon_sd * 1.96 / sqrt(n),
+    projected_carbon_max = projected_carbon + projected_carbon_sd * 1.96 / sqrt(n),
     adjusted_carbon = adjusted_carbon_mean,
-    adjusted_carbon_min = adjusted_carbon - 1.96 * adjusted_carbon_sd / sqrt(n),
-    adjusted_carbon_max = adjusted_carbon + 1.96 * adjusted_carbon_sd / sqrt(n)
+    adjusted_carbon_min = adjusted_carbon - adjusted_carbon_sd * 1.96 / sqrt(n),
+    adjusted_carbon_max = adjusted_carbon + adjusted_carbon_sd * 1.96 / sqrt(n)
   ) |>
   select(
-    starting_carbon, starting_carbon_min, starting_carbon_max,
+    Year,
     projected_carbon, projected_carbon_min, projected_carbon_max,
     adjusted_carbon, adjusted_carbon_min, adjusted_carbon_max
   ) |>
-  pivot_longer(everything()) |>
+  pivot_longer(-Year) |>
   mutate(
     value = value * hectares,
-    group = if_else(grepl("starting", name), "starting", if_else(grepl("projected", name), "projected", "adjusted")),
+    group = if_else(grepl("projected", name), "projected", "adjusted"),
     kind  = if_else(grepl("_min", name), "min", if_else(grepl("_max", name), "max", "mean"))
   ) |>
-  pivot_wider(id_cols = "group", names_from = "kind")
+  pivot_wider(id_cols = c("group", "Year"), names_from = "kind")
 ```
 
 Plot it:
-```{r}
-starting_carbon |>
-  mutate(group = ordered(group, levels = c("starting", "projected", "adjusted"))) |>
-  ggplot(aes(group, mean)) +
-  geom_col(aes(fill = group)) +
-  geom_errorbar(aes(ymin = min, ymax = max), width = 0.25) +
-  theme_bw()
+```{r plot population mean, eval = FALSE}
+library(ggfx)
+population_mean |>
+  mutate(group = ordered(group, levels = c("projected", "adjusted"))) |>
+  ggplot(aes(Year, mean)) +
+  with_blur(
+    geom_ribbon(aes(ymin = min, ymax = max, fill = group), alpha = 0.25),
+    sigma = 3
+    
+  ) +
+  geom_line(aes(color = group)) +
+  coord_cartesian(ylim = c(0, NA)) +
+  guides(
+    color = guide_legend(order = 1),
+    fill = guide_legend(order = 2)
+  ) +
+  theme_bw() +
+  ggtitle("Projected vs. Measured Total Carbon, 0.1% sample") +
+  ylab(bquote("Total Carbon" ~(`Mg C`))) +
+  scale_color_discrete(name = "Estimated\nPopulation\nMean") +
+  scale_fill_discrete(name = "95% CI")
 ```
 
-So, starting carbon is 50.89+/-2.49 Mg C / hectare, times hectares
+```{r population mean values, eval = FALSE}
+population_mean |>
+  filter(Year == 1970 | Year == 2020) |>
+  mutate(ci = mean - min) |>
+  select(group, Year, mean, ci)
+```
 
-To plot this, can use
-- geom_bar
-- geom_rect - set all positions by hand
-- geom_linerange - set ymax and ymin, with a big size
-- waterfall (in waterfall package)
-- geom_errorbar for +/- CI
+In 1970, there were 1170155 +- 57272 Mg C / ha
+In 2020, projected was 2839915 +- 80259
+In 2020, adjusted  was 2713476 +- 68425
+2839915 - 2713476 = 126439,
+126439 / 2839915 = 0.04452210718, so off by 4.5%
 
-```{r projected vs corrected carbon, eval = FALSE}
-projected_vs_corrected_carbon <- cficop_none_bai |>
-  left_join(
-    cficop_sam_wt |> mutate(StandID = as.character(MasterPlotID)),
-    by = join_by(StandID)
-  ) |>
-  mutate(
-    HectaresPerPlot = conv_unit(AcresPerPlot, "acre", "hectare"),
-    StartingCarbon = Starting_Carbon * HectaresPerPlot,
-    ProjectedCarbon = Projected_AGLCF * (2020 - 1970) * HectaresPerPlot,
-    CorrectedCarbon = Adjusted_AGLCF * (2020 - 1970) * HectaresPerPlot
-  ) |>
-  group_by(random_seed) |>
-  summarize(
-    Starting = sum(StartingCarbon),
-    FVS = sum(ProjectedCarbon),
-    `FVS Adjusted` = sum(CorrectedCarbon),
-    Error = (FVS - `FVS Adjusted`) / ((FVS + `FVS Adjusted`) / 2),
-    GrowthError = (FVS - `FVS Adjusted`) / (FVS - Starting)
+2713476 - 1170155 = 1543321 Mg C growth
+126439 / 1543321 = 0.08192657263, so over-projects growth by 8%
+
+# CFICOP_DFLT
+
+Like CFIGRO_NONE, but use default growth and mortality.
+
+## Regeneration
+
+Ignore plot-specificc regeneration. use a spatial average over the
+first survey period to see how many trees of each species establish
+in each plot.
+
+Regeneration in Quabbin is fraught. Regen was suppressed in areas
+from 1960 into the 1990s by excessive deer browse; hunting was
+re-introduced in the 1990s to reduce the deer population.
+
+Table 13.  Reproduction by Species
+
+Here is a reproduction of Fred Hunt's table 13 showing reproduction in
+1960, from Brian Keevan, personal communication, June 12 2025.
+
+Keevan notes:
+> "Note that Hunt decided to call anything from 3 foot tall to 4.9”
+> diameter ‘reproduction’."
+
+```{r fh_table_13, eval = FALSE}
+fh_table_13 <- tibble(
+  Species = c(
+    "White pine", "Hemlock", "Spruce", "Red Pine",
+    "Sugar Maple", "Red maple", "Oak", "Black birch",
+    "Other birch", "White ash", "Other hardwoods"
+  ),
+  Stems_Per_Acre = c(
+    45, 13, 4, 10,
+    8, 63, 54, 21,
+    10, 16, 10
+  ),
+  Percent = c(
+    10, 5, 2, 4,
+    3, 25, 21, 8,
+    4, 6, 4
   )
-
-knitr::kable(projected_vs_corrected_carbon, padding = 5)
+)
+knitr::kable(fh_table_13)
 ```
 
-```{r plot projected vs corrected carbon, eval = FALSE}
-projected_vs_corrected_carbon |>
-  select(
-    Starting = StartingCarbon,
-    FVS = ProjectedCarbon,
-    `FVS Adjusted` = CorrectedCarbon
+For our purposes, the most interesting thing here is the relative
+proportion, where 25% of reproduction is red maple, 21% is Oak NOS,
+10% is white pine, and the rest is a scattering of other things.
+
+If we assume 1 stem / acre / year of establishment, this means
+that every 10 years, per acre, we should get:
+- 3 red maple
+- 2 oak
+- 1 white pine
+- 1 birch, probably black
+- 1 sugar maple
+- 1 white ash
+- 1 hemlock
+
+Can we use trees that establish in the 1970-1980 cycle to represent
+"what would a manager's perspective be on establishment in 1970?".
+
+Start by finding all the trees that establish:
+
+```{r cfiabp_estab, eval = FALSE}
+cfiabp_estab <- qryDWSPCFIPlotVisitTreeDetail |>
+  filter(VisitTreeStatusCode == 1) |>
+  left_join(
+    tblDWSPCFIPlotVisitsComplete |>
+      select(MasterPlotID, VisitCycle, MasterPlotVisitID),
+    by = join_by(MasterPlotVisitID)
   ) |>
-  pivot_longer(c("Starting", "FVS", "FVS Adjusted")) |>
-  mutate(name = ordered(name, levels = c("Starting", "FVS", "FVS Adjusted"))) |>
-  ggplot(aes(name, value)) +
+  left_join( 
+    tblDWSPCFITreesComplete |> select(MasterTreeID, SpeciesCode),
+    by = join_by(MasterTreeID)
+  ) |>
+  inner_join(
+    cfiabp_trees |>
+      distinct(MasterPlotID, VisitCycle, MasterTreeID, StatusB),
+    by = join_by(MasterPlotID, VisitCycle, MasterTreeID)
+  ) |>
+  filter(StatusB == "R")
+```
+
+Let's look at establishment rate - this will be how many trees
+establish per 0.2 acre plot in a 10-year interval, on grow-only
+plots.
+
+```{r establisment rate, eval = FALSE}
+cfiabp_estab |>
+  left_join(
+    cfigro_plot_harvested,
+    by = join_by(MasterPlotID)
+  ) |>
+  left_join(
+    cfigro_plot_disturbed,
+    by = join_by(MasterPlotID)
+  ) |>
+  filter(!CFIHarvested & !CFIDisturbed) |>
+  group_by(MasterPlotID, VisitCycle) |>
+  summarize(rate = n(), .groups = "keep") |>
+  ungroup() |>
+  # Convert rate to trees per acre per year
+  mutate(rate = rate * 5 / 10) |>
+  ggplot(aes(factor(VisitCycle), rate)) +
   geom_boxplot() +
   theme_bw() +
-  ggtitle("Modeled AGL Carbon") +
-  xlab(label = NULL) +
-  ylab(bquote("Aboveground Live Carbon" ~ (`Mg C`))) +
-  scale_fill_viridis_d()# +
-  #scale_y_continuous(limits = c(0, NA), n.breaks = 6)
+  ggtitle("Grow-Only Quabbin CFI Plot Establisment Rate") +
+  ylab("New 5\"dbh trees per acre per year") +
+  xlab("Inventory Year")
+  
 ```
 
-So, it over-projects by 22.2+-0.3%
+This says "no" - 1980 establishment rate is roughly 5x that of 2020.
+1990 is still double.
 
-# Harvest
+```{r establishment per cycle, eval = FALSE}
+cfiabp_estab |>
+  left_join(
+    cfigro_plot_harvested,
+    by = join_by(MasterPlotID)
+  ) |>
+  left_join(
+    cfigro_plot_disturbed,
+    by = join_by(MasterPlotID)
+  ) |>
+  filter(!CFIHarvested & !CFIDisturbed) |>
+  group_by(MasterPlotID, VisitCycle) |>
+  summarize(rate = n(), .groups = "keep") |>
+  ungroup() |>
+  mutate(rate = rate * 5 / 10) |>
+  group_by(VisitCycle) |>
+  summarize(rate = mean(rate))
+```
+
+Maybe we can use Hunt's data for seedling establishment. To do this,
+we'd create a stems-per-acre NATURAL block that omits height; the
+omission of height says these are seedlings, and FVS should figure
+things out from there.
+
+```{r establishment by species, eval = FALSE}
+cfiabp_estab |>
+  left_join(
+    cfigro_plot_harvested,
+    by = join_by(MasterPlotID)
+  ) |>
+  left_join(
+    cfigro_plot_disturbed,
+    by = join_by(MasterPlotID)
+  ) |>
+  left_join(
+    species_crosswalk,
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  mutate(GENUS = if_else(GENUS == "Tree", "Other", GENUS)) |>
+  filter(!CFIHarvested & !CFIDisturbed) |>
+  mutate(GENUS = fct_lump(GENUS, n = 5, other_level = "Other")) |>
+  ggplot(aes(VisitCycle, fill = GENUS, group = GENUS)) +
+  geom_bar() +
+  theme_bw() +
+  ggtitle("Quabbin CFI Recruitment in Grow-Only Plots") +
+  ylab("Number of Trees Recruited")
+```
+
+```{r establishment by species in all plots, eval = FALSE}
+cfiabp_estab |>
+  left_join(
+    cfigro_plot_harvested,
+    by = join_by(MasterPlotID)
+  ) |>
+  left_join(
+    cfigro_plot_disturbed,
+    by = join_by(MasterPlotID)
+  ) |>
+  left_join(
+    species_crosswalk,
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  mutate(GENUS = if_else(GENUS == "Tree", "Other", GENUS)) |>
+#  filter(!CFIHarvested & !CFIDisturbed) |>
+  mutate(GENUS = fct_lump(GENUS, n = 5, other_level = "Other")) |>
+  ggplot(aes(VisitCycle, fill = GENUS, group = GENUS)) +
+  geom_bar() +
+  theme_bw() +
+  ggtitle("Quabbin CFI Recruitment in All Plots") +
+  ylab("Number of Trees Recruited")
+```
+
+```
+  summarize(rate = mean(rate)) |>
+  mutate(
+    VisitTreeTotalHeight = if_else(
+      VisitTreeTotalHeight < 10, NA, VisitTreeTotalHeight
+  )) |>
+  group_by(MasterPlotID, SpeciesCode) |>
+  # Some plots may have been recently harvested; remove the top 1%
+  # by density to eliminate those
+  mutate(
+    ESTAB_COUNT = n()
+  ) |>
+  group_by(SpeciesCode) |>
+  arrange(desc(ESTAB_COUNT)) |>
+  filter(row_number() > (n() * 0.025)) |>
+  ungroup() |>
+  filter(ESTAB_COUNT > 0) |>
+  group_by(SpeciesCode) |>
+  summarize(
+    # Stems per acre per 10-year interval
+    DENSITY = mean(ESTAB_COUNT) * 5 / 10, # 5 plots per acre / 10 years
+    HEIGHT = min(VisitTreeTotalHeight, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  ungroup() |>
+  filter(!is.na(HEIGHT) & !is.infinite(HEIGHT)) |>
+  left_join(
+    species_crosswalk |> select(SPCD, FVS_SPCD),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  filter(!is.na(FVS_SPCD)) |>
+  select(
+    SPECIES = FVS_SPCD,
+    DENSITY,
+    HEIGHT
+  )
+```
+
+# CFICOP_SRVY
+
+Look at how things actually grew, so we can compare to CFICOP_HVST.
+
+```{targets cficop_srvy}
+tar_target(
+  cficop_srvy,
+  {
+    # Find all the VisitYears for each plot,
+    # and expand the plots to visit in each year
+    visits <- cfiabp_trees |>
+      distinct(MasterPlotID, VisitCycle) |>
+      left_join(
+        tblDWSPCFIPlotVisitsComplete |>
+          select(MasterPlotID, VisitCycle, MasterPlotVisitID, VisitYear),
+        by = join_by(MasterPlotID, VisitCycle)
+      ) |>
+      mutate(MasterPlotVisitID = as.character(MasterPlotVisitID)) |>
+      select(
+        STAND_CN = MasterPlotVisitID,
+        STAND_ID = MasterPlotID,
+        INV_YEAR = VisitYear
+      )
+    
+    plots_for_fvs <- cfigro_plot |>
+      select(-STAND_CN, -INV_YEAR) |>
+      full_join(visits, by = join_by(STAND_ID)) |>
+      mutate(FIRST_YEAR = INV_YEAR, LAST_YEAR = INV_YEAR)
+
+    # No establishment for survey runs
+
+    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
+    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    data_dir <- "data/fvs"
+    title <- "CFICarbonOffsetProgram"
+    mgmt_id <- "SRVY"
+
+    # We communicate with FVS through files. FVSOnline shows a model in which
+    # a "project" (the inputs and outputs of a single FVS run) live in a
+    # single directory; we follow that model.
+    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+    if (!dir.exists(project_dir)) {
+      dir.create(project_dir)
+    }
+    
+    fvs_run(
+      fvsbin_dir = fvsbin_dir,
+      fvs_variant = fvs_variant,
+      project_dir = project_dir,
+      fiadb = NULL,
+      title = title,
+      mgmt_id = mgmt_id,
+      stands = plots_for_fvs,
+      trees = cfigro_trees,
+      num_partitions = fvs_num_partitions,
+      partition = fvs_partition
+    )
+  },
+  iteration = "vector",
+  # cross() and map() are unparsed targets:: functions here:
+  pattern = map(fvs_partition)
+)
+```
+
+
+# CFICOP_HVST
 
 Let's look at the distribution of harvest, and what we'll need to model.
 
-## Observed Harvest
+## Observed Growth and Harvest
 
+I don't know why we didn't start here, but let's plot what actually
+happens on the landscape:
+
+```{r population_mean with harvest, eval = FALSE}
+hectares <- conv_unit(56816, "acre", "hectare")
+
+population_mean <- cficop_none_carbon |>
+  rename(
+    Projected_Carbon = Aboveground_Total_Live
+  ) |>
+  left_join(
+    cficop_none_bai |>
+      select(StandID, Starting_Carbon, Projected_Carbon, Adjusted_AGLCF) |>
+      group_by(StandID) |>
+      summarize(
+        Starting_Carbon = min(Starting_Carbon),
+        Adjusted_AGLCF = mean(Adjusted_AGLCF),
+        .groups = "keep"
+      ) |>
+      ungroup(),
+    by = join_by(StandID)
+  ) |>
+  mutate(
+    Adjusted_Carbon = Starting_Carbon + Adjusted_AGLCF * (Year - 1970)
+  ) |>
+  group_by(Year) |>
+  summarize(
+    projected_carbon_mean = mean(Projected_Carbon),
+    projected_carbon_sd = sd(Projected_Carbon),
+    adjusted_carbon_mean = mean(Adjusted_Carbon),
+    adjusted_carbon_sd = sd(Adjusted_Carbon),
+    n = n(),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  mutate(
+    # convert sd to ci via 1.96 / sqrt(n)
+    projected_carbon = projected_carbon_mean,
+    projected_carbon_min = projected_carbon - projected_carbon_sd * 1.96 / sqrt(n),
+    projected_carbon_max = projected_carbon + projected_carbon_sd * 1.96 / sqrt(n),
+    adjusted_carbon = adjusted_carbon_mean,
+    adjusted_carbon_min = adjusted_carbon - adjusted_carbon_sd * 1.96 / sqrt(n),
+    adjusted_carbon_max = adjusted_carbon + adjusted_carbon_sd * 1.96 / sqrt(n)
+  ) |>
+  select(
+    Year,
+    projected_carbon, projected_carbon_min, projected_carbon_max,
+    adjusted_carbon, adjusted_carbon_min, adjusted_carbon_max
+  ) |>
+  pivot_longer(-Year) |>
+  mutate(
+    value = value * hectares,
+    group = if_else(grepl("projected", name), "projected", "adjusted"),
+    kind  = if_else(grepl("_min", name), "min", if_else(grepl("_max", name), "max", "mean"))
+  ) |>
+  pivot_wider(id_cols = c("group", "Year"), names_from = "kind")
+```
+
+Plot it:
+```{r plot population mean with harvest, eval = FALSE}
+library(ggfx)
+population_mean |>
+  mutate(group = ordered(group, levels = c("projected", "adjusted"))) |>
+  ggplot(aes(Year, mean)) +
+  with_blur(
+    geom_ribbon(aes(ymin = min, ymax = max, fill = group), alpha = 0.25),
+    sigma = 3
+    
+  ) +
+  geom_line(aes(color = group)) +
+  coord_cartesian(ylim = c(0, NA)) +
+  guides(
+    color = guide_legend(order = 1),
+    fill = guide_legend(order = 2)
+  ) +
+  theme_bw() +
+  ggtitle("Projected vs. Measured Total Carbon, 0.1% sample") +
+  ylab(bquote("Total Carbon" ~(`Mg C`))) +
+  scale_color_discrete(name = "Estimated\nPopulation\nMean") +
+  scale_fill_discrete(name = "95% CI")
+```
+
+```{r population mean values with harvest, eval = FALSE}
+population_mean |>
+  filter(Year == 1970 | Year == 2020) |>
+  mutate(ci = mean - min) |>
+  select(group, Year, mean, ci)
+```
