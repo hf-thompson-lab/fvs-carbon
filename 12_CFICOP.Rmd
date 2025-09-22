@@ -981,49 +981,7 @@ Regeneration in Quabbin is fraught. Regen was suppressed in areas
 from 1960 into the 1990s by excessive deer browse; hunting was
 re-introduced in the 1990s to reduce the deer population.
 
-Table 13.  Reproduction by Species
-
-Here is a reproduction of Fred Hunt's table 13 showing reproduction in
-1960, from Brian Keevan, personal communication, June 12 2025.
-
-Keevan notes:
-> "Note that Hunt decided to call anything from 3 foot tall to 4.9”
-> diameter ‘reproduction’."
-
-```{r fh_table_13, eval = FALSE}
-fh_table_13 <- tibble(
-  Species = c(
-    "White pine", "Hemlock", "Spruce", "Red Pine",
-    "Sugar Maple", "Red maple", "Oak", "Black birch",
-    "Other birch", "White ash", "Other hardwoods"
-  ),
-  Stems_Per_Acre = c(
-    45, 13, 4, 10,
-    8, 63, 54, 21,
-    10, 16, 10
-  ),
-  Percent = c(
-    10, 5, 2, 4,
-    3, 25, 21, 8,
-    4, 6, 4
-  )
-)
-knitr::kable(fh_table_13)
-```
-
-For our purposes, the most interesting thing here is the relative
-proportion, where 25% of reproduction is red maple, 21% is Oak NOS,
-10% is white pine, and the rest is a scattering of other things.
-
-If we assume 1 stem / acre / year of establishment, this means
-that every 10 years, per acre, we should get:
-- 3 red maple
-- 2 oak
-- 1 white pine
-- 1 birch, probably black
-- 1 sugar maple
-- 1 white ash
-- 1 hemlock
+### 1970 Model Year
 
 Can we use trees that establish in the 1970-1980 cycle to represent
 "what would a manager's perspective be on establishment in 1970?".
@@ -1049,6 +1007,9 @@ cfiabp_estab <- qryDWSPCFIPlotVisitTreeDetail |>
   ) |>
   filter(StatusB == "R")
 ```
+
+
+### CFI Establishment By Year
 
 Let's look at establishment rate - this will be how many trees
 establish per 0.2 acre plot in a 10-year interval, on grow-only
@@ -1101,6 +1062,8 @@ cfiabp_estab |>
   summarize(rate = mean(rate))
 ```
 
+### CFI Grow-Only Recruitment
+
 Maybe we can use Hunt's data for seedling establishment. To do this,
 we'd create a stems-per-acre NATURAL block that omits height; the
 omission of height says these are seedlings, and FVS should figure
@@ -1130,6 +1093,8 @@ cfiabp_estab |>
   ylab("Number of Trees Recruited")
 ```
 
+### CFI All Recruitment
+
 ```{r establishment by species in all plots, eval = FALSE}
 cfiabp_estab |>
   left_join(
@@ -1154,43 +1119,140 @@ cfiabp_estab |>
   ylab("Number of Trees Recruited")
 ```
 
-```
-  summarize(rate = mean(rate)) |>
+
+### Fred Hunt's Table 13
+
+Fred Hunt's 1961 Master's Thesis at UMass Amherst describes
+a general rate of 254 stems of "establishment" per acre; we can use
+this number, distributed according to his table 13, to set up 
+background establishment.
+
+Table 13.  Reproduction by Species
+
+Here is a reproduction of Fred Hunt's table 13 showing reproduction in
+1960, from Brian Keevan, personal communication, June 12 2025.
+
+Keevan notes:
+> "Note that Hunt decided to call anything from 3 foot tall to 4.9”
+> diameter ‘reproduction’."
+
+Hunt left some species unspecified; we substitute the most common
+in Quabbin for these:
+- Red maple = red maple
+- Oak = northern red oak
+- white pine = eastern white pine
+- black birch = sweet birch
+- white ash = white ash
+- red pine = red pine
+- other birch = paper birch
+- other hardwoods = black cherry
+- sugar maple = sugar maple
+- spruce = red spruce
+
+```{targets cficop_dflt_estab, tar_simple = TRUE}
+tibble(
+  Species = c(
+    "White pine", "Hemlock", "Spruce", "Red Pine",
+    "Sugar Maple", "Red maple", "Oak", "Black birch",
+    "Other birch", "White ash", "Other hardwoods"
+  ),
+  Stems_Per_Acre = c(
+    45, 13, 4, 10,
+    8, 63, 54, 21,
+    10, 16, 10
+  ),
+  Percent = c(
+    10, 5, 2, 4,
+    3, 25, 21, 8,
+    4, 6, 4
+  )
+) |>
   mutate(
-    VisitTreeTotalHeight = if_else(
-      VisitTreeTotalHeight < 10, NA, VisitTreeTotalHeight
-  )) |>
-  group_by(MasterPlotID, SpeciesCode) |>
-  # Some plots may have been recently harvested; remove the top 1%
-  # by density to eliminate those
-  mutate(
-    ESTAB_COUNT = n()
+    SPCD = case_match(
+      Species,
+      "Red maple" ~ 316,
+      "Oak" ~ 833,
+      "White pine" ~ 129,
+      "Black birch" ~ 372,
+      "White ash" ~ 541,
+      "Hemlock" ~ 261,
+      "Red Pine" ~ 125,
+      "Other birch" ~ 375,
+      "Other hardwoods" ~ 762,
+      "Sugar Maple" ~ 318,
+      "Spruce" ~ 97
+    )
   ) |>
-  group_by(SpeciesCode) |>
-  arrange(desc(ESTAB_COUNT)) |>
-  filter(row_number() > (n() * 0.025)) |>
-  ungroup() |>
-  filter(ESTAB_COUNT > 0) |>
-  group_by(SpeciesCode) |>
-  summarize(
-    # Stems per acre per 10-year interval
-    DENSITY = mean(ESTAB_COUNT) * 5 / 10, # 5 plots per acre / 10 years
-    HEIGHT = min(VisitTreeTotalHeight, na.rm = TRUE),
-    .groups = "drop"
-  ) |>
-  ungroup() |>
-  filter(!is.na(HEIGHT) & !is.infinite(HEIGHT)) |>
   left_join(
     species_crosswalk |> select(SPCD, FVS_SPCD),
-    by = join_by(SpeciesCode == SPCD)
+    by = join_by(SPCD)
   ) |>
-  filter(!is.na(FVS_SPCD)) |>
-  select(
-    SPECIES = FVS_SPCD,
-    DENSITY,
-    HEIGHT
-  )
+  select(SPECIES = FVS_SPCD, DENSITY = Stems_Per_Acre) |>
+  mutate(STAND_CN = NA, YEAR = NA) |>
+  arrange(desc(DENSITY))
 ```
+
+## Run FVS
+
+This should be simple; there's no calibration.
+
+```{targets cficop_dflt}
+tar_target(
+  cficop_none,
+  {
+    plots_for_fvs <- cfiabp_trees |>
+      distinct(MasterPlotID, VisitCycle) |>
+      left_join(
+        tblDWSPCFIPlotVisitsComplete |>
+          select(MasterPlotID, VisitCycle, MasterPlotVisitID, VisitYear),
+        by = join_by(MasterPlotID, VisitCycle)
+      ) |>
+      mutate(MasterPlotVisitID = as.character(MasterPlotVisitID)) |>
+      filter(VisitYear == 1970) |>
+      select(
+        STAND_CN = MasterPlotVisitID,
+        STAND_ID = MasterPlotID,
+        FIRST_YEAR = VisitYear
+      ) |>
+      mutate(LAST_YEAR = 2020)
+    
+    timestep <- 10 # years; determined by FVSne variant
+    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
+    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    data_dir <- "data/fvs"
+    title <- "CFICarbonOffsetProgram"
+    mgmt_id <- "DFLT"
+    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+    if (!dir.exists(project_dir)) {
+      dir.create(project_dir)
+    }
+    
+    fvs_run(
+      fvsbin_dir = fvsbin_dir,
+      fvs_variant = fvs_variant,
+      project_dir = project_dir,
+      fiadb = NULL,
+      title = title,
+      mgmt_id = mgmt_id,
+      stands = plots_for_fvs,
+      trees = cfigro_trees,
+      regen = cficop_dflt_estab,
+      num_partitions = fvs_num_partitions,
+      partition = fvs_partition,
+      random_seed = fvs_randseed
+    )
+  },
+  # iteration = "vector" branches execution for each partition value (see below)
+  iteration = "vector",
+  # cross() and map() are unparsed targets:: functions here.
+  # cross() ensures that every combination of values for its arguments is processed
+  # map() distributes each value of its argument to a separate sub-target (branch)
+  # so cross(randseed, map(partition)) will run each partition in a separate branch,
+  # and each branch will run with each value of randseed
+  pattern = cross(fvs_randseed, map(fvs_partition))
+)
+```
+
 
 # CFICOP_SRVY
 
@@ -1202,7 +1264,7 @@ tar_target(
   {
     # Find all the VisitYears for each plot,
     # and expand the plots to visit in each year
-    visits <- cfiabp_trees |>
+    plots_for_fvs <- cfiabp_trees |>
       distinct(MasterPlotID, VisitCycle) |>
       left_join(
         tblDWSPCFIPlotVisitsComplete |>
@@ -1213,13 +1275,9 @@ tar_target(
       select(
         STAND_CN = MasterPlotVisitID,
         STAND_ID = MasterPlotID,
-        INV_YEAR = VisitYear
-      )
-    
-    plots_for_fvs <- cfigro_plot |>
-      select(-STAND_CN, -INV_YEAR) |>
-      full_join(visits, by = join_by(STAND_ID)) |>
-      mutate(FIRST_YEAR = INV_YEAR, LAST_YEAR = INV_YEAR)
+        FIRST_YEAR = VisitYear
+      ) |>
+      mutate(LAST_YEAR = FIRST_YEAR)
 
     # No establishment for survey runs
 
