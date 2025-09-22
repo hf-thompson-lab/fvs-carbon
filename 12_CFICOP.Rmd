@@ -847,125 +847,6 @@ cficop_none_bai |>
   ggtitle("Modeled AGL Carbon Flux Residual")
 ```
 
-## Carbon on the Landscape
-
-- Treat the 277 plots as a sample (by area?)
-- For the sample, we can compute the Standard Error of the Mean (SEM) as:
-  - SEM = s / sqrt(n)
-    where s = sample standard deviation
-    and   n = number of points in the sample
-  - Note that if sample size > 5% of the population size, also apply
-    Finite Population Correction (FPC), which says
-  - SEM = s / sqrt(n) * (N - n) / (N - 1)
-    where N = population size
-- Then a 95% CI for the population mean is
-  x_bar +/- (1.96 * SEM)
-  where x_bar is the sample mean
-
-What does this mean for total carbon on the landscape?
-
-I think we just multiply the FVS projected vs. corrected AGLCF times years
-times acres (converted to hectares).
-
-from above, estimated 56816 forested acres; we have 277 * 0.2 = 55.4 acres,
-so 0.1%
-
-So, let's look at distribution of biomass in our 277 plot sample:
-
-```{r population_mean, eval = FALSE}
-hectares <- conv_unit(56816, "acre", "hectare")
-
-population_mean <- cficop_none_carbon |>
-  rename(
-    Projected_Carbon = Aboveground_Total_Live
-  ) |>
-  left_join(
-    cficop_none_bai |>
-      select(StandID, Starting_Carbon, Projected_Carbon, Adjusted_AGLCF) |>
-      group_by(StandID) |>
-      summarize(
-        Starting_Carbon = min(Starting_Carbon),
-        Adjusted_AGLCF = mean(Adjusted_AGLCF),
-        .groups = "keep"
-      ) |>
-      ungroup(),
-    by = join_by(StandID)
-  ) |>
-  mutate(
-    Adjusted_Carbon = Starting_Carbon + Adjusted_AGLCF * (Year - 1970)
-  ) |>
-  group_by(Year) |>
-  summarize(
-    projected_carbon_mean = mean(Projected_Carbon),
-    projected_carbon_sd = sd(Projected_Carbon),
-    adjusted_carbon_mean = mean(Adjusted_Carbon),
-    adjusted_carbon_sd = sd(Adjusted_Carbon),
-    n = n(),
-    .groups = "keep"
-  ) |>
-  ungroup() |>
-  mutate(
-    # convert sd to ci via 1.96 / sqrt(n)
-    projected_carbon = projected_carbon_mean,
-    projected_carbon_min = projected_carbon - projected_carbon_sd * 1.96 / sqrt(n),
-    projected_carbon_max = projected_carbon + projected_carbon_sd * 1.96 / sqrt(n),
-    adjusted_carbon = adjusted_carbon_mean,
-    adjusted_carbon_min = adjusted_carbon - adjusted_carbon_sd * 1.96 / sqrt(n),
-    adjusted_carbon_max = adjusted_carbon + adjusted_carbon_sd * 1.96 / sqrt(n)
-  ) |>
-  select(
-    Year,
-    projected_carbon, projected_carbon_min, projected_carbon_max,
-    adjusted_carbon, adjusted_carbon_min, adjusted_carbon_max
-  ) |>
-  pivot_longer(-Year) |>
-  mutate(
-    value = value * hectares,
-    group = if_else(grepl("projected", name), "projected", "adjusted"),
-    kind  = if_else(grepl("_min", name), "min", if_else(grepl("_max", name), "max", "mean"))
-  ) |>
-  pivot_wider(id_cols = c("group", "Year"), names_from = "kind")
-```
-
-Plot it:
-```{r plot population mean, eval = FALSE}
-library(ggfx)
-population_mean |>
-  mutate(group = ordered(group, levels = c("projected", "adjusted"))) |>
-  ggplot(aes(Year, mean)) +
-  with_blur(
-    geom_ribbon(aes(ymin = min, ymax = max, fill = group), alpha = 0.25),
-    sigma = 3
-    
-  ) +
-  geom_line(aes(color = group)) +
-  coord_cartesian(ylim = c(0, NA)) +
-  guides(
-    color = guide_legend(order = 1),
-    fill = guide_legend(order = 2)
-  ) +
-  theme_bw() +
-  ggtitle("Projected vs. Measured Total Carbon, 0.1% sample") +
-  ylab(bquote("Total Carbon" ~(`Mg C`))) +
-  scale_color_discrete(name = "Estimated\nPopulation\nMean") +
-  scale_fill_discrete(name = "95% CI")
-```
-
-```{r population mean values, eval = FALSE}
-population_mean |>
-  filter(Year == 1970 | Year == 2020) |>
-  mutate(ci = mean - min) |>
-  select(group, Year, mean, ci)
-```
-
-In 1970, there were 1170155 +- 57272 Mg C / ha
-In 2020, projected was 2839915 +- 80259
-In 2020, adjusted  was 2713476 +- 68425
-2839915 - 2713476 = 126439,
-126439 / 2839915 = 0.04452210718, so off by 4.5%
-
-2713476 - 1170155 = 1543321 Mg C growth
-126439 / 1543321 = 0.08192657263, so over-projects growth by 8%
 
 # CFICOP_DFLT
 
@@ -1237,10 +1118,41 @@ tar_target(
 )
 ```
 
+## Load Results
+
+
+Carbon
+
+```{targets cficop_dflt_carbon, tar_simple = TRUE}
+fvs_read_output(cficop_dflt, "FVS_Carbon") |>
+  group_by(StandID, Year) |> # Combine results from different random seeds
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    .groups = "keep"
+  ) |>
+  ungroup()
+```
+
+Summary
+
+```{targets cficop_dflt_summary, tar_simple = TRUE}
+fvs_read_output(cficop_dflt, "FVS_Summary2_East") |>
+  group_by(StandID, Year) |>
+  summarize(
+    BA = mean(BA),
+    Tpa = mean(Tpa),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+```
+
+
 
 # CFICOP_SRVY
 
 Look at how things actually grew, so we can compare to CFICOP_HVST.
+
+## Run FVS
 
 ```{targets cficop_srvy}
 tar_target(
@@ -1300,6 +1212,36 @@ tar_target(
   pattern = map(fvs_partition)
 )
 ```
+
+## Load Results
+
+
+Carbon
+
+```{targets cficop_srvy_carbon, tar_simple = TRUE}
+fvs_read_output(cficop_srvy, "FVS_Carbon") |>
+  group_by(StandID, Year) |> # Combine results from different random seeds
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    .groups = "keep"
+  ) |>
+  ungroup()
+```
+
+Summary
+
+```{targets cficop_srvy_summary, tar_simple = TRUE}
+fvs_read_output(cficop_srvy, "FVS_Summary2_East") |>
+  group_by(StandID, Year) |>
+  summarize(
+    BA = mean(BA),
+    Tpa = mean(Tpa),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+```
+
+
 
 
 # CFICOP_HVST
@@ -1396,3 +1338,124 @@ population_mean |>
   mutate(ci = mean - min) |>
   select(group, Year, mean, ci)
 ```
+
+
+# Carbon on the Landscape
+
+- Treat the 277 plots as a sample (by area?)
+- For the sample, we can compute the Standard Error of the Mean (SEM) as:
+  - SEM = s / sqrt(n)
+    where s = sample standard deviation
+    and   n = number of points in the sample
+  - Note that if sample size > 5% of the population size, also apply
+    Finite Population Correction (FPC), which says
+  - SEM = s / sqrt(n) * (N - n) / (N - 1)
+    where N = population size
+- Then a 95% CI for the population mean is
+  x_bar +/- (1.96 * SEM)
+  where x_bar is the sample mean
+
+What does this mean for total carbon on the landscape?
+
+I think we just multiply the FVS projected vs. corrected AGLCF times years
+times acres (converted to hectares).
+
+from above, estimated 56816 forested acres; we have 277 * 0.2 = 55.4 acres,
+so 0.1%
+
+So, let's look at distribution of biomass in our 277 plot sample:
+
+```{r population_mean, eval = FALSE}
+hectares <- conv_unit(56816, "acre", "hectare")
+
+population_mean <- cficop_none_carbon |>
+  rename(
+    Projected_Carbon = Aboveground_Total_Live
+  ) |>
+  left_join(
+    cficop_none_bai |>
+      select(StandID, Starting_Carbon, Projected_Carbon, Adjusted_AGLCF) |>
+      group_by(StandID) |>
+      summarize(
+        Starting_Carbon = min(Starting_Carbon),
+        Adjusted_AGLCF = mean(Adjusted_AGLCF),
+        .groups = "keep"
+      ) |>
+      ungroup(),
+    by = join_by(StandID)
+  ) |>
+  mutate(
+    Adjusted_Carbon = Starting_Carbon + Adjusted_AGLCF * (Year - 1970)
+  ) |>
+  group_by(Year) |>
+  summarize(
+    projected_carbon_mean = mean(Projected_Carbon),
+    projected_carbon_sd = sd(Projected_Carbon),
+    adjusted_carbon_mean = mean(Adjusted_Carbon),
+    adjusted_carbon_sd = sd(Adjusted_Carbon),
+    n = n(),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  mutate(
+    # convert sd to ci via 1.96 / sqrt(n)
+    projected_carbon = projected_carbon_mean,
+    projected_carbon_min = projected_carbon - projected_carbon_sd * 1.96 / sqrt(n),
+    projected_carbon_max = projected_carbon + projected_carbon_sd * 1.96 / sqrt(n),
+    adjusted_carbon = adjusted_carbon_mean,
+    adjusted_carbon_min = adjusted_carbon - adjusted_carbon_sd * 1.96 / sqrt(n),
+    adjusted_carbon_max = adjusted_carbon + adjusted_carbon_sd * 1.96 / sqrt(n)
+  ) |>
+  select(
+    Year,
+    projected_carbon, projected_carbon_min, projected_carbon_max,
+    adjusted_carbon, adjusted_carbon_min, adjusted_carbon_max
+  ) |>
+  pivot_longer(-Year) |>
+  mutate(
+    value = value * hectares,
+    group = if_else(grepl("projected", name), "projected", "adjusted"),
+    kind  = if_else(grepl("_min", name), "min", if_else(grepl("_max", name), "max", "mean"))
+  ) |>
+  pivot_wider(id_cols = c("group", "Year"), names_from = "kind")
+```
+
+Plot it:
+```{r plot population mean, eval = FALSE}
+library(ggfx)
+population_mean |>
+  mutate(group = ordered(group, levels = c("projected", "adjusted"))) |>
+  ggplot(aes(Year, mean)) +
+  with_blur(
+    geom_ribbon(aes(ymin = min, ymax = max, fill = group), alpha = 0.25),
+    sigma = 3
+    
+  ) +
+  geom_line(aes(color = group)) +
+  coord_cartesian(ylim = c(0, NA)) +
+  guides(
+    color = guide_legend(order = 1),
+    fill = guide_legend(order = 2)
+  ) +
+  theme_bw() +
+  ggtitle("Projected vs. Measured Total Carbon, 0.1% sample") +
+  ylab(bquote("Total Carbon" ~(`Mg C`))) +
+  scale_color_discrete(name = "Estimated\nPopulation\nMean") +
+  scale_fill_discrete(name = "95% CI")
+```
+
+```{r population mean values, eval = FALSE}
+population_mean |>
+  filter(Year == 1970 | Year == 2020) |>
+  mutate(ci = mean - min) |>
+  select(group, Year, mean, ci)
+```
+
+In 1970, there were 1170155 +- 57272 Mg C / ha
+In 2020, projected was 2839915 +- 80259
+In 2020, adjusted  was 2713476 +- 68425
+2839915 - 2713476 = 126439,
+126439 / 2839915 = 0.04452210718, so off by 4.5%
+
+2713476 - 1170155 = 1543321 Mg C growth
+126439 / 1543321 = 0.08192657263, so over-projects growth by 8%
