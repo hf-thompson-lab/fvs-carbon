@@ -1,8 +1,6 @@
 tar_target(
-  cficop_srvy,
+  cficop_none,
   {
-    # Find all the VisitYears for each plot,
-    # and expand the plots to visit in each year
     plots_for_fvs <- cfiabp_trees |>
       distinct(MasterPlotID, VisitCycle) |>
       left_join(
@@ -11,24 +9,20 @@ tar_target(
         by = join_by(MasterPlotID, VisitCycle)
       ) |>
       mutate(MasterPlotVisitID = as.character(MasterPlotVisitID)) |>
+      filter(VisitYear == 1970) |>
       select(
         STAND_CN = MasterPlotVisitID,
         STAND_ID = MasterPlotID,
         FIRST_YEAR = VisitYear
       ) |>
-      mutate(LAST_YEAR = FIRST_YEAR)
-
-    # No establishment for survey runs
-
+      mutate(LAST_YEAR = 2020)
+    
+    timestep <- 10 # years; determined by FVSne variant
     fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
     fvs_variant <- "fvsne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
     title <- "CFICarbonOffsetProgram"
-    mgmt_id <- "SRVY"
-
-    # We communicate with FVS through files. FVSOnline shows a model in which
-    # a "project" (the inputs and outputs of a single FVS run) live in a
-    # single directory; we follow that model.
+    mgmt_id <- "DFLT"
     project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
     if (!dir.exists(project_dir)) {
       dir.create(project_dir)
@@ -43,11 +37,18 @@ tar_target(
       mgmt_id = mgmt_id,
       stands = plots_for_fvs,
       trees = cfigro_trees,
+      regen = cficop_dflt_estab,
       num_partitions = fvs_num_partitions,
-      partition = fvs_partition
+      partition = fvs_partition,
+      random_seed = fvs_randseed
     )
   },
+  # iteration = "vector" branches execution for each partition value (see below)
   iteration = "vector",
-  # cross() and map() are unparsed targets:: functions here:
-  pattern = map(fvs_partition)
+  # cross() and map() are unparsed targets:: functions here.
+  # cross() ensures that every combination of values for its arguments is processed
+  # map() distributes each value of its argument to a separate sub-target (branch)
+  # so cross(randseed, map(partition)) will run each partition in a separate branch,
+  # and each branch will run with each value of randseed
+  pattern = cross(fvs_randseed, map(fvs_partition))
 )
