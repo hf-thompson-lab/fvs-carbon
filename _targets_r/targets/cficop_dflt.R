@@ -1,5 +1,5 @@
 tar_target(
-  cficop_none,
+  cficop_dflt,
   {
     plots_for_fvs <- cfiabp_trees |>
       distinct(MasterPlotID, VisitCycle) |>
