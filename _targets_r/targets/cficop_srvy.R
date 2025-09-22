@@ -1,9 +1,7 @@
 tar_target(
   cficop_srvy,
   {
-    # Find all the VisitYears for each plot,
-    # and expand the plots to visit in each year
-    plots_for_fvs <- cfiabp_trees |>
+    visits <- cfiabp_trees |>
       distinct(MasterPlotID, VisitCycle) |>
       left_join(
         tblDWSPCFIPlotVisitsComplete |>
@@ -14,9 +12,14 @@ tar_target(
       select(
         STAND_CN = MasterPlotVisitID,
         STAND_ID = MasterPlotID,
-        FIRST_YEAR = VisitYear
-      ) |>
-      mutate(LAST_YEAR = FIRST_YEAR)
+        INV_YEAR = VisitYear
+      )
+    
+    # Despite its name, cfigro_plot has all plots in it
+    plots_for_fvs <- cfigro_plot |>
+      select(-STAND_CN, -INV_YEAR) |>
+      full_join(visits, by = join_by(STAND_ID)) |>
+      mutate(FIRST_YEAR = INV_YEAR, LAST_YEAR = INV_YEAR)
 
     # No establishment for survey runs
 

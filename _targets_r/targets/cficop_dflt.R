@@ -1,22 +1,6 @@
 tar_target(
   cficop_dflt,
   {
-    plots_for_fvs <- cfiabp_trees |>
-      distinct(MasterPlotID, VisitCycle) |>
-      left_join(
-        tblDWSPCFIPlotVisitsComplete |>
-          select(MasterPlotID, VisitCycle, MasterPlotVisitID, VisitYear),
-        by = join_by(MasterPlotID, VisitCycle)
-      ) |>
-      mutate(MasterPlotVisitID = as.character(MasterPlotVisitID)) |>
-      filter(VisitYear == 1970) |>
-      select(
-        STAND_CN = MasterPlotVisitID,
-        STAND_ID = MasterPlotID,
-        FIRST_YEAR = VisitYear
-      ) |>
-      mutate(LAST_YEAR = 2020)
-    
     timestep <- 10 # years; determined by FVSne variant
     fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
     fvs_variant <- "fvsne"      # TODO: put these in a config file
@@ -35,7 +19,7 @@ tar_target(
       fiadb = NULL,
       title = title,
       mgmt_id = mgmt_id,
-      stands = plots_for_fvs,
+      stands = cfigro_plot,
       trees = cfigro_trees,
       regen = cficop_dflt_estab,
       num_partitions = fvs_num_partitions,
