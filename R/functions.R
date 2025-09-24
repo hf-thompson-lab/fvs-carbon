@@ -18,7 +18,7 @@ tar_objects_defined_in_rmd <- function(filename) {
 hectare_at <- function(lat, lon) {
   old_axis_order <- st_axis_order()
   st_axis_order(TRUE)
-  
+
   crs <- 'EPSG:4326'
   center <- c(lat, lon)
   center_point <- st_point(center)
@@ -29,16 +29,16 @@ hectare_at <- function(lat, lon) {
   # The result is the distance between a and b is in meters per 0.001 degree;
   # invert and multiply by 50 to get degrees per 50 meters
   fifty_meter_angle_lat <- 0.05 / as.numeric(st_distance(a, b))
-  
+
   c <- st_sfc(center_point + c(0,  approx_offset), crs = crs)
   d <- st_sfc(center_point + c(0, -approx_offset), crs = crs)
   fifty_meter_angle_lon <- 0.05 / as.numeric(st_distance(c, d))
-  
+
   south_west <- c(-fifty_meter_angle_lat, -fifty_meter_angle_lon)
   north_west <- c( fifty_meter_angle_lat, -fifty_meter_angle_lon)
   north_east <- c( fifty_meter_angle_lat,  fifty_meter_angle_lon)
   south_east <- c(-fifty_meter_angle_lat,  fifty_meter_angle_lon)
-  
+
   # Note: winding direction matters!
   hectare_geometry = matrix(
     c(
@@ -60,12 +60,12 @@ hectare_at <- function(lat, lon) {
 fia_state_clipped <- function(fiadb, statecd) {
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
-  
+
   state <- tbl(con, "REF_RESEARCH_STATION") |>
     filter(STATECD == statecd) |>
     distinct(STATECD, STATE_NAME, STATE_ABBR) |>
     collect()
-  
+
   state_abbr <- state[["STATE_ABBR"]]
   state_data <- rFIA::readFIA(
     con = con,
@@ -73,7 +73,7 @@ fia_state_clipped <- function(fiadb, statecd) {
     states = state_abbr, # state abbreviation, e.g. "MA", or c("MA", "CT")
     inMemory = TRUE # findEVALID doesn't work with inMemory = FALSE
   )
-  
+
   state_name <- state[["STATE_NAME"]]
   evalids <- rFIA::findEVALID(
     state_data,
@@ -82,7 +82,7 @@ fia_state_clipped <- function(fiadb, statecd) {
     year = 1999:2024, # Evidence suggests this wants an INVYR, not MEASYEAR
     type = NULL #  ('ALL', 'CURR', 'VOL', 'GROW', 'MORT', 'REMV', 'CHANGE', 'DWM', 'REGEN')
   )
-  
+
   # Clip to inventories of interest
   # This is necessary for biomass() to return anything other than just
   # the most recent year.
@@ -91,7 +91,7 @@ fia_state_clipped <- function(fiadb, statecd) {
 
 
 #' FIA Biomass for each plot in a state
-#' 
+#'
 #' Given an FIA state code and file path to a SQLite FIADB, returns
 #' the biomass for all plots in the state for each inventory year from 1999:2024
 #' Result columns are as described in https://doserlab.com/files/rfia/reference/biomass,
@@ -109,7 +109,7 @@ fia_state_clipped <- function(fiadb, statecd) {
 #' @examples
 fia_biomass_for_state <- function(fiadb, statecd) {
   state_data_clipped <- fia_state_clipped(fiadb, statecd)
-  
+
   # note that byPlot=TRUE causes the result's YEAR to be MEASYEAR
   rFIA::biomass(state_data_clipped, byPlot = TRUE) |>
     mutate(
@@ -147,7 +147,7 @@ fia_tpa_for_state <- function(fiadb, statecd) {
 #' @export
 #'
 #' @examples
-#' 
+#'
 #' > beers_transformation(0)
 #' [1] 1.707107
 #' > beers_transformation(45)

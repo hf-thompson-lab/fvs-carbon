@@ -73,7 +73,7 @@ fia_fiadb_indexed <- function() {
   fiadb <- "data/raw/SQLite_FIADB_ENTIRE.db"
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO) # not SQLITE_RC
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
-  
+
   tbls <- DBI::dbListTables(con)
   lapply(tbls, \(tbl) {
     lapply(fia_cn_columns(con, tbl), \(col) {
@@ -177,7 +177,7 @@ fia_conds <- function(fiadb, plots) {
 fia_trees <- function(fiadb, plots) {
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
-  
+
   if ("INVYR" %in% names(plots)) {
     tbl(con, "TREE") |>
       inner_join(
@@ -208,7 +208,7 @@ fia_trees_by_cn <- function(fiadb, cns) {
 fia_trees_filtered <- function(fiadb, plots, filter) {
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
-  
+
   if (is.null(plots)) {
     fia_trees <- tbl(con, "TREE")
   } else if ("INVYR" %in% names(plots)) {
@@ -253,7 +253,7 @@ fia_grm_ingrowth <- function(fiadb, plots) {
 fia_grm_mortality <- function(fiadb, plots) {
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
-  
+
   tbl(con, "TREE_GRM_COMPONENT") |>
     inner_join(plots |> select(CN), by = join_by(PLT_CN == CN), copy = TRUE) |>
     filter(
@@ -274,7 +274,7 @@ fia_grm_mortality <- function(fiadb, plots) {
 fia_grm_estn <- function(fiadb, trees) {
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
-  
+
   tbl(con, "TREE_GRM_ESTN") |>
     inner_join(
       trees |>
@@ -288,7 +288,7 @@ fia_grm_estn <- function(fiadb, trees) {
 fia_seedlings <- function(fiadb, plots) {
   con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
-  
+
   tbl(con, "SEEDLING") |>
     inner_join(plots |> select(CN), by = join_by(PLT_CN == CN), copy = TRUE) |>
     collect()
