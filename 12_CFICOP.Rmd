@@ -17,6 +17,7 @@ suppressPackageStartupMessages({
   library(measurements)
   library(mlr3verse) # Machine Learning in R framework, larger universe
   library(ggspatial) # annotation_scale, annotation_north_arrow
+  library(ggfx) # for fancy ggplot stuff like with_blur
 })
 tar_source()
 ```
@@ -1402,11 +1403,11 @@ population_mean <- cficop_none_carbon |>
   mutate(
     # convert sd to ci via 1.96 / sqrt(n)
     projected_carbon = projected_carbon_mean,
-    projected_carbon_min = projected_carbon - projected_carbon_sd * 1.96,
-    projected_carbon_max = projected_carbon + projected_carbon_sd * 1.96,
+    projected_carbon_min = projected_carbon - projected_carbon_sd * 1.96 / sqrt(n),
+    projected_carbon_max = projected_carbon + projected_carbon_sd * 1.96 / sqrt(n),
     adjusted_carbon = adjusted_carbon_mean,
-    adjusted_carbon_min = adjusted_carbon - adjusted_carbon_sd * 1.96,
-    adjusted_carbon_max = adjusted_carbon + adjusted_carbon_sd * 1.96
+    adjusted_carbon_min = adjusted_carbon - adjusted_carbon_sd * 1.96 / sqrt(n),
+    adjusted_carbon_max = adjusted_carbon + adjusted_carbon_sd * 1.96 / sqrt(n)
   ) |>
   select(
     Year,
@@ -1424,7 +1425,6 @@ population_mean <- cficop_none_carbon |>
 
 Plot it:
 ```{r plot population mean, eval = FALSE}
-library(ggfx)
 population_mean |>
   mutate(group = ordered(group, levels = c("projected", "adjusted"))) |>
   ggplot(aes(Year, mean)) +
@@ -1494,22 +1494,248 @@ cficop_none_carbon |>
   ) |>
   select(-c("Starting_Carbon", "Adjusted_AGLCF")) |>
   pivot_longer(-c("StandID", "Year")) |>
+  union_all(
+    cfigro_srvy_carbon |>
+      select(StandID, Year, Reference = Aboveground_Total_Live) |>
+      pivot_longer(-c("StandID", "Year"))
+  ) |>
   group_by(Year, name) |>
   summarize(
     n = n(),
     mean = mean(value),
-    ymin = mean(value) - 1.96 * sd(value),
-    ymax = mean(value) + 1.96 * sd(value),
+    ymin = mean(value) - 1.96 * sd(value) / sqrt(n),
+    ymax = mean(value) + 1.96 * sd(value) / sqrt(n),
     .groups = "drop"
   ) |>
-  mutate(name = ordered(name, levels = c("Uncalibrated", "Calibrated", "Adjusted", "Measured"))) |>
+  mutate(name = ordered(
+    name,
+    levels = c("Uncalibrated", "Calibrated", "Adjusted", "Reference", "Measured")
+  )) |>
   ggplot(aes(Year, mean, color = name)) +
+  with_blur(
+    geom_ribbon(aes(ymin = ymin, ymax = ymax, fill = name), alpha = 0.25),
+    sigma = 3
+    
+  ) +
   geom_line() +
   geom_point() +
   theme_bw() +
-  ggtitle("Quabbin CFI Projected Carbon") +
+  scale_color_discrete() +
+  scale_fill_discrete() +
+#  scale_y_continuous(limits = c(0, NA)) +
+  ggtitle("Quabbin CFI Projected Carbon (277 stands)") +
   xlab("Year") +
   ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
 ```
 
+```{r none vs dflt vs srvy, eval = FALSE}
+# Use a consistent, decent palette
+colors <- brewer.set1(5)
 
+cficop_none_carbon |>
+  rename(Calibrated = Aboveground_Total_Live) |>
+  left_join(
+    cficop_dflt_carbon |>
+      rename(Uncalibrated = Aboveground_Total_Live),
+    by = join_by(StandID, Year)
+  ) |>
+  left_join(
+    cficop_srvy_carbon |>
+      rename(Measured = Aboveground_Total_Live),
+    by = join_by(StandID, Year)
+  ) |>
+  left_join(
+    cficop_none_bai |>
+      select(StandID, Starting_Carbon, Projected_Carbon, Adjusted_AGLCF) |>
+      group_by(StandID) |>
+      summarize(
+        Starting_Carbon = min(Starting_Carbon),
+        Adjusted_AGLCF = mean(Adjusted_AGLCF),
+        .groups = "keep"
+      ) |>
+      ungroup(),
+    by = join_by(StandID)
+  ) |>
+  mutate(
+    Adjusted = Starting_Carbon + Adjusted_AGLCF * (Year - 1970)
+  ) |>
+  select(-c("Starting_Carbon", "Adjusted_AGLCF")) |>
+  pivot_longer(-c("StandID", "Year")) |>
+  union_all(
+    cfigro_srvy_carbon |>
+      select(StandID, Year, Reference = Aboveground_Total_Live) |>
+      pivot_longer(-c("StandID", "Year"))
+  ) |>
+  group_by(Year, name) |>
+  summarize(
+    n = n(),
+    mean = mean(value),
+    ymin = mean(value) - 1.96 * sd(value) / sqrt(n),
+    ymax = mean(value) + 1.96 * sd(value) / sqrt(n),
+    .groups = "drop"
+  ) |>
+  mutate(name = ordered(
+    name,
+    levels = c("Uncalibrated", "Calibrated", "Adjusted", "Reference", "Measured")
+  )) |>
+  filter(name %in% c(
+    "Reference",
+    "Measured",
+    "Adjusted",
+#    "Calibrated",
+    "Uncalibrated"
+  )) |>
+  ggplot(aes(Year, mean, color = name)) +
+  with_blur(
+    geom_ribbon(aes(ymin = ymin, ymax = ymax, fill = name), alpha = 0.5),
+    sigma = 3
+  ) +
+  # geom_ribbon(aes(ymin = ymin, ymax = ymax, fill = name), color = NA, alpha = 0.5) +
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  scale_color_manual(values = c(
+    "Uncalibrated" = colors[1],
+    "Calibrated" = colors[2],
+    "Adjusted" = colors[3],
+    "Reference" = colors[4],
+    "Measured" = colors[5]
+  )) +
+  scale_fill_manual(values = c(
+    "Uncalibrated" = colors[1],
+    "Calibrated" = colors[2],
+    "Adjusted" = colors[3],
+    "Reference" = colors[4],
+    "Measured" = colors[5]
+  )) +
+  scale_y_continuous(limits = c(40, 140)) +
+  ggtitle("Quabbin CFI Projected Carbon (277 stands)") +
+  xlab("Year") +
+  ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
+```
+
+Q: Why does "Reference" go above Calibrated in this picture, but originally it did not?
+
+A: Because originally, we plotted the 31 plot Reference projection against
+a 31 plot projection; now we have a 277 plot projection, and lo and
+behold it is different!
+
+## Diameter Distribution
+
+Look at distribution of trees by diameter class across time.
+
+Treelists are big (millions of trees), so we don't hold on to
+the raw list.
+
+```{r dimater class distribution, eval = FALSE}
+add_diameter_class <- function(x) {
+  x |>
+    mutate(diameter_class = case_when(
+      DBH < 3 ~ 0,
+      DBH < 5 ~ 3,
+      DBH < 9 ~ 5,
+      DBH < 15 ~ 9,
+      DBH < 21 ~ 15,
+      DBH < 40 ~ 21,
+      .default = 40
+    ))
+}
+
+fill_dbhlist <- function(x) {
+  all_diameter_classes <- c(0, 3, 5, 9, 15, 21, 40)
+  all_years <- unique(x$Year)
+  all_stands <- unique(x$StandID)
+
+  everything <- tibble(diameter_class = all_diameter_classes) |>
+    cross_join(tibble(StandID = all_stands)) |>
+    cross_join(tibble(Year = all_years))
+
+  x |>
+    full_join(everything, by = join_by(Year, diameter_class, StandID)) |>
+    replace_na(list(tpa = 0))
+}
+
+cficop_none_dbhdist <- fvs_read_output(cficop_none, "FVS_TreeList_East") |>
+  filter(Year %% 10 == 0) |>
+  add_diameter_class() |>
+  group_by(Year, diameter_class, StandID, random_seed) |>
+  summarize(tpa = sum(TPA), .groups = "keep") |>
+  group_by(Year, diameter_class, StandID) |>
+  summarize(tpa = mean(tpa), .groups = "keep") |>
+  ungroup() |>
+  fill_dbhlist()
+
+cficop_srvy_dbhdist <- fvs_read_output(cficop_srvy, "FVS_TreeList_East") |>
+  filter(Year %% 10 == 0) |>
+  add_diameter_class() |>
+  group_by(Year, diameter_class, StandID, random_seed) |>
+  summarize(tpa = sum(TPA), .groups = "keep") |>
+  group_by(Year, diameter_class, StandID) |>
+  summarize(tpa = mean(tpa), .groups = "keep") |>
+  ungroup() |>
+  fill_dbhlist()
+
+cficop_dflt_dbhdist <- fvs_read_output(cficop_dflt, "FVS_TreeList_East") |>
+  filter(Year %% 10 == 0) |>
+  add_diameter_class() |>
+  group_by(Year, diameter_class, StandID, random_seed) |>
+  summarize(tpa = sum(TPA), .groups = "keep") |>
+  group_by(Year, diameter_class, StandID) |>
+  summarize(tpa = mean(tpa), .groups = "keep") |>
+  ungroup() |>
+  fill_dbhlist()
+
+cfigro_srvy_dbhdist <- fvs_read_output(cfigro_none, "FVS_TreeList_East") |>
+  filter(Year %% 10 == 0) |>
+  add_diameter_class() |>
+  group_by(Year, diameter_class, StandID, random_seed) |>
+  summarize(tpa = sum(TPA), .groups = "keep") |>
+  group_by(Year, diameter_class, StandID) |>
+  summarize(tpa = mean(tpa), .groups = "keep") |>
+  ungroup() |>
+  fill_dbhlist()
+```
+
+```{r plot dbhdist, eval = FALSE}
+all_dbhdist <- cficop_none_dbhdist |>
+  rename(Adjusted = tpa) |>
+  left_join(
+    cficop_srvy_dbhdist |>
+      rename(Measured = tpa),
+    by = join_by(Year, diameter_class, StandID)
+  ) |>
+  left_join(
+    cficop_dflt_dbhdist |>
+      rename(Uncalibrated = tpa),
+    by = join_by(Year, diameter_class, StandID)
+  ) |>
+  pivot_longer(-c(Year, diameter_class, StandID)) |>    
+  union_all(
+    cfigro_srvy_dbhdist |>
+      rename(Reference = tpa) |>
+      pivot_longer(-c(Year, diameter_class, StandID))
+  ) |>
+  mutate(name = ordered(
+    name,
+    levels = c("Uncalibrated", "Calibrated", "Adjusted", "Reference", "Measured")
+  ))
+
+all_dbhdist |>
+  filter(diameter_class >= 5) |>
+  mutate(diameter_class = factor(diameter_class)) |>
+  ggplot(aes(diameter_class, value, fill = name)) +
+  geom_boxplot(outlier.size = 0.1) +
+  scale_fill_manual(values = c(
+    "Uncalibrated" = colors[1],
+    "Calibrated" = colors[2],
+    "Adjusted" = colors[3],
+    "Reference" = colors[4],
+    "Measured" = colors[5]
+  )) +
+  facet_wrap("Year") +
+  coord_cartesian(ylim = c(0, 200)) +
+  theme_bw() +
+  ggtitle("CFI Diameter Class Frequency by Plot") +
+  xlab("Diameter Class (inches)") +
+  ylab(bquote(trees %.% acre^-1))
+```
