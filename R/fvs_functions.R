@@ -132,10 +132,13 @@ fvs_Estab <- function(rows) {
 }
 
 fvs_ThinDBH <- function(rows) {
+  cycleat <- function(years) {
+    lapply(years, \(year) fvs_kwd("CycleAt", year))
+  }
   thindbh <- function(row) {
     year <- row["YEAR"]
-    min_dbh <- row["MIN_DBH"]
-    max_dbh <- row["MAX_DBH"]
+    dbh_min <- row["DBH_MIN"]
+    dbh_max <- row["DBH_MAX"]
     spcd <- row["SPCD"]
     tpa <- row["TPA"]
     if ("PERCENT" %in% names(row) & !is.na(row["PERCENT"])) {
@@ -143,20 +146,20 @@ fvs_ThinDBH <- function(rows) {
     } else {
       percent <- 1
     }
-    c(
-      fvs_kwd("CycleAt", year),
-      # ThinDBH fields:
-      # 1 - year
-      # 2 - smallest dbh (>=; 0)
-      # 3 - largest dbh (<; 999)
-      # 4 - efficiency (0 - 1; 1)
-      # 5 - species (0)
-      # 6 - target tpa (0)
-      # 7 - target BA (0)
-      fvs_kwd("ThinDBH", year, min_dbh, max_dbh, percent, spcd, tpa)
-    )
+    # ThinDBH fields:
+    # 1 - year
+    # 2 - smallest dbh (>=; 0)
+    # 3 - largest dbh (<; 999)
+    # 4 - efficiency (0 - 1; 1)
+    # 5 - species (0)
+    # 6 - target tpa (0)
+    # 7 - target BA (0)
+    fvs_kwd("ThinDBH", year, dbh_min, dbh_max, percent, spcd, tpa)
   }
-  apply(rows, 1, thindbh)
+  c(
+    cycleat(unique(rows$YEAR)),
+    apply(rows, 1, thindbh)
+  )
 }
 
 fvs_ThinPRSC <- function(rows) {
@@ -184,7 +187,7 @@ fvs_thin <- function(rows) {
     c()
   } else if ("PRESCRIPTION" %in% names(rows)) {
     fvs_ThinPRSC(rows)
-  } else if ("MIN_DBH" %in% names(rows)) {
+  } else if ("DBH_MIN" %in% names(rows)) {
     fvs_ThinDBH(rows)
   } else {
     stop(paste("Unrecognized harvest schema:", names(rows)))
