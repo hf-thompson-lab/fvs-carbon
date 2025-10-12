@@ -1538,6 +1538,95 @@ remaining_tpa_by_diameter_class |>
 
 ```
 
+
+```{r remaining tpa by diameter class}
+remaining_tpa_by_diameter_class <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  left_join(tmp_harvest_history, by = join_by(MasterPlotID, VisitCycle)) |>
+  filter(CFIHarvested) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  mutate(
+    # Judgment: basal_area intended to be left in harvest is better
+    # represented by ba PRIOR to harvest, than POST harvest. We don't
+    # have BA at the time of harvest, which would be ideal.
+    basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi,
+    diameter_class = as.integer(conv_unit(dbh_prior, "cm", "in") / 2) * 2
+  ) |>
+  # Replace na's in status to keep them from propagating
+  replace_na(list(StatusB = "X", Status6 = "X")) |>
+  # Live trees, not recruits
+  filter(StatusB == "L" | StatusB == "R" | Status6 == "L" | Status6 == "R") |>
+  filter(!is.na(diameter_class)) |>
+  filter(diameter_class <= 40) |>
+  group_by(VisitCycle) |>
+  mutate(VisitCycle = paste0(VisitCycle, " (n=", n_distinct(MasterPlotID), ")")) |>
+  ungroup() |>
+  group_by(MasterPlotID, VisitCycle, diameter_class) |>
+  summarize(
+    tpa = n() * 5, .groups = "keep"
+  ) |>
+  ungroup()
+
+starting_tpa <- remaining_tpa_by_diameter_class |>
+  filter(diameter_class == 6) |>
+  ungroup() |>
+  select(MasterPlotID, VisitCycle, starting_tpa = tpa) |>
+  mutate(
+    starting_tpa = 25 * floor(starting_tpa / 25),
+    tpa_class = if_else(
+      starting_tpa < 75, as.character(starting_tpa),
+      "75+"
+    )
+  )
+
+ideal_tpa_by_diameter_class <- lapply(
+  c(0, 25, 50, 75), \(x) {
+    tibble(
+      diameter_class = seq(5, 35, 2),
+      tpa = sapply(0:15, \(i) as.integer((x + 12.5) / 1.4^i)),
+      starting_tpa = x
+    ) |>
+      mutate(
+        tpa_class = if_else(
+          starting_tpa < 75, as.character(starting_tpa),
+          "75+"
+        )
+      )
+  }
+) |>
+  do.call(bind_rows, args = _)
+
+remaining_tpa_by_diameter_class |>
+  left_join(
+    starting_tpa, by = join_by(MasterPlotID, VisitCycle)
+  ) |>
+  replace_na(list(tpa_class = "0")) |>
+  mutate(group = paste(tpa_class, diameter_class)) |>
+  ggplot(aes(diameter_class, tpa)) +
+  geom_boxplot(
+    aes(fill = tpa_class, group = group),
+    outlier.size = 0.1
+  ) +
+  geom_step(
+    data = ideal_tpa_by_diameter_class,
+    aes(color = tpa_class),
+    show.legend = FALSE
+  ) +
+  scale_x_continuous(breaks = seq(2,40,2)) +
+  coord_cartesian(xlim = c(6, 20), ylim = c(0, 100)) +
+  theme_bw() +
+  labs(fill = "6\" TPA") +
+  ggtitle("Unharvested TPA Per Plot by 2\" diameter class") +
+  ylab(bquote("Unharvested TPA" ~ (stems %.% acre^-1))) +
+  xlab("Diameter Class")
+```
+
 ## Before / After Ratio
 
 ```{r harvest ratio by diameter class}
@@ -1944,7 +2033,15 @@ the raw list.
 ```{r dimater class distribution, eval = FALSE}
 add_diameter_class <- function(x) {
   x |>
-    mutate(diameter_class = diameter_class(DBH))
+    mutate(diameter_class = case_when(
+      DBH < 3 ~ 0,
+      DBH < 5 ~ 3,
+      DBH < 9 ~ 5,
+      DBH < 15 ~ 9,
+      DBH < 21 ~ 15,
+      DBH < 40 ~ 21,
+      .default = 40
+    )
 }
 
 fill_dbhlist <- function(x) {

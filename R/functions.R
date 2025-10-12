@@ -161,3 +161,33 @@ fia_tpa_for_state <- function(fiadb, statecd) {
 beers_transformation <- function(ASPECT) {
   cos((45 - ASPECT)*pi/180) + 1
 }
+
+#' diameter_class
+#'
+#' As describedin FIA 5.2.45 LARGE_END_DIA_CLASS
+#'
+#' Alternative: FIA 2.5.21 FLDSZCD Field stand-size calss code
+#' Seedling, Sapling, Poletimber, Sawtimber,
+#'
+#' Softwood: 5, 9, 20, 40
+#' Hardwood: 5, 11, 20, 40
+#'
+#' @param x diameter at breast height (in inches)
+#'
+#' @returns diameter class (0, 3, 5, 9, 15, 21, 40+)
+#' @export
+#'
+#' @examples
+#' a <- data.frame(dbh = c(1, 1, 3, 5, 8, 13, 21, 33, 54))
+#' a$dc <- diameter_class(a$dbh)
+#diameter_class <- function(x) {
+#    case_when(
+#      x < 3 ~ 0,
+#      x < 5 ~ 3,
+#      x < 9 ~ 5,
+#      x < 15 ~ 9,
+#      x < 21 ~ 15,
+#      x < 40 ~ 21,
+#      .default = 40
+#    )
+#}
