@@ -131,6 +131,34 @@ fvs_Estab <- function(rows) {
   }
 }
 
+fvs_ThinDBH <- function(rows) {
+  thindbh <- function(row) {
+    year <- row["YEAR"]
+    min_dbh <- row["MIN_DBH"]
+    max_dbh <- row["MAX_DBH"]
+    spcd <- row["SPCD"]
+    tpa <- row["TPA"]
+    if ("PERCENT" %in% names(row) & !is.na(row["PERCENT"])) {
+      percent <- row["PERCENT"] # CUTEFF - Efficiency, 0 - 1
+    } else {
+      percent <- 1
+    }
+    c(
+      fvs_kwd("CycleAt", year),
+      # ThinDBH fields:
+      # 1 - year
+      # 2 - smallest dbh (>=; 0)
+      # 3 - largest dbh (<; 999)
+      # 4 - efficiency (0 - 1; 1)
+      # 5 - species (0)
+      # 6 - target tpa (0)
+      # 7 - target BA (0)
+      fvs_kwd("ThinDBH", year, min_dbh, max_dbh, percent, spcd, tpa)
+    )
+  }
+  apply(rows, 1, thindbh)
+}
+
 fvs_ThinPRSC <- function(rows) {
   thinprsc <- function(row) {
     year <- row["YEAR"]
@@ -146,10 +174,20 @@ fvs_ThinPRSC <- function(rows) {
     )
   }
 
-  if (!is.null(rows)) {
-    apply(rows |> distinct(PRESCRIPTION, YEAR, .keep_all = TRUE), 1, thinprsc)
-  } else {
+  apply(rows |> distinct(PRESCRIPTION, YEAR, .keep_all = TRUE), 1, thinprsc)
+}
+
+# Figure out what kind of thinning to do and insert appropriate
+# keywords
+fvs_thin <- function(rows) {
+  if (is.null(rows)) {
     c()
+  } else if ("PRESCRIPTION" %in% names(rows)) {
+    fvs_ThinPRSC(rows)
+  } else if ("MIN_DBH" %in% names(rows)) {
+    fvs_ThinDBH(rows)
+  } else {
+    stop(paste("Unrecognized harvest schema:", names(rows)))
   }
 }
 
@@ -211,7 +249,9 @@ fvs_fia_input <- function(
     }
   }
 
-  if (is.null(harvest)) {
+  # If Harvest has prescription, swap out the prescription in the
+  # schema and replace it with the one provided.
+  if (is.null(harvest) | !"PRESCRIPTION" %in% names(harvest)) {
     append_prescription <- function(.data) {
       .data
     }
@@ -447,7 +487,7 @@ fvs_keywordfile_section <- function(
     fvs_kwd("Summary", 2),
     fvs_kwd("TreeLiDB", 2),
     fvs_kwd("End"), # Database
-    fvs_ThinPRSC(harvest),
+    fvs_thin(harvest),
     fvs_Estab(regen),
     fvs_kwd("Process")
   )
@@ -539,11 +579,11 @@ fvs_run <- function(
   if (!is.null(partition)) {
     stands <- stands |>
       filter((digest::digest2int(STAND_CN) %% num_partitions) == (partition - 1))
-  }
 
-  if (!is.null(harvest)) {
-    harvest <- harvest |>
-      filter((digest::digest2int(STAND_CN) %% num_partitions) == (partition - 1))
+    if (!is.null(harvest)) {
+      harvest <- harvest |>
+        filter((digest::digest2int(STAND_CN) %% num_partitions) == (partition - 1))
+    }
   }
 
   fvs_input_db <- fvs_fia_input(
