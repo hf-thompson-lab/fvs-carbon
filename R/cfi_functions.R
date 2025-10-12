@@ -47,7 +47,8 @@ cfi_abp <- function(.data, cfiabp_trees) {
       cfiabp_trees |>
         select(
           MasterPlotID, VisitCycle, MasterTreeID,
-          StatusB, Status6, dbhcm, stems.ha.All, CutAnyTime, CutSinceLastVisit,
+          StatusB, Status6, dbhcm, stems.ha.All,
+          CutAnyTime, CutSinceLastVisit, YearsSinceLastCut,
           Status.prior6, dbh_prior
         ),
       by = join_by(MasterPlotID, VisitCycle, MasterTreeID)

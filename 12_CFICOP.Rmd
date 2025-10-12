@@ -1266,7 +1266,7 @@ We're interested in a few things:
 2. What trees are left? (when / where / species / size / tpa)
 
 
-```{r observed harvest ba}
+```{r observed harvest ba, eval = FALSE}
 tmp_observed_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
@@ -1323,13 +1323,29 @@ tmp_observed_harvest |>
 
 ```
 
-## Who got left behind?
+Are any stands harvested in multiple cycles?
+
+```{r observed multiple harvest, eval = FALSE}
+tmp_observed_harvest |>
+  distinct(MasterPlotID, VisitCycle) |>
+  group_by(MasterPlotID) |>
+  summarise(num_harvests = n()) |>
+  ungroup() |>
+  filter(num_harvests > 1) |>
+  nrow()
+```
+
+So, 54 plots are harvested more than once.
+
+## Harvest Parameters
+
+### Who got left behind?
 
 Unharvested:
 - Filter to plot/cycles with harvest
 - sum the ba of what's left
 
-```{r observed unharvested ba}
+```{r observed unharvested ba, eval = FALSE}
 
 # Which plots are harvested, in which visit cycles?
 
@@ -1417,11 +1433,11 @@ tmp_observed_remainders |>
 
 ```
 
-## Diameter Class
+### Diameter Class
 
 What's the distribution of trees left behind, by diameter class?
 
-```{r harvest by diameter class}
+```{r harvest by diameter class, eval = FALSE}
 qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
@@ -1462,7 +1478,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
 ```
 
 
-```{r remaining tpa by diameter class}
+```{r remaining tpa by diameter class, eval = FALSE}
 remaining_tpa_by_diameter_class <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
@@ -1539,7 +1555,7 @@ remaining_tpa_by_diameter_class |>
 ```
 
 
-```{r remaining tpa by diameter class}
+```{r remaining tpa by diameter class 2, eval = FALSE}
 remaining_tpa_by_diameter_class <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
@@ -1627,9 +1643,9 @@ remaining_tpa_by_diameter_class |>
   xlab("Diameter Class")
 ```
 
-## Before / After Ratio
+### Before / After Ratio
 
-```{r harvest ratio by diameter class}
+```{r harvest ratio by diameter class, eval = FALSE}
 qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
@@ -1677,7 +1693,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
   xlab("Visit Cycle (Number of Plots Harvested)")
 ```
 
-```{r harvest ratio by genus}
+```{r harvest ratio by genus, eval = FALSE}
 qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
@@ -1730,9 +1746,9 @@ qryDWSPCFIPlotVisitTreeDetail |>
   xlab("Visit Cycle (Number of Plots Harvested)")
 ```
 
-## Theoretical
+### Theoretical Q
 
-```{r theoretical description of what's on the landscape}
+```{r theoretical description of what is on the landscape, eval = FALSE}
 x <- tibble(
   diameter_class = seq(6, 40, 2),
   tpa = sapply(0:17, \(i) as.integer(40 / 1.4^i))
@@ -1743,6 +1759,77 @@ x |>
   geom_line() +
   geom_point()
 ```
+
+## Harvest by DBH
+
+After talking with folks, we're going to harvest by basal area by
+diameter class by species by plot by time.
+
+FVS provides the THINDBH keyword to schedule thinning from throughout
+a dbh range for any or all species to a residual basal area or trees
+per acre target.
+
+We will provide multiple THINDBH keywords per stand per timestep,
+describing the target residual trees per acre of that species in that
+dbh range for that stand; the rest will be harvested. Ideally, we'd
+specify the number of trees to remove, but between ingrowth, mortality,
+and multiple rounds of harvest, we don't actually know how many trees
+FVS will have in the stand at any given time, so we can't compute
+the residual number of trees that would cause the right number to be
+removed.
+
+We could also do this by telling FVS the fraction of trees to
+remove; we know how many were harvested and when, but we don't know
+how many trees were on the landscape at the time of harvest, so we
+can't compute the correct fraction. By looking at cficop_dflt_treelist
+and cficop_none_treelist, we can get a pretty good idea of what FVS
+thinks is there.
+
+### Harvest List
+
+Let's build a list of the number of live trees after each harvest:
+
+```{targets cficop_hvst_tpa, tar_simple = TRUE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  mutate(
+    YearCut = VisitCycle - YearsSinceLastCut,
+    diameter_class = as.integer(conv_unit(dbh_prior, "cm", "in") / 2) * 2
+  ) |>
+  filter(
+    diameter_class >= 6 # TPA below 6" can't really be trusted
+  ) |>
+  # Replace na's in status to keep them from propagating
+  replace_na(list(StatusB = "X", Status6 = "X")) |>
+  group_by(MasterPlotVisitID, YearCut, SpeciesCode, diameter_class) |>
+  summarize(
+    tpa_harvested = sum(if_else(StatusB == "C" | Status6 == "B", 1, 0)) * 5,
+    tpa_remaining = sum(if_else(StatusB == "L" | Status6 == "L", 1, 0)) * 5,
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  filter(tpa_harvested > 0) |>
+# For prescription-based harvest, our schema is:
+# STAND_CN, TREE_CN, PREV_TRE_CN, YEAR, PRESCRIPTION
+# For DBH-based harvest, our schema is:
+# STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, TPA
+  mutate(
+    STAND_CN = MasterPlotVisitID,
+    YEAR = YearCut,
+    DBH_MIN = diameter_class,
+    DBH_MAX = diameter_class + 2,
+    SPCD = SpeciesCode,
+    TPA = tpa_remaining
+  ) |>
+  select(STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, TPA)
+```
+
+### Post-Harvest Regeneration
+
+Post-harvest there's a bunch of regeneration; find it and insert it.
 
 # Carbon on the Landscape
 
@@ -1931,7 +2018,7 @@ cficop_none_carbon |>
   ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
 ```
 
-```{r none vs dflt vs srvy, eval = FALSE}
+```{r none vs dflt vs srvy alt, eval = FALSE}
 # Use a consistent, decent palette
 colors <- brewer.set1(5)
 
