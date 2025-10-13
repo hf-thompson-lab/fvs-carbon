@@ -1252,6 +1252,14 @@ fvs_read_output(cficop_srvy, "FVS_Summary2_East") |>
 ```
 
 
+Cut trees
+
+```{targets cficop_srvy_cutlist, tar_simple = TRUE}
+fvs_read_output(cficop_srvy, "FVS_CutList_East") |>
+  group_by(StandID, Year) |>
+  filter(row_number() == 1) |>
+  ungroup()
+```
 
 
 # CFICOP_HVST
@@ -1888,6 +1896,107 @@ tar_target(
   # and each branch will run with each value of randseed
   pattern = cross(fvs_randseed, map(fvs_partition))
 )
+```
+
+## Load Results
+
+Carbon
+
+```{targets cficop_hvst_carbon, tar_simple = TRUE}
+fvs_read_output(cficop_hvst, "FVS_Carbon") |>
+  group_by(StandID, Year) |> # Combine results from different random seeds
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    .groups = "keep"
+  ) |>
+  ungroup()
+```
+
+Summary
+
+```{targets cficop_hvst_summary, tar_simple = TRUE}
+fvs_read_output(cficop_hvst, "FVS_Summary2_East") |>
+  group_by(StandID, Year) |>
+  summarize(
+    BA = mean(BA),
+    Tpa = mean(Tpa),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+```
+
+Cut trees
+
+```{targets cficop_hvst_cutlist, tar_simple = TRUE}
+fvs_read_output(cficop_hvst, "FVS_CutList_East") |>
+  group_by(StandID, Year) |>
+  filter(row_number() == 1) |>
+  ungroup()
+```
+
+### Measured vs. Projected Harvest
+
+How does harvest compare to survey?
+
+```{r hvst vs srvy, eval = FALSE}
+measured_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  mutate(
+    Year = VisitCycle - YearsSinceLastCut,
+    ba = pi * (conv_unit(dbh_prior, "cm", "m") / 2)^2
+  ) |>
+  # Replace na's in status to keep them from propagating
+  replace_na(list(StatusB = "X", Status6 = "X")) |>
+  filter(!is.na(ba) & ba > 0 & StatusB == "C" | Status6 == "B") |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  group_by(GENUS) |>
+  summarize(
+    Measured_Trees = n(),
+    Measured_BA = sum(ba, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+projected_harvest <- cficop_hvst_cutlist |>
+  mutate(
+    SPCD = as.integer(SpeciesFIA),
+    ba = pi * (conv_unit(DBH, "in", "m") / 2)^2
+  ) |>
+  filter(!is.na(ba) & ba > 0) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SPCD)
+  ) |>
+  group_by(GENUS) |>
+  summarize(
+    Projected_Trees = n(),
+    Projected_BA = sum(ba, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+measured_harvest |>
+  full_join(
+    projected_harvest,
+    by = join_by(GENUS)
+  ) |>
+  pivot_longer(cols = c(Measured_Trees, Projected_Trees)) |>
+  filter(!is.na(value)) |>
+  ggplot(aes(GENUS, value, fill = GENUS)) +
+  geom_col(show.legend = FALSE) +
+  theme_bw() +
+  facet_wrap("name") +
+  scale_y_continuous(transform = "log10") +
+  ggtitle("Quabbin CFI Trees Harvested") +
+  xlab("Genus") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  ylab(bquote("Trees harvested"))
 ```
 
 
