@@ -25,11 +25,7 @@ tar_target(cficop_hvst_tpa, {
       cfigro_plot |> select(STAND_ID, STAND_CN),
       by = join_by(MasterPlotID == STAND_ID)
     ) |>
-    left_join(
-      species_crosswalk |> select(SPCD, FVS_SPCD),
-      by = join_by(SpeciesCode == SPCD)
-    ) |>
-    
+  
   # For prescription-based harvest, our schema is:
   # STAND_CN, TREE_CN, PREV_TRE_CN, YEAR, PRESCRIPTION
   # For DBH-based harvest, our schema is:
@@ -38,7 +34,7 @@ tar_target(cficop_hvst_tpa, {
       YEAR = YearCut,
       DBH_MIN = diameter_class,
       DBH_MAX = diameter_class + 2,
-      SPCD = FVS_SPCD,
+      SPCD = sprintf("%03d", SpeciesCode),
       TPA = tpa_remaining
     ) |>
     select(STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, TPA)

@@ -18,6 +18,7 @@ suppressPackageStartupMessages({
   library(mlr3verse) # Machine Learning in R framework, larger universe
   library(ggspatial) # annotation_scale, annotation_north_arrow
   library(ggfx) # for fancy ggplot stuff like with_blur
+  library(patchwork) # for n-up ggplot
 })
 tar_source()
 
@@ -1345,6 +1346,28 @@ tmp_observed_harvest |>
 
 So, 54 plots are harvested more than once.
 
+Any stands harvested multiple times in a single cycle?
+
+```{r observed multiple year cut, eval = FALSE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  mutate(
+    YearCut = VisitCycle - YearsSinceLastCut
+  ) |>
+  distinct(MasterPlotID, VisitCycle, YearCut) |>
+  group_by(MasterPlotID, VisitCycle) |>
+  summarize(num_harvests = n(), .groups = "keep") |>
+  ungroup() |>
+  filter(num_harvests > 1) |>
+  nrow()
+```
+
+No; when a plot is harvested during a visitcycle, all trees are
+harvested in the same year.
+
 ## Harvest Parameters
 
 ### Who got left behind?
@@ -1824,11 +1847,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
     cfigro_plot |> select(STAND_ID, STAND_CN),
     by = join_by(MasterPlotID == STAND_ID)
   ) |>
-  left_join(
-    species_crosswalk |> select(SPCD, FVS_SPCD),
-    by = join_by(SpeciesCode == SPCD)
-  ) |>
-  
+
 # For prescription-based harvest, our schema is:
 # STAND_CN, TREE_CN, PREV_TRE_CN, YEAR, PRESCRIPTION
 # For DBH-based harvest, our schema is:
@@ -1837,7 +1856,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
     YEAR = YearCut,
     DBH_MIN = diameter_class,
     DBH_MAX = diameter_class + 2,
-    SPCD = FVS_SPCD,
+    SPCD = sprintf("%03d", SpeciesCode),
     TPA = tpa_remaining
   ) |>
   select(STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, TPA)
@@ -1929,10 +1948,131 @@ Cut trees
 
 ```{targets cficop_hvst_cutlist, tar_simple = TRUE}
 fvs_read_output(cficop_hvst, "FVS_CutList_East") |>
-  group_by(StandID, Year) |>
-  filter(row_number() == 1) |>
-  ungroup()
+  filter(random_seed == min(random_seed))
 ```
+
+### Did it do what we asked?
+
+FVS will cancel a harvest if it can't meet the target.
+
+How many THINDBH directives did we give?
+
+```{bash, eval = FALSE}
+# I've done this in R before, but don't feel like going and figuring
+# it out again
+grep "ThinDBH" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.key | wc -l
+```
+
+> 1512
+
+```{bash, eval = FALSE}
+grep "DELETED OR CANCELED" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.out | grep THINDBH | wc -l
+```
+> 796
+
+So, a little over half the harvest was canceled.
+And it's not just trees of species "Other".
+
+Let's pick an example; MasterPlotID 10153, STAND_CN 119700153, we
+we request to harvest white pine (SPCD==129) in diameter class 6-8"
+down to 60 TPA in 1993; this harvest gets canceled.
+
+```{r}
+cficop_hvst_tpa |> filter(STAND_CN == "119700153") |> arrange(SPCD, DBH_MIN)
+```
+
+Let's look at pre-harvest number of trees
+```{r pre-harvest trees}
+stand_10153_trees <- fvs_read_output(cficop_hvst, "FVS_TreeList_East") |>
+  filter(StandID == "10153") |>
+  filter(random_seed == min(random_seed))
+```
+
+```{r}
+tmp_modeled <- stand_10153_trees |>
+  filter(SpeciesFIA == 129) |>
+  filter(1990 <= Year & Year <= 2000) |>
+  mutate(
+    diameter_class = floor(DBH / 2) * 2
+  ) |>
+  group_by(Year, diameter_class) |>
+  summarize(TPA = sum(TPA), .groups = "drop") |>
+  mutate(series = "Modeled")
+
+tmp_observed <- cfiabp_trees |>
+  filter(MasterPlotID == "10153") |>
+  filter(USFSCode == 129) |>
+  filter(VisitTreeStatusCode == 1) |>
+  filter(1990 <= VisitCycle & VisitCycle <= 2000) |>
+  mutate(
+    Year = VisitCycle,
+    diameter_class = 2 * floor(conv_unit(dbhcm, "cm", "in") / 2)
+  ) |>
+  group_by(Year, diameter_class) |>
+  summarize(TPA = n() * 5, .groups = "drop") |>
+  mutate(series = "Observed")
+
+tmp_modeled |>
+  union_all(tmp_observed) |>
+  mutate(
+    Year = ordered(Year),
+    diameter_class = ordered(diameter_class)
+  ) |>
+  ggplot(aes(series, TPA, fill = diameter_class, group = diameter_class)) +
+  geom_col(position = "dodge") +
+  facet_wrap("Year") +
+  theme_bw() +
+  labs(
+    title = "Trees per acre by diameter class in plot 10153",
+    fill = "Diameter Class"
+  ) +
+  ylab("TPA") +
+  xlab(NULL)
+```
+
+Here we can see that in 1990, there were not enough trees in the 6-8" diameter
+class in 1990.
+
+What's the rolling establishment for this plot?
+```{r}
+tmp_stand_cn <- cficop_plot_sibling |>
+  filter(MasterPlotID == "10153") |>
+  left_join(
+    cfigro_plot |>
+      select(MasterPlotID = STAND_ID, STAND_CN),
+    by = join_by(MasterPlotID)
+  ) |>
+  pull(STAND_CN)
+
+cfigro_estab |>
+  filter(STAND_CN == tmp_stand_cn)
+  
+```
+
+What about the 1980 influx?
+
+```{r}
+cfiabp_trees |>
+  filter(MasterPlotID == "10153") |>
+  filter(USFSCode == 129) |>
+  filter(VisitTreeStatusCode == 1) |>
+  filter(1980 >= VisitCycle) |>
+  mutate(
+    Year = VisitCycle,
+    diameter_class = 2 * floor(conv_unit(dbhcm, "cm", "in") / 2)
+  ) |>
+  group_by(Year, diameter_class) |>
+  summarize(TPA = n() * 5, .groups = "drop") |>
+  mutate(series = "Observed") |>
+  arrange(Year, diameter_class)
+```
+
+> Nik is here
+> take the 1980 pulse (delta in 6" fron 1970 - 1980?) and turn
+> those into extra trees in 1970? 4" trees? 2/3 the height?
+> 2/3 the DBH? (2/3 because 4 is 2/3 of 6)
+> also, i feel like i was looking at a spot in harvest where we're
+> looking at fvs trees without summing tpa
 
 ### Measured vs. Projected Harvest
 
@@ -1975,8 +2115,13 @@ projected_harvest <- cficop_hvst_cutlist |>
   ) |>
   group_by(GENUS) |>
   summarize(
-    Projected_Trees = n(),
-    Projected_BA = sum(ba, na.rm = TRUE),
+    # Note that FVS can have fractional trees per acre, so it's
+    # important to sum TPA rather than count trees. Divide by 5
+    # because FVS provides a per-acre value and CFI plots are 1/5 acre.
+    Projected_Trees = sum(TPA) / 5,
+    # Since FVS can have fractional trees per acre, we need
+    # to scale BA by the number of trees
+    Projected_BA = sum(ba * TPA) / 5,
     .groups = "keep"
   ) |>
   ungroup()
@@ -1986,19 +2131,108 @@ measured_harvest |>
     projected_harvest,
     by = join_by(GENUS)
   ) |>
+  pivot_longer(cols = c(Measured_BA, Projected_BA)) |>
+  filter(!is.na(value)) |>
+  ggplot(aes(GENUS, value, fill = name, group = name)) +
+  geom_col(position = "dodge") +
+  theme_bw() +
+  #facet_wrap("name") +
+  #scale_y_continuous(transform = "log10") +
+  ggtitle("Quabbin CFI Basal Area Harvested") +
+  xlab("Genus") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  ylab(bquote("Basal Area harvested" ~(m^2)))
+
+measured_harvest |>
+  full_join(
+    projected_harvest,
+    by = join_by(GENUS)
+  ) |>
   pivot_longer(cols = c(Measured_Trees, Projected_Trees)) |>
   filter(!is.na(value)) |>
-  ggplot(aes(GENUS, value, fill = GENUS)) +
-  geom_col(show.legend = FALSE) +
+  ggplot(aes(GENUS, value, fill = name, group = name)) +
+  geom_col(position = "dodge") +
   theme_bw() +
-  facet_wrap("name") +
-  scale_y_continuous(transform = "log10") +
+  #facet_wrap("name") +
+  #scale_y_continuous(transform = "log10") +
   ggtitle("Quabbin CFI Trees Harvested") +
   xlab("Genus") +
   theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
-  ylab(bquote("Trees harvested"))
+  ylab(bquote("Trees harvested" ~ (trees)))
 ```
 
+### Measured vs. Projected Post-Harvest Trees
+
+cficop_hvst_tpa is the tpa that we requested that FVS leave behind.
+
+Ugh; stand 119700442 was harvested twice between 1970 and 1980.
+Let's ignore it for now; probably the right thing to do is to
+consolidate into a single harvest - the earlier one to give
+regeneration more time, or the later one to give regeneration
+less time.
+
+```{r hvst vs srvy remainders, eval = FALSE}
+measured_remainders <- cficop_hvst_tpa |>
+  mutate(SPCD = as.numeric(SPCD)) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS),
+    by = join_by(SPCD)
+  ) |>
+  group_by(GENUS) |>
+  summarize(
+    Measured_Trees = sum(TPA),
+    .groups = "drop"
+  )
+
+post_harvest_inventories <- cficop_hvst_tpa |>
+  mutate(YEAR = 10 * ceiling(YEAR / 10)) |>
+  distinct(STAND_CN, YEAR) |>
+  left_join(cfigro_plot |> distinct(STAND_CN, STAND_ID), by = join_by(STAND_CN)) |>
+  select(
+    StandID = STAND_ID,
+    Year = YEAR
+  ) |>
+  mutate(StandID = as.character(StandID))
+
+post_harvest_treelist <- fvs_read_output(cficop_hvst, "FVS_TreeList_East") |>
+  filter(random_seed == min(random_seed)) |>
+  semi_join(post_harvest_inventories, by = join_by(StandID, Year))
+  
+projected_remainders <- post_harvest_treelist |>
+  mutate(
+    SPCD = as.integer(SpeciesFIA)
+  ) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SPCD)
+  ) |>
+  group_by(GENUS) |>
+  summarize(
+    # Note that FVS can have fractional trees per acre, so it's
+    # important to sum TPA rather than count trees. Divide by 5
+    # because FVS provides a per-acre value and CFI plots are 1/5 acre.
+    Projected_Trees = sum(TPA) / 5,
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+measured_remainders |>
+  full_join(
+    projected_remainders,
+    by = join_by(GENUS)
+  ) |>
+  pivot_longer(cols = c(Measured_Trees, Projected_Trees)) |>
+  filter(!is.na(value)) |>
+  ggplot(aes(GENUS, value, fill = name, group = name)) +
+  geom_col(position = "dodge") +
+  theme_bw() +
+  #facet_wrap("name") +
+  #scale_y_continuous(transform = "log10") +
+  ggtitle("Quabbin CFI Trees Remaining") +
+  xlab("Genus") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  ylab(bquote("Trees remaining" ~ (trees)))
+```
 
 # Carbon on the Landscape
 
@@ -2189,7 +2423,7 @@ cficop_none_carbon |>
 
 ```{r none vs dflt vs srvy alt, eval = FALSE}
 # Use a consistent, decent palette
-colors <- brewer.set1(5)
+#colors <- brewer.set1(5)
 
 cficop_none_carbon |>
   rename(Calibrated = Aboveground_Total_Live) |>
