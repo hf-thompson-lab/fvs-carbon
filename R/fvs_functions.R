@@ -141,6 +141,7 @@ fvs_ThinDBH <- function(rows) {
     dbh_max <- row["DBH_MAX"]
     spcd <- row["SPCD"]
     tpa <- row["TPA"]
+    ba <- row["BA"]
     if ("PERCENT" %in% names(row) & !is.na(row["PERCENT"])) {
       percent <- row["PERCENT"] # CUTEFF - Efficiency, 0 - 1
     } else {
@@ -154,7 +155,7 @@ fvs_ThinDBH <- function(rows) {
     # 5 - species (0)
     # 6 - target tpa (0)
     # 7 - target BA (0)
-    fvs_kwd("ThinDBH", year, dbh_min, dbh_max, percent, spcd, tpa)
+    fvs_kwd("ThinDBH", year, dbh_min, dbh_max, percent, spcd, tpa, ba)
   }
   c(
     cycleat(unique(rows$YEAR)),

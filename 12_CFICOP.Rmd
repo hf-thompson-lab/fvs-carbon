@@ -1253,16 +1253,6 @@ fvs_read_output(cficop_srvy, "FVS_Summary2_East") |>
 ```
 
 
-Cut trees
-
-```{targets cficop_srvy_cutlist, tar_simple = TRUE}
-fvs_read_output(cficop_srvy, "FVS_CutList_East") |>
-  group_by(StandID, Year) |>
-  filter(row_number() == 1) |>
-  ungroup()
-```
-
-
 # CFICOP_HVST
 
 Let's look at the distribution of harvest, and what we'll need to model.
@@ -1847,19 +1837,24 @@ qryDWSPCFIPlotVisitTreeDetail |>
     cfigro_plot |> select(STAND_ID, STAND_CN),
     by = join_by(MasterPlotID == STAND_ID)
   ) |>
+  left_join(
+    species_crosswalk |> select(SPCD, FVS_SPCD),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
 
 # For prescription-based harvest, our schema is:
 # STAND_CN, TREE_CN, PREV_TRE_CN, YEAR, PRESCRIPTION
 # For DBH-based harvest, our schema is:
-# STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, TPA
+# STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, TPA, BA
   mutate(
     YEAR = YearCut,
     DBH_MIN = diameter_class,
     DBH_MAX = diameter_class + 2,
-    SPCD = sprintf("%03d", SpeciesCode),
-    TPA = tpa_remaining
+    SPCD = FVS_SPCD,
+    TPA = tpa_remaining,
+    BA = 0
   ) |>
-  select(STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, TPA)
+  select(STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, TPA, BA)
 ```
 
 ### Post-Harvest Regeneration
@@ -1977,18 +1972,18 @@ Let's pick an example; MasterPlotID 10153, STAND_CN 119700153, we
 we request to harvest white pine (SPCD==129) in diameter class 6-8"
 down to 60 TPA in 1993; this harvest gets canceled.
 
-```{r}
+```{r, eval = FALSE}
 cficop_hvst_tpa |> filter(STAND_CN == "119700153") |> arrange(SPCD, DBH_MIN)
 ```
 
 Let's look at pre-harvest number of trees
-```{r pre-harvest trees}
+```{r pre-harvest trees, eval = FALSE}
 stand_10153_trees <- fvs_read_output(cficop_hvst, "FVS_TreeList_East") |>
   filter(StandID == "10153") |>
   filter(random_seed == min(random_seed))
 ```
 
-```{r}
+```{r, eval = FALSE}
 tmp_modeled <- stand_10153_trees |>
   filter(SpeciesFIA == 129) |>
   filter(1990 <= Year & Year <= 2000) |>
@@ -2034,7 +2029,7 @@ Here we can see that in 1990, there were not enough trees in the 6-8" diameter
 class in 1990.
 
 What's the rolling establishment for this plot?
-```{r}
+```{r, eval = FALSE}
 tmp_stand_cn <- cficop_plot_sibling |>
   filter(MasterPlotID == "10153") |>
   left_join(
@@ -2051,7 +2046,7 @@ cfigro_estab |>
 
 What about the 1980 influx?
 
-```{r}
+```{r, eval = FALSE}
 cfiabp_trees |>
   filter(MasterPlotID == "10153") |>
   filter(USFSCode == 129) |>
@@ -2400,21 +2395,29 @@ cficop_none_carbon |>
     ymax = mean(value) + 1.96 * sd(value) / sqrt(n),
     .groups = "drop"
   ) |>
+  mutate(
+    name = case_match(
+      name,
+      "Uncalibrated" ~ "Standard",
+      "Adjusted" ~ "Best Effort",
+      .default = name
+    )
+  ) |>
   mutate(name = ordered(
     name,
-    levels = c("Uncalibrated", "Calibrated", "Adjusted", "Reference", "Measured")
+    levels = c("Standard", "Calibrated", "Best Effort", "Reference", "Measured")
   )) |>
   ggplot(aes(Year, mean, color = name)) +
   with_blur(
-    geom_ribbon(aes(ymin = ymin, ymax = ymax, fill = name), alpha = 0.25),
+    geom_ribbon(aes(ymin = ymin, ymax = ymax, fill = name), alpha = 0.25, color = NA),
     sigma = 3
     
   ) +
   geom_line() +
   geom_point() +
   theme_bw() +
-  scale_color_discrete() +
-  scale_fill_discrete() +
+  scale_color_discrete(name = "Scenario") +
+  scale_fill_discrete(name = "Scenario") +
 #  scale_y_continuous(limits = c(0, NA)) +
   ggtitle("Quabbin CFI Projected Carbon (277 stands)") +
   xlab("Year") +
