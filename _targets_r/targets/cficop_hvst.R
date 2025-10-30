@@ -26,7 +26,7 @@ tar_target(
           by = join_by(STAND_ID == MasterPlotID)
         ),
       trees = cfigro_trees,
-      regen = cficop_estab,
+      regen = cficop_hvst_estab,
       harvest = cficop_hvst_tpa,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,

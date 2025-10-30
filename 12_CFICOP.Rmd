@@ -1454,6 +1454,246 @@ tmp_observed_remainders |>
 
 ```
 
+### Harvest Efficiency
+
+What fraction of trees were harvested?
+
+> Nik is here
+> take the 1980 pulse (delta in 6" fron 1970 - 1980?) and turn
+> those into extra trees in 1970? 4" trees? 2/3 the height?
+> 2/3 the DBH? (2/3 because 4 is 2/3 of 6)
+> also, i feel like i was looking at a spot in harvest where we're
+> looking at fvs trees without summing tpa
+> Also also, instead of ThinDBH, try ThinBTA - thin from below to
+> a TPA target.
+> - DBH range - everything
+> - TPA target - what's left on the plot
+> - Efficiency - calculate ratio of initial to residual tpa in each
+>   diameter class, take the max? mean? median?
+> ThinBTA doesn't allow species selection; ThinDBH does, can
+> maybe use ThinDBH with Cuteff to achieve the same goal? Note that
+> ThinDBH ignores CutEFF if target TPA or BA is specified.
+> ThinQFA also allows species to be specified; can thin to TPA,
+>    specified in supplemental record.
+
+
+```{r observed harvested ba, eval = FALSE}
+# What got harvested?
+
+tmp_observed_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  mutate(
+    basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi,
+  ) |>
+  # Replace na's in status to keep them from propagating
+  replace_na(list(StatusB = "X", Status6 = "X")) |>
+  filter(StatusB == "C" | Status6 == "B") |>
+  filter(!is.na(basal_area)) |>
+  group_by(MasterPlotID, VisitCycle, GENUS) |>
+  summarize(
+    hvst_basal_area = sum(basal_area, na.rm = TRUE),
+    hvst_tpa = n() * 5,
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+# Which plots are harvested, in which visit cycles?
+
+tmp_harvest_history <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  # cfi_harvested() |> # Can't use this, doesn't retain VisitCycle
+  group_by(MasterPlotID, VisitCycle) |>
+  summarize(
+    CFIHarvested = any(CutSinceLastVisit, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# What trees are left behind after harvest?
+
+tmp_observed_remainders <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  left_join(tmp_harvest_history, by = join_by(MasterPlotID, VisitCycle)) |>
+  filter(CFIHarvested) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  mutate(
+    # Judgment: basal_area intended to be left in harvest is better
+    # represented by ba PRIOR to harvest, than POST harvest. We don't
+    # have BA at the time of harvest, which would be ideal.
+    basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi,
+  ) |>
+  # Replace na's in status to keep them from propagating
+  replace_na(list(StatusB = "X", Status6 = "X")) |>
+  # Live trees, not recruits
+  filter(StatusB == "L" | Status6 == "L") |>
+  filter(!is.na(basal_area)) |>
+  group_by(MasterPlotID, VisitCycle, GENUS) |>
+  summarize(
+    rmdr_basal_area = sum(basal_area, na.rm = TRUE),
+    rmdr_tpa = n() * 5,
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+tmp_harvest_fraction <- tmp_observed_harvest |>
+  left_join(
+    tmp_observed_remainders,
+    by = join_by(MasterPlotID, VisitCycle, GENUS)
+  ) |>
+  replace_na(list(
+    rmdr_basal_area = 0,
+    rmdr_tpa = 0,
+    hvst_basal_area = 0,
+    hvst_tpa = 0
+  )) |>
+  mutate(
+    tpa_fraction = hvst_tpa / (hvst_tpa + rmdr_tpa),
+    ba_fraction = hvst_basal_area / (hvst_basal_area + rmdr_basal_area)
+  ) |>
+  mutate(
+    group = sprintf("%s %s", VisitCycle, GENUS)
+  )
+
+tmp_harvest_fraction |>
+  ggplot(aes(VisitCycle, tpa_fraction, fill = GENUS, group = group)) +
+  geom_boxplot() +
+  scale_fill_manual(values = eves_colors)
+
+
+```
+
+### 1980 Pulse
+
+Let's see how many extra trees recruit in 1980
+
+```{r cut in 1980, eval = FALSE}
+excess_recruits <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  left_join(
+    species_crosswalk |> select(SPCD, FVS_SPCD),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  # Replace na's in status to keep them from propagating
+  replace_na(list(StatusB = "X", Status6 = "X")) |>
+  # Live trees and recruits
+  filter(cfi_status_live(VisitTreeStatusCode)) |>
+  mutate(
+    diameter_class = as.integer(VisitTreeDIAM / 2) * 2
+  ) |>
+  filter(
+    diameter_class == 6
+  ) |>
+  group_by(MasterPlotID, FVS_SPCD, VisitCycle) |>
+  summarize(recruits = n(), .groups = "keep") |>
+  left_join(
+    cficop_estab |> select(MasterPlotID, SPECIES, DENSITY),
+    by = join_by(FVS_SPCD == SPECIES)
+  ) |>
+  mutate(excess_recruits = recruits - DENSITY) |>
+  ungroup() |>
+  filter(!is.na(excess_recruits) & excess_recruits >= 0) |>
+  mutate(Year = ordered(VisitCycle))
+
+excess_recruits |>
+  ggplot(aes(Year, excess_recruits, group = Year)) +
+  geom_boxplot() +
+  coord_cartesian(ylim = c(0, 5))
+```
+
+Rather than derive a principled way to turn 1980 ingrowth into
+1970 saplings, we can represent the 1970 sapling population by
+actual 1980 ingrowth. By 1980, the 1970 seedling should have
+created a sapling pool that FVS can track, so we don't need to
+do anything beyond 1980.
+So let's add 1980 establishment as a 1-off.
+We use actual trees and height when available.
+
+```{targets cficop_hvst_estab, tar_simple = TRUE}
+# Find 1970 trees
+tmp_trees_1970 <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  filter(
+    VisitCycle == 1970
+  ) |>
+  select(
+    MasterPlotID, MasterTreeID
+  )
+
+tmp_estab_1980 <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  # Remove any trees that were around in 1970
+  anti_join(
+    tmp_trees_1970,
+    by = join_by(MasterPlotID, MasterTreeID)
+  ) |>
+  left_join(
+    species_crosswalk |> select(SPCD, FVS_SPCD),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  # Live trees and recruits
+  filter(cfi_status_live(VisitTreeStatusCode)) |>
+  mutate(
+    diameter_class = as.integer(VisitTreeDIAM / 2) * 2
+  ) |>
+  filter(
+    VisitCycle == 1980
+  ) |>
+  group_by(FVS_SPCD) |>
+  # Impute mean height for missing values
+  mutate(
+    VisitTreeTotalHeight = if_else(
+      is.na(VisitTreeTotalHeight) | VisitTreeTotalHeight == 0,
+      mean(VisitTreeTotalHeight, na.rm = TRUE),
+      VisitTreeTotalHeight
+    ),
+    DENSITY = 5  # trees per acre
+  ) |>
+  left_join(
+    cfigro_plot |> select(STAND_ID, STAND_CN),
+    by = join_by(MasterPlotID == STAND_ID)
+  ) |>
+  select(
+    STAND_ID = MasterPlotID,
+    STAND_CN,
+    YEAR = VisitCycle,
+    SPECIES = FVS_SPCD,
+    DENSITY,
+    HEIGHT = VisitTreeTotalHeight
+  )
+
+cficop_hvst_estab <- cficop_dflt_estab |>
+  mutate(
+    STAND_ID = NA,
+    HEIGHT = NA
+  ) |>
+  union_all(
+    tmp_estab_1980
+  )
+```
+
 ### Diameter Class
 
 What's the distribution of trees left behind, by diameter class?
@@ -1894,7 +2134,7 @@ tar_target(
           by = join_by(STAND_ID == MasterPlotID)
         ),
       trees = cfigro_trees,
-      regen = cficop_estab,
+      regen = cficop_hvst_estab,
       harvest = cficop_hvst_tpa,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
@@ -2044,7 +2284,7 @@ cfigro_estab |>
   
 ```
 
-What about the 1980 influx?
+What about the 1980 pulse?
 
 ```{r, eval = FALSE}
 cfiabp_trees |>
@@ -2061,13 +2301,6 @@ cfiabp_trees |>
   mutate(series = "Observed") |>
   arrange(Year, diameter_class)
 ```
-
-> Nik is here
-> take the 1980 pulse (delta in 6" fron 1970 - 1980?) and turn
-> those into extra trees in 1970? 4" trees? 2/3 the height?
-> 2/3 the DBH? (2/3 because 4 is 2/3 of 6)
-> also, i feel like i was looking at a spot in harvest where we're
-> looking at fvs trees without summing tpa
 
 ### Measured vs. Projected Harvest
 
