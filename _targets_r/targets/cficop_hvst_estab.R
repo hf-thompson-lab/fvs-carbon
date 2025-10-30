@@ -60,7 +60,7 @@ tar_target(cficop_hvst_estab, {
   cficop_hvst_estab <- cficop_dflt_estab |>
     mutate(
       STAND_ID = NA,
-      HEIGHT = NA
+      HEIGHT = 0
     ) |>
     union_all(
       tmp_estab_1980
