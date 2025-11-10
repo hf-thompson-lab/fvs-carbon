@@ -163,6 +163,48 @@ fvs_ThinDBH <- function(rows) {
   )
 }
 
+fvs_ThinQFA <- function(rows) {
+  cycleat <- function(years) {
+    lapply(years, \(year) fvs_kwd("CycleAt", year))
+  }
+  thinqfa <- function(row) {
+    year <- row["YEAR"]
+    dbh_min <- row["DBH_MIN"]
+    dbh_max <- row["DBH_MAX"]
+    spcd <- row["SPCD"]
+    if ("BA" %in% names(row) & !is.na(row["BA"])) {
+      residual <- row["BA"]
+      method <- 0
+    } else if ("TPA" %in% names(row) & !is.na(row["TPA"])) {
+      residual <- row["TPA"]
+      method <- 1
+    } else if ("SDI" %in% names(row) & !is.na(row["SDI"])) {
+      residual <- row["SDI"]
+      method <- 2
+    } else {
+      stop(paste("Can't determine units for ThinQFA residual density"))
+    }
+    # ThinQFA fields:
+    # 1 - year
+    # 2 - smallest dbh (>=; 0)
+    # 3 - largest dbh (<; 999)
+    # 4 - species (0)
+    # 5 - q-factor (1.4)
+    # 6 - diameter class width (2)
+    # 7 - residual density (0)
+    # Supplemental record: 0 = BA, 1 = TPA, 2 = SDI
+    c(
+      fvs_kwd("ThinQFA", year, dbh_min, dbh_max, spcd, 1.4, 2, residual),
+      fvs_kwd(method) # supplemental record to specify units
+    )
+  }
+  c(
+    cycleat(unique(rows$YEAR)),
+    apply(rows, 1, thinqfa)
+  )
+}
+
+
 fvs_ThinPRSC <- function(rows) {
   thinprsc <- function(row) {
     year <- row["YEAR"]
@@ -188,6 +230,8 @@ fvs_thin <- function(rows) {
     c()
   } else if ("PRESCRIPTION" %in% names(rows)) {
     fvs_ThinPRSC(rows)
+  } else if ("QFA" %in% names(rows)) {
+    fvs_ThinQFA(rows)
   } else if ("DBH_MIN" %in% names(rows)) {
     fvs_ThinDBH(rows)
   } else {

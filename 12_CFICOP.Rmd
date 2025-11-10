@@ -111,6 +111,34 @@ period from 1970 - 2020, during which plot location is consistent. There were
 337 plots with trees in 1970; of these, detailed information on harvest and
 disturbance is available on 277 [Barker-Plotkin 2024]."
 
+### Size Distribution in 1970
+
+```{r, eval = FALSE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  filter(cfi_status_live(VisitTreeStatusCode)) |> # Only Live Trees
+  mutate(
+    diameter_class = ordered(as.integer(VisitTreeDIAM / 2) * 2),
+    diameter_class = fct_lump(diameter_class, n = 7, other_level = "> 16")
+  ) |>
+  filter(
+    diameter_class >= 6 # TPA below 6" can't really be trusted
+  ) |>
+  group_by(MasterPlotID, diameter_class) |>
+  summarize(value = n() * 5, .groups = "drop") |>
+  ungroup() |>
+  ggplot(aes(diameter_class, value)) +
+  geom_boxplot(outlier.size = 0.1) +
+  theme_bw() +
+  coord_cartesian(ylim = c(0, 400)) +
+  ggtitle("Tree Size Distribution in 1970") +
+  xlab("Diameter at Breast Height (inches)") +
+  ylab(bquote(trees %.% acre^-1))
+```
+
 ## Regeneration
 
 We ignored harvest in CFIGRO; can we continue to ignore it?
@@ -309,7 +337,7 @@ tmp_species <- qryDWSPCFIPlotVisitTreeDetail |>
 
 matched_plots <- cficop_plot_sibling |>
   mutate(
-    status = if_else(MasterPlotID == sibling_plot, "reference", "matched")
+    status = if_else(MasterPlotID == sibling_plot, "sibling", "disturbed")
   ) |>
   left_join(
     cfigro_plot,
@@ -361,16 +389,16 @@ ggplot() +
   geom_sf(data = lakes, fill = "blue", inherit.aes = FALSE) +
 #  geom_sf(data = rivers, fill = "blue", inherit.aes = FALSE) +
   geom_point(
-    data = matched_plots |> filter(status == "reference"),
+    data = matched_plots |> filter(status == "sibling"),
     aes(long, lat, color = Species, shape = status), size = 2.5
   ) +
   geom_point(
-    data = matched_plots |> filter(status == "matched"),
+    data = matched_plots |> filter(status == "disturbed"),
     aes(long, lat, color = Species, shape = status), size = 1.75
   ) +
   facet_wrap("group") +
 #  scale_color_discrete(guide = "none") +
-  scale_shape_manual(values = list(reference = 17, matched = 16)) +
+  scale_shape_manual(values = list(sibling = 17, disturbed = 16)) +
 #  annotation_scale(location = "br") +
 #  annotation_north_arrow(
 #    location = "tl",
@@ -378,9 +406,12 @@ ggplot() +
 #    pad_x = unit(0.75, "cm"),
 #    pad_y = unit(0.5, "cm")
 #  ) +
+  #scale_x_continuous(name = NULL, labels = NULL) +
+  #scale_y_continuous(name = NULL, labels = NULL) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
   ggtitle("Matching harvested and disturbed CFI plots to grow-only plots")
+
 ```
 
 
@@ -1604,7 +1635,7 @@ excess_recruits <- qryDWSPCFIPlotVisitTreeDetail |>
   summarize(recruits = n(), .groups = "keep") |>
   left_join(
     cficop_estab |> select(MasterPlotID, SPECIES, DENSITY),
-    by = join_by(FVS_SPCD == SPECIES)
+    by = join_by(MasterPlotID, FVS_SPCD == SPECIES)
   ) |>
   mutate(excess_recruits = recruits - DENSITY) |>
   ungroup() |>
@@ -2012,7 +2043,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
 ```{r theoretical description of what is on the landscape, eval = FALSE}
 x <- tibble(
   diameter_class = seq(6, 40, 2),
-  tpa = sapply(0:17, \(i) as.integer(40 / 1.4^i))
+  tpa = sapply(0:17, \(i) (40 / 1.4^i))
 )
 
 x |>
@@ -2023,8 +2054,8 @@ x |>
 
 ## Harvest by DBH
 
-After talking with folks, we're going to harvest by basal area by
-diameter class by species by plot by time.
+After talking with folks, we thought we were going to harvest by basal
+area by diameter class by species by plot by time.
 
 FVS provides the THINDBH keyword to schedule thinning from throughout
 a dbh range for any or all species to a residual basal area or trees
@@ -2057,15 +2088,14 @@ qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
   cfi_abp(cfiabp_trees) |>
   mutate(
-    YearCut = VisitCycle - YearsSinceLastCut,
-    diameter_class = as.integer(conv_unit(dbh_prior, "cm", "in") / 2) * 2
+    YearCut = VisitCycle - YearsSinceLastCut
   ) |>
   filter(
-    diameter_class >= 6 # TPA below 6" can't really be trusted
+    dbh_prior >= 15.24 # TPA below 6" can't really be trusted
   ) |>
   # Replace na's in status to keep them from propagating
   replace_na(list(StatusB = "X", Status6 = "X")) |>
-  group_by(MasterPlotID, YearCut, SpeciesCode, diameter_class) |>
+  group_by(MasterPlotID, YearCut, SpeciesCode) |>
   summarize(
     tpa_harvested = sum(if_else(StatusB == "C" | Status6 == "B", 1, 0)) * 5,
     tpa_remaining = sum(if_else(StatusB == "L" | Status6 == "L", 1, 0)) * 5,
@@ -2086,15 +2116,17 @@ qryDWSPCFIPlotVisitTreeDetail |>
 # STAND_CN, TREE_CN, PREV_TRE_CN, YEAR, PRESCRIPTION
 # For DBH-based harvest, our schema is:
 # STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, TPA, BA
+# For Q-Factor harvest, our schema is:
+# STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, QFA, RESIDUAL
   mutate(
     YEAR = YearCut,
-    DBH_MIN = diameter_class,
-    DBH_MAX = diameter_class + 2,
+    DBH_MIN = 6,
+    DBH_MAX = 99,
     SPCD = FVS_SPCD,
-    TPA = tpa_remaining,
-    BA = 0
+    QFA = 1.4,
+    TPA = tpa_remaining
   ) |>
-  select(STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, TPA, BA)
+  select(STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, QFA, TPA)
 ```
 
 ### Post-Harvest Regeneration
@@ -2203,10 +2235,66 @@ grep "ThinDBH" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.key | wc -l
 ```{bash, eval = FALSE}
 grep "DELETED OR CANCELED" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.out | grep THINDBH | wc -l
 ```
-> 796
+> 832
 
 So, a little over half the harvest was canceled.
 And it's not just trees of species "Other".
+
+### Projected vs Observed TPA
+
+```{r, eval = FALSE}
+observed_trees <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  filter(cfi_status_live(VisitTreeStatusCode)) |>
+  mutate(
+    diameter_class = floor(VisitTreeDIAM / 2) * 2,
+    Scenario = "Observed",
+    MasterPlotID = as.character(MasterPlotID)
+  ) |>
+  group_by(MasterPlotID, VisitCycle) |>
+  summarize(Tpa = n() * 5, .groups = "drop") |>
+  select(
+    StandID = MasterPlotID,
+    Year = VisitCycle,
+    Observed = Tpa
+  )
+
+observed_trees |>
+  full_join(
+    cficop_hvst_summary |>
+      filter(Year %% 10 == 0) |>
+      select(StandID, Year, Projected = Tpa),
+    by = join_by(StandID, Year)
+  ) |>
+  mutate(Year = sprintf("%d", Year)) |>
+  pivot_longer(cols = c(Observed, Projected)) |>
+  ggplot(aes(Year, value, fill = name)) +
+  geom_boxplot(outlier.size = 0.1) +
+  theme_bw() +
+  ggtitle("Projected vs. Observed Tree Density") +
+  ylab(bquote(trees %.% acre^-1))
+
+observed_trees |>
+  full_join(
+    cficop_hvst_summary |>
+      filter(Year %% 10 == 0) |>
+      select(StandID, Year, Projected = Tpa),
+    by = join_by(StandID, Year)
+  ) |>
+  mutate(
+    Year = sprintf("%d", Year),
+    Surplus = Projected - Observed
+  ) |>
+  ggplot(aes(Year, Surplus)) +
+  geom_boxplot(outlier.size = 0.1) +
+  theme_bw() +
+  ggtitle("Surplus trees by inventory") +
+  ylab(bquote(trees %.% acre^-1))
+```
+
 
 Let's pick an example; MasterPlotID 10153, STAND_CN 119700153, we
 we request to harvest white pine (SPCD==129) in diameter class 6-8"
@@ -2226,29 +2314,38 @@ stand_10153_trees <- fvs_read_output(cficop_hvst, "FVS_TreeList_East") |>
 ```{r, eval = FALSE}
 tmp_modeled <- stand_10153_trees |>
   filter(SpeciesFIA == 129) |>
-  filter(1990 <= Year & Year <= 2000) |>
+  filter(1970 <= Year & Year <= 2000) |>
   mutate(
     diameter_class = floor(DBH / 2) * 2
   ) |>
   group_by(Year, diameter_class) |>
   summarize(TPA = sum(TPA), .groups = "drop") |>
-  mutate(series = "Modeled")
+  mutate(series = "Modeled") |>
+  complete(
+    Year, diameter_class,
+    fill = list(TPA = 0, series = "Modeled")
+  )
 
 tmp_observed <- cfiabp_trees |>
   filter(MasterPlotID == "10153") |>
   filter(USFSCode == 129) |>
   filter(VisitTreeStatusCode == 1) |>
-  filter(1990 <= VisitCycle & VisitCycle <= 2000) |>
+  filter(1970 <= VisitCycle & VisitCycle <= 2000) |>
   mutate(
     Year = VisitCycle,
     diameter_class = 2 * floor(conv_unit(dbhcm, "cm", "in") / 2)
   ) |>
   group_by(Year, diameter_class) |>
   summarize(TPA = n() * 5, .groups = "drop") |>
-  mutate(series = "Observed")
+  mutate(series = "Observed") |>
+  complete(
+    Year, diameter_class,
+    fill = list(TPA = 0, series = "Observed")
+  )
 
 tmp_modeled |>
   union_all(tmp_observed) |>
+  filter(diameter_class > 2) |>
   mutate(
     Year = ordered(Year),
     diameter_class = ordered(diameter_class)
@@ -2387,6 +2484,44 @@ measured_harvest |>
   xlab("Genus") +
   theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
   ylab(bquote("Trees harvested" ~ (trees)))
+```
+
+```{r, eval = FALSE}
+measured_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  filter(StatusB == "C" | Status6 == "B") |>
+  group_by(VisitCycle) |>
+  summarize(
+    Observed = n() * 5,
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  select(Year = VisitCycle, Observed)
+
+projected_harvest <- cficop_hvst_cutlist |>
+  mutate(Year = ceiling(Year / 10) * 10) |>
+  group_by(Year) |>
+  summarize(
+    Projected = sum(TPA),
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+measured_harvest |>
+  full_join(
+    projected_harvest,
+    by = join_by(Year)
+  ) |>
+  pivot_longer(cols = c(Observed, Projected)) |>
+  mutate(Year = sprintf("%d", Year)) |>
+  ggplot(aes(Year, value, fill = name)) +
+  geom_col(position = "dodge") +
+  theme_bw() +
+  ggtitle("Projected Vs Observed Trees Harvested") +
+  ylab("Number of Trees Harvested")
 ```
 
 ### Measured vs. Projected Post-Harvest Trees
@@ -2585,7 +2720,7 @@ In 2020, adjusted  was 2713476 +- 68425
 
 ## Calibrated vs Uncalibrated vs Observed
 
-```{r none vs dflt vs srvy, eval = FALSE}
+```{r, eval = FALSE}
 cficop_none_carbon |>
   rename(Calibrated = Aboveground_Total_Live) |>
   left_join(
@@ -2632,13 +2767,13 @@ cficop_none_carbon |>
     name = case_match(
       name,
       "Uncalibrated" ~ "Standard",
-      "Adjusted" ~ "Best Effort",
+      "Adjusted" ~ "Best Estimate",
       .default = name
     )
   ) |>
   mutate(name = ordered(
     name,
-    levels = c("Standard", "Calibrated", "Best Effort", "Reference", "Measured")
+    levels = c("Standard", "Calibrated", "Best Estimate", "Reference", "Measured")
   )) |>
   ggplot(aes(Year, mean, color = name)) +
   with_blur(
@@ -2652,9 +2787,114 @@ cficop_none_carbon |>
   scale_color_discrete(name = "Scenario") +
   scale_fill_discrete(name = "Scenario") +
 #  scale_y_continuous(limits = c(0, NA)) +
-  ggtitle("Quabbin CFI Projected Carbon (277 stands)") +
+  ggtitle("Carbon in Quabbin CFI plots") +
   xlab("Year") +
   ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
+```
+
+In numbers:
+
+```{r, eval = FALSE}
+cficop_none_carbon |>
+  rename(Calibrated = Aboveground_Total_Live) |>
+  left_join(
+    cficop_dflt_carbon |>
+      rename(Uncalibrated = Aboveground_Total_Live),
+    by = join_by(StandID, Year)
+  ) |>
+  left_join(
+    cficop_srvy_carbon |>
+      rename(Measured = Aboveground_Total_Live),
+    by = join_by(StandID, Year)
+  ) |>
+  left_join(
+    cficop_none_bai |>
+      select(StandID, Starting_Carbon, Projected_Carbon, Adjusted_AGLCF) |>
+      group_by(StandID) |>
+      summarize(
+        Starting_Carbon = min(Starting_Carbon),
+        Adjusted_AGLCF = mean(Adjusted_AGLCF),
+        .groups = "keep"
+      ) |>
+      ungroup(),
+    by = join_by(StandID)
+  ) |>
+  mutate(
+    Adjusted = Starting_Carbon + Adjusted_AGLCF * (Year - 1970)
+  ) |>
+  select(-c("Starting_Carbon", "Adjusted_AGLCF")) |>
+  pivot_longer(-c("StandID", "Year")) |>
+  union_all(
+    cfigro_srvy_carbon |>
+      select(StandID, Year, Reference = Aboveground_Total_Live) |>
+      pivot_longer(-c("StandID", "Year"))
+  ) |>
+  group_by(Year, name) |>
+  summarize(
+    n = n(),
+    mean = mean(value),
+    ci = 1.96 * sd(value) / sqrt(n),
+    .groups = "drop"
+  ) |>
+  mutate(
+    name = case_match(
+      name,
+      "Uncalibrated" ~ "Standard",
+      "Adjusted" ~ "Best Estimate",
+      .default = name
+    )
+  ) |>
+  mutate(name = ordered(
+    name,
+    levels = c("Standard", "Calibrated", "Best Estimate", "Reference", "Measured")
+  )) |>
+  filter(Year == 2020 | Year == 1970) |>
+  select(Scenario = name, `AGLC` = mean, ci)
+```
+
+How comparable are these?
+
+```{r, eval = FALSE}
+x <- cficop_none_carbon |>
+  rename(Calibrated = Aboveground_Total_Live) |>
+  left_join(
+    cficop_dflt_carbon |>
+      rename(Uncalibrated = Aboveground_Total_Live),
+    by = join_by(StandID, Year)
+  ) |>
+  left_join(
+    cficop_srvy_carbon |>
+      rename(Measured = Aboveground_Total_Live),
+    by = join_by(StandID, Year)
+  ) |>
+  left_join(
+    cficop_none_bai |>
+      select(StandID, Starting_Carbon, Projected_Carbon, Adjusted_AGLCF) |>
+      group_by(StandID) |>
+      summarize(
+        Starting_Carbon = min(Starting_Carbon),
+        Adjusted_AGLCF = mean(Adjusted_AGLCF),
+        .groups = "keep"
+      ) |>
+      ungroup(),
+    by = join_by(StandID)
+  ) |>
+  mutate(
+    Adjusted = Starting_Carbon + Adjusted_AGLCF * (Year - 1970)
+  ) |>
+  select(-c("Starting_Carbon", "Adjusted_AGLCF")) |>
+  pivot_longer(-c("StandID", "Year")) |>
+  union_all(
+    cfigro_srvy_carbon |>
+      select(StandID, Year, Reference = Aboveground_Total_Live) |>
+      pivot_longer(-c("StandID", "Year"))
+  ) |>
+  filter(Year == 2020) |>
+  pivot_wider(id_cols = c(StandID, Year))
+
+t.test(x$Adjusted, x$Reference, paired=TRUE)
+t.test(x$Uncalibrated, x$Adjusted, paired = TRUE)
+t.test(x$Calibrated, x$Adjusted, paired = TRUE)
 ```
 
 ```{r none vs dflt vs srvy alt, eval = FALSE}
@@ -2768,6 +3008,7 @@ add_diameter_class <- function(x) {
       DBH < 40 ~ 21,
       .default = 40
     )
+    )
 }
 
 fill_dbhlist <- function(x) {
@@ -2850,7 +3091,7 @@ all_dbhdist <- cficop_none_dbhdist |>
   ))
 
 all_dbhdist |>
-  filter(diameter_class >= 5) |>
+  filter(diameter_class >= 5 & Year == 1970) |>
   mutate(diameter_class = factor(diameter_class)) |>
   ggplot(aes(diameter_class, value, fill = name)) +
   geom_boxplot(outlier.size = 0.1) +
