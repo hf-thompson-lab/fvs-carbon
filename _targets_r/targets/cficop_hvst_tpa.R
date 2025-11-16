@@ -1,5 +1,5 @@
 tar_target(cficop_hvst_tpa, {
-  qryDWSPCFIPlotVisitTreeDetail |>
+  tmp_harvested <- qryDWSPCFIPlotVisitTreeDetail |>
     cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
     cfi_with_tree_info(tblDWSPCFITreesComplete) |>
     cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
@@ -8,40 +8,69 @@ tar_target(cficop_hvst_tpa, {
       YearCut = VisitCycle - YearsSinceLastCut
     ) |>
     filter(
-      dbh_prior >= 15.24 # TPA below 6" can't really be trusted
+      !is.na(YearCut) & !is.na(dbh_prior)
     ) |>
-    # Replace na's in status to keep them from propagating
-    replace_na(list(StatusB = "X", Status6 = "X")) |>
-    group_by(MasterPlotID, YearCut, SpeciesCode) |>
+    # When harvest and inventory occur in the same year,
+    # harvest might occur before or after the inventory.
+    # To simplify things, we'll make all harvest happen
+    # before the inventory.
+    # Select the post-harvest inventory as the VisitCycle
+    mutate(
+      VisitCycle = ceiling(YearCut / 10) * 10,
+      DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 6) * 6
+    ) |>
+    group_by(MasterPlotID, VisitCycle, SpeciesCode, DBH_MIN) |>
+    summarize(YearCut = max(YearCut), .groups = "drop")
+  
+  cficop_hvst_tpa <- qryDWSPCFIPlotVisitTreeDetail |>
+    cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+    cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+    cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+    cfi_abp(cfiabp_trees) |>
+    filter(cfi_status_live(VisitTreeStatusCode)) |>
+    filter(!is.na(dbh_prior)) |>
+    mutate(
+      DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 6) * 6
+    ) |>
+    semi_join(
+      tmp_harvested,
+      by = join_by(MasterPlotID, VisitCycle, SpeciesCode, DBH_MIN)
+    ) |>
+    group_by(MasterPlotID, VisitCycle, SpeciesCode, DBH_MIN) |>
     summarize(
-      tpa_harvested = sum(if_else(StatusB == "C" | Status6 == "B", 1, 0)) * 5,
-      tpa_remaining = sum(if_else(StatusB == "L" | Status6 == "L", 1, 0)) * 5,
-      .groups = "keep"
+      TPA = n() * 5, # Each plot is 1/5 acre
+      .groups = "drop"
     ) |>
-    ungroup() |>
-    filter(tpa_harvested > 0) |>
-    left_join(
-      cfigro_plot |> select(STAND_ID, STAND_CN),
-      by = join_by(MasterPlotID == STAND_ID)
+    # Add back in the things that were harvested down to 0 TPA
+    # This will also add YearCut to the things harvested to >0 TPA
+    full_join(
+      tmp_harvested,
+      by = join_by(MasterPlotID, VisitCycle, SpeciesCode, DBH_MIN)
+    ) |>
+    # The harvest blocks added back will have TPA == NA
+    mutate(
+      DBH_MAX = DBH_MIN + 6,
+      TPA = if_else(is.na(TPA), 0, TPA),
+      BA = 0
+    ) |>
+    # For prescription-based harvest, our schema is:
+    # STAND_CN, TREE_CN, PREV_TRE_CN, YEAR, PRESCRIPTION
+    # For DBH-based harvest, our schema is:
+    # STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, TPA, BA
+    mutate(
+      YEAR = YearCut
     ) |>
     left_join(
       species_crosswalk |> select(SPCD, FVS_SPCD),
       by = join_by(SpeciesCode == SPCD)
     ) |>
-  
-  # For prescription-based harvest, our schema is:
-  # STAND_CN, TREE_CN, PREV_TRE_CN, YEAR, PRESCRIPTION
-  # For DBH-based harvest, our schema is:
-  # STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, TPA, BA
-  # For Q-Factor harvest, our schema is:
-  # STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, QFA, RESIDUAL
-    mutate(
+    select(
+      STAND_CN = MasterPlotID,
       YEAR = YearCut,
-      DBH_MIN = 6,
-      DBH_MAX = 99,
+      DBH_MIN,
+      DBH_MAX,
       SPCD = FVS_SPCD,
-      QFA = 1.4,
-      TPA = tpa_remaining
-    ) |>
-    select(STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, QFA, TPA)
+      TPA,
+      BA
+    )
 })

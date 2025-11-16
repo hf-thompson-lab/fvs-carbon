@@ -132,8 +132,13 @@ fvs_Estab <- function(rows) {
 }
 
 fvs_ThinDBH <- function(rows) {
-  cycleat <- function(years) {
-    lapply(years, \(year) fvs_kwd("CycleAt", year))
+  yardloss <- function(years) {
+    # YardLoss: Designates a portion of a harvest to be left in the woods.
+    # Field 1: Year; YardLoss needs to come after Thin*
+    # Field 2: Proportion of cut stems left in the stand
+    # Field 3: Proportion of left stems that are down
+    # Field 4: Proportion of branch wood left from removed stems
+    lapply(years, \(year) fvs_kwd("YardLoss", year, 0, 0, 1))
   }
   thindbh <- function(row) {
     year <- row["YEAR"]
@@ -158,52 +163,10 @@ fvs_ThinDBH <- function(rows) {
     fvs_kwd("ThinDBH", year, dbh_min, dbh_max, percent, spcd, tpa, ba)
   }
   c(
-    cycleat(unique(rows$YEAR)),
-    apply(rows, 1, thindbh)
+    apply(rows, 1, thindbh),
+    yardloss(unique(rows$YEAR))
   )
 }
-
-fvs_ThinQFA <- function(rows) {
-  cycleat <- function(years) {
-    lapply(years, \(year) fvs_kwd("CycleAt", year))
-  }
-  thinqfa <- function(row) {
-    year <- row["YEAR"]
-    dbh_min <- row["DBH_MIN"]
-    dbh_max <- row["DBH_MAX"]
-    spcd <- row["SPCD"]
-#    if ("BA" %in% names(row) & !is.na(row["BA"])) {
-#      residual <- row["BA"]
-#      method <- 0
-#    } else if ("TPA" %in% names(row) & !is.na(row["TPA"])) {
-      residual <- row["TPA"]
-      method <- 1
-#    } else if ("SDI" %in% names(row) & !is.na(row["SDI"])) {
-#      residual <- row["SDI"]
-#      method <- 2
-#    } else {
-#      stop(paste("Can't determine units for ThinQFA residual density", str(row)))
-#    }
-    # ThinQFA fields:
-    # 1 - year
-    # 2 - smallest dbh (>=; 0)
-    # 3 - largest dbh (<; 999)
-    # 4 - species (0)
-    # 5 - q-factor (1.4)
-    # 6 - diameter class width (2)
-    # 7 - residual density (0)
-    # Supplemental record: 0 = BA, 1 = TPA, 2 = SDI
-    c(
-      fvs_kwd("ThinQFA", year, dbh_min, dbh_max, spcd, 1.4, 2, residual),
-      fvs_kwd(method) # supplemental record to specify units
-    )
-  }
-  c(
-#    cycleat(unique(rows$YEAR)),
-    apply(rows, 1, thinqfa)
-  )
-}
-
 
 fvs_ThinPRSC <- function(rows) {
   thinprsc <- function(row) {
@@ -230,8 +193,6 @@ fvs_thin <- function(rows) {
     c()
   } else if ("PRESCRIPTION" %in% names(rows)) {
     fvs_ThinPRSC(rows)
-  } else if ("QFA" %in% names(rows)) {
-    fvs_ThinQFA(rows)
   } else if ("DBH_MIN" %in% names(rows)) {
     fvs_ThinDBH(rows)
   } else {
@@ -245,13 +206,14 @@ fvs_thin <- function(rows) {
 # > Do The Right Thing. fvs_run() would need to take the same
 # > input for stands.
 fvs_fia_input <- function(
-    fiadb,
-    stands,
-    trees,
-    calibration,
-    calib_mort,
-    harvest,
-    filename) {
+  fiadb,
+  stands,
+  trees,
+  calibration,
+  calib_mort,
+  harvest,
+  filename
+) {
   out <- DBI::dbConnect(RSQLite::SQLite(), filename, flags = RSQLite::SQLITE_RWC)
   on.exit(DBI::dbDisconnect(out), add = TRUE, after = FALSE)
 
@@ -416,21 +378,22 @@ fvs_fia_input <- function(
 }
 
 fvs_keywordfile_section <- function(
-    title,
-    mgmt_id,
-    input_db,
-    output_db,
-    stand_id,
-    stand_cn,
-    first_year,
-    last_year,
-    calibration,
-    calib_mort,
-    calib_years,
-    regen,
-    harvest,
-    carb_calc,
-    random_seed) {
+  title,
+  mgmt_id,
+  input_db,
+  output_db,
+  stand_id,
+  stand_cn,
+  first_year,
+  last_year,
+  calibration,
+  calib_mort,
+  calib_years,
+  regen,
+  harvest,
+  carb_calc,
+  random_seed
+) {
   stand_table <- "FVS_StandInit_Plot"
   tree_table <- "FVS_TreeInit_Plot"
   # for cond, we would use:
@@ -543,20 +506,21 @@ fvs_keywordfile_section <- function(
 
 
 fvs_write_keyword_file <- function(
-    keyword_filename,
-    input_db,
-    output_db,
-    stand_type,
-    title,
-    mgmt_id,
-    stands,
-    calibration,
-    calib_mort,
-    calib_years,
-    regen,
-    harvest,
-    carb_calc,
-    random_seed) {
+  keyword_filename,
+  input_db,
+  output_db,
+  stand_type,
+  title,
+  mgmt_id,
+  stands,
+  calibration,
+  calib_mort,
+  calib_years,
+  regen,
+  harvest,
+  carb_calc,
+  random_seed
+) {
   unlink(keyword_filename)
   apply(stands, 1, \(row) {
     write_lines(
@@ -588,23 +552,24 @@ fvs_write_keyword_file <- function(
 }
 
 fvs_run <- function(
-    fvsbin_dir,
-    fvs_variant,
-    project_dir,
-    fiadb,
-    title,
-    mgmt_id,
-    stands,
-    calibration = NULL,
-    calib_mort = NULL,
-    calib_years = 5,
-    harvest = NULL,
-    trees = NULL,
-    regen = NULL,
-    carb_calc = "Jenkins",
-    num_partitions = NULL,
-    partition = NULL,
-    random_seed = NULL) {
+  fvsbin_dir,
+  fvs_variant,
+  project_dir,
+  fiadb,
+  title,
+  mgmt_id,
+  stands,
+  calibration = NULL,
+  calib_mort = NULL,
+  calib_years = 5,
+  harvest = NULL,
+  trees = NULL,
+  regen = NULL,
+  carb_calc = "Jenkins",
+  num_partitions = NULL,
+  partition = NULL,
+  random_seed = NULL
+) {
   # We need to separate inputs and outputs for each partition and each replica
   # Each partition will process a different subset of records;
   # Each replica will process using a different random seed
