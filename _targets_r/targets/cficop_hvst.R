@@ -24,7 +24,8 @@ tar_target(
         semi_join(
           cficop_plot_sibling,
           by = join_by(STAND_ID == MasterPlotID)
-        ),
+        ) |>
+        mutate(SAM_WT = 100), # Remove sample weight
       trees = cfigro_trees,
       regen = cficop_hvst_estab,
       harvest = cficop_hvst_tpa,

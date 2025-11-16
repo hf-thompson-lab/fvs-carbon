@@ -2133,6 +2133,171 @@ qryDWSPCFIPlotVisitTreeDetail |>
 
 Post-harvest there's a bunch of regeneration; find it and insert it.
 
+## Run FVS through the UI
+
+FVS really doesn't like to do harvest. Let's load up the UI and see if we can
+convince it.
+
+### FvS_StandInit and FVS_PlotInit
+
+From DBSUserGuide.pdf, Table 3.0.1, we learn the following about table structure:
+
+* Stand_CN - optional, but used by queries, so we'll include it
+* Stand_ID - required
+* StandPlot_ID - optional; plot identification code;
+             required by the user interface when populating stand lists from
+             the plot initiation table (PlotInit)
+* Variant  - required; set to "ne"
+* Inv_Year - required; set to 1970
+* Latitude - optional
+* Longitude - optional
+* Location - recommended; nearest national forest;
+             takes precedence over Region, forest, District, and Compartment
+* Apsect   - recommended; (0 = no meaningful aspect; 360 = north)
+* Slope    - recommended
+* ElevFt   - recommended; Elevation in feet
+* Basal_Area_Factor - required
+* Inv_Plot_Size - required
+* Brk_DBH  - required
+* Num_Plots - recommended; if 0, the number of plots in the stand is determined
+              by counting the numbers [sic] of unique plot identification
+              codes on the tree record data
+
+All other fields are optional.
+
+### FVS_TreeInit
+
+From DBSUserGuide.pdf, Table 3.0.2, we learn the following about table structure:
+
+* Stand_CN - optional, but used by queries, so we'll include it
+* Stand_ID - required
+* StandPlot_ID - required to run plots as stands
+* Plot_ID  - recommended; plot identification, should be unique for an
+             individual stand but can be repeated for plots in different stands
+* Tree_ID  - optional
+* Tree_Count - recommended - the number of trees represented by the tree record;
+             if left blank FVS assumes the tree record represents a single sample
+             tree
+* Species  - required
+* DBH or Diameter - required
+* Ht       - recommended; total height in feet
+* CrRatio  - recommended; values 1-9 are read as crown ratio codes; 10-99 as percent
+
+All other fields are optional.
+
+### Generate Tables
+
+```{r, eval = FALSE}
+blank_db <- DBI::dbConnect(
+  RSQLite::SQLite(),
+  file.path("data/fvs/BlankDatabase.db"),
+  flags = RSQLite::SQLITE_RO
+)
+
+fvs_data_db <- DBI::dbConnect(
+  RSQLite::SQLite(),
+  file.path("data/fvs/FVS_Data.db"),
+  flags = RSQLite::SQLITE_RWC
+)
+
+# There are three tables: FVS_PlotInit, FVS_StandInit, and FVS_TreeInit
+
+# FVS_PlotInit
+# We aren't supporting by-plot
+DBI::dbWriteTable(
+  fvs_data_db,
+  "FVS_PlotInit",
+  tbl(blank_db, "FVS_PlotInit") |> collect(),
+  overwrite = TRUE
+)
+
+# FVS_StandInit
+# Grab the structure of the table from the blank database,
+# and make cfigro_plot conform to it
+fvs_standinit <- bind_rows(
+  tbl(blank_db, "FVS_StandInit") |>
+    collect() |>
+    mutate(
+      Stand_CN = character()
+    ),
+  cfigro_plot |>
+    filter(INV_YEAR == 1970) |>
+    mutate(
+      Stand_ID = as.character(STAND_ID),
+      Variant = "ne",
+      Aspect = if_else(SLOPE > 0 & ASPECT == 0, 360, ASPECT),
+      INV_PLOT_SIZE = 5, # We don't use microplot data
+      Sam_Wt = 10
+    ) |>
+    select(
+      Stand_CN = STAND_CN,
+      Stand_ID,
+      StandPlot_ID = STAND_ID,
+      Variant,
+      Inv_Year = INV_YEAR,
+      Latitude = LATITUDE,
+      Longitude = LONGITUDE,
+      Region = REGION,
+      Forest = FOREST,
+      Aspect,
+      Slope = SLOPE,
+      ElevFt = ELEVFT,
+      Basal_Area_Factor = BASAL_AREA_FACTOR,
+      Inv_Plot_Size = INV_PLOT_SIZE,
+      Brk_DBH = BRK_DBH,
+      Num_Plots = NUM_PLOTS,
+      Sam_Wt
+  )
+)
+
+DBI::dbWriteTable(
+  fvs_data_db,
+  "FVS_StandInit",
+  fvs_standinit,
+  overwrite = TRUE
+)
+
+# FVS_TreeInit
+# Grab the structure of the table from the blank database,
+# and make cfigro_trees conform to it
+fvs_treeinit <- bind_rows(
+  tbl(blank_db, "FVS_TreeInit") |>
+    collect(),
+  cfigro_trees |>
+    semi_join(fvs_standinit |> distinct(Stand_CN), by = join_by(STAND_CN == Stand_CN)) |>
+    mutate(
+      Stand_ID = as.character(STAND_ID),
+      Variant = "ne",
+      Aspect = if_else(SLOPE > 0 & ASPECT == 0, 360, ASPECT),
+      Tree_Count = 1
+    ) |>
+    select(
+      Stand_CN = STAND_CN,
+      Stand_ID,
+      Plot_ID = STAND_ID,
+      Tree_CN = TREE_CN,
+#      Tree_ID = TREE_ID,
+      Tree_Count,
+      Species = SPECIES,
+      Diameter = DIAMETER,
+      Ht = HT,
+      Slope = SLOPE,
+      Aspect = ASPECT,
+      TopoCode = TOPOCODE
+  )
+)
+
+DBI::dbWriteTable(
+  fvs_data_db,
+  "FVS_TreeInit",
+  fvs_treeinit,
+  overwrite = TRUE
+)
+
+DBI::dbDisconnect(blank_db)
+DBI::dbDisconnect(fvs_data_db)
+```
+
 ## Run FVS
 
 Make our best effort at replicating what actually happend in Quabbin.
@@ -2164,7 +2329,8 @@ tar_target(
         semi_join(
           cficop_plot_sibling,
           by = join_by(STAND_ID == MasterPlotID)
-        ),
+        ) |>
+        mutate(SAM_WT = 100), # Remove sample weight
       trees = cfigro_trees,
       regen = cficop_hvst_estab,
       harvest = cficop_hvst_tpa,
@@ -2227,13 +2393,13 @@ How many THINDBH directives did we give?
 ```{bash, eval = FALSE}
 # I've done this in R before, but don't feel like going and figuring
 # it out again
-grep "ThinDBH" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.key | wc -l
+grep "ThinQFA" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.key | wc -l
 ```
 
 > 1512
 
 ```{bash, eval = FALSE}
-grep "DELETED OR CANCELED" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.out | grep THINDBH | wc -l
+grep "DELETED OR CANCELED" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.out | grep THINQFA | wc -l
 ```
 > 832
 
