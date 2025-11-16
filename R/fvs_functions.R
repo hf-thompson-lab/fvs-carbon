@@ -172,18 +172,18 @@ fvs_ThinQFA <- function(rows) {
     dbh_min <- row["DBH_MIN"]
     dbh_max <- row["DBH_MAX"]
     spcd <- row["SPCD"]
-    if ("BA" %in% names(row) & !is.na(row["BA"])) {
-      residual <- row["BA"]
-      method <- 0
-    } else if ("TPA" %in% names(row) & !is.na(row["TPA"])) {
+#    if ("BA" %in% names(row) & !is.na(row["BA"])) {
+#      residual <- row["BA"]
+#      method <- 0
+#    } else if ("TPA" %in% names(row) & !is.na(row["TPA"])) {
       residual <- row["TPA"]
       method <- 1
-    } else if ("SDI" %in% names(row) & !is.na(row["SDI"])) {
-      residual <- row["SDI"]
-      method <- 2
-    } else {
-      stop(paste("Can't determine units for ThinQFA residual density"))
-    }
+#    } else if ("SDI" %in% names(row) & !is.na(row["SDI"])) {
+#      residual <- row["SDI"]
+#      method <- 2
+#    } else {
+#      stop(paste("Can't determine units for ThinQFA residual density", str(row)))
+#    }
     # ThinQFA fields:
     # 1 - year
     # 2 - smallest dbh (>=; 0)
@@ -199,7 +199,7 @@ fvs_ThinQFA <- function(rows) {
     )
   }
   c(
-    cycleat(unique(rows$YEAR)),
+#    cycleat(unique(rows$YEAR)),
     apply(rows, 1, thinqfa)
   )
 }
