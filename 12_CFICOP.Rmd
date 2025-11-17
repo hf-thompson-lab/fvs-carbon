@@ -2157,8 +2157,12 @@ cficop_hvst_tpa <- qryDWSPCFIPlotVisitTreeDetail |>
     species_crosswalk |> select(SPCD, FVS_SPCD),
     by = join_by(SpeciesCode == SPCD)
   ) |>
+  left_join(
+    cfigro_plot |> filter(INV_YEAR == 1970) |> select(STAND_CN, STAND_ID),
+    by = join_by(MasterPlotID == STAND_ID)
+  ) |>
   select(
-    STAND_CN = MasterPlotID,
+    STAND_CN,
     YEAR = YearCut,
     DBH_MIN,
     DBH_MAX,
@@ -2369,7 +2373,11 @@ tar_target(
           cficop_plot_sibling,
           by = join_by(STAND_ID == MasterPlotID)
         ) |>
-        mutate(SAM_WT = 100), # Remove sample weight
+        mutate(
+          ASPECT = if_else(SLOPE > 0 & ASPECT == 0, 360, ASPECT),
+          INV_PLOT_SIZE = 5, # We don't use microplot data
+          SAM_WT = 10
+        ),
       trees = cfigro_trees,
       regen = cficop_hvst_estab,
       harvest = cficop_hvst_tpa,
@@ -2432,13 +2440,13 @@ How many THINDBH directives did we give?
 ```{bash, eval = FALSE}
 # I've done this in R before, but don't feel like going and figuring
 # it out again
-grep "ThinQFA" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.key | wc -l
+grep "ThinDBH" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.key | wc -l
 ```
 
 > 1512
 
 ```{bash, eval = FALSE}
-grep "DELETED OR CANCELED" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.out | grep THINQFA | wc -l
+grep "DELETED OR CANCELED" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.out | grep THINDBH | wc -l
 ```
 > 832
 

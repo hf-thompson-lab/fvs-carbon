@@ -64,8 +64,12 @@ tar_target(cficop_hvst_tpa, {
       species_crosswalk |> select(SPCD, FVS_SPCD),
       by = join_by(SpeciesCode == SPCD)
     ) |>
+    left_join(
+      cfigro_plot |> filter(INV_YEAR == 1970) |> select(STAND_CN, STAND_ID),
+      by = join_by(MasterPlotID == STAND_ID)
+    ) |>
     select(
-      STAND_CN = MasterPlotID,
+      STAND_CN,
       YEAR = YearCut,
       DBH_MIN,
       DBH_MAX,

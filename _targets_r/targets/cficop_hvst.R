@@ -25,7 +25,11 @@ tar_target(
           cficop_plot_sibling,
           by = join_by(STAND_ID == MasterPlotID)
         ) |>
-        mutate(SAM_WT = 100), # Remove sample weight
+        mutate(
+          ASPECT = if_else(SLOPE > 0 & ASPECT == 0, 360, ASPECT),
+          INV_PLOT_SIZE = 5, # We don't use microplot data
+          SAM_WT = 10
+        ),
       trees = cfigro_trees,
       regen = cficop_hvst_estab,
       harvest = cficop_hvst_tpa,
