@@ -3,8 +3,8 @@
 get_this_rmd_file <- function(){
   # return the current rmd file depending on usage mode
   return(ifelse(rstudioapi::isAvailable(),
-                rstudioapi::getSourceEditorContext()$path,
-                rprojroot::thisfile()))
+                normalizePath(rstudioapi::getSourceEditorContext()$path),
+                whereami::thisfile()))
 }
 
 tar_objects_defined_in_rmd <- function(filename) {
