@@ -31,7 +31,7 @@ tar_target(
           SAM_WT = 10
         ),
       trees = cfigro_trees,
-      regen = cficop_hvst_estab,
+      regen = cficop_hvst_estab, # cficop_dflt_estab,  
       harvest = cficop_hvst_tpa,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,

@@ -2379,7 +2379,7 @@ tar_target(
           SAM_WT = 10
         ),
       trees = cfigro_trees,
-      regen = cficop_hvst_estab,
+      regen = cficop_hvst_estab, # cficop_dflt_estab,  
       harvest = cficop_hvst_tpa,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
@@ -2443,15 +2443,26 @@ How many THINDBH directives did we give?
 grep "ThinDBH" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.key | wc -l
 ```
 
-> 1512
+> 3873
 
 ```{bash, eval = FALSE}
 grep "DELETED OR CANCELED" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.out | grep THINDBH | wc -l
 ```
-> 832
+> 2242 with 1980 compensatio, 2252 without - so canceled 8 more harvests
 
 So, a little over half the harvest was canceled.
-And it's not just trees of species "Other".
+This seems to be:
+1. Trees where actual diameter growth was different enough from modeled
+   diameter growth that it ended up in a different diameter class than
+   harvest specified (lessened by using 6" diameter classes), and
+2. At the low end, different ingrowth rates between actual and modeled.
+
+Is it a problem?
+
+Let's compare harvested and remaining TPA and BA.
+
+
+> Deleted: Analysis of MasterPlotID 10153
 
 ### Projected vs Observed TPA
 
@@ -2463,7 +2474,6 @@ observed_trees <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_abp(cfiabp_trees) |>
   filter(cfi_status_live(VisitTreeStatusCode)) |>
   mutate(
-    diameter_class = floor(VisitTreeDIAM / 2) * 2,
     Scenario = "Observed",
     MasterPlotID = as.character(MasterPlotID)
   ) |>
@@ -2508,109 +2518,9 @@ observed_trees |>
   ylab(bquote(trees %.% acre^-1))
 ```
 
-
-Let's pick an example; MasterPlotID 10153, STAND_CN 119700153, we
-we request to harvest white pine (SPCD==129) in diameter class 6-8"
-down to 60 TPA in 1993; this harvest gets canceled.
-
-```{r, eval = FALSE}
-cficop_hvst_tpa |> filter(STAND_CN == "119700153") |> arrange(SPCD, DBH_MIN)
-```
-
-Let's look at pre-harvest number of trees
-```{r pre-harvest trees, eval = FALSE}
-stand_10153_trees <- fvs_read_output(cficop_hvst, "FVS_TreeList_East") |>
-  filter(StandID == "10153") |>
-  filter(random_seed == min(random_seed))
-```
-
-```{r, eval = FALSE}
-tmp_modeled <- stand_10153_trees |>
-  filter(SpeciesFIA == 129) |>
-  filter(1970 <= Year & Year <= 2000) |>
-  mutate(
-    diameter_class = floor(DBH / 2) * 2
-  ) |>
-  group_by(Year, diameter_class) |>
-  summarize(TPA = sum(TPA), .groups = "drop") |>
-  mutate(series = "Modeled") |>
-  complete(
-    Year, diameter_class,
-    fill = list(TPA = 0, series = "Modeled")
-  )
-
-tmp_observed <- cfiabp_trees |>
-  filter(MasterPlotID == "10153") |>
-  filter(USFSCode == 129) |>
-  filter(VisitTreeStatusCode == 1) |>
-  filter(1970 <= VisitCycle & VisitCycle <= 2000) |>
-  mutate(
-    Year = VisitCycle,
-    diameter_class = 2 * floor(conv_unit(dbhcm, "cm", "in") / 2)
-  ) |>
-  group_by(Year, diameter_class) |>
-  summarize(TPA = n() * 5, .groups = "drop") |>
-  mutate(series = "Observed") |>
-  complete(
-    Year, diameter_class,
-    fill = list(TPA = 0, series = "Observed")
-  )
-
-tmp_modeled |>
-  union_all(tmp_observed) |>
-  filter(diameter_class > 2) |>
-  mutate(
-    Year = ordered(Year),
-    diameter_class = ordered(diameter_class)
-  ) |>
-  ggplot(aes(series, TPA, fill = diameter_class, group = diameter_class)) +
-  geom_col(position = "dodge") +
-  facet_wrap("Year") +
-  theme_bw() +
-  labs(
-    title = "Trees per acre by diameter class in plot 10153",
-    fill = "Diameter Class"
-  ) +
-  ylab("TPA") +
-  xlab(NULL)
-```
-
-Here we can see that in 1990, there were not enough trees in the 6-8" diameter
-class in 1990.
-
-What's the rolling establishment for this plot?
-```{r, eval = FALSE}
-tmp_stand_cn <- cficop_plot_sibling |>
-  filter(MasterPlotID == "10153") |>
-  left_join(
-    cfigro_plot |>
-      select(MasterPlotID = STAND_ID, STAND_CN),
-    by = join_by(MasterPlotID)
-  ) |>
-  pull(STAND_CN)
-
-cfigro_estab |>
-  filter(STAND_CN == tmp_stand_cn)
-  
-```
-
-What about the 1980 pulse?
-
-```{r, eval = FALSE}
-cfiabp_trees |>
-  filter(MasterPlotID == "10153") |>
-  filter(USFSCode == 129) |>
-  filter(VisitTreeStatusCode == 1) |>
-  filter(1980 >= VisitCycle) |>
-  mutate(
-    Year = VisitCycle,
-    diameter_class = 2 * floor(conv_unit(dbhcm, "cm", "in") / 2)
-  ) |>
-  group_by(Year, diameter_class) |>
-  summarize(TPA = n() * 5, .groups = "drop") |>
-  mutate(series = "Observed") |>
-  arrange(Year, diameter_class)
-```
+So overall TPA in the modeled plots goes up a lot compared to what's observed.
+A lot ov this is likely because the model can see all trees down to seedlings,
+whereas CFI inventory only captures trees >5.6"
 
 ### Measured vs. Projected Harvest
 
@@ -2671,6 +2581,9 @@ measured_harvest |>
   ) |>
   pivot_longer(cols = c(Measured_BA, Projected_BA)) |>
   filter(!is.na(value)) |>
+  group_by(GENUS) |>
+  filter(sum(value) > 5) |>
+  ungroup() |>
   ggplot(aes(GENUS, value, fill = name, group = name)) +
   geom_col(position = "dodge") +
   theme_bw() +
@@ -2688,6 +2601,9 @@ measured_harvest |>
   ) |>
   pivot_longer(cols = c(Measured_Trees, Projected_Trees)) |>
   filter(!is.na(value)) |>
+  group_by(GENUS) |>
+  filter(sum(value) > 100) |>
+  ungroup() |>
   ggplot(aes(GENUS, value, fill = name, group = name)) +
   geom_col(position = "dodge") +
   theme_bw() +
@@ -2749,14 +2665,14 @@ less time.
 
 ```{r hvst vs srvy remainders, eval = FALSE}
 measured_remainders <- cficop_hvst_tpa |>
-  mutate(SPCD = as.numeric(SPCD)) |>
+  filter(!is.na(SPCD)) |>
   left_join(
-    species_crosswalk |> select(SPCD, GENUS),
-    by = join_by(SPCD)
+    species_crosswalk |> select(FVS_SPCD, GENUS),
+    by = join_by(SPCD == FVS_SPCD)
   ) |>
-  group_by(GENUS) |>
+  group_by(GENUS, DBH_MIN) |>
   summarize(
-    Measured_Trees = sum(TPA),
+    Measured_Trees = sum(TPA), # TPA is already scaled to full acres
     .groups = "drop"
   )
 
@@ -2776,18 +2692,18 @@ post_harvest_treelist <- fvs_read_output(cficop_hvst, "FVS_TreeList_East") |>
   
 projected_remainders <- post_harvest_treelist |>
   mutate(
-    SPCD = as.integer(SpeciesFIA)
+    SPCD = as.integer(SpeciesFIA),
+    DBH_MIN = floor(DBH / 6) * 6
   ) |>
   left_join(
     species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
     by = join_by(SPCD)
   ) |>
-  group_by(GENUS) |>
+  group_by(GENUS, DBH_MIN) |>
   summarize(
     # Note that FVS can have fractional trees per acre, so it's
-    # important to sum TPA rather than count trees. Divide by 5
-    # because FVS provides a per-acre value and CFI plots are 1/5 acre.
-    Projected_Trees = sum(TPA) / 5,
+    # important to sum TPA rather than count trees.
+    Projected_Trees = sum(TPA),
     .groups = "keep"
   ) |>
   ungroup()
@@ -2795,19 +2711,26 @@ projected_remainders <- post_harvest_treelist |>
 measured_remainders |>
   full_join(
     projected_remainders,
-    by = join_by(GENUS)
+    by = join_by(GENUS, DBH_MIN)
   ) |>
+  filter(DBH_MIN > 0) |>
+  mutate(DBH_MIN = ordered(DBH_MIN)) |>
   pivot_longer(cols = c(Measured_Trees, Projected_Trees)) |>
-  filter(!is.na(value)) |>
-  ggplot(aes(GENUS, value, fill = name, group = name)) +
+  filter(!is.na(GENUS) & !is.na(value)) |>
+  # Remove uninteresting genera
+  group_by(GENUS) |>
+  filter(sum(value) > 2000) |>
+  ungroup() |>
+  ggplot(aes(DBH_MIN, value, fill = name, group = name)) +
   geom_col(position = "dodge") +
   theme_bw() +
-  #facet_wrap("name") +
+  facet_wrap("GENUS") +
+  scale_x_discrete(drop = FALSE) +
   #scale_y_continuous(transform = "log10") +
-  ggtitle("Quabbin CFI Trees Remaining") +
-  xlab("Genus") +
+  ggtitle("Quabbin CFI Post-Harvest Trees") +
+  xlab("6\" Diameter Class") +
   theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
-  ylab(bquote("Trees remaining" ~ (trees)))
+  ylab(bquote("Post-Harvest Trees" ~ (trees)))
 ```
 
 # Carbon on the Landscape
