@@ -3766,6 +3766,10 @@ base_cop_plot +
     ),
     inherit.aes = FALSE
   ) +
+  geom_line(
+    data = imaginary_cop |>
+      filter(name == "All Plots")
+  ) +
   geom_point(
     data = imaginary_cop |>
       filter(name == "All Plots" & Year <= 1980)
