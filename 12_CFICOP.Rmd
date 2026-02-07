@@ -3697,40 +3697,39 @@ base_cop_plot +
   )
 
 ```
+
 ## Year 10: Re-Survey
 
 ```{r}
-credit_debit <- imaginary_cop |>
-  filter(name %in% c("Default", "All Plots", "Baseline")) |>
-  # Create a table with a column per Year
-  pivot_wider(
-    id_cols = "Year", names_from = "name", values_from = "mean"
-  ) |>
-  arrange(Year) |>
+adjusted_credits <- imaginary_cop |>
+  filter(name == "All Plots" & Year == 1980) |>
+  pull(mean)
+
+credit_debit <- credit_debit |>
+  arrange(name, Year) |>
   mutate(
-    Baseline_Credits = Baseline - lag(Baseline),
-    Baseline_Direction = if_else(Baseline_Credits > 0, "Debit", "Credit"),
-    All_Plots_Credits = `All Plots` - lag(`All Plots`),
-    All_Plots_Direction = if_else(All_Plots_Credits < 0, "Debit", "Credit"),
-    Default_Credits = Default - lag(Default) - All_Plots_Credits,
-    Default_Direction = "Reversal", 
+    value = if_else(
+      name == "Default" & Year == 1980,
+      adjusted_credits,
+      value
+    ),
+    annual_credits = if_else(
+      name == "Default" & Year == 1980,
+      value - lag(value),
+      annual_credits
+    )
   )
 
-starting_credits <- credit_debit |>
-  filter(Year == 1970) |>
-  pull(`All Plots`)
-ending_credits <- credit_debit |>
-  filter(Year == 2020) |>
-  pull(`All Plots`)
-total_credits <- ending_credits - starting_credits
 
-starting_debits <- credit_debit |>
-  filter(Year == 1970) |>
-  pull(Baseline)
-ending_debits <- credit_debit |>
-  filter(Year == 2020) |>
-  pull(Baseline)
-total_debits <- ending_debits - starting_debits
+total_credits <- credit_debit |>
+  filter(credit_debit == "Credit") |>
+  pull(annual_credits) |>
+  sum()
+
+total_debits <- credit_debit |>
+  filter(credit_debit == "Debit") |>
+  pull(annual_credits) |>
+  sum()
 
 credit_caption <- paste0(
   round(total_credits),
@@ -3741,54 +3740,46 @@ credit_caption <- paste0(
   " Credits/ha"
 )
 
+
 base_cop_plot +
   geom_rect(
     data = credit_debit |>
-      filter(Year > 1970),
+      filter(name == "Default"),
     aes(
-      xmin = Year - 1,
+      xmin = Year - 0.2,
       xmax = Year,
-      ymax = `All Plots`,
-      ymin = `All Plots` - All_Plots_Credits,
-      fill = All_Plots_Direction
+      ymax = value,
+      ymin = value - annual_credits,
+      fill = credit_debit
     ),
     inherit.aes = FALSE
   ) +
   geom_rect(
     data = credit_debit |>
-      filter(Year > 1970),
+      filter(name == "Baseline"),
     aes(
       xmin = Year,
-      xmax = Year + 1,
-      ymax = Baseline,
-      ymin = Baseline - Baseline_Credits,
-      fill = Baseline_Direction
+      xmax = Year + 0.2,
+      ymax = value,
+      ymin = value - annual_credits,
+      fill = credit_debit
     ),
     inherit.aes = FALSE
-  ) +
-  geom_rect(
-    data = credit_debit |>
-      filter(Year > 1990),
-    aes(
-      xmin = Year,
-      xmax = Year + 1,
-      ymax = Default,
-      ymin = Default - Default_Credits,
-      fill = Default_Direction
-    ),
-    inherit.aes = FALSE
-  ) +
-  geom_line(
-    data = imaginary_cop |>
-      filter(name == "All Plots")
   ) +
   geom_point(
     data = imaginary_cop |>
-      filter(name == "All Plots")
+      filter(name == "All Plots" & Year <= 1980)
   ) +
+  theme(
+    aspect.ratio = 1,
+    axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)
+  ) +
+  coord_cartesian(xlim = c(1970, 1980), ylim = c(48, 75)) +
+  scale_x_continuous(breaks = 1970:1980) +
   labs(
     caption = credit_caption
   )
+
 ```
 
 ## Subsequent Re-Surveys
