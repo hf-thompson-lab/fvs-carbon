@@ -17,11 +17,10 @@ suppressPackageStartupMessages({
   library(ggpmisc) # for stat_poly_eq
 })
 tar_source()
-```
+
 
 ## Load targets results from other documents
 
-```{r load tar objects, eval = FALSE}
 tar_load(fiadb)
 tar_load(fvsne_states)
 tar_load(species_crosswalk)
@@ -32,14 +31,9 @@ tar_load(fvs_num_partitions)
 tar_load(fvs_partition)
 tar_load(fvs_randseed)
 tar_load(nrsres_model)
-```
 
 ## Preload targets results from this document
 
-When tar_make() has already built the objects defined in this document,
-run this block to pre-load them. You can then skip running ```{targets} blocks.
-
-```{r load tar objects defined here, eval = FALSE}
 get_this_rmd_file() |>
   tar_objects_defined_in_rmd() |>
   tar_load()

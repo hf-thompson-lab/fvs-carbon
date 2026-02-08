@@ -841,20 +841,26 @@ nrsgro_ca10_proj_vs_meas <- ca10_carbon_tmp |>
 
 ```{r plot nrsgro_ca10_proj_vs_meas flux, eval = FALSE}
 nrsgro_ca10_proj_vs_meas |>
+  mutate(
+    Carbon_Flux_Srvy = -Carbon_Flux_Srvy,
+    Carbon_Flux_Calb = -Carbon_Flux_Calb
+  ) |>
   ggplot(aes(Carbon_Flux_Srvy, Carbon_Flux_Calb)) +
   geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
   geom_hline(yintercept = 0, color = "black", linewidth = 0.25) +
+  geom_bin2d(binwidth = 0.25) +
+  scale_fill_viridis_c(name = "Number\nof Plots", direction = -1)+
   geom_abline(slope = 1, intercept = 0, color = "gray", linewidth = 0.25) +
-  geom_point(size = 0.1, alpha = 0.25) +
+  #geom_point(size = 0.1, alpha = 0.25) +
   coord_cartesian(xlim = c(-5, 5), ylim = c(-5, 5)) +
-  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.5, color = "blue") +
-  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  #stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.5, color = "blue") +
+  #stat_poly_eq(use_label("eq", "R2","p"), formula = y ~ x, color = "blue") +
   theme_bw() +
   theme(aspect.ratio = 1) +
-  ggtitle("FVS Grow-Only\nProjected vs. Measured Annual Carbon Flux") +
+  ggtitle("Projected vs. Measured Annual Carbon Flux") +
   xlab(bquote("Measured Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
-  ylab(bquote("Projected Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1))) +
-  labs(caption = "With 10-Year Calibration")
+  ylab(bquote("Projected Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% year^-1)))# +
+  #labs(caption = "With 10-Year Calibration")
 ```
 
 ## Carbon Flux Residual
@@ -912,31 +918,30 @@ nrsgro_ca10_proj_vs_meas |>
   theme_bw() +
   xlab(bquote("Starting Basal Area" ~ (m^2 %.% hectare^-1))) +
   ylab(bquote("BAI Residual" ~ (m^2 %.% hectare^-1 %.% year^-1))) +
-  ggtitle("BAI Residual vs. Stand Starting Basal Area (10-year Calibration)")
-#  labs(caption = "With 10-year calibration") +
+  ggtitle("BAI Residual vs. Stand Starting Basal Area") +
+  labs(caption = "With 10-year calibration")
   #scale_y_continuous(limits = c(-10, 5))
 ```
 
 ## BAI vs. Starting BA
 
 ```{r basal_area_trend, eval = FALSE}
-ggplot(
-  nrsgro_ca10_proj_vs_meas |>
-    mutate(
-      BA_Range = cut(BALIVE_METRIC, 0:19 * 5)
-    ),# |>
-#    group_by(FOREST_TYPE_GROUP) |>
-#    mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
-#    ungroup(),
-  aes(x = BA_Range, y = Carbon_Flux_Residual)
-) +
+nrsgro_ca10_proj_vs_meas |>
+  mutate(
+    BA_Range = cut(BALIVE_METRIC, 0:19 * 5),
+    Carbon_Flux_Residual = -Carbon_Flux_Residual
+  ) |>
+#  group_by(FOREST_TYPE_GROUP) |>
+#  mutate(FOREST_TYPE_GROUP = paste0(FOREST_TYPE_GROUP, ", n=", n())) |>
+#  ungroup() |>
+  ggplot(aes(x = BA_Range, y = Carbon_Flux_Residual)) +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_boxplot(outlier.size = 0.1, varwidth = TRUE) +
+  geom_boxplot(outlier.size = 0.1, varwidth = TRUE, color = "blue") +
   scale_fill_discrete(name = "Forest Type Group") +
-  ggtitle("Carbon Flux Residual vs. Measured BA") +
-  labs(caption = "With 10-Year Calibration") +
+  ggtitle("Carbon Flux Residual vs. Starting Stand BA") +
+#  labs(caption = "With 10-Year Calibration") +
   ylab(bquote("Carbon Flux Residual "(`Mg C` %.% ha^-1 %.% yr^-1))) +
   xlab(bquote("Starting Stand BA "(m^2 %.% ha^-1))) +
   theme_bw() +
-  coord_cartesian(ylim = c(-5, 5))
+  coord_cartesian(ylim = c(-3, 3))
 ```
