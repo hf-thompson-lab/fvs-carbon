@@ -863,23 +863,117 @@ nrsgro_ca10_proj_vs_meas |>
   #labs(caption = "With 10-Year Calibration")
 ```
 
+Uncertainty
+
+```{r carbon flux uncertainty, eval = FALSE}
+nrsgro_ca10_proj_vs_meas |>
+  mutate(
+    `Projected Flux` = -Carbon_Flux_Calb * (44/12),
+    `Measured Flux` = -Carbon_Flux_Srvy * (44/12)
+  ) |>
+  select(`Projected Flux`, `Measured Flux`) |>
+  pivot_longer(everything()) |>
+  ggplot(aes(value)) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  geom_density(aes(fill = name), alpha = 0.25) +
+  theme_bw(base_size = 14) +
+  theme(aspect.ratio = 1) +
+  coord_cartesian(xlim = c(-3, 12)) +
+  scale_fill_manual(
+    name = NULL,
+    values = c(
+      "Projected Flux" = "darkorange",
+      "Measured Flux" = "blue"
+    )
+  ) +
+  xlab(bquote(Mg ~ CO[2]*e %.% ha^-1 %.% yr^-1)) +
+  ylab("Density") +
+  ggtitle("Projected vs. Measured Annual Carbon Flux")
+```
+
 ## Carbon Flux Residual
+
+Need some numbers:
+
+```{r}
+nrsgro_ca10_proj_vs_meas |>
+  mutate(
+    Carbon_Flux_Srvy = -Carbon_Flux_Srvy,
+    Carbon_Flux_Calb = -Carbon_Flux_Calb
+  ) |>
+  summarize(
+    Carbon_Flux_Srvy = mean(Carbon_Flux_Srvy),
+    Carbon_Flux_Calb = mean(Carbon_Flux_Calb)
+  )
+```
 
 ```{r plot carbon flux residual vs balive, eval = FALSE}
 nrsgro_ca10_proj_vs_meas |>
+  mutate(
+    group = cut(BALIVE_METRIC, 0:19 * 5),
+    Carbon_Flux_Residual = -Carbon_Flux_Residual
+  ) |>
   ggplot(aes(BALIVE_METRIC, Carbon_Flux_Residual)) +
-  geom_point(size=0.25) +
-  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 1, color = "blue") +
-  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
+  geom_boxplot(aes(group = group), median.linewidth = 0.5, outlier.shape = NA, color = "black", fill = "transparent") +
+  geom_point(size=0.25, color = "green3", alpha = 0.5) +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.5, linetype = "dashed", color = "blue") +
+  stat_poly_eq(use_label("eq", "R2", "P"), formula = y ~ x, label.x = "right", label.y = "bottom", color = "blue") +
   geom_hline(yintercept = 0, color = "black", linewidth = 0.25) +
   theme_bw() +
-  xlab(bquote("Starting Basal Area" ~ (m^2 %.% hectare^-1))) +
-  ylab(bquote("Carbon Flux Residual" ~ (`Mg C` %.% hectare^-1 %.% year^-1))) +
-  ggtitle("Carbon Flux Residual vs. Stand Starting Basal Area (10-year Calibration)") +
+  xlab(bquote("Starting Stand Basal Area" ~ (m^2 %.% ha^-1))) +
+  ylab(bquote("Carbon Flux Residual" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  ggtitle("Carbon Flux Residual vs. Stand Starting Basal Area") +
 #  labs(caption = "With 10-year calibration") +
-  scale_y_continuous(limits = c(-10, 5))
+  scale_y_continuous(limits = c(-4, 4))
 ```
 
+Uncertainty
+
+```{r carbon flux uncertainty, eval = FALSE}
+nrsgro_ca10_proj_vs_meas |>
+  mutate(
+    `Flux Residual` = -Carbon_Flux_Residual * (44/12),
+    `Measured Flux` = -Carbon_Flux_Srvy * (44/12)
+  ) |>
+  select(`Flux Residual`, `Measured Flux`) |>
+  pivot_longer(everything()) |>
+  ggplot(aes(value)) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  geom_density(aes(fill = name), alpha = 0.25) +
+  theme_bw(base_size = 14) +
+  theme(aspect.ratio = 1) +
+  coord_cartesian(xlim = c(-3, 12)) +
+  scale_fill_manual(
+    name = NULL,
+    values = c(
+      "Flux Residual" = "green2",
+      "Measured Flux" = "blue"
+    )
+  ) +
+  xlab(bquote(Mg ~ CO[2]*e %.% ha^-1 %.% yr^-1)) +
+  ylab("Density") +
+  ggtitle("Flux Residual vs. Measured Flux")
+```
+
+Ratio of residual to flux
+
+
+```{r carbon flux residual ratio, eval = FALSE}
+nrsgro_ca10_proj_vs_meas |>
+  mutate(
+    Log_Ratio = log10(abs((Carbon_Flux_Residual - median(Carbon_Flux_Residual)) / Carbon_Flux_Srvy))
+  ) |>
+  ggplot(aes(Log_Ratio)) +
+  geom_histogram(fill = "green3", binwidth = 0.5, boundary = 0) +
+  geom_vline(xintercept = 0, color = "black", linewidth = 0.25) +
+  theme_bw() +
+  scale_x_continuous(breaks = -3:3) +
+  coord_cartesian(xlim = c(-3,3)) +
+  theme(aspect.ratio = 1) +
+  ggtitle("Ratio of Bias-Adjusted C Flux Residual\nto Measured C Flux") +
+  ylab("Number of Plots") +
+  xlab(bquote(log10(`C Flux Residual` / `Measured C Flux`)))
+```
 
 ## BAI
 

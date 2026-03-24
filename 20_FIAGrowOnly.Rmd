@@ -207,10 +207,11 @@ fiagro_bai |>
     BAI < quantile(fiagro_bai$BAI, 0.99)) |>
   ggplot(aes(LAT, BAI)) +
   geom_point(size = 0.1) +
-  stat_poly_line(formula = y ~ x, se = FALSE) +
-  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x) +
+  stat_poly_line(formula = y ~ x, se = FALSE, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
   theme_bw() +
-  ggtitle("FIA Measured BAI by Latitude and Forest Type Group") +
+  coord_cartesian(ylim = c(-1, 2)) +
+  ggtitle("FIA Measured BAI in grow-only plots by Latitude, 1999 - 2024") +
   ylab(bquote("BAI" ~ (m^2 %.% ha^-1 %.% yr^-1))) +
   xlab("Latitude (degrees)") +
   labs(caption = "1% outliers removed")
@@ -224,8 +225,8 @@ fiagro_bai |>
   ) |>
   ggplot(aes(LAT, BAI)) +
   geom_point(size = 0.1) +
-  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.5) +
-  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x) +
+  stat_poly_line(formula = y ~ x, se = FALSE, linewidth = 0.5, color = "blue") +
+  stat_poly_eq(use_label("eq", "R2"), formula = y ~ x, color = "blue") +
   geom_hline(yintercept = 0, linewidth = 0.25) +
   facet_wrap("FOREST_TYPE_GROUP") +
   theme_bw() +

@@ -1435,7 +1435,12 @@ ggplot(fvsne_states_map, aes(long, lat, group = group)) +
 #    mid = "lightgray",
 #    low = "blue"
 #  ) +
-  scale_color_viridis_c(name = bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1))) +
+  scale_color_viridis_c(
+    name = bquote("Carbon Flux" ~ (`Mg C` %.% ha^-1 %.% yr^-1)),
+    direction = -1,
+    limits = c(-3, 3),
+    oob = scales::squish
+  ) +
   ggtitle("FIA Measured Carbon Flux by Plot Location")
 
 remove(plot_location_tmp)
