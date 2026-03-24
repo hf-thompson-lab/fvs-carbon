@@ -280,6 +280,7 @@ plot_location_tmp <- nrsgro_plot |>
     lat = LAT,
     long = LON
   ) |>
+  filter(FOREST_TYPE_GROUP != "Nonstocked") |>
   group_by(FOREST_TYPE_GROUP) |>
   mutate(
     n = n(),
@@ -305,7 +306,7 @@ ggplot(fvsne_states_map, aes(long, lat, group = group)) +
   theme_bw() +
   theme(legend.position = "right") +
   scale_color_discrete(name = "Forest Type Group") +
-  ggtitle("FIA Grow-Only Plots in the Northeast Region") +
+  ggtitle("Unharvested, Undisturbed FIA Plots in the Northeast Region") +
   xlab("Longitude") +
   ylab("Latitude")
 
