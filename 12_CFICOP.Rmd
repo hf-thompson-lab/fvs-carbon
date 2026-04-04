@@ -4256,3 +4256,123 @@ imaginary_cop_co2e |>
   )
 
 ```
+
+# Alternate COPs
+
+We created an imaginary baseline; now let's create 2 more imaginary
+baselines and 2 more IFM scenarios
+
+## imaginary_cops
+
+Units are Mg CO2e ha^-1 yr-1
+
+Create a High Harvest and Low Harvest scenario, each of which has
+37Mg ha additionality.
+
+```{r}
+imaginary_cop_baseline2 <- imaginary_cop_co2e |>
+  select(Year, name, mean) |>
+  filter(name == "Actual") |>
+  mutate(
+    name = "Baseline 2",
+    mean = mean - 100 * (Year - 1970) / 50
+  )
+imaginary_cop_ifm2 <- imaginary_cop_co2e |>
+  select(Year, name, mean) |>
+  filter(name == "Actual") |>
+  mutate(
+    name = "IFM 2",
+    mean = mean - (100 - 37) * (Year - 1970) / 50
+  )
+
+imaginary_cop_baseline3 <- imaginary_cop_co2e |>
+  select(Year, name, mean) |>
+  filter(name == "Actual") |>
+  mutate(
+    name = "Baseline 3",
+    mean = mean + 50 * (Year - 1970) / 50
+  )
+
+imaginary_cop_ifm3 <- imaginary_cop_co2e |>
+  select(Year, name, mean) |>
+  filter(name == "Actual") |>
+  mutate(
+    name = "IFM 3",
+    mean = mean + (50 + 37) * (Year - 1970) / 50
+  )
+
+imaginary_cops <- imaginary_cop_co2e |>
+  select(Year, name, mean) |>
+  filter(name %in% c("Actual", "Baseline")) |>
+  mutate(name = if_else(name == "Actual", "IFM", name)) |>
+  union_all(imaginary_cop_baseline2) |>
+  union_all(imaginary_cop_baseline3) |>
+  union_all(imaginary_cop_ifm2) |>
+  union_all(imaginary_cop_ifm3) |>
+  mutate(
+    name = ordered(
+      name,
+      levels = c(
+        "IFM", "Baseline",
+        "IFM 2", "Baseline 2",
+        "IFM 3", "Baseline 3"
+      )
+    )
+  )
+
+imaginary_cops_addtly <- imaginary_cops |>
+  pivot_wider(id_cols = Year, names_from = "name", values_from = "mean")
+
+ggplot_cops_style <- list(
+  scale_color_discrete(
+    name = NULL
+  ),
+  scale_fill_manual(
+    name = "Scenario",
+    values = c(
+      "Actual" = "black",
+      "High Harvest" = "darkred",
+      "Low Harvest" = "royalblue"
+    ),
+    breaks = c(
+      "Low Harvest",
+      "Actual",
+      "High Harvest"
+    ),
+    drop = FALSE
+  ),
+  coord_cartesian(xlim = c(1970, 2020), ylim = c(150,500)),
+  scale_x_continuous(minor_breaks = NULL),
+  ylab(expression(Mg ~ CO[2]*e %.% ha^-1)),
+  theme_bw(base_size = 18),
+  theme(aspect.ratio = 1),
+  xlab(NULL)
+)
+
+imaginary_cops |>
+  # The scenarios
+  ggplot(aes(x = Year, y = mean, color = name)) +
+  # Additionalities
+  geom_ribbon(
+    data = imaginary_cops_addtly,
+    mapping = aes(x = Year, ymin = Baseline, ymax = IFM, fill = "Actual", group = 1),
+    alpha = 0.5,
+    inherit.aes = FALSE
+  ) +
+  geom_ribbon(
+    data = imaginary_cops_addtly,
+    mapping = aes(x = Year, ymin = `Baseline 2`, ymax = `IFM 2`, fill = "High Harvest", group = 2),
+    alpha = 0.5,
+    inherit.aes = FALSE
+  ) +
+  geom_ribbon(
+    data = imaginary_cops_addtly,
+    mapping = aes(x = Year, ymin = `Baseline 3`, ymax = `IFM 3`, fill = "Low Harvest", group = 3),
+    alpha = 0.5,
+    inherit.aes = FALSE
+  ) +
+  geom_line(linewidth = 1, show.legend = FALSE) +
+  ggplot_cops_style
+
+```
+
