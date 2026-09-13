@@ -1395,6 +1395,7 @@ FVS produces three tree tables:
  
  > As of FVS 2026.04, FVS_TreeList_East is merged into FVS_TreeList
  > As of FVS 2026.04, FVS_CutList_East is merged into FVS_CutList
+ > As of FVS 2026.04, FVS_ATRTList_East is merged into FVS_ATRTList
  
  Note that a tree in TreeList may be in neither ATRTList nor CutList, e.g.
  if it died but was not cut during the cycle.
@@ -1417,7 +1418,7 @@ nrshrv_prsc_treelist <- fvs_read_output(nrshrv_prsc, "FVS_TreeList") |>
   ungroup() |>
   arrange(StandID, Year, PtIndex, TreeIndex)
 
-nrshrv_prsc_atrtlist <- fvs_read_output(nrshrv_prsc, "FVS_ATRTList_East") |>
+nrshrv_prsc_atrtlist <- fvs_read_output(nrshrv_prsc, "FVS_ATRTList") |>
   group_by(StandID) |>
   filter(
     Year == min(Year, na.rm = TRUE),
