@@ -68,3 +68,4 @@ _targets/
 # rendered documents
 *.html
 rendered/
+.positai
