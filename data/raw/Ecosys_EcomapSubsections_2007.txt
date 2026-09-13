@@ -1,0 +1,35 @@
+USFS Ecological Subsections
+
+Retrieved from:
+
+https://data.fs.usda.gov/geodata/edw/datasets.php?dsetCategory=geoscientificinformation
+
+Retrieved on:
+2026-09-12
+
+Date of last refresh: Jan 1, 2007
+
+The name of the GeoDatabase within the .ZIP file is
+Ecosys_EcomapSubsections_2007.gdb
+
+The Ecomap Subsections feature class contains ecological subsection
+polygons attributed with subsection names and descriptions. The
+EcomapSubsections 2007 data set describes the ecological subsections
+within the conterminous United States. It contains regional geographic
+delineations for analysis of ecological relationships across ecological
+units. ECOMAP is the term used for a USDA Forest Service initiative to
+map ecological units and encourage their use in ecosystem-based
+approaches to forest land conservation and management. This is a
+collaborative effort with many partners. It is coordinated at the
+national and regional levels by USDA Forest Service staff and
+implemented in cooperation with State forestry agencies and others.
+ECOMAP mapping criteria are outlined in the National Hierarchical
+Framework of Ecological Units. The framework systematically divides the
+country into progressively smaller areas of land and water that have
+similar physical and biological characteristics and ecological
+processes.
+
+Central MA incl. Harvard Forest is in 221Ah; Eastern MA and Southern NH
+are in 221Ai.
+
+See also: https://research.fs.usda.gov/download/treesearch/48672.pdf

@@ -5,3 +5,7 @@ DWSP_CFI
 
 # Data from MassGIS
 MassGIS
+
+# USFS Ecoregions
+Ecosys_Ecomap*.zip
+
