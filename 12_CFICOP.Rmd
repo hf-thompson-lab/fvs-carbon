@@ -2742,7 +2742,7 @@ fvs_read_output(cficop_hvst, "FVS_Summary2") |>
 Cut trees
 
 ```{targets cficop_hvst_cutlist, tar_simple = TRUE}
-fvs_read_output(cficop_hvst, "FVS_CutList_East") |>
+fvs_read_output(cficop_hvst, "FVS_CutList") |>
   filter(random_seed == min(random_seed))
 ```
 
