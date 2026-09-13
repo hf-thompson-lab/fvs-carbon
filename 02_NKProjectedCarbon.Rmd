@@ -19,6 +19,18 @@ library(ggplot2)
 tar_source()
 ```
 
+## Preload targets results from this document
+
+When tar_make() has already built the objects defined in this document,
+run this block to pre-load them. You can then skip running ```{targets} blocks.
+
+```{r load tar objects defined here, eval = FALSE}
+get_this_rmd_file() |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+```
+
+
 # Reconstructing NK Figure 2
 
 To validate FVS runs, we reconstruct the table behind Figure 2. To do

@@ -20,6 +20,7 @@ tar_target(cficop_plot_sibling, {
     mutate(
       TPA = 5,
       BA = VisitTreeDIAM
+  #    BA = pi * (VisitTreeDIAM / 2)^2 * 5
     )
   
   tmp_by_plot <- tmp_trees |>

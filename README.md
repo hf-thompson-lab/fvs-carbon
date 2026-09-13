@@ -23,8 +23,8 @@ FIA Data Mart and unzip into `data/raw`. This should result in the file
 to add indexes to the FIADB; while not required, these can reduce the time
 for a single run of FVS from hours to minutes.
 
-You will need a working FVS installation, with the FVSne.exe program installed.
-Currently this is hard-coded to look in `C:\FVS\FVSbin\` for `FVSne.exe`.
+You will need a working FVS installation, with the FVSne program installed.
+Currently this is hard-coded to look in `~/bin` for `FVSne`.
 
 # Building
 

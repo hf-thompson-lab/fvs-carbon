@@ -571,8 +571,8 @@ tar_target(
       filter_add_stand_id()
     
 
-    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    fvsbin_dir <- "~/bin" # TODO: put these in a config file
+    fvs_variant <- "FVSne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
     title <- "NRSGrowOnly"
     mgmt_id <- "CA10"
@@ -895,7 +895,7 @@ nrsgro_ca10_proj_vs_meas |>
 
 Need some numbers:
 
-```{r}
+```{r, eval = FALSE}
 nrsgro_ca10_proj_vs_meas |>
   mutate(
     Carbon_Flux_Srvy = -Carbon_Flux_Srvy,
@@ -929,7 +929,7 @@ nrsgro_ca10_proj_vs_meas |>
 
 Uncertainty
 
-```{r carbon flux uncertainty, eval = FALSE}
+```{r carbon flux residual vs measured, eval = FALSE}
 nrsgro_ca10_proj_vs_meas |>
   mutate(
     `Flux Residual` = -Carbon_Flux_Residual * (44/12),

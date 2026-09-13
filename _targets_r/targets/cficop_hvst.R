@@ -2,8 +2,8 @@ tar_target(
   cficop_hvst,
   {
     timestep <- 10 # years; determined by FVSne variant
-    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    fvsbin_dir <- "~/bin" # TODO: put these in a config file
+    fvs_variant <- "FVSne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
     title <- "CFICarbonOffsetProgram"
     mgmt_id <- "HVST"

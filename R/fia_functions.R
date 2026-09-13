@@ -71,7 +71,7 @@ fia_fiadb_indexed <- function() {
   #    else we need to do to make the download practical to use.
   # 3. Notify targets that the database is in the appropriate files.
   fiadb <- "data/raw/SQLite_FIADB_ENTIRE.db"
-  con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO) # not SQLITE_RC
+  con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RW) # not SQLITE_RWC
   on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
 
   tbls <- DBI::dbListTables(con)

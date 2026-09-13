@@ -545,8 +545,8 @@ Next, we want to run FVS for each of those plots, in each of those years.
 Generate the keywordfile for NK Plots projected carbon using FFE algorithm.
 
 ```{targets nk_ffe_none, tar_simple = TRUE}
-fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-fvs_variant <- "fvsne"      # TODO: put these in a config file
+fvsbin_dir <- "~/bin" # TODO: put these in a config file
+fvs_variant <- "FVSne"      # TODO: put these in a config file
 data_dir <- "data/fvs"
 title <- "NKFFE"
 mgmt_id <- "NONE"
@@ -608,8 +608,8 @@ knitr::kable(fvs_stand_projected_ffe)
 Generate the keywordfile for NK Plots measured carbon using FFE algorithm.
 
 ```{targets nk_ffe_srvy, tar_simple = TRUE}
-fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-fvs_variant <- "fvsne"      # TODO: put these in a config file
+fvsbin_dir <- "~/bin" # TODO: put these in a config file
+fvs_variant <- "FVSne"      # TODO: put these in a config file
 data_dir <- "data/fvs"
 title <- "NKFFE"
 mgmt_id <- "SRVY"
@@ -666,8 +666,8 @@ knitr::kable(fvs_stand_measured_ffe)
 
 Generate the keywordfile for NK Plots projected carbon using Jenkins algorithm.
 ```{targets nk_jenkins_none, tar_simple = TRUE}
-fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-fvs_variant <- "fvsne"      # TODO: put these in a config file
+fvsbin_dir <- "~/bin" # TODO: put these in a config file
+fvs_variant <- "FVSne"      # TODO: put these in a config file
 data_dir <- "data/fvs"
 title <- "NKJenkins"
 mgmt_id <- "NONE"
@@ -724,8 +724,8 @@ knitr::kable(fvs_stand_projected_jenkins)
 Generate the keywordfile for NK Plots measured carbon using FFE algorithm.
 
 ```{targets nk_jenkins_srvy, tar_simple = TRUE}
-fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-fvs_variant <- "fvsne"      # TODO: put these in a config file
+fvsbin_dir <- "~/bin" # TODO: put these in a config file
+fvs_variant <- "FVSne"      # TODO: put these in a config file
 data_dir <- "data/fvs"
 title <- "NKJenkins"
 mgmt_id <- "SRVY"

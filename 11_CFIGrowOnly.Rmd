@@ -1615,8 +1615,8 @@ tar_target(
     #   survey year to the start of the projection.
     # LAST_YEAR - end of the projection
     timestep <- 10 # years; determined by FVSne variant
-    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    fvsbin_dir <- "~/bin" # TODO: put these in a config file
+    fvs_variant <- "FVSne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
     title <- "CFIGrowOnly"
     mgmt_id <- "NONE"
@@ -1692,8 +1692,8 @@ tar_target(
 
     # No establishment for survey runs
 
-    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    fvsbin_dir <- "~/bin" # TODO: put these in a config file
+    fvs_variant <- "FVSne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
     title <- "CFIGrowOnly"
     mgmt_id <- "SRVY"
@@ -2682,7 +2682,7 @@ cfigro_training_data |>
 
 ## Error Distribution
 
-```{r plot cfigro_aglcf_model density, eval = FALSE}
+```{r plot cfigro_aglcf_model density2, eval = FALSE}
 cfigro_training_data |>
   mutate(
     Modeled_Residual = cfigro_aglcf_model$predict(cfigro_aglcf_task)$response
@@ -2741,7 +2741,7 @@ so 0.011%
 
 So, let's look at distribution of biomass in our 277 plot sample:
 
-```{r population mean}
+```{r population mean, eval = FALSE}
 hectares <- conv_unit(56816, "acre", "hectare")
 
 population_mean <- cfigro_none_proj_vs_meas |>
@@ -2776,7 +2776,7 @@ population_mean <- cfigro_none_proj_vs_meas |>
 ```
 
 Plot it:
-```{r plot population mean}
+```{r plot population mean, eval = FALSE}
 population_mean |>
   mutate(group = ordered(group, levels = c("measured", "projected"))) |>
   ggplot(aes(Year, mean)) +
@@ -2790,7 +2790,7 @@ population_mean |>
   scale_fill_discrete(name = "95% CI")
 ```
 
-```{r adjusted_population_mean}
+```{r adjusted_population_mean, eval = FALSE}
 # These definitions need to match what's used in the target to build the model
 cfigro_aglcf_task <- as_task_regr(
   cfigro_training_data,
@@ -2866,7 +2866,7 @@ adjusted_population_mean <- cfigro_training_data |>
 
 ```
 
-```{r plot adjusted population mean}
+```{r plot adjusted population mean, eval = FALSE}
 adjusted_population_mean |>
   mutate(group = ordered(group, levels = c("measured", "projected", "adjusted"))) |>
   ggplot(aes(Year, mean)) +

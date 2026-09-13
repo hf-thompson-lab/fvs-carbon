@@ -680,7 +680,8 @@ x <- fiagro_tpa |>
   ) |>
   ungroup()
 ```
-```{r}
+
+```{r, eval = FALSE}
 x |>  
   ggplot(aes(TPH_BIN, BAH_BIN, group = GROUP)) +
   geom_point(aes(color = N), shape = "square", size = 3) +
@@ -786,7 +787,7 @@ tph_bah_dir <- fiagro_tpa |>
   left_join(direction_colors, by = join_by(TPH_DIR, BAH_DIR))
 ```
 
-```{r}
+```{r, eval = FALSE}
 tph_bah_dir |>
   ggplot(aes(TPH_BIN, BAH_BIN, color = COLOR)) +
   geom_point(shape = "square", size = 3.75) +

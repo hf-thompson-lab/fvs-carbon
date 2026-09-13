@@ -19,8 +19,8 @@ tar_target(
     # year, so we run 0-year timesteps for 1 year.
     timestep <- 1
     
-    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    fvsbin_dir <- "~/bin" # TODO: put these in a config file
+    fvs_variant <- "FVSne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
     title <- "NRSGrowOnly"
     mgmt_id <- "SRVY"

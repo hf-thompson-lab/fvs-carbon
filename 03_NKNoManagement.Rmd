@@ -199,8 +199,8 @@ The main output will be Carbon and fuels. Stand visualization, Tree
 lists, and Inventory statistics may also be interesting.
 
 ```{targets nk_byplot_none, tar_simple = TRUE}
-fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-fvs_variant <- "fvsne"      # TODO: put these in a config file
+fvsbin_dir <- "~/bin" # TODO: put these in a config file
+fvs_variant <- "FVSne"      # TODO: put these in a config file
 data_dir <- "data/fvs"
 title <- "NKByPlot"
 mgmt_id <- "NONE"

@@ -26,8 +26,8 @@ tar_target(
       filter_add_stand_id()
     
 
-    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    fvsbin_dir <- "~/bin" # TODO: put these in a config file
+    fvs_variant <- "FVSne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
     title <- "NRSGrowOnly"
     mgmt_id <- "CA10"

@@ -60,8 +60,8 @@ tar_target(
       filter(!is.na(SPECIES) & !is.na(DENSITY) & !is.na(HEIGHT)) |>
       select(STAND_CN, SPECIES, DENSITY, HEIGHT)
       
-    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    fvsbin_dir <- "~/bin" # TODO: put these in a config file
+    fvs_variant <- "FVSne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
     title <- "NRSGrowOnly"
     mgmt_id <- "NONE"

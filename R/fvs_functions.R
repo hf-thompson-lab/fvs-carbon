@@ -475,6 +475,8 @@ fvs_keywordfile_section <- function(
     fvs_kwd("FuelRept"),
     fvs_kwd("End"), # FMIn
     fvs_kwd("Database"), # Database extension
+    fvs_kwd("DSNOut"),
+    output_db,
     fvs_kwd("DSNIn"),
     input_db,
     fvs_kwd("StandSQL"),
@@ -483,8 +485,6 @@ fvs_keywordfile_section <- function(
     fvs_kwd("TreeSQL"),
     paste0("SELECT * FROM ", tree_table, " WHERE Stand_CN = '%Stand_CN%'"),
     fvs_kwd("EndSQL"), # TreeSQL
-    fvs_kwd("DSNOut"),
-    output_db,
     fvs_kwd("ATrtLiDB", 2),
     fvs_kwd("CalbStDb", 2),
     fvs_kwd("CarbReDB", 2),
@@ -639,7 +639,7 @@ fvs_run <- function(
 
   # Return the name of the keyword file and output database
   fvs <- processx::process$new(
-    file.path(fvsbin_dir, fvs_variant),
+    file.path(normalizePath(fvsbin_dir), fvs_variant),
     paste0("--keywordfile=", basename(fvs_keyword_filename)),
     wd = dirname(fvs_keyword_filename)
   )

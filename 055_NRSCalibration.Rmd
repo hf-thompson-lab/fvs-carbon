@@ -857,8 +857,8 @@ tar_target(
       filter(!is.na(SPECIES) & !is.na(DENSITY) & !is.na(HEIGHT)) |>
       select(STAND_CN, SPECIES, DENSITY, HEIGHT)
       
-    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    fvsbin_dir <- "~/bin" # TODO: put these in a config file
+    fvs_variant <- "FVSne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
     title <- "NRSGrowOnly"
     mgmt_id <- "CALB"
@@ -1424,7 +1424,8 @@ ggplot(fvsne_states_map, aes(long, lat, group = group)) +
     location = "tl",
     width = unit(1, "cm"),
     pad_x = unit(0.75, "cm"),
-    pad_y = unit(0.5, "cm")
+    pad_y = unit(0.5, "cm"),
+    which_north = "true"
   ) +
   theme_bw() +
   theme(legend.position = "bottom") +

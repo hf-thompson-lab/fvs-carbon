@@ -12,6 +12,7 @@ suppressPackageStartupMessages({
   library(tidyverse)
   library(readxl)
   library(terra)
+  library(tidyterra)
   library(sf)
   library(rnaturalearth)
   library(measurements)
@@ -792,6 +793,14 @@ I think I need to get a polygon for the watershed / districts, then use
 land cover to find the forested area ... in 1970. Which I can't. Unless
 they have literature that tells me.
 
+From MassGIS:
+https://www.mass.gov/info-details/massgis-data-nrcs-huc-basins-81012
+
+> This dataset is a digital hydrologic unit boundary layer that is at the Subwatershed (12-digit) level. The layer also includes delineations at the Watershed (10-digit) and Subbasin (8-digit) levels. Each basin is identified by a unique Hydrologic Unit Code (HUC), as well a name, at each level. HUCs are identifiers as assigned to basin polygons by the U.S. Geological Survey (USGS).
+
+HUC 12 seems to correspond to the DCR notion of subbasin, even though
+HUC 8 is labeled "subbasin".
+
 But we can start with, what if it's 100% forested.
 
 ```{targets cficop_sam_wt, tar_simple = TRUE}
@@ -916,8 +925,8 @@ tar_target(
   cficop_none,
   {
     timestep <- 10 # years; determined by FVSne variant
-    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    fvsbin_dir <- "~/bin" # TODO: put these in a config file
+    fvs_variant <- "FVSne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
     title <- "CFICarbonOffsetProgram"
     mgmt_id <- "NONE"
@@ -1444,8 +1453,8 @@ tar_target(
   cficop_dflt,
   {
     timestep <- 10 # years; determined by FVSne variant
-    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    fvsbin_dir <- "~/bin" # TODO: put these in a config file
+    fvs_variant <- "FVSne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
     title <- "CFICarbonOffsetProgram"
     mgmt_id <- "DFLT"
@@ -1539,8 +1548,8 @@ tar_target(
 
     # No establishment for survey runs
 
-    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    fvsbin_dir <- "~/bin" # TODO: put these in a config file
+    fvs_variant <- "FVSne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
     title <- "CFICarbonOffsetProgram"
     mgmt_id <- "SRVY"
@@ -2656,8 +2665,8 @@ tar_target(
   cficop_hvst,
   {
     timestep <- 10 # years; determined by FVSne variant
-    fvsbin_dir <- "/fvs/fvsbin" # TODO: put these in a config file
-    fvs_variant <- "fvsne"      # TODO: put these in a config file
+    fvsbin_dir <- "~/bin" # TODO: put these in a config file
+    fvs_variant <- "FVSne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
     title <- "CFICarbonOffsetProgram"
     mgmt_id <- "HVST"
@@ -3271,7 +3280,7 @@ cficop_cmp_carbon_summary |>
 
 Without the Calibrated line:
 
-```{r}
+```{r, eval = FALSE}
 plt <- cficop_cmp_carbon_summary |>
   filter(name %in% levels(name)[c(1,3,4,5)]) |>
   ggplot(aes(Year, mean, color = name)) +
@@ -3601,7 +3610,7 @@ the mean lands at about 98. Since actual management represents IFM already,
 let's create a fake baseline by migrating from mean to the 2.5%ile over
 50 years, which is subtracting 5 for each decade after 1970.
 
-```{r}
+```{r, eval = FALSE}
 imaginary_cop_baseline <- cficop_cmp_carbon_summary |>
   filter(name == "All Plots") |>
   mutate(
@@ -3625,7 +3634,7 @@ imaginary_cop <- cficop_cmp_carbon_summary |>
 
 ## Base Plot
 
-```{r}
+```{r, eval = FALSE}
 base_cop_plot <- imaginary_cop |>
   filter(
     name %in% c("Baseline", "Default")
@@ -3663,7 +3672,7 @@ print(base_cop_plot)
 
 ## Time 0: Estimated Value
 
-```{r}
+```{r, eval = FALSE}
 overall_value <- imaginary_cop |>
   filter(Year == 2020) |>
   pivot_wider(id_cols = "Year", values_from = mean) |>
@@ -3695,7 +3704,7 @@ base_cop_plot +
 
 ## Years 1-9 Desk Reports
 
-```{r}
+```{r, eval = FALSE}
 # We need annual credit / debit.
 credit_debit <- imaginary_cop |>
   filter(Year <= 1980) |>
@@ -3784,7 +3793,7 @@ base_cop_plot +
 
 ## Year 10: Re-Survey
 
-```{r}
+```{r, eval = FALSE}
 adjusted_credits <- imaginary_cop |>
   filter(name == "All Plots" & Year == 1980) |>
   pull(mean)
@@ -3872,7 +3881,7 @@ base_cop_plot +
 
 ## Subsequent Re-Surveys
 
-```{r}
+```{r, eval = FALSE}
 credit_debit <- imaginary_cop |>
   filter(name %in% c("Default", "All Plots", "Baseline")) |>
   # Create a table with a column per Year
@@ -3966,7 +3975,7 @@ base_cop_plot +
 
 ## For creating partial plots
 
-```{r}
+```{r, eval = FALSE}
 alt_cop_plot <- imaginary_cop |>
   mutate(
     name = if_else(name == "All Plots", "IFM", name),
@@ -4039,7 +4048,7 @@ print(alt_cop_plot)
 ## CO2e Charts
 
 Convert Mg C to CO2e
-```{r}
+```{r, eval = FALSE}
 imaginary_cop_co2e <- imaginary_cop |>
   filter(name != "Site Calibrated") |>
   filter(name != "Undisturbed (31)") |>
@@ -4084,7 +4093,7 @@ ggplot_cop_style <- list(
 )
 ```
 
-```{r}
+```{r, eval = FALSE}
 final_add <- round((
   imaginary_cop_co2e |>
     filter(name == "Actual") |>
@@ -4119,7 +4128,7 @@ ggplot(aes(x = Year, y = mean, color = name)) +
 ```
 
 
-```{r}
+```{r, eval = FALSE}
 additionality <- imaginary_cop_co2e |>
   filter(name == "Actual" | name == "Default") |>
   pivot_wider(id_cols = Year, names_from = name, values_from = mean) |>
@@ -4161,7 +4170,7 @@ imaginary_cop_co2e |>
   ggplot_cop_style
 ```
 
-```{r}
+```{r, eval = FALSE}
 additionality <- imaginary_cop_co2e |>
   filter(name == "Actual" | name == "Best Estimate") |>
   pivot_wider(id_cols = Year, names_from = name, values_from = mean) |>
@@ -4203,7 +4212,7 @@ imaginary_cop_co2e |>
 
 ```
 
-```{r}
+```{r, eval = FALSE}
 additionality <- imaginary_cop_co2e |>
   filter(name == "Actual" | name == "Baseline") |>
   pivot_wider(id_cols = Year, names_from = name, values_from = mean) |>
@@ -4269,7 +4278,7 @@ Units are Mg CO2e ha^-1 yr-1
 Create a High Harvest and Low Harvest scenario, each of which has
 37Mg ha additionality.
 
-```{r}
+```{r, eval = FALSE}
 imaginary_cop_baseline2 <- imaginary_cop_co2e |>
   select(Year, name, mean) |>
   filter(name == "Actual") |>
@@ -4375,4 +4384,318 @@ imaginary_cops |>
   ggplot_cops_style
 
 ```
+
+# Verra 5.0
+
+## Baseline
+
+### Sensitivity
+
+NRS-18 says we need the sd / mean; how much do these vary by sample size?
+
+```{r, eval = FALSE}
+c1970_actual <- cficop_none_carbon |>
+  filter(Year == 1970) |>
+  select(Aboveground_Total_Live)
+
+# We have 277 rows; let's start at sample size 20, and do 100 iterations
+# at each sample size
+bootstrap <- lapply(seq(35,265,5), \(sample_size) {
+  lapply(1:100, \(n) {
+    c1970_actual |>
+      slice_sample(n = sample_size) |>
+      summarize(
+        sample_size = !!sample_size,
+        mean = mean(Aboveground_Total_Live),
+        sd = sd(Aboveground_Total_Live)
+      )
+  }) |>
+    bind_rows()
+}) |>
+  bind_rows()
+```
+
+```{r, eval = FALSE}
+bootstrap |>
+  group_by(sample_size) |>
+  summarize(
+    val = mean(sd),
+    range = sd(sd),
+    ymax = val + range,
+    ymin = val - range
+  ) |>
+  ggplot(aes(sample_size, ymin = ymin, ymax = ymax)) +
+  geom_ribbon()
+```
+
+So, a lot.
+
+What does this say for n?
+
+```{r, eval = FALSE}
+bootstrap <- bootstrap |>
+  mutate(
+    n = (sd * 2.1)/(mean * 0.08)^2 
+  )
+bootstrap |>
+  group_by(sample_size) |>
+  summarize(
+    val = mean(n),
+    range = sd(n),
+    ymax = val + range,
+    ymin = val - range
+  ) |>
+  ggplot(aes(sample_size, ymin = ymin, ymax = ymax)) +
+  geom_ribbon()
+
+```
+
+I think what we learn from this is that the Quabbin plots are very uniform.
+
+### USFS Ecosubsections
+
+Finzi 2020 used 193 unharvested FIA plots in EPA ecoregions 58g and 59b
+
+This is a little odd, since FIA references USFS Ecosubsections, which
+are NOT the same as EPA ecoregions.
+
+Harvard Forest is in USFS Ecosubsection 221Ah; 58g and 59b extend into
+southern New Hampshire, which is USFS Ecosubsections M211Bd and 221Ai.
+So I'll look at plots in those two ecoregions.
+
+```{r, eval = FALSE}
+usfs_ecosub <- terra::vect(file.path(
+  "/vsizip",
+  "data/raw/Ecosys_EcomapSubsections_2007.gdb.zip",
+  "Ecosys_EcomapSubsections_2007.gdb"
+)) |>
+  # These come in EPSG:4269, which is a meters projection
+  # for North America. Convert to lat/lon like everything else.
+  # Note that EPSG:4269 is NAD83, whereas EPSG:4326 is WGS84,
+  # so this re-projection is not meter accurate.
+  terra::project(crs("epsg:4326"))
+```
+
+When did we get plots in each ecoregion of interest?
+```{r, eval = FALSE}
+fia_plots_filtered(fiadb, plots = NULL, filter = \(.data, con) {
+  .data |>
+    filter(ECOSUBCD %in% c("M211Bd", "221Ah")) |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    filter(INVYR == min(INVYR, na.rm = TRUE)) |>
+    ungroup() |>
+    group_by(ECOSUBCD, INVYR) |>
+    summarize(n = n(), .groups = "drop")
+}) |>
+  group_by(ECOSUBCD) |>
+  mutate(n = cumsum(n)) |>
+  ggplot(aes(INVYR, n, color = ECOSUBCD)) +
+  geom_step() +
+  theme_bw() +
+  coord_cartesian(xlim = c(1970, 2020), ylim = c(0, NA)) +
+  ggtitle("Number of FIA plots in Ecosub M211Bd and 221Ah") +
+  ylab("Number of Plots") +
+  xlab("Year")
+```
+
+
+```{r, eval = FALSE}
+fvsne_states_map <- fvsne_states |>
+  distinct(STATE_NAME) |>
+  rename(region = STATE_NAME) |>
+  _$region |>
+  map_data("state", region = _)
+
+fvsne_ecosub_map <- usfs_ecosub |>
+  filter(MAP_UNIT_SYMBOL %in% c("M211Bd", "221Ah"))
+
+map_ext <- fvsne_ecosub_map |>
+  terra::buffer(50 * 1000) |>
+  terra::ext()
+
+#map_ext <- fvsne_states_map |>
+#  filter(region == "massachusetts") |>
+#  summarize(
+#    xmin = min(long) - 0.25,
+#    xmax = max(long) + 0.25,
+#    ymin = min(lat) - 0.25,
+#    ymax = max(lat) + 0.25
+#  ) |>
+#  as.list()
+
+plot_location_tmp <- fia_plots_filtered(
+  fiadb, plots = NULL, filter = \(.data, con) {
+    .data |>
+      filter(ECOSUBCD %in% c("M211Bd", "221Ah")) |>
+      #filter(INVYR >= 1965 & INVYR <= 1970) |>
+      group_by(STATECD, COUNTYCD, PLOT) |>
+      filter(INVYR == min(INVYR, na.rm = TRUE)) |>
+      ungroup()
+  }
+) |>
+  filter_add_stand_id() |>
+  select(STAND_ID, CN, LAT, LON, ELEV, ECOSUBCD) |>
+  rename(
+    StandID = STAND_ID,
+    group = CN,
+    lat = LAT,
+    long = LON,
+    elev = ELEV
+  )
+
+
+plot_location_tmp <- nrsgro_plot |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  filter(INVYR == min(INVYR, na.rm = TRUE)) |>
+  ungroup() |>
+  filter_add_stand_id() |>
+  select(STAND_ID, CN, LAT, LON, ELEV) |>
+  rename(
+    StandID = STAND_ID,
+    group = CN,
+    lat = LAT,
+    long = LON,
+    elev = ELEV
+  )
+
+ggplot() +
+  geom_spatvector(
+    data = fvsne_ecosub_map,
+    mapping = aes(group = MAP_UNIT_SYMBOL, fill = MAP_UNIT_NAME),
+    inherit.aes = FALSE
+  ) +
+  geom_sf(
+    data = lakes,
+    fill = "blue",
+    inherit.aes = FALSE
+  ) +
+  geom_point(
+    data = plot_location_tmp,
+    mapping = aes(long, lat, group = group),
+    size = 0.5,
+    color = "white"
+  ) +
+  geom_point(
+    data = plot_location_tmp,
+    mapping = aes(long, lat, group = group),
+    size = 0.1,
+    color = "black"
+  ) +
+  geom_polygon(
+    data = fvsne_states_map,
+    mapping = aes(long, lat, group = group),
+    fill = "transparent",
+    color = "black"
+  ) +
+  scale_fill_viridis_d() +
+  coord_sf(
+    crs = "epsg:4326",
+    xlim = c(map_ext$xmin, map_ext$xmax),
+    ylim = c(map_ext$ymin, map_ext$ymax)
+  ) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(
+    location = "br",
+    #width = unit(1, "cm"),
+    style = north_arrow_minimal,
+    pad_x = unit(-0.25, "cm"),
+    pad_y = unit(0.65, "cm"),
+    which_north = "true"
+  ) +
+  theme_bw() +
+#  theme(legend.position = "bottom") +
+  ggtitle("FIA Plots in USFS Ecosubsections") +
+  labs(fill = "Ecosubsection")
+
+#remove(plot_location_tmp)
+```
+
+How many?
+
+```{r, eval = FALSE}
+plot_location_tmp |>
+  left_join(
+    usfs_ecosub |> as.data.frame(), by = join_by(ECOSUBCD == MAP_UNIT_SYMBOL)
+  ) |>
+  group_by(MAP_UNIT_NAME) |>
+  summarize(n = n()) |>
+  View()
+```
+
+## CFI Harvest
+
+```{r, eval = FALSE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  View()
+```
+
+Yeah, there are 14 trees cut in 1970; that ain't right.
+
+## Massachusetts Timber History
+
+https://research.fs.usda.gov/treesearch/22951
+> Northeastern Forest Experiment Station 1956. The Timber Resource in
+> Massachusetts. Upper Darby, PA: U.S. Department of Agriculture,
+> Forest Service, Northeastern Forest Experiment Station. 45 p.
+
+This was done in collaboration with Harvard Forest; maybe the
+materials that went into it were preserved?
+
+p 1:
+The forest survey recently completed in Massachusetts shows that the
+state has 3.3 million acres of commercia1 forest land. This land
+supports 2.7 billion board feet of timber, an average of 800 board feet
+per acre. 
+
+p 4:
+In 1952, sawmills in Massachusetts produced
+130,000,000 board feet of lumber, 85 percent of it
+(110,000,000 board feet ) from sawlogs harvested in local
+forests. More than l9,OOO,OOO board feet of sawlogs were
+received at the mills from out-of-state sources. On the
+other hand, about 4,000,000 board feet of Massachusetts sawlogs were shipped out of the state (table 1).
+
+```{r, eval = FALSE}
+ma_timber_1952 <- tribble(
+  ~Species, ~thousand_board_feet, ~pct,
+  "White and red pine", 59722, 53,
+  "Hemlock", 17082, 15,
+  "Spruce and fir", 6792, 6,
+  "Other softwoods", 149, NA,
+  "Oaks", 11231, 10,
+  "Birch-beech-maple", 10059, 9,
+  "Other hard hardwoods", 2153, 2,
+  "Paper birch", 3210, 3,
+  "Other soft hardwoods", 2638, 2
+)
+```
+
+There are a total of 2.7 billion board feet; in 1952 113,036 thousand
+board feet were cut.
+
+Let's look at that as an annual fraction of harvest:
+```{r, eval = FALSE}
+(113036 * 1e3) / (2.7 * 1e9)
+```
+
+So, roughly 4.19% harvested per year.
+
+On p iv, it's noted:
+THE NET GROWTH of forest growing stock in 1952 was about 80,000,000 cubic
+feet. The 1952 cut from growing stock was almost 26,000,000 cubic feet.
+The great surplus growth was in the hardwoods.
+
+p 12:
+For sawtimber trees, the cut is much closer to growth. In terms of
+sawtimber volume, the board-foot cut of softwoods is more than 90
+percent of the net annual growth, but the board-foot cut of
+hardwoods is only one-third of their growth.
+
+HF Archives has
+Massachusetts Timber Harvesting Study 1984-2003
+https://harvardforest1.fas.harvard.edu/exist/apps/datasets/showData.html?id=hf080
+
 
