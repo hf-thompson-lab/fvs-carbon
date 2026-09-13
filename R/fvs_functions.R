@@ -723,7 +723,7 @@ fvs_species_composition <- function(fvs_output) {
       con <- DBI::dbConnect(RSQLite::SQLite(), output_db, flags = RSQLite::SQLITE_RO)
       on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
 
-      tbl(con, "FVS_TreeList_East") |>
+      tbl(con, "FVS_TreeList") |>
         mutate(BA = TPA * pi * (DBH / 12 / 2)^2) |>
         group_by(StandID, Year, SpeciesFIA) |>
         summarize(BA = sum(BA, na.rm = TRUE), TPA = sum(TPA, na.rm = TRUE), .groups = "drop") |>

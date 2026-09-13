@@ -2999,7 +2999,7 @@ post_harvest_inventories <- cficop_hvst_tpa |>
   ) |>
   mutate(StandID = as.character(StandID))
 
-post_harvest_treelist <- fvs_read_output(cficop_hvst, "FVS_TreeList_East") |>
+post_harvest_treelist <- fvs_read_output(cficop_hvst, "FVS_TreeList") |>
   filter(random_seed == min(random_seed)) |>
   semi_join(post_harvest_inventories, by = join_by(StandID, Year))
   
@@ -3395,7 +3395,7 @@ fill_dbhlist <- function(x) {
     replace_na(list(tpa = 0))
 }
 
-cficop_none_dbhdist <- fvs_read_output(cficop_none, "FVS_TreeList_East") |>
+cficop_none_dbhdist <- fvs_read_output(cficop_none, "FVS_TreeList") |>
   filter(Year %% 10 == 0) |>
   add_diameter_class() |>
   group_by(Year, diameter_class, StandID, random_seed) |>
@@ -3405,7 +3405,7 @@ cficop_none_dbhdist <- fvs_read_output(cficop_none, "FVS_TreeList_East") |>
   ungroup() |>
   fill_dbhlist()
 
-cficop_srvy_dbhdist <- fvs_read_output(cficop_srvy, "FVS_TreeList_East") |>
+cficop_srvy_dbhdist <- fvs_read_output(cficop_srvy, "FVS_TreeList") |>
   filter(Year %% 10 == 0) |>
   add_diameter_class() |>
   group_by(Year, diameter_class, StandID, random_seed) |>
@@ -3415,7 +3415,7 @@ cficop_srvy_dbhdist <- fvs_read_output(cficop_srvy, "FVS_TreeList_East") |>
   ungroup() |>
   fill_dbhlist()
 
-cficop_dflt_dbhdist <- fvs_read_output(cficop_dflt, "FVS_TreeList_East") |>
+cficop_dflt_dbhdist <- fvs_read_output(cficop_dflt, "FVS_TreeList") |>
   filter(Year %% 10 == 0) |>
   add_diameter_class() |>
   group_by(Year, diameter_class, StandID, random_seed) |>
@@ -3425,7 +3425,7 @@ cficop_dflt_dbhdist <- fvs_read_output(cficop_dflt, "FVS_TreeList_East") |>
   ungroup() |>
   fill_dbhlist()
 
-cfigro_srvy_dbhdist <- fvs_read_output(cfigro_none, "FVS_TreeList_East") |>
+cfigro_srvy_dbhdist <- fvs_read_output(cfigro_none, "FVS_TreeList") |>
   filter(Year %% 10 == 0) |>
   add_diameter_class() |>
   group_by(Year, diameter_class, StandID, random_seed) |>

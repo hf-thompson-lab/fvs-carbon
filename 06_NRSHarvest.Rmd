@@ -1393,6 +1393,8 @@ FVS produces three tree tables:
  trees as loaded. This precedes any tree records splitting that will confuse
  the connection between FVS and FIA trees.
  
+ > As of FVS 2026.02, FVS_TreeList_East is merged into FVS_TreeList
+ 
  Note that a tree in TreeList may be in neither ATRTList nor CutList, e.g.
  if it died but was not cut during the cycle.
  
@@ -1406,7 +1408,7 @@ FVS produces three tree tables:
  from all random seeds in other datasets.
 
 ```{r fvs tree lists, eval = FALSE}
-nrshrv_prsc_treelist <- fvs_read_output(nrshrv_prsc, "FVS_TreeList_East") |>
+nrshrv_prsc_treelist <- fvs_read_output(nrshrv_prsc, "FVS_TreeList") |>
   group_by(StandID) |>
   filter(
     random_seed == min(random_seed, na.rm = TRUE)
