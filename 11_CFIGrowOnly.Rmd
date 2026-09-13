@@ -1752,7 +1752,7 @@ fvs_read_output(cfigro_none, "FVS_Carbon") |>
 Summary
 
 ```{targets cfigro_none_summary, tar_simple = TRUE}
-fvs_read_output(cfigro_none, "FVS_Summary2_East") |>
+fvs_read_output(cfigro_none, "FVS_Summary2") |>
   group_by(StandID, Year) |>
   summarize(
     BA = mean(BA),
@@ -1782,7 +1782,7 @@ fvs_read_output(cfigro_srvy, "FVS_Carbon") |>
 Summary
 
 ```{targets cfigro_srvy_summary, tar_simple = TRUE}
-fvs_read_output(cfigro_srvy, "FVS_Summary2_East") |>
+fvs_read_output(cfigro_srvy, "FVS_Summary2") |>
   select(StandID, Year, BA, Tpa)
 ```
 

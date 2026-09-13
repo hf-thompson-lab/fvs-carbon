@@ -253,7 +253,7 @@ tar_target(nk_byplot_grow_carbon, fvs_read_output(nk_byplot_none, "FVS_Carbon"))
 We're not using the summary yet, but define the target for it.
 
 ```{targets nk_byplot_grow_summary}
-tar_target(nk_byplot_grow_summary, fvs_read_output(nk_byplot_none, "FVS_Summary2_East"))
+tar_target(nk_byplot_grow_summary, fvs_read_output(nk_byplot_none, "FVS_Summary2"))
 ```
 
 ```{r NoManagement_Carbon_ByPlot, eval=FALSE}

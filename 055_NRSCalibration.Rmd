@@ -917,7 +917,7 @@ fvs_read_output(nrsgro_calb, "FVS_Carbon") |>
 Summary
 
 ```{targets nrsgro_calb_summary, tar_simple = TRUE}
-fvs_read_output(nrsgro_calb, "FVS_Summary2_East") |>
+fvs_read_output(nrsgro_calb, "FVS_Summary2") |>
   group_by(StandID, Year) |>
   summarize(
     BA = mean(BA),

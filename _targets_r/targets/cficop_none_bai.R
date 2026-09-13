@@ -52,7 +52,7 @@ tar_target(cficop_none_bai, {
   
   # cficop_none_summary aggregates over random_seed; we need random_seed
   # in the output.
-  tmp_none_summary <- fvs_read_output(cficop_none, "FVS_Summary2_East")
+  tmp_none_summary <- fvs_read_output(cficop_none, "FVS_Summary2")
   
   tmp_plot_starting_ba <- tmp_none_summary |>
     filter(Year == 1970) |>

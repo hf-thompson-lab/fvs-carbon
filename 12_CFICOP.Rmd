@@ -990,7 +990,7 @@ fvs_read_output(cficop_none, "FVS_Carbon") |>
 Summary
 
 ```{targets cficop_none_summary, tar_simple = TRUE}
-fvs_read_output(cficop_none, "FVS_Summary2_East") |>
+fvs_read_output(cficop_none, "FVS_Summary2") |>
   group_by(StandID, Year) |>
   summarize(
     BA = mean(BA),
@@ -1112,7 +1112,7 @@ tmp_plot_species <- tmp_species_cmp |>
 
 # cficop_none_summary aggregates over random_seed; we need random_seed
 # in the output.
-tmp_none_summary <- fvs_read_output(cficop_none, "FVS_Summary2_East")
+tmp_none_summary <- fvs_read_output(cficop_none, "FVS_Summary2")
 
 tmp_plot_starting_ba <- tmp_none_summary |>
   filter(Year == 1970) |>
@@ -1506,7 +1506,7 @@ fvs_read_output(cficop_dflt, "FVS_Carbon") |>
 Summary
 
 ```{targets cficop_dflt_summary, tar_simple = TRUE}
-fvs_read_output(cficop_dflt, "FVS_Summary2_East") |>
+fvs_read_output(cficop_dflt, "FVS_Summary2") |>
   group_by(StandID, Year) |>
   summarize(
     BA = mean(BA),
@@ -1598,7 +1598,7 @@ fvs_read_output(cficop_srvy, "FVS_Carbon") |>
 Summary
 
 ```{targets cficop_srvy_summary, tar_simple = TRUE}
-fvs_read_output(cficop_srvy, "FVS_Summary2_East") |>
+fvs_read_output(cficop_srvy, "FVS_Summary2") |>
   group_by(StandID, Year) |>
   summarize(
     BA = mean(BA),
@@ -2729,7 +2729,7 @@ fvs_read_output(cficop_hvst, "FVS_Carbon") |>
 Summary
 
 ```{targets cficop_hvst_summary, tar_simple = TRUE}
-fvs_read_output(cficop_hvst, "FVS_Summary2_East") |>
+fvs_read_output(cficop_hvst, "FVS_Summary2") |>
   group_by(StandID, Year) |>
   summarize(
     BA = mean(BA),

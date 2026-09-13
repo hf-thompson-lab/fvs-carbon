@@ -1,5 +1,5 @@
 tar_target(nrsgro_none_summary, {
-  fvs_read_output(nrsgro_none, "FVS_Summary2_East") |>
+  fvs_read_output(nrsgro_none, "FVS_Summary2") |>
     group_by(StandID, Year) |>
     summarize(
       BA = mean(BA),

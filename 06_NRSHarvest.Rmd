@@ -1321,7 +1321,7 @@ fvs_read_output(nrshrv_prsc, "FVS_Carbon") |>
 Summary
 
 ```{targets nrshrv_prsc_summary, tar_simple = TRUE}
-fvs_read_output(nrshrv_prsc, "FVS_Summary2_East") |>
+fvs_read_output(nrshrv_prsc, "FVS_Summary2") |>
   group_by(StandID, Year) |>
   summarize(
     BA = mean(BA),
@@ -1363,7 +1363,7 @@ fvs_read_output(nrshrv_srvy, "FVS_Carbon") |>
 Summary
 
 ```{targets nrshrv_srvy_summary, tar_simple = TRUE}
-fvs_read_output(nrshrv_srvy, "FVS_Summary2_East") |>
+fvs_read_output(nrshrv_srvy, "FVS_Summary2") |>
   select(StandID, Year, BA, Tpa) |>
   left_join(
     nrshrv_plot_stats |>

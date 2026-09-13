@@ -1,4 +1,4 @@
 tar_target(nrsgro_srvy_summary, {
-  fvs_read_output(nrsgro_srvy, "FVS_Summary2_East") |>
+  fvs_read_output(nrsgro_srvy, "FVS_Summary2") |>
     select(StandID, Year, BA, Tpa)
 })

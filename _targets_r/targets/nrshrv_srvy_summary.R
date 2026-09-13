@@ -1,5 +1,5 @@
 tar_target(nrshrv_srvy_summary, {
-  fvs_read_output(nrshrv_srvy, "FVS_Summary2_East") |>
+  fvs_read_output(nrshrv_srvy, "FVS_Summary2") |>
     select(StandID, Year, BA, Tpa) |>
     left_join(
       nrshrv_plot_stats |>

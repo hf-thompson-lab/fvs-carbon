@@ -583,7 +583,7 @@ fvs_read_output(nk_ffe_none, "FVS_Carbon")
 We're not using the summary yet, but define the target for it.
 
 ```{targets nk_ffe_none_summary, tar_simple = TRUE}
-fvs_read_output(nk_ffe_none, "FVS_Summary2_East")
+fvs_read_output(nk_ffe_none, "FVS_Summary2")
 ```
 
 ```{r fvs_stand_projected_ffe, eval=FALSE}
@@ -646,7 +646,7 @@ fvs_read_output(nk_ffe_srvy, "FVS_Carbon")
 We're not using the summary yet, but define the target for it.
 
 ```{targets nk_ffe_srvy_summary, tar_simple = TRUE}
-fvs_read_output(nk_ffe_srvy, "FVS_Summary2_East")
+fvs_read_output(nk_ffe_srvy, "FVS_Summary2")
 ```
 
 
@@ -704,7 +704,7 @@ fvs_read_output(nk_jenkins_none, "FVS_Carbon")
 We're not using the summary yet, but define the target for it.
 
 ```{targets nk_jenkins_none_summary, tar_simple = TRUE}
-fvs_read_output(nk_jenkins_none, "FVS_Summary2_East")
+fvs_read_output(nk_jenkins_none, "FVS_Summary2")
 ```
 
 ```{r fvs_stand_projected_jenkins, eval = FALSE}
@@ -762,7 +762,7 @@ fvs_read_output(nk_jenkins_srvy, "FVS_Carbon")
 We're not using the summary yet, but define the target for it.
 
 ```{targets nk_jenkins_srvy_summary, tar_simple = TRUE}
-fvs_read_output(nk_jenkins_srvy, "FVS_Summary2_East")
+fvs_read_output(nk_jenkins_srvy, "FVS_Summary2")
 ```
 
 ```{r fvs_stand_measured_jenkins, eval = FALSE}
