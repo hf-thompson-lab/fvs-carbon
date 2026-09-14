@@ -180,7 +180,10 @@ pers. comm.). The size of each FIA hexagon is
 > defoliation.
 
 ```{r}
-knitr::download_image("https://ars.els-cdn.com/content/image/1-s2.0-S0378112725000155-gr3_lrg.jpg")
+knitr::download_image(
+  "https://ars.els-cdn.com/content/image/1-s2.0-S0378112725000155-gr3_lrg.jpg",
+  path = "data/intermediate/1-s2.0-S0378112725000155-gr3_lrg.jpg"
+)
 ```
 
 ```{r}
