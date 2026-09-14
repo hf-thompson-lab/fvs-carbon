@@ -484,7 +484,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
   cfi_abp(cfiabp_trees) |>
   mutate(
     Status6 = if_else(is.na(Status6), "X", Status6),
-    StatusDesc = case_match(
+    StatusDesc = recode_values(
       Status6,
       "L" ~ "Live",
       "R" ~ "Recruit",

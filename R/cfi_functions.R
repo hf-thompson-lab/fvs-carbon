@@ -76,7 +76,7 @@ cfi_abp <- function(.data, cfiabp_trees) {
 #  5 = ridge top
 cfi_topocode <- function(.data) {
   .data |>
-    mutate(TOPOCODE = case_match(
+    mutate(TOPOCODE = recode_values(
       TerrainPosition,
       1 ~ 5, # top of slope
       2 ~ 4, # upper slope

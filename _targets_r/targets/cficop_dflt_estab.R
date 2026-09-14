@@ -17,7 +17,7 @@ tar_target(cficop_dflt_estab, {
     )
   ) |>
     mutate(
-      SPCD = case_match(
+      SPCD = recode_values(
         Species,
         "Red maple" ~ 316,
         "Oak" ~ 833,
