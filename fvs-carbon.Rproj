@@ -17,4 +17,4 @@ AutoAppendNewline: Yes
 StripTrailingWhitespace: Yes
 
 BuildType: Custom
-CustomScriptPath: build.cmd
+CustomScriptPath: build.sh
