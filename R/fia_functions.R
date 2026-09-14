@@ -84,6 +84,11 @@ fia_fiadb_indexed <- function() {
       fia_create_plot_indexes_maybe(con, tbl, plot_cols[2])
     }
   })
+
+  # Analyze the database so the query optimizer has a chance
+  DBI::dbExecute(con, "ANALYZE")
+
+  # Return the name of the optimized database
   fiadb
 }
 

@@ -65,10 +65,11 @@ filter_plots_forested <- function(.data, con) {
   plots_forested <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    inner_join(
-      .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
-      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
-    ) |>
+    # [Ed - wrong, this is slow]
+    # inner_join(
+    #  .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
+    #  by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    # ) |>
     # Note that we do not group by INVYR; all INVYR must be forested.
     group_by(STATECD, COUNTYCD, PLOT) |>
     filter(max(COND_STATUS_CD, na.rm = TRUE) == 1) |>
@@ -86,10 +87,11 @@ filter_plots_undisturbed <- function(.data, con) {
   plots_undisturbed <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    inner_join(
-      .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
-      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
-    ) |>
+    # [Ed - wrong, this is slow]
+    # inner_join(
+    #  .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
+    #  by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    # ) |>
     # Note that we do not group by INVYR; all INVYR must be undisturbed.
     group_by(STATECD, COUNTYCD, PLOT) |>
     filter(
@@ -110,10 +112,11 @@ filter_plots_untreated <- function(.data, con) {
   plots_untreated <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    inner_join(
-      .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
-      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
-    ) |>
+    # [Ed - wrong, this is slow]
+    # inner_join(
+    #  .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
+    #  by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    # ) |>
     # Note that we do not group by INVYR
     group_by(STATECD, COUNTYCD, PLOT) |>
     filter(
@@ -133,10 +136,11 @@ filter_plots_harvested <- function(.data, con) {
   plots_harvested_bycond <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    inner_join(
-      .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
-      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
-    ) |>
+    # [Ed - wrong, this is slow]
+    # inner_join(
+    #  .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
+    #  by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    # ) |>
     # Note that we do not group by INVYR
     group_by(STATECD, COUNTYCD, PLOT) |>
     filter(
@@ -198,10 +202,10 @@ filter_plots_harvested <- function(.data, con) {
 # unlike other filters, it RETAINS plots that are harvested exactly once
 filter_plots_single_harvest <- function(.data, con) {
   plots_single_harvest <- tbl(con, "COND") |>
-    inner_join(
-      .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
-      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
-    ) |>
+    #inner_join(
+    #  .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
+    #  by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    #) |>
     # Each condition can be harvested separately; gather
     # all they inventories in which any condition was harvested
     mutate(
@@ -232,10 +236,11 @@ filter_plots_unfertilized <- function(.data, con) {
   plots_unfertilized <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    inner_join(
-      .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
-      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
-    ) |>
+    #[Ed - wrong, this is slow]
+    #inner_join(
+    #  .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
+    #  by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    #) |>
     # Note that we do not group by INVYR
     group_by(STATECD, COUNTYCD, PLOT) |>
     #    filter(
@@ -277,10 +282,11 @@ filter_plots_measured_pre_post_harvest <- function(.data, con) {
   plots_harvested_bycond <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    inner_join(
-      .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
-      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
-    ) |>
+    #[Ed - wrong, this is slow]
+    #inner_join(
+    #  .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
+    #  by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    #) |>
     mutate(
       HRVYR1 = if_else(!is.na(TRTCD1) & (TRTCD1 == 10), TRTYR1, NA),
       HRVYR2 = if_else(!is.na(TRTCD2) & (TRTCD2 == 10), TRTYR2, NA),
@@ -365,10 +371,11 @@ filter_plots_single_cond <- function(.data, con) {
   plots_single_cond <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    inner_join(
-      .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
-      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
-    ) |>
+    #[Ed - wrong, this is slow]
+    #inner_join(
+    #  .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
+    #  by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    #) |>
     group_by(STATECD, COUNTYCD, PLOT) |>
     filter(max(CONDID, na.rm = TRUE) == 1) |>
     summarize(.groups = "keep") |>
@@ -384,10 +391,11 @@ filter_plots_trees <- function(.data, con) {
   plots_trees <- tbl(con, "COND") |>
     # Expectation is that this filter will come late enough in the chain
     # that it's more efficient to filter conditions prior to grouping
-    inner_join(
-      .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
-      by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
-    ) |>
+    # [Ed - wrong, this is slow]
+    # inner_join(
+    #  .data |> distinct(STATECD, COUNTYCD, PLOT, INVYR),
+    #  by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    # ) |>
     group_by(STATECD, COUNTYCD, PLOT) |>
     # Note that this sums the number of occasions when BALIVE is NOT > 0
     filter(
@@ -410,12 +418,12 @@ filter_plots_ba_frac <- function(.data, con, spcds, frac) {
     # Only consider the most recent survey of the plot
     group_by(STATECD, COUNTYCD, PLOT) |>
     filter(INVYR == max(INVYR, na.rm = TRUE)) |>
-    mutate(BA_TOTAL = sum(6 * pi * (DIA/12/2)^2, na.rm = TRUE)) |>
+    mutate(BA_TOTAL = sum(6 * pi * (DIA / 12 / 2)^2, na.rm = TRUE)) |>
     ungroup() |>
     inner_join(spcds |> distinct(SPCD), by = join_by(SPCD), copy = TRUE) |>
     group_by(STATECD, COUNTYCD, PLOT) |>
     summarize(
-      BA_FVS = sum(6 * pi * (DIA/12/2)^2, na.rm = TRUE),
+      BA_FVS = sum(6 * pi * (DIA / 12 / 2)^2, na.rm = TRUE),
       BA_TOTAL = max(BA_TOTAL, na.rm = TRUE),
       .groups = "keep"
     ) |>
@@ -592,12 +600,13 @@ filter_fvs_spcd <- function(estab, fiadb, species_crosswalk) {
 #'
 #' @examples
 filter_estab_height <- function(
-    estab,
-    fiadb,
-    min_sample_size = 3,
-    max_sample_size = 9,
-    min_sample_dia = 2.5,
-    max_sample_dia = 6) {
+  estab,
+  fiadb,
+  min_sample_size = 3,
+  max_sample_size = 9,
+  min_sample_dia = 2.5,
+  max_sample_dia = 6
+) {
   plot_cns <- estab |>
     select(PLT_CN) |>
     rename(CN = PLT_CN)
