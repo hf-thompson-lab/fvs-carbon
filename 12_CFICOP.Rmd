@@ -179,21 +179,24 @@ pers. comm.). The size of each FIA hexagon is
 > 88–93 % of all trees classified as ‘susceptible’ to spongy moth
 > defoliation.
 
-```{r}
+```{r, eval = FALSE}
 knitr::download_image(
   "https://ars.els-cdn.com/content/image/1-s2.0-S0378112725000155-gr3_lrg.jpg",
   path = "data/intermediate/1-s2.0-S0378112725000155-gr3_lrg.jpg"
 )
 ```
 
-```{r}
-knitr::download_image("https://ars.els-cdn.com/content/image/1-s2.0-S0378112725000155-gr4_lrg.jpg")
+```{r, eval = FALSE}
+knitr::download_image(
+  "https://ars.els-cdn.com/content/image/1-s2.0-S0378112725000155-gr4_lrg.jpg",
+  path = "data/intermediate/1-s2.0-S0378112725000155-gr4_lrg.jpg"
+)
 ```
 
 DCR Land Management Plan 2017, table 3-6 "Cover Types by Watershed",
 page 40, gives breakdown for Quabbin:
 
-```{r}
+```{r, eval = FALSE}
 # Values are in acres
 quabbin_cover_types <- c(
   "White pine" = 6518,
@@ -231,7 +234,8 @@ quabbin_cover_types |>
     grepl("^Hemlock", cover_type) ~ "Hemlock",
     grepl("[Oo]ak|[Mm]aple|[Hh]ardwood|[Bb]irch|[Dd]eciduous", cover_type) ~ "Hardwood",
     .default = "Other"
-  ))
+  )) |>
+  arrange(desc(acres))
 ```
 
 ## Plots
