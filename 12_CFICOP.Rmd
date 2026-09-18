@@ -1725,8 +1725,10 @@ harvested in the same year.
 
 ### Who got left behind?
 
-Unharvested: - Filter to plot/cycles with harvest - sum the ba of what's
-left
+Unharvested:
+
+- Filter to plot/cycles with harvest
+- sum the ba of what's left
 
 ```{r observed unharvested ba, eval = FALSE}
 
@@ -1820,7 +1822,7 @@ tmp_observed_remainders |>
 
 What fraction of trees were harvested?
 
-> Nik is here take the 1980 pulse (delta in 6" fron 1970 - 1980?) and
+> Take the 1980 pulse (delta in 6" fron 1970 - 1980?) and
 > turn those into extra trees in 1970? 4" trees? 2/3 the height? 2/3 the
 > DBH? (2/3 because 4 is 2/3 of 6) also, i feel like i was looking at a
 > spot in harvest where we're looking at fvs trees without summing tpa
@@ -1936,7 +1938,7 @@ tmp_harvest_fraction |>
 
 Let's see how many extra trees recruit in 1980
 
-```{r cut in 1980, eval = FALSE}
+```{r excess recruits in 1980, eval = FALSE}
 excess_recruits <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
@@ -2381,14 +2383,19 @@ x |>
   geom_point()
 ```
 
-## Harvest by DBH
+## Harvest using ThinDBH
 
-After talking with folks, we thought we were going to harvest by basal
-area by diameter class by species by plot by time.
+After talking with folks, we thought we were going to harvest by:
+
+- basal area removed, by
+- diameter class (6"), by
+- species, by
+- plot, by
+- time
 
 FVS provides the THINDBH keyword to schedule thinning from throughout a
-dbh range for any or all species to a residual basal area or trees per
-acre target.
+dbh range for any or all species to a residual basal area (BA) or trees per
+acre (TPA) target.
 
 We will provide multiple THINDBH keywords per stand per timestep,
 describing the target residual trees per acre of that species in that
@@ -2410,12 +2417,17 @@ is there.
 
 Let's build a list of the number of live trees after each harvest:
 
-We need: - In what plot, in what year, what species was harvested - for
-the plot/year/species combo, what trees were left behind? - lump those
-left behind into dbh classes for ThinDBH - Trees on the landscape grow
-at different rates than in FVS; it's too hard to try to hit 2" diameter
-classes, so we use much wider 6" diameter classes to try to catch more
-trees.
+We need:
+
+- In what plot, in what year, what species was harvested
+- for the plot/year/species combo, what trees were left behind?
+- lump those left behind into dbh classes for ThinDBH
+- Trees on the landscape grow at different rates than in FVS;
+
+it's too hard to try to hit 2" diameter classes, so we use much wider
+6" diameter classes to try to catch more trees.
+
+> WHy 6, making the 5" BRK_DBH awkward? Can we use 5" diameter classes?
 
 ```{targets cficop_hvst_tpa, tar_simple = TRUE}
 tmp_harvested <- qryDWSPCFIPlotVisitTreeDetail |>
@@ -2436,7 +2448,7 @@ tmp_harvested <- qryDWSPCFIPlotVisitTreeDetail |>
   # Select the post-harvest inventory as the VisitCycle
   mutate(
     VisitCycle = ceiling(YearCut / 10) * 10,
-    DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 6) * 6
+    DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5
   ) |>
   group_by(MasterPlotID, VisitCycle, SpeciesCode, DBH_MIN) |>
   summarize(YearCut = max(YearCut), .groups = "drop")
@@ -2448,8 +2460,9 @@ cficop_hvst_tpa <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_abp(cfiabp_trees) |>
   filter(cfi_status_live(VisitTreeStatusCode)) |>
   filter(!is.na(dbh_prior)) |>
+  filter(MasterPlotID == 10226) |>
   mutate(
-    DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 6) * 6
+    DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5
   ) |>
   semi_join(
     tmp_harvested,
@@ -2468,7 +2481,7 @@ cficop_hvst_tpa <- qryDWSPCFIPlotVisitTreeDetail |>
   ) |>
   # The harvest blocks added back will have TPA == NA
   mutate(
-    DBH_MAX = DBH_MIN + 6,
+    DBH_MAX = DBH_MIN + 5,
     TPA = if_else(is.na(TPA), 0, TPA),
     BA = 0
   ) |>
@@ -2479,10 +2492,17 @@ cficop_hvst_tpa <- qryDWSPCFIPlotVisitTreeDetail |>
   mutate(
     YEAR = YearCut
   ) |>
+  mutate(SpeciesCode = replace_values(
+    SpeciesCode,
+    320 ~ 317, # norway maple -> sugar maple
+    402 ~ 403, # bitternut hickory -> pignut hickory
+    740 ~ 743  # unknown aspen -> bigtooth aspen
+  )) |>
   left_join(
     species_crosswalk |> select(SPCD, FVS_SPCD),
     by = join_by(SpeciesCode == SPCD)
   ) |>
+  filter(!is.na(FVS_SPCD)) |>
   left_join(
     cfigro_plot |> filter(INV_YEAR == 1970) |> select(STAND_CN, STAND_ID),
     by = join_by(MasterPlotID == STAND_ID)
@@ -2500,12 +2520,7 @@ cficop_hvst_tpa <- qryDWSPCFIPlotVisitTreeDetail |>
 
 ### Post-Harvest Regeneration
 
-Post-harvest there's a bunch of regeneration; find it and insert it.
-
-## Run FVS through the UI
-
-FVS really doesn't like to do harvest. Let's load up the UI and see if
-we can convince it.
+TODO: Post-harvest there's a bunch of regeneration; find it and insert it.
 
 ### FvS_StandInit and FVS_PlotInit
 
@@ -2598,7 +2613,8 @@ fvs_standinit <- bind_rows(
       Stand_ID = as.character(STAND_ID),
       Variant = "ne",
       Aspect = if_else(SLOPE > 0 & ASPECT == 0, 360, ASPECT),
-      INV_PLOT_SIZE = 5, # We don't use microplot data
+      INV_PLOT_SIZE = 385/4, # We don't use microplot data, but there
+      # are 4x6' radius microplots.
       Sam_Wt = 10
     ) |>
     select(
@@ -2704,10 +2720,12 @@ tar_target(
         ) |>
         mutate(
           ASPECT = if_else(SLOPE > 0 & ASPECT == 0, 360, ASPECT),
-          INV_PLOT_SIZE = 5, # We don't use microplot data
+          INV_PLOT_SIZE = 385/4, # We don't use microplot data, but
+          # there are 4x6' radius microplots
           SAM_WT = 10
         ),
-      trees = cfigro_trees,
+      trees = cfigro_trees |>
+        filter(DIAMETER > 0),
       regen = cficop_hvst_estab, # cficop_dflt_estab,  
       harvest = cficop_hvst_tpa,
       num_partitions = fvs_num_partitions,
@@ -2760,6 +2778,112 @@ fvs_read_output(cficop_hvst, "FVS_CutList") |>
   filter(random_seed == min(random_seed))
 ```
 
+### Parse Problems
+
+What errors and warnings do we get?
+```{r cficop_hvst_warnings, eval = FALSE}
+title <- "CFICarbonOffsetProgram"
+mgmt_id <- "HVST"
+
+cficop_hvst_outfiles <- list.files(
+  path = file.path(
+    "data/fvs",
+    paste0("FVS_", title, "_", mgmt_id)
+  ),
+  pattern = paste0("FVS_", title, "_", mgmt_id, "_P.*_R", fvs_randseed[1], ".out"),
+  full.names = TRUE
+)
+
+cficop_hvst_warnings <- lapply(cficop_hvst_outfiles, \(filename) {
+  partition = filename |>
+    sub("^.*_P(\\d+)_R.*$", "\\1", x = _)
+  read_lines(filename) |>
+    as.data.frame(nm = "text") |>
+    # Filter to just initial STAND ID and WARNING lines
+    filter(
+      grepl("^ +STAND ID=", text) |
+        grepl("WARNING:", text) |
+        grepl("ERROR:", text)
+    ) |>
+    # Parse out the STAND ID and fill it into the following lines
+    mutate(
+      STAND_ID = case_when(
+        grepl("^ +STAND ID=", text) ~ sub("^ +STAND ID= *([^ ]+) .*$", "\\1", text)
+      ),
+      partition = !!partition
+    ) |>
+    fill(STAND_ID) |>
+    # Remove everything but warnings (which now have STAND_ID)
+    filter(
+      grepl("WARNING:", text) |
+        grepl("ERROR:", text)
+    )
+}) |>
+  bind_rows() |>
+  # See below about ignoring this warning
+  filter(text != "********   WARNING:  DATE OF DISTURBANCE IS IGNORED.") |>
+  # See below about ignoring this warning
+  filter(text != " *** FFE MODEL WARNING: NO INITIAL BASAL AREA")
+```
+
+Find the distinct warnings
+```{r distinct fvs warnings, eval = FALSE}
+fvs_warnings_distinct <- fvs_warnings |>
+  # Warnings have some leading text, the tag WARNING:,
+  # then descriptive text; if there's a number in the descriptive text,
+  # it's probably pulled from the data, so we chop off the descriptive
+  # text starting at the first number to find the truly distinct warnings
+  mutate(
+    PROBLEM = case_when(
+      grepl("WARNING:", text) ~ sub("^[*. ]*(.*WARNING: [^0-9]+)([0-9].*)?$", "\\1", text),
+      grepl("ERROR:", text) ~ sub("^[*. ]*(.*ERROR: [^0-9]+)([0-9].*)?$", "\\1", text)
+    ),
+    PROBLEM = sub("\\s+$", "", PROBLEM)
+  ) |>
+  distinct(PROBLEM) |>
+  arrange(PROBLEM)
+knitr::kable(fvs_warnings_distinct)
+```
+
+### DATE OF DISTURBANCE IS IGNORED
+
+We are using IF / THEN to trigger establishment based on cycle,
+not disturbance. So this is correct, the date of disturbance is
+ignored, and that's what we intended.
+
+### FFE MODEL WARNING: NO INITIAL BASAL AREA
+
+This error does not mean there is no initial basal area; it means
+that the cover type could not be determined from crown area.
+
+From fire/ne/fmcba.f:
+```{fortran, eval = FALSE}
+C----------
+C   IF THERE ARE NO TREES (COVTYP=0) IN CYCLE 1,
+C   SET COVTYP TO A DEFAULT BALSAM FIR COVER. AFTER THE
+C   FIRST CYCLE, USE THE PREVIOUS COVER TYPE IF NO COVER IS
+C   PRESENT.
+C----------
+      IF (COVTYP .EQ. 0) THEN
+        IF (IYR .EQ. IY(1)) THEN
+             WRITE (JOSTND,"(/1X,'*** FFE MODEL WARNING: NO INITIAL ',
+     &       'BASAL AREA',
+     &       /1X,'*** COVER TYPE SET TO BALSAM FIR',/1X)")
+            CALL RCDSET (2,.TRUE.)
+            COVTYP = 1
+        ELSE
+          COVTYP = OLDCOVTYP
+        ENDIF
+      ENDIF
+
+```
+This code was introduced in 2022; no idea why the error started to
+show up with the 2026 release, maybe has to do with how COVTYP is
+determined.
+
+Anyway, we can ignore these errors, especially since cover type is
+not used by the NE variant.
+
 ### Did it do what we asked?
 
 FVS will cancel a harvest if it can't meet the target.
@@ -2777,7 +2901,7 @@ grep "ThinDBH" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.key | wc -l
 ```{bash, eval = FALSE}
 grep "DELETED OR CANCELED" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.out | grep THINDBH | wc -l
 ```
-> 2242 with 1980 compensatio, 2252 without - so canceled 8 more harvests
+> 2242 with 1980 compensation, 2252 without - so canceled 8 more harvests
 
 So, a little over half the harvest was canceled.
 This seems to be:
@@ -2847,7 +2971,7 @@ observed_trees |>
 ```
 
 So overall TPA in the modeled plots goes up a lot compared to what's observed.
-A lot ov this is likely because the model can see all trees down to seedlings,
+A lot of this is likely because the model can see all trees down to seedlings,
 whereas CFI inventory only captures trees >5.6"
 
 ### Measured vs. Projected Harvest
@@ -2985,7 +3109,7 @@ measured_harvest |>
 
 cficop_hvst_tpa is the tpa that we requested that FVS leave behind.
 
-Ugh; stand 119700442 was harvested twice between 1970 and 1980. Let's
+TODO: Ugh; stand 119700442 was harvested twice between 1970 and 1980. Let's
 ignore it for now; probably the right thing to do is to consolidate into
 a single harvest - the earlier one to give regeneration more time, or
 the later one to give regeneration less time.
@@ -3102,8 +3226,8 @@ cficop_cmp_carbon <- cficop_none_carbon |>
       select(StandID, Starting_Carbon, Projected_Carbon, Adjusted_AGLCF) |>
       group_by(StandID) |>
       summarize(
-        Starting_Carbon = min(Starting_Carbon),
-        Adjusted_AGLCF = mean(Adjusted_AGLCF),
+        Starting_Carbon = min(Starting_Carbon, na.rm = TRUE),
+        Adjusted_AGLCF = mean(Adjusted_AGLCF, na.rm = TRUE),
         .groups = "drop"
       ),
     by = join_by(StandID)
@@ -3136,9 +3260,9 @@ cficop_cmp_carbon_summary <- cficop_cmp_carbon |>
   group_by(Year, name, method) |>
   summarize(
     n = n(),
-    mean = mean(value),
-    ymin = mean(value) - 1.96 * sd(value) / sqrt(n),
-    ymax = mean(value) + 1.96 * sd(value) / sqrt(n),
+    mean = mean(value, na.rm = TRUE),
+    ymin = mean(value, na.rm = TRUE) - 1.96 * sd(value) / sqrt(n),
+    ymax = mean(value, na.rm = TRUE) + 1.96 * sd(value) / sqrt(n),
     .groups = "drop"
   )
 ```
@@ -3146,6 +3270,8 @@ cficop_cmp_carbon_summary <- cficop_cmp_carbon |>
 ## Population Mean
 
 So, let's look at distribution of biomass in our 277 plot sample:
+
+TODO: plot 10316 ends up with NA starting carbon and adjusted AGLF, why?
 
 ```{r population_mean, eval = FALSE}
 hectares <- conv_unit(56816, "acre", "hectare")
@@ -3159,8 +3285,8 @@ population_mean <- cficop_none_carbon |>
       select(StandID, Starting_Carbon, Projected_Carbon, Adjusted_AGLCF) |>
       group_by(StandID) |>
       summarize(
-        Starting_Carbon = min(Starting_Carbon),
-        Adjusted_AGLCF = mean(Adjusted_AGLCF),
+        Starting_Carbon = min(Starting_Carbon, na.rm = TRUE),
+        Adjusted_AGLCF = mean(Adjusted_AGLCF, na.rm = TRUE),
         .groups = "keep"
       ) |>
       ungroup(),
@@ -3171,10 +3297,10 @@ population_mean <- cficop_none_carbon |>
   ) |>
   group_by(Year) |>
   summarize(
-    projected_carbon_mean = mean(Projected_Carbon),
-    projected_carbon_sd = sd(Projected_Carbon),
-    adjusted_carbon_mean = mean(Adjusted_Carbon),
-    adjusted_carbon_sd = sd(Adjusted_Carbon),
+    projected_carbon_mean = mean(Projected_Carbon, na.rm = TRUE),
+    projected_carbon_sd = sd(Projected_Carbon), na.rm = TRUE,
+    adjusted_carbon_mean = mean(Adjusted_Carbon, na.rm = TRUE),
+    adjusted_carbon_sd = sd(Adjusted_Carbon, na.rm = TRUE),
     n = n(),
     .groups = "keep"
   ) |>
@@ -3233,9 +3359,12 @@ population_mean |>
   select(group, Year, mean, ci)
 ```
 
-In 1970, there were 1170155 +- 57272 Mg C / ha In 2020, projected was
-2839915 +- 80259 In 2020, adjusted was 2713476 +- 68425 2839915 -
-2713476 = 126439, 126439 / 2839915 = 0.04452210718, so off by 4.5%
+In 1970, there were 1170155 +- 57272 Mg C / ha
+
+In 2020, projected was 2839915 +- 80259
+
+In 2020, adjusted was 2713476 +- 68425 2839915 - 2713476 = 126439,
+126439 / 2839915 = 0.04452210718, so off by 4.5%
 
 2713476 - 1170155 = 1543321 Mg C growth 126439 / 1543321 =
 0.08192657263, so over-projects growth by 8%

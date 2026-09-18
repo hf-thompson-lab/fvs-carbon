@@ -17,7 +17,7 @@ tar_target(cficop_hvst_tpa, {
     # Select the post-harvest inventory as the VisitCycle
     mutate(
       VisitCycle = ceiling(YearCut / 10) * 10,
-      DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 6) * 6
+      DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5
     ) |>
     group_by(MasterPlotID, VisitCycle, SpeciesCode, DBH_MIN) |>
     summarize(YearCut = max(YearCut), .groups = "drop")
@@ -29,8 +29,9 @@ tar_target(cficop_hvst_tpa, {
     cfi_abp(cfiabp_trees) |>
     filter(cfi_status_live(VisitTreeStatusCode)) |>
     filter(!is.na(dbh_prior)) |>
+    filter(MasterPlotID == 10226) |>
     mutate(
-      DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 6) * 6
+      DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5
     ) |>
     semi_join(
       tmp_harvested,
@@ -49,7 +50,7 @@ tar_target(cficop_hvst_tpa, {
     ) |>
     # The harvest blocks added back will have TPA == NA
     mutate(
-      DBH_MAX = DBH_MIN + 6,
+      DBH_MAX = DBH_MIN + 5,
       TPA = if_else(is.na(TPA), 0, TPA),
       BA = 0
     ) |>
@@ -60,10 +61,17 @@ tar_target(cficop_hvst_tpa, {
     mutate(
       YEAR = YearCut
     ) |>
+    mutate(SpeciesCode = replace_values(
+      SpeciesCode,
+      320 ~ 317, # norway maple -> sugar maple
+      402 ~ 403, # bitternut hickory -> pignut hickory
+      740 ~ 743  # unknown aspen -> bigtooth aspen
+    )) |>
     left_join(
       species_crosswalk |> select(SPCD, FVS_SPCD),
       by = join_by(SpeciesCode == SPCD)
     ) |>
+    filter(!is.na(FVS_SPCD)) |>
     left_join(
       cfigro_plot |> filter(INV_YEAR == 1970) |> select(STAND_CN, STAND_ID),
       by = join_by(MasterPlotID == STAND_ID)
