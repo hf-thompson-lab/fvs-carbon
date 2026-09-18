@@ -158,7 +158,7 @@ fvs_ThinDBH <- function(rows) {
     # 3 - largest dbh (<; 999)
     # 4 - efficiency (0 - 1; 1)
     # 5 - species (0)
-    # 6 - target tpa (0)
+    # 6 - target TPA (0)
     # 7 - target BA (0)
     fvs_kwd("ThinDBH", year, dbh_min, dbh_max, percent, spcd, tpa, ba)
   }
@@ -364,12 +364,18 @@ fvs_fia_input <- function(
         )
       ) |>
       ungroup() |>
-      # Create new TREE_IDs. We can try to be clever, but it's really not worth it.
+      # Create new TREE_IDs. We could try to be clever and preserve
+      # some TREE_ID info, but it's really not worth it.
       group_by(STAND_CN, PLOT_ID) |>
       arrange(TREE_ID, TREE_COUNT) |> # Maintain the same order
       mutate(TREE_ID = row_number()) |>
       ungroup() |>
-      select(-any_of(c("BRK_DBH", "BASAL_AREA_FACTOR", "INV_PLOT_SIZE", "REPLICATES"))),
+      select(-any_of(c("BRK_DBH", "BASAL_AREA_FACTOR", "INV_PLOT_SIZE", "REPLICATES"))) |>
+      # Arrange in order of descending diameter. There's an issue in
+      # FVS where its internal bookkeeping can get muddled by 0-diameter
+      # trees; if we put them at the end then the large diameter trees
+      # will dominate and the bookkeeping won't go awry.
+      arrange(desc(DIAMETER)),
     overwrite = TRUE
   )
 
@@ -467,13 +473,6 @@ fvs_keywordfile_section <- function(
     fvs_kwd("CutList", 0),
     fvs_kwd("ATrtList", 0),
     fvs_kwd("TreeList", 0),
-    fvs_kwd("FMIn"), # Fire and Fuels Extension
-    fvs_kwd("CarbRept"),
-    fvs_kwd("CarbCut"),
-    fvs_kwd("CarbCalc", cc_code, 1),
-    fvs_kwd("FuelOut"),
-    fvs_kwd("FuelRept"),
-    fvs_kwd("End"), # FMIn
     fvs_kwd("Database"), # Database extension
     fvs_kwd("DSNOut"),
     output_db,
@@ -500,6 +499,13 @@ fvs_keywordfile_section <- function(
     fvs_kwd("End"), # Database
     fvs_thin(harvest),
     fvs_Estab(regen),
+    fvs_kwd("FMIn"), # Fire and Fuels Extension
+    fvs_kwd("CarbRept"),
+    fvs_kwd("CarbCut"),
+    fvs_kwd("CarbCalc", cc_code, 1),
+    fvs_kwd("FuelOut"),
+    fvs_kwd("FuelRept"),
+    fvs_kwd("End"), # FMIn
     fvs_kwd("Process")
   )
 }
