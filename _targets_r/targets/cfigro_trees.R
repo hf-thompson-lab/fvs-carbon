@@ -15,10 +15,17 @@ tar_target(cfigro_trees, {
     ungroup() |>
     cfi_topocode() |>
     cfi_history() |>
+    mutate(SpeciesCode = replace_values(
+      SpeciesCode,
+      320 ~ 317, # norway maple -> sugar maple
+      402 ~ 403, # bitternut hickory -> pignut hickory
+      740 ~ 743  # unknown aspen -> bigtooth aspen
+    )) |>
     left_join(
       species_crosswalk |> select(SPCD, FVS_SPCD),
       by = join_by(SpeciesCode == SPCD)
     ) |>
+    filter(!is.na(FVS_SPCD)) |>
     mutate(
       STAND_CN = as.character(MasterPlotVisitID),
       STAND_ID = MasterPlotID,

@@ -22,10 +22,17 @@ tar_target(cficop_hvst_estab, {
       tmp_trees_1970,
       by = join_by(MasterPlotID, MasterTreeID)
     ) |>
+    mutate(SpeciesCode = replace_values(
+      SpeciesCode,
+      320 ~ 317, # norway maple -> sugar maple
+      402 ~ 403, # bitternut hickory -> pignut hickory
+      740 ~ 743  # unknown aspen -> bigtooth aspen
+    )) |>
     left_join(
       species_crosswalk |> select(SPCD, FVS_SPCD),
       by = join_by(SpeciesCode == SPCD)
     ) |>
+    filter(!is.na(FVS_SPCD)) |>
     # Live trees and recruits
     filter(cfi_status_live(VisitTreeStatusCode)) |>
     mutate(

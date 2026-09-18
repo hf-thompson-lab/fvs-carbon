@@ -1172,6 +1172,42 @@ CFI Terrain Position:
 6 = Bottomland; horizontal region in low-lying areas, may be subject to occasional flooding.
 7 = Flatland; regions not part of or related to slopes; may have minimal elevation changes - less than 5% slope.
 
+## Species
+
+There are some species in CFI that FVS doesn't handle; make a
+substitution table.
+
+```{r}
+tblDWSPCFITreesComplete |>
+  distinct(SpeciesCode) |>
+  mutate(SpeciesCode = replace_values(
+    SpeciesCode,
+    320 ~ 317, # norway maple -> sugar maple
+    402 ~ 403, # bitternut hickory -> pignut hickory
+    740 ~ 743  # unknown aspen -> bigtooth aspen
+  )) |>
+  left_join(species_crosswalk, by = join_by(SpeciesCode == SPCD)) |>
+  filter(is.na(FVS_SPCD))
+```
+
+Substitutions:
+- Populus spp. / unknown cottonwood or poplar
+  - Replace with Populus grandidentata, which is the most common Populus
+- Carya cordiformis / bitternut hickory
+  - Carya glabra - pignut hickory; very similar
+- Castanea dentata / American chestnut
+  - FVS does not handle any chestnuts, and these will never get big
+- Sorbus americana / American mountain-ash
+  - FVS does not handle any mountain-ash, and these will never get big
+- Acer platanoides / Norway maple
+  - Sugar saccharum / sugar maple; a hard maple FVS does handle
+- Phellodendron amurense / Amur corktree
+  - No other species in this genus
+- Unknown tree
+  - No information to go on
+
+## Trees for FVS
+
 ```{targets cfigro_trees, tar_simple = TRUE}
 qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
@@ -1189,10 +1225,17 @@ qryDWSPCFIPlotVisitTreeDetail |>
   ungroup() |>
   cfi_topocode() |>
   cfi_history() |>
+  mutate(SpeciesCode = replace_values(
+    SpeciesCode,
+    320 ~ 317, # norway maple -> sugar maple
+    402 ~ 403, # bitternut hickory -> pignut hickory
+    740 ~ 743  # unknown aspen -> bigtooth aspen
+  )) |>
   left_join(
     species_crosswalk |> select(SPCD, FVS_SPCD),
     by = join_by(SpeciesCode == SPCD)
   ) |>
+  filter(!is.na(FVS_SPCD)) |>
   mutate(
     STAND_CN = as.character(MasterPlotVisitID),
     STAND_ID = MasterPlotID,
