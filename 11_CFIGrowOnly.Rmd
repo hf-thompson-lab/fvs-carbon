@@ -870,7 +870,8 @@ qryDWSPCFIPlotVisitTreeDetail |>
 
 Minimum diameter is 4.5" - this is important for BRK_DBH - trees smaller
 than BRK_DBH will be on the microplot, and will get the microplot TPA
-multiplier (385), rather than the plot multiplier (5). There is a history
+multiplier (385/4=95.25, since there are 4x6'radius microplots), rather than
+the plot multiplier (5). There is a history
 of using different diameters in different CFI inventories.
 
 From 1970 - 2020, only 2 trees establish on grow-only plots with DIAM < 5.6".
@@ -1103,7 +1104,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
     SLOPE = Slope,
     ELEVFT = ELEVFT,
     BASAL_AREA_FACTOR = -5, # 52.7' = 1/5 acre; negative means fixed radius
-    INV_PLOT_SIZE = 385, # Microplot area, in inverse fraction of an acre
+    INV_PLOT_SIZE = 385/4, # Microplot area, in inverse fraction of an acre
     BRK_DBH = 5, # ABP uses 6" for break diameter; see ABP 2025
     NUM_PLOTS = 1,
     SAM_WT = 0.2,

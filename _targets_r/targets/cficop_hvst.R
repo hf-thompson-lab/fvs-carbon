@@ -27,10 +27,12 @@ tar_target(
         ) |>
         mutate(
           ASPECT = if_else(SLOPE > 0 & ASPECT == 0, 360, ASPECT),
-          INV_PLOT_SIZE = 5, # We don't use microplot data
+          INV_PLOT_SIZE = 385/4, # We don't use microplot data, but
+          # there are 4x6' radius microplots
           SAM_WT = 10
         ),
-      trees = cfigro_trees,
+      trees = cfigro_trees |>
+        filter(DIAMETER > 0),
       regen = cficop_hvst_estab, # cficop_dflt_estab,  
       harvest = cficop_hvst_tpa,
       num_partitions = fvs_num_partitions,

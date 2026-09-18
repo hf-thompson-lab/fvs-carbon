@@ -33,7 +33,7 @@ tar_target(cfigro_plot, {
       SLOPE = Slope,
       ELEVFT = ELEVFT,
       BASAL_AREA_FACTOR = -5, # 52.7' = 1/5 acre; negative means fixed radius
-      INV_PLOT_SIZE = 385, # Microplot area, in inverse fraction of an acre
+      INV_PLOT_SIZE = 385/4, # Microplot area, in inverse fraction of an acre
       BRK_DBH = 5, # ABP uses 6" for break diameter; see ABP 2025
       NUM_PLOTS = 1,
       SAM_WT = 0.2,
