@@ -54,6 +54,10 @@ tar_target(cficop_hvst_tpa, {
       TPA = if_else(is.na(TPA), 0, TPA),
       BA = 0
     ) |>
+    # Except seedlings / saplings - remove those from the harvest list
+    filter(
+      DBH_MIN > 0
+    ) |>
     # For prescription-based harvest, our schema is:
     # STAND_CN, TREE_CN, PREV_TRE_CN, YEAR, PRESCRIPTION
     # For DBH-based harvest, our schema is:

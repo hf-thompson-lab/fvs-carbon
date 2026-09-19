@@ -2427,7 +2427,7 @@ We need:
 it's too hard to try to hit 2" diameter classes, so we use much wider
 6" diameter classes to try to catch more trees.
 
-> WHy 6, making the 5" BRK_DBH awkward? Can we use 5" diameter classes?
+> Why 6, making the 5" BRK_DBH awkward? Can we use 5" diameter classes?
 
 ```{targets cficop_hvst_tpa, tar_simple = TRUE}
 tmp_harvested <- qryDWSPCFIPlotVisitTreeDetail |>
@@ -2484,6 +2484,10 @@ cficop_hvst_tpa <- qryDWSPCFIPlotVisitTreeDetail |>
     DBH_MAX = DBH_MIN + 5,
     TPA = if_else(is.na(TPA), 0, TPA),
     BA = 0
+  ) |>
+  # Except seedlings / saplings - remove those from the harvest list
+  filter(
+    DBH_MIN > 0
   ) |>
   # For prescription-based harvest, our schema is:
   # STAND_CN, TREE_CN, PREV_TRE_CN, YEAR, PRESCRIPTION
@@ -2974,7 +2978,9 @@ So overall TPA in the modeled plots goes up a lot compared to what's observed.
 A lot of this is likely because the model can see all trees down to seedlings,
 whereas CFI inventory only captures trees >5.6"
 
-### Measured vs. Projected Harvest
+### Meas vs. Proj harvested
+
+#### By Genus
 
 How does harvest compare to survey?
 
@@ -3031,18 +3037,250 @@ measured_harvest |>
     projected_harvest,
     by = join_by(GENUS)
   ) |>
+  filter(Measured_Trees > 100 | Projected_Trees > 100) |>
+  ggplot(aes(fct_reorder(GENUS, desc(Measured_Trees)))) +
+  geom_col(
+    aes(y = Measured_BA, fill = "Measured", group = "Measured"),
+    width = 0.4,
+    position = position_nudge(x = -0.2)
+  ) +
+  geom_col(
+    aes(y = Projected_BA, fill = "Projected", group = "Projected"),
+    width = 0.4,
+    position = position_nudge(x = 0.2)
+  ) +
+  theme_bw() +
+  #facet_wrap("name") +
+  #scale_y_continuous(transform = "log10") +
+  ggtitle("Quabbin CFI Basal Area Harvested") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  xlab("Genus") +
+  ylab(bquote("Basal Area harvested" ~(m^2))) +
+  labs(fill = NULL)
+
+measured_harvest |>
+  full_join(
+    projected_harvest,
+    by = join_by(GENUS)
+  ) |>
+  filter(Measured_Trees > 100 | Projected_Trees > 100) |>
+  ggplot(aes(fct_reorder(GENUS, desc(Measured_Trees)))) +
+  geom_col(
+    aes(y = Measured_Trees, fill = "Measured", group = "Measured"),
+    width = 0.4,
+    position = position_nudge(x = -0.2)
+  ) +
+  geom_col(
+    aes(y = Projected_Trees, fill = "Projected", group = "Projected"),
+    width = 0.4,
+    position = position_nudge(x = 0.2)
+  ) +
+  theme_bw() +
+  #facet_wrap("name") +
+  scale_y_continuous(transform = "log10") +
+  ggtitle("Quabbin CFI Trees Harvested") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  xlab("Genus") +
+  ylab(bquote("Trees harvested" ~ (trees))) +
+  labs(fill = NULL)
+```
+
+
+#### By Diameter Class
+
+
+```{r, eval = FALSE}
+measured_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  mutate(
+    Year = VisitCycle - YearsSinceLastCut,
+    Diameter_Class = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5,
+    ba = pi * (conv_unit(dbh_prior, "cm", "m") / 2)^2
+  ) |>
+  # Replace na's in status to keep them from propagating
+  replace_na(list(StatusB = "X", Status6 = "X")) |>
+  filter(!is.na(ba) & ba > 0 & StatusB == "C" | Status6 == "B") |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  group_by(GENUS, Diameter_Class) |>
+  summarize(
+    Measured_Trees = n(),
+    Measured_BA = sum(ba, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+projected_harvest <- cficop_hvst_cutlist |>
+  mutate(
+    SPCD = as.integer(SpeciesFIA),
+    Diameter_Class = floor(DBH / 5) * 5,
+    ba = pi * (conv_unit(DBH, "in", "m") / 2)^2
+  ) |>
+  filter(!is.na(ba) & ba > 0) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SPCD)
+  ) |>
+  group_by(GENUS, Diameter_Class) |>
+  summarize(
+    # Note that FVS can have fractional trees per acre, so it's
+    # important to sum TPA rather than count trees. Divide by 5
+    # because FVS provides a per-acre value and CFI plots are 1/5 acre.
+    Projected_Trees = sum(TPA) / 5,
+    # Since FVS can have fractional trees per acre, we need
+    # to scale BA by the number of trees
+    Projected_BA = sum(ba * TPA) / 5,
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+measured_harvest |>
+  full_join(
+    projected_harvest,
+    by = join_by(GENUS, Diameter_Class)
+  ) |>
+  mutate(Diameter_Class = ordered(Diameter_Class)) |>
   pivot_longer(cols = c(Measured_BA, Projected_BA)) |>
   filter(!is.na(value)) |>
   group_by(GENUS) |>
   filter(sum(value) > 5) |>
   ungroup() |>
-  ggplot(aes(GENUS, value, fill = name, group = name)) +
+  ggplot(aes(Diameter_Class, value, fill = name, group = name)) +
   geom_col(position = "dodge") +
   theme_bw() +
-  #facet_wrap("name") +
+  facet_wrap(~GENUS) +
   #scale_y_continuous(transform = "log10") +
   ggtitle("Quabbin CFI Basal Area Harvested") +
-  xlab("Genus") +
+  xlab("Diameter Class") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  ylab(bquote("Basal Area harvested" ~(m^2)))
+
+measured_harvest |>
+  full_join(
+    projected_harvest,
+    by = join_by(GENUS, Diameter_Class)
+  ) |>
+  filter(GENUS %in% c("Acer", "Betula", "Fraxinus", "Pinus", "Quercus", "Tsuga")) |>
+  mutate(Diameter_Class = ordered(Diameter_Class)) |>
+  pivot_longer(cols = c(Measured_Trees, Projected_Trees)) |>
+  filter(!is.na(value)) |>
+  ggplot(aes(Diameter_Class, value, fill = name, group = name)) +
+  geom_col(position = "dodge") +
+  theme_bw() +
+  facet_wrap(~GENUS) +
+  scale_y_continuous(transform = "log10") +
+  ggtitle("Quabbin CFI Trees Harvested") +
+#  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  xlab("Diameter Class") +
+  ylab("Trees Harvested (trees)")
+
+```
+
+Looks OK, but we're generally harvesting less than measured.
+
+Let's see what size trees FVS thought were there at harvest.
+
+#### Pre-Harvest Trees
+
+```{r, eval = FALSE}
+pre_harvest_year <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  mutate(
+    HarvestYear = VisitCycle - YearsSinceLastCut,
+    PreHarvestYear = floor(HarvestYear / 10) * 10
+  ) |>
+  # Replace na's in status to keep them from propagating
+  replace_na(list(StatusB = "X", Status6 = "X")) |>
+  filter(!is.na(dbh_prior) & dbh_prior > 0 & StatusB == "C" | Status6 == "B") |>
+  filter(!is.na(PreHarvestYear)) |>
+  distinct(MasterPlotID, PreHarvestYear)
+
+measured_pre_harvest_trees <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  semi_join(
+    pre_harvest_year,
+    by = join_by(MasterPlotID, VisitCycle == PreHarvestYear)
+  ) |>
+  mutate(
+    Diameter_Class = floor(dbh_prior / 5) * 5,
+    ba = pi * (conv_unit(dbh_prior, "cm", "m") / 2)^2
+  ) |>
+  # Replace na's in status to keep them from propagating
+  replace_na(list(StatusB = "X", Status6 = "X")) |>
+  filter(
+    !is.na(ba) & ba > 0 & (
+      StatusB == "L" |
+        StatusB == "R" |
+        Status6 == "L" |
+        Status6 == "R"
+    )
+  ) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  group_by(GENUS, Diameter_Class) |>
+  summarize(
+    Measured_Trees = n(),
+    Measured_BA = sum(ba, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+cficop_hvst_treelist <- fvs_read_output(cficop_hvst, "FVS_TreeList")
+
+projected_pre_harvest_trees <- cficop_hvst_cutlist |>
+  mutate(
+    SPCD = as.integer(SpeciesFIA),
+    Diameter_Class = floor(DBH / 5) * 5,
+    ba = pi * (conv_unit(DBH, "in", "m") / 2)^2
+  ) |>
+  filter(!is.na(ba) & ba > 0) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SPCD)
+  ) |>
+  group_by(GENUS, Diameter_Class) |>
+  summarize(
+    # Note that FVS can have fractional trees per acre, so it's
+    # important to sum TPA rather than count trees. Divide by 5
+    # because FVS provides a per-acre value and CFI plots are 1/5 acre.
+    Projected_Trees = sum(TPA) / 5,
+    # Since FVS can have fractional trees per acre, we need
+    # to scale BA by the number of trees
+    Projected_BA = sum(ba * TPA) / 5,
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+measured_harvest |>
+  full_join(
+    projected_harvest,
+    by = join_by(GENUS, Diameter_Class)
+  ) |>
+  pivot_longer(cols = c(Measured_BA, Projected_BA)) |>
+  filter(!is.na(value)) |>
+  group_by(GENUS, Diameter_Class) |>
+  filter(sum(value) > 5) |>
+  ungroup() |>
+  ggplot(aes(Diameter_Class, value, fill = name, group = name)) +
+  geom_col(position = "dodge") +
+  theme_bw() +
+  facet_wrap(~GENUS) +
+  #scale_y_continuous(transform = "log10") +
+  ggtitle("Quabbin CFI Basal Area Harvested") +
+  xlab("Diameter Class") +
   theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
   ylab(bquote("Basal Area harvested" ~(m^2)))
 
@@ -3066,6 +3304,8 @@ measured_harvest |>
   theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
   ylab(bquote("Trees harvested" ~ (trees)))
 ```
+
+#### By Year
 
 ```{r, eval = FALSE}
 measured_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
@@ -3144,7 +3384,7 @@ post_harvest_treelist <- fvs_read_output(cficop_hvst, "FVS_TreeList") |>
 projected_remainders <- post_harvest_treelist |>
   mutate(
     SPCD = as.integer(SpeciesFIA),
-    DBH_MIN = floor(DBH / 6) * 6
+    DBH_MIN = floor(DBH / 5) * 5
   ) |>
   left_join(
     species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
@@ -3170,7 +3410,7 @@ measured_remainders |>
   filter(!is.na(GENUS) & !is.na(value)) |>
   # Remove uninteresting genera
   group_by(GENUS) |>
-  filter(sum(value) > 2000) |>
+  filter(sum(value) > 100) |>
   ungroup() |>
   ggplot(aes(DBH_MIN, value, fill = name, group = name)) +
   geom_col(position = "dodge") +
@@ -3178,8 +3418,9 @@ measured_remainders |>
   facet_wrap("GENUS") +
   scale_x_discrete(drop = FALSE) +
   #scale_y_continuous(transform = "log10") +
+  coord_cartesian(ylim = c(0, 100)) +
   ggtitle("Quabbin CFI Post-Harvest Trees") +
-  xlab("6\" Diameter Class") +
+  xlab("5\" Diameter Class") +
   theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
   ylab(bquote("Post-Harvest Trees" ~ (trees)))
 ```
