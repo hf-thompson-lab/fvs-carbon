@@ -3098,6 +3098,7 @@ measured_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
   mutate(
     Year = VisitCycle - YearsSinceLastCut,
     Diameter_Class = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5,
+    Diameter_Class = paste0(Diameter_Class, " - ", Diameter_Class + 5),
     ba = pi * (conv_unit(dbh_prior, "cm", "m") / 2)^2
   ) |>
   # Replace na's in status to keep them from propagating
@@ -3119,6 +3120,7 @@ projected_harvest <- cficop_hvst_cutlist |>
   mutate(
     SPCD = as.integer(SpeciesFIA),
     Diameter_Class = floor(DBH / 5) * 5,
+    Diameter_Class = paste0(Diameter_Class, " - ", Diameter_Class + 5),
     ba = pi * (conv_unit(DBH, "in", "m") / 2)^2
   ) |>
   filter(!is.na(ba) & ba > 0) |>
@@ -3144,7 +3146,10 @@ measured_harvest |>
     projected_harvest,
     by = join_by(GENUS, Diameter_Class)
   ) |>
-  mutate(Diameter_Class = ordered(Diameter_Class)) |>
+  mutate(Diameter_Class = ordered(
+    Diameter_Class,
+    c("5 - 10", "10 - 15", "15 - 20", "20 - 25", "25 - 30")
+  )) |>
   pivot_longer(cols = c(Measured_BA, Projected_BA)) |>
   filter(!is.na(value)) |>
   group_by(GENUS) |>
@@ -3156,7 +3161,7 @@ measured_harvest |>
   facet_wrap(~GENUS) +
   #scale_y_continuous(transform = "log10") +
   ggtitle("Quabbin CFI Basal Area Harvested") +
-  xlab("Diameter Class") +
+  xlab("Diameter (inches)") +
   theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
   ylab(bquote("Basal Area harvested" ~(m^2)))
 
@@ -3166,7 +3171,10 @@ measured_harvest |>
     by = join_by(GENUS, Diameter_Class)
   ) |>
   filter(GENUS %in% c("Acer", "Betula", "Fraxinus", "Pinus", "Quercus", "Tsuga")) |>
-  mutate(Diameter_Class = ordered(Diameter_Class)) |>
+  mutate(Diameter_Class = ordered(
+    Diameter_Class,
+    c("5 - 10", "10 - 15", "15 - 20", "20 - 25", "25 - 30")
+  )) |>
   pivot_longer(cols = c(Measured_Trees, Projected_Trees)) |>
   filter(!is.na(value)) |>
   ggplot(aes(Diameter_Class, value, fill = name, group = name)) +
@@ -3175,8 +3183,8 @@ measured_harvest |>
   facet_wrap(~GENUS) +
   scale_y_continuous(transform = "log10") +
   ggtitle("Quabbin CFI Trees Harvested") +
-#  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
-  xlab("Diameter Class") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  xlab("Diameter (inches)") +
   ylab("Trees Harvested (trees)")
 
 ```
@@ -3213,7 +3221,7 @@ measured_pre_harvest_trees <- qryDWSPCFIPlotVisitTreeDetail |>
     by = join_by(MasterPlotID, VisitCycle == PreHarvestYear)
   ) |>
   mutate(
-    Diameter_Class = floor(dbh_prior / 5) * 5,
+    Diameter_Class = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5,
     ba = pi * (conv_unit(dbh_prior, "cm", "m") / 2)^2
   ) |>
   # Replace na's in status to keep them from propagating
@@ -3246,7 +3254,7 @@ projected_pre_harvest_trees <- cficop_hvst_cutlist |>
     Diameter_Class = floor(DBH / 5) * 5,
     ba = pi * (conv_unit(DBH, "in", "m") / 2)^2
   ) |>
-  filter(!is.na(ba) & ba > 0) |>
+  filter(!is.na(ba) & ba > 0 & DBH >= 5) |>
   left_join(
     species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
     by = join_by(SPCD)
@@ -3264,45 +3272,67 @@ projected_pre_harvest_trees <- cficop_hvst_cutlist |>
   ) |>
   ungroup()
 
-measured_harvest |>
+measured_pre_harvest_trees |>
   full_join(
-    projected_harvest,
+    projected_pre_harvest_trees,
     by = join_by(GENUS, Diameter_Class)
   ) |>
-  pivot_longer(cols = c(Measured_BA, Projected_BA)) |>
-  filter(!is.na(value)) |>
+  mutate(
+        Diameter_Class = paste0(Diameter_Class, " - ", Diameter_Class + 5)
+  ) |>
   group_by(GENUS, Diameter_Class) |>
-  filter(sum(value) > 5) |>
+  summarize(
+    Measured_BA = sum(Measured_BA),
+    Projected_BA = sum(Projected_BA),
+    .groups = "drop"
+  ) |>
   ungroup() |>
+  # There's one 45" maple
+  filter(Diameter_Class < 30) |>
+  mutate(Diameter_Class = ordered(
+    Diameter_Class,
+    c("5 - 10", "10 - 15", "15 - 20", "20 - 25", "25 - 30", "30 - 35")
+  )) |>
+  pivot_longer(cols = c(Measured_BA, Projected_BA)) |>
+  replace_na(list(value = 0)) |>
+  filter(GENUS %in% c("Acer", "Betula", "Fraxinus", "Pinus", "Quercus", "Tsuga")) |>
   ggplot(aes(Diameter_Class, value, fill = name, group = name)) +
   geom_col(position = "dodge") +
   theme_bw() +
   facet_wrap(~GENUS) +
   #scale_y_continuous(transform = "log10") +
-  ggtitle("Quabbin CFI Basal Area Harvested") +
+  ggtitle("Quabbin CFI Pre-Harvest Basal Area") +
   xlab("Diameter Class") +
   theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
-  ylab(bquote("Basal Area harvested" ~(m^2)))
+  ylab(bquote("Basal Area" ~(m^2)))
 
-measured_harvest |>
+
+measured_pre_harvest_trees |>
   full_join(
-    projected_harvest,
-    by = join_by(GENUS)
+    projected_pre_harvest_trees,
+    by = join_by(GENUS, Diameter_Class)
   ) |>
+  # There's one 45" maple
+  filter(Diameter_Class < 30) |>
+  mutate(
+        Diameter_Class = paste0(Diameter_Class, " - ", Diameter_Class + 5)
+  ) |>
+  filter(GENUS %in% c("Acer", "Betula", "Fraxinus", "Pinus", "Quercus", "Tsuga")) |>
+  mutate(Diameter_Class = ordered(
+    Diameter_Class,
+    c("5 - 10", "10 - 15", "15 - 20", "20 - 25", "25 - 30", "30 - 35")
+  )) |>
   pivot_longer(cols = c(Measured_Trees, Projected_Trees)) |>
-  filter(!is.na(value)) |>
-  group_by(GENUS) |>
-  filter(sum(value) > 100) |>
-  ungroup() |>
-  ggplot(aes(GENUS, value, fill = name, group = name)) +
+  replace_na(list(value = 1)) |>
+  ggplot(aes(Diameter_Class, value, fill = name, group = name)) +
   geom_col(position = "dodge") +
   theme_bw() +
-  #facet_wrap("name") +
-  #scale_y_continuous(transform = "log10") +
-  ggtitle("Quabbin CFI Trees Harvested") +
-  xlab("Genus") +
+  facet_wrap(~GENUS) +
+  scale_y_continuous(transform = "log10") +
+  ggtitle("Quabbin CFI Pre-Harvest Trees") +
   theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
-  ylab(bquote("Trees harvested" ~ (trees)))
+  xlab("Diameter (inches)") +
+  ylab("Trees (trees)")
 ```
 
 #### By Year
