@@ -1,5 +1,5 @@
 tar_target(cficop_hvst_estab, {
-  # Find 1970 trees
+  # Find 1970 trees; we'll remove these from 1980
   tmp_trees_1970 <- qryDWSPCFIPlotVisitTreeDetail |>
     cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
     cfi_with_tree_info(tblDWSPCFITreesComplete) |>
@@ -12,16 +12,24 @@ tar_target(cficop_hvst_estab, {
       MasterPlotID, MasterTreeID
     )
   
+  # Find 1980 trees, less those that were around in 1970
   tmp_estab_1980 <- qryDWSPCFIPlotVisitTreeDetail |>
     cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
     cfi_with_tree_info(tblDWSPCFITreesComplete) |>
     cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
     cfi_abp(cfiabp_trees) |>
-    # Remove any trees that were around in 1970
+    # Live trees and recruits
+    filter(StatusB == "L" | StatusB == "R" | Status6 == "L" | Status6 == "R") |>
+    # Only trees that were around in 1980
+    filter(
+      VisitCycle == 1980
+    ) |>
+    # Not trees that were around in 1970
     anti_join(
       tmp_trees_1970,
       by = join_by(MasterPlotID, MasterTreeID)
     ) |>
+    # Deal with species that FVS doesn't handle
     mutate(SpeciesCode = replace_values(
       SpeciesCode,
       320 ~ 317, # norway maple -> sugar maple
@@ -33,26 +41,23 @@ tar_target(cficop_hvst_estab, {
       by = join_by(SpeciesCode == SPCD)
     ) |>
     filter(!is.na(FVS_SPCD)) |>
-    # Live trees and recruits
-    filter(cfi_status_live(VisitTreeStatusCode)) |>
-    mutate(
-      diameter_class = as.integer(VisitTreeDIAM / 2) * 2
-    ) |>
-    filter(
-      VisitCycle == 1980
-    ) |>
+    # Tree height - some trees have it, some don't.
+    # Impute mean height of those that have it for missing values
     group_by(FVS_SPCD) |>
-    # Impute mean height for missing values
     mutate(
       VisitTreeTotalHeight = if_else(
         is.na(VisitTreeTotalHeight) | VisitTreeTotalHeight == 0,
         mean(VisitTreeTotalHeight, na.rm = TRUE),
         VisitTreeTotalHeight
       ),
-      DENSITY = 5  # trees per acre
+      DENSITY = 5  # trees per acre for one tree on a 1/5 acre plot
     ) |>
+    ungroup() |>
+    # We need STAND_CN for the 1970 stand
     left_join(
-      cfigro_plot |> select(STAND_ID, STAND_CN),
+      cfigro_plot |>
+        filter(INV_YEAR == 1970) |>
+        select(STAND_ID, STAND_CN),
       by = join_by(MasterPlotID == STAND_ID)
     ) |>
     select(
@@ -64,6 +69,8 @@ tar_target(cficop_hvst_estab, {
       HEIGHT = VisitTreeTotalHeight
     )
   
+  # Add the 1980 establishment to the establishment from Fred Hunt's
+  # thesis to create establishment for the harvest scenarios
   cficop_hvst_estab <- cficop_dflt_estab |>
     mutate(
       STAND_ID = NA,

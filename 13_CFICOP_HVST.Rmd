@@ -1,31 +1,108 @@
-# CFICOP_HVST
+---
+title: "13_CFICOP_HVST"
+output: html_document
+---
 
-Let's look at the distribution of harvest, and what we'll need to model.
+# Intro
 
-## Observed Harvest
+This is split out of 12_CFICOP.Rmd because that was getting too big. 
+
+# Setup
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(targets)
+  library(tarchetypes)
+  library(tidyverse)
+  library(readxl)
+  library(terra)
+  library(tidyterra)
+  library(sf)
+  library(rnaturalearth)
+  library(measurements)
+  library(mlr3verse) # Machine Learning in R framework, larger universe
+  library(ggspatial) # annotation_scale, annotation_north_arrow
+  library(ggfx) # for fancy ggplot stuff like with_blur
+  library(patchwork) # for n-up ggplot
+})
+tar_source()
+
+## Load targets results from other documents ----
+
+tar_load(fiadb)
+tar_load(species_crosswalk)
+tar_load(fvs_num_partitions)
+tar_load(fvs_partition)
+tar_load(fvs_randseed)
+tar_load(fvsne_states)
+tar_load(cfigro_bai_model)
+tar_load(cfigro_estab)
+tar_load(cfigro_none_growth)
+tar_load(cficop_estab)
+tar_load(cficop_dflt_estab)
+
+## Preload everything from 11_CFIGrowOnly.Rmd ----
+
+get_this_rmd_file() |>
+  str_replace(basename(get_this_rmd_file()), "11_CFIGrowOnly.Rmd") |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+
+## Preload targets results from this document ----
+
+# When tar_make() has already built the objects defined in this document,
+# run this block to pre-load them. You can then skip running ```{targets}
+# blocks.
+
+get_this_rmd_file() |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+```
+
+# Observed Harvest
 
 We're interested in a few things:
 
 1.  What trees get cut? (when / where / species / size / tpa)
 2.  What trees are left? (when / where / species / size / tpa)
 
-```{r observed harvest ba, eval = FALSE}
-tmp_observed_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
+```{targets cficop_hvst_observed_harvest, tar_simple = TRUE}
+cficop_hvst_observed_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
   cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
   cfi_abp(cfiabp_trees) |>
+  # Deal with species that FVS doesn't handle
+  mutate(SpeciesCode = replace_values(
+    SpeciesCode,
+    320 ~ 317, # norway maple -> sugar maple
+    402 ~ 403, # bitternut hickory -> pignut hickory
+    740 ~ 743  # unknown aspen -> bigtooth aspen
+  )) |>
   left_join(
-    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, FVS_SPCD),
     by = join_by(SpeciesCode == SPCD)
   ) |>
-  mutate(
-    basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi,
-  ) |>
+  filter(!is.na(FVS_SPCD)) |>
+  # At this point we have fully-decorated tree records
   # Replace na's in status to keep them from propagating
   replace_na(list(StatusB = "X", Status6 = "X")) |>
-  filter(StatusB == "C" | Status6 == "B") |>
-  filter(!is.na(basal_area)) |>
+  # If either of StatusB or Status6 is "C", they both are, but
+  # this shows the intent
+  filter(StatusB == "C" | Status6 == "C") |>
+  # Some trees don't have a value for pre-harvest dbh; ignore them
+  filter(!is.na(dbh_prior)) |>
+  mutate(
+    basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi,
+    HarvestYear = VisitCycle - YearsSinceLastCut,
+    PreHarvestVisitCycle = floor(HarvestYear / 10) * 10
+  )
+```
+
+## By Year
+
+```{r, eval = FALSE}
+cficop_hvst_observed_harvest |>
   group_by(VisitCycle) |>
   mutate(
     VisitCycle = paste0(VisitCycle, " (n=", n_distinct(MasterPlotID), ")")
@@ -41,35 +118,49 @@ tmp_observed_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
     tpa = n() * 5,
     .groups = "keep"
   ) |>
-  ungroup()
-
-tmp_observed_harvest |>
+  ungroup() |>
   ggplot(aes(VisitCycle, basal_area, fill = GENUS)) +
   geom_boxplot(outlier.size = 0.1) +
   coord_cartesian(ylim = c(0, 2)) +
   theme_bw() +
-  scale_fill_manual(values = eves_colors) +
-  ggtitle("Harvested BA Per Plot") +
+  ggtitle("CFI Observed Harvest (BA Per Plot)") +
   ylab(bquote("Harvested BA" ~ (m^2))) +
   xlab("Visit Cycle (Number of Plots Harvested)")
+```
 
-tmp_observed_harvest |>
+```{r, eval = FALSE}
+cficop_hvst_observed_harvest |>
+  group_by(VisitCycle) |>
+  mutate(
+    VisitCycle = paste0(VisitCycle, " (n=", n_distinct(MasterPlotID), ")")
+  ) |>
+  ungroup() |>
+  mutate(
+    GENUS = fct_lump_n(GENUS, n = 5, w = basal_area, other_level = "Other"),
+    VisitCycle = ordered(VisitCycle)
+  ) |>
+  group_by(MasterPlotID, VisitCycle, GENUS) |>
+  summarize(
+    basal_area = sum(basal_area, na.rm = TRUE),
+    tpa = n() * 5,
+    .groups = "keep"
+  ) |>
+  ungroup() |>
   ggplot(aes(VisitCycle, tpa, fill = GENUS)) +
   geom_boxplot(outlier.size = 0.1) +
-#  coord_cartesian(ylim = c(0, 2)) +
   theme_bw() +
-  scale_fill_manual(values = eves_colors) +
   scale_y_continuous(transform = "log10") +
-  ggtitle("Harvested TPA Per Plot") +
+  ggtitle("CFI Observed Harvest (TPA Per Plot)") +
   ylab(bquote("Harvested TPA" ~ (trees %.% acre^-1))) +
   xlab("Visit Cycle (Number of Plots Harvested)")
-
 ```
+
+## Multiple Harvest
 
 Are any stands harvested in multiple cycles?
 
-```{r observed multiple harvest, eval = FALSE}
-tmp_observed_harvest |>
+```{r, eval = FALSE}
+cficop_hvst_observed_harvest |>
   distinct(MasterPlotID, VisitCycle) |>
   group_by(MasterPlotID) |>
   summarise(num_harvests = n()) |>
@@ -82,16 +173,9 @@ So, 54 plots are harvested more than once.
 
 Any stands harvested multiple times in a single cycle?
 
-```{r observed multiple year cut, eval = FALSE}
-qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  mutate(
-    YearCut = VisitCycle - YearsSinceLastCut
-  ) |>
-  distinct(MasterPlotID, VisitCycle, YearCut) |>
+```{r, eval = FALSE}
+cficop_hvst_observed_harvest |>
+  distinct(MasterPlotID, VisitCycle, HarvestYear) |>
   group_by(MasterPlotID, VisitCycle) |>
   summarize(num_harvests = n(), .groups = "keep") |>
   ungroup() |>
@@ -99,61 +183,72 @@ qryDWSPCFIPlotVisitTreeDetail |>
   nrow()
 ```
 
-Stand 10202 was harvested in 1980 and 1982.
-
 No; when a plot is harvested during a visitcycle, all trees are
 harvested in the same year.
 
-## Harvest Parameters
+# Observed Unharvest
 
-### Who got left behind?
+> It's not enough for a plot to be harvested and some trees left over;
+> we need to know what kind of trees were harvested, and how many of
+> the kinds harvested were left over.
 
-Unharvested:
+When a plot is harvested, what is left unharvested?
+
+To figure this out, we'll:
 
 - Filter to plot/cycles with harvest
 - sum the ba of what's left
 
-```{r observed unharvested ba, eval = FALSE}
-
-# Which plots are harvested, in which visit cycles?
-
-tmp_harvest_history <- qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  # cfi_harvested() |> # Can't use this, doesn't retain VisitCycle
-  group_by(MasterPlotID, VisitCycle) |>
-  summarize(
-    CFIHarvested = any(CutSinceLastVisit, na.rm = TRUE),
-    .groups = "drop"
-  )
-
+```{targets cficop_hvst_observed_remainders, tar_simple = TRUE}
 # What trees are left behind after harvest?
-
-tmp_observed_remainders <- qryDWSPCFIPlotVisitTreeDetail |>
+cficop_hvst_observed_remainders <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
   cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
   cfi_abp(cfiabp_trees) |>
-  left_join(tmp_harvest_history, by = join_by(MasterPlotID, VisitCycle)) |>
-  filter(CFIHarvested) |>
+  inner_join(
+    # Which species are harvested on which plots, in which visit cycles?
+    # Keep only those ones
+    cficop_hvst_observed_harvest |>
+      distinct(MasterPlotID, VisitCycle, SpeciesCode, HarvestYear),
+    by = join_by(MasterPlotID, VisitCycle, SpeciesCode)
+  ) |>
+  # Deal with species that FVS doesn't handle
+  mutate(SpeciesCode = replace_values(
+    SpeciesCode,
+    320 ~ 317, # norway maple -> sugar maple
+    402 ~ 403, # bitternut hickory -> pignut hickory
+    740 ~ 743  # unknown aspen -> bigtooth aspen
+  )) |>
   left_join(
-    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, FVS_SPCD),
     by = join_by(SpeciesCode == SPCD)
   ) |>
+  filter(!is.na(FVS_SPCD)) |>
+  # At this point we have fully-decorated tree records
+  # Replace na's in status to keep them from propagating
+  replace_na(list(StatusB = "X", Status6 = "X")) |>
+  # Live trees, not recruits
+  filter(StatusB == "L" | Status6 == "L") |>
+  # Some trees don't have a value for pre-harvest dbh; ignore them
+  filter(!is.na(dbh_prior)) |>
   mutate(
     # Judgment: basal_area intended to be left in harvest is better
     # represented by ba PRIOR to harvest, than POST harvest. We don't
     # have BA at the time of harvest, which would be ideal.
     basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi,
-  ) |>
-  # Replace na's in status to keep them from propagating
-  replace_na(list(StatusB = "X", Status6 = "X")) |>
-  # Live trees, not recruits
-  filter(StatusB == "L" | Status6 == "L") |>
-  filter(!is.na(basal_area)) |>
+    tpa = n() * 5
+  )
+```
+
+## By Year
+
+```{r, eval = FALSE}
+cficop_hvst_observed_remainders |>
   group_by(VisitCycle) |>
-  mutate(VisitCycle = paste0(VisitCycle, " (n=", n_distinct(MasterPlotID), ")")) |>
+  mutate(
+    VisitCycle = paste0(VisitCycle, " (n=", n_distinct(MasterPlotID), ")")
+  ) |>
   ungroup() |>
   mutate(
     GENUS = fct_lump_n(GENUS, n = 5, w = basal_area, other_level = "Other"),
@@ -165,208 +260,61 @@ tmp_observed_remainders <- qryDWSPCFIPlotVisitTreeDetail |>
     tpa = n() * 5,
     .groups = "keep"
   ) |>
-  ungroup()
-
-tmp_observed_remainders |>
+  ungroup() |>
   ggplot(aes(VisitCycle, basal_area, fill = GENUS)) +
   geom_boxplot(outlier.size = 0.1) +
   coord_cartesian(ylim = c(0, 2)) +
   theme_bw() +
-  scale_fill_manual(values = eves_colors) +
-  ggtitle("Unharvested BA Per Plot") +
-  ylab(bquote("Unarvested BA" ~ (m^2))) +
+  ggtitle("CFI Observed Remainders (BA Per Plot)") +
+  ylab(bquote("Harvested BA" ~ (m^2))) +
   xlab("Visit Cycle (Number of Plots Harvested)")
+```
 
-tmp_observed_remainders |>
+
+```{r, eval = FALSE}
+cficop_hvst_observed_remainders |>
+  group_by(VisitCycle) |>
+  mutate(
+    VisitCycle = paste0(VisitCycle, " (n=", n_distinct(MasterPlotID), ")")
+  ) |>
+  ungroup() |>
+  mutate(
+    GENUS = fct_lump_n(GENUS, n = 5, w = basal_area, other_level = "Other"),
+    VisitCycle = ordered(VisitCycle)
+  ) |>
+  group_by(MasterPlotID, VisitCycle, GENUS) |>
+  summarize(
+    basal_area = sum(basal_area, na.rm = TRUE),
+    tpa = n() * 5,
+    .groups = "keep"
+  ) |>
+  ungroup() |>
   ggplot(aes(VisitCycle, tpa, fill = GENUS)) +
   geom_boxplot(outlier.size = 0.1) +
-  coord_cartesian(ylim = c(5, 100)) +
   theme_bw() +
-  scale_fill_manual(values = eves_colors) +
-#  scale_y_continuous(transform = "log10") +
-  ggtitle("Unharvested TPA Per Plot") +
-  ylab(bquote("Unarvested TPA" ~ (trees %.% acre^-1))) +
+  scale_y_continuous(transform = "log10") +
+  ggtitle("CFI Observed Remainders (TPA Per Plot)") +
+  ylab(bquote("Harvested TPA" ~ (trees %.% acre^-1))) +
   xlab("Visit Cycle (Number of Plots Harvested)")
-
-tmp_observed_remainders |>
-  ggplot(aes(VisitCycle, tpa)) +
-  geom_boxplot(outlier.size = 0.1) +
-  coord_cartesian(ylim = c(1, 50)) +
-  theme_bw() +
-#  scale_fill_manual(values = eves_colors) +
-#  scale_y_continuous(transform = "log10") +
-  ggtitle("Unharvested TPA Per Plot") +
-  ylab(bquote("Unarvested TPA" ~ (trees %.% acre^-1))) +
-  xlab("Visit Cycle (Number of Plots Harvested)")
-
 ```
 
-### Harvest Efficiency
+# Regeneration
 
-What fraction of trees were harvested?
+## 1980 Establishment
 
-> Take the 1980 pulse (delta in 6" fron 1970 - 1980?) and
-> turn those into extra trees in 1970? 4" trees? 2/3 the height? 2/3 the
-> DBH? (2/3 because 4 is 2/3 of 6) also, i feel like i was looking at a
-> spot in harvest where we're looking at fvs trees without summing tpa
-> Also also, instead of ThinDBH, try ThinBTA - thin from below to a TPA
-> target. - DBH range - everything - TPA target - what's left on the
-> plot - Efficiency - calculate ratio of initial to residual tpa in each
-> diameter class, take the max? mean? median? ThinBTA doesn't allow
-> species selection; ThinDBH does, can maybe use ThinDBH with Cuteff to
-> achieve the same goal? Note that ThinDBH ignores CutEFF if target TPA
-> or BA is specified. ThinQFA also allows species to be specified; can
-> thin to TPA, specified in supplemental record.
+The 1970 inventory does not have saplings or seedlings, which will
+cause under-recruitement in 1980.
 
-```{r observed harvested ba, eval = FALSE}
-# What got harvested?
-
-tmp_observed_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  left_join(
-    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
-    by = join_by(SpeciesCode == SPCD)
-  ) |>
-  mutate(
-    basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi,
-  ) |>
-  # Replace na's in status to keep them from propagating
-  replace_na(list(StatusB = "X", Status6 = "X")) |>
-  filter(StatusB == "C" | Status6 == "B") |>
-  filter(!is.na(basal_area)) |>
-  group_by(MasterPlotID, VisitCycle, GENUS) |>
-  summarize(
-    hvst_basal_area = sum(basal_area, na.rm = TRUE),
-    hvst_tpa = n() * 5,
-    .groups = "keep"
-  ) |>
-  ungroup()
-
-# Which plots are harvested, in which visit cycles?
-
-tmp_harvest_history <- qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  # cfi_harvested() |> # Can't use this, doesn't retain VisitCycle
-  group_by(MasterPlotID, VisitCycle) |>
-  summarize(
-    CFIHarvested = any(CutSinceLastVisit, na.rm = TRUE),
-    .groups = "drop"
-  )
-
-# What trees are left behind after harvest?
-
-tmp_observed_remainders <- qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  left_join(tmp_harvest_history, by = join_by(MasterPlotID, VisitCycle)) |>
-  filter(CFIHarvested) |>
-  left_join(
-    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
-    by = join_by(SpeciesCode == SPCD)
-  ) |>
-  mutate(
-    # Judgment: basal_area intended to be left in harvest is better
-    # represented by ba PRIOR to harvest, than POST harvest. We don't
-    # have BA at the time of harvest, which would be ideal.
-    basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi,
-  ) |>
-  # Replace na's in status to keep them from propagating
-  replace_na(list(StatusB = "X", Status6 = "X")) |>
-  # Live trees, not recruits
-  filter(StatusB == "L" | Status6 == "L") |>
-  filter(!is.na(basal_area)) |>
-  group_by(MasterPlotID, VisitCycle, GENUS) |>
-  summarize(
-    rmdr_basal_area = sum(basal_area, na.rm = TRUE),
-    rmdr_tpa = n() * 5,
-    .groups = "keep"
-  ) |>
-  ungroup()
-
-tmp_harvest_fraction <- tmp_observed_harvest |>
-  left_join(
-    tmp_observed_remainders,
-    by = join_by(MasterPlotID, VisitCycle, GENUS)
-  ) |>
-  replace_na(list(
-    rmdr_basal_area = 0,
-    rmdr_tpa = 0,
-    hvst_basal_area = 0,
-    hvst_tpa = 0
-  )) |>
-  mutate(
-    tpa_fraction = hvst_tpa / (hvst_tpa + rmdr_tpa),
-    ba_fraction = hvst_basal_area / (hvst_basal_area + rmdr_basal_area)
-  ) |>
-  mutate(
-    group = sprintf("%s %s", VisitCycle, GENUS)
-  )
-
-tmp_harvest_fraction |>
-  ggplot(aes(VisitCycle, tpa_fraction, fill = GENUS, group = group)) +
-  geom_boxplot() +
-  scale_fill_manual(values = eves_colors)
-
-
-```
-
-### 1980 Pulse
-
-Let's see how many extra trees recruit in 1980
-
-```{r excess recruits in 1980, eval = FALSE}
-excess_recruits <- qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  left_join(
-    species_crosswalk |> select(SPCD, FVS_SPCD),
-    by = join_by(SpeciesCode == SPCD)
-  ) |>
-  # Replace na's in status to keep them from propagating
-  replace_na(list(StatusB = "X", Status6 = "X")) |>
-  # Live trees and recruits
-  filter(cfi_status_live(VisitTreeStatusCode)) |>
-  mutate(
-    diameter_class = as.integer(VisitTreeDIAM / 2) * 2
-  ) |>
-  filter(
-    diameter_class == 6
-  ) |>
-  group_by(MasterPlotID, FVS_SPCD, VisitCycle) |>
-  summarize(recruits = n(), .groups = "keep") |>
-  left_join(
-    cficop_estab |> select(MasterPlotID, SPECIES, DENSITY),
-    by = join_by(MasterPlotID, FVS_SPCD == SPECIES)
-  ) |>
-  mutate(excess_recruits = recruits - DENSITY) |>
-  ungroup() |>
-  filter(!is.na(excess_recruits) & excess_recruits >= 0) |>
-  mutate(Year = ordered(VisitCycle))
-
-excess_recruits |>
-  ggplot(aes(Year, excess_recruits, group = Year)) +
-  geom_boxplot() +
-  coord_cartesian(ylim = c(0, 5))
-```
-
-Rather than derive a principled way to turn 1980 ingrowth into 1970
-saplings, we can represent the 1970 sapling population by actual 1980
-ingrowth. By 1980, the 1970 seedling should have created a sapling pool
-that FVS can track, so we don't need to do anything beyond 1980. So
-let's add 1980 establishment as a 1-off. We use actual trees and height
-when available.
+Rather than try to turn 1980 ingrowth into 1970 saplings, which would
+require figuring out a survival rate, we can represent the 1970 sapling
+population by actual 1980 ingrowth. By 1980, the 1970 seedlings in the
+background establishment should have created a sapling pool that FVS can
+track, so we don't need to do anything beyond 1980. So let's add 1980
+establishment as a one-off. We use actual trees, with height when
+available.
 
 ```{targets cficop_hvst_estab, tar_simple = TRUE}
-# Find 1970 trees
+# Find 1970 trees; we'll remove these from 1980
 tmp_trees_1970 <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
@@ -379,16 +327,24 @@ tmp_trees_1970 <- qryDWSPCFIPlotVisitTreeDetail |>
     MasterPlotID, MasterTreeID
   )
 
+# Find 1980 trees, less those that were around in 1970
 tmp_estab_1980 <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
   cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
   cfi_abp(cfiabp_trees) |>
-  # Remove any trees that were around in 1970
+  # Live trees and recruits
+  filter(StatusB == "L" | StatusB == "R" | Status6 == "L" | Status6 == "R") |>
+  # Only trees that were around in 1980
+  filter(
+    VisitCycle == 1980
+  ) |>
+  # Not trees that were around in 1970
   anti_join(
     tmp_trees_1970,
     by = join_by(MasterPlotID, MasterTreeID)
   ) |>
+  # Deal with species that FVS doesn't handle
   mutate(SpeciesCode = replace_values(
     SpeciesCode,
     320 ~ 317, # norway maple -> sugar maple
@@ -400,26 +356,23 @@ tmp_estab_1980 <- qryDWSPCFIPlotVisitTreeDetail |>
     by = join_by(SpeciesCode == SPCD)
   ) |>
   filter(!is.na(FVS_SPCD)) |>
-  # Live trees and recruits
-  filter(cfi_status_live(VisitTreeStatusCode)) |>
-  mutate(
-    diameter_class = as.integer(VisitTreeDIAM / 2) * 2
-  ) |>
-  filter(
-    VisitCycle == 1980
-  ) |>
+  # Tree height - some trees have it, some don't.
+  # Impute mean height of those that have it for missing values
   group_by(FVS_SPCD) |>
-  # Impute mean height for missing values
   mutate(
     VisitTreeTotalHeight = if_else(
       is.na(VisitTreeTotalHeight) | VisitTreeTotalHeight == 0,
       mean(VisitTreeTotalHeight, na.rm = TRUE),
       VisitTreeTotalHeight
     ),
-    DENSITY = 5  # trees per acre
+    DENSITY = 5  # trees per acre for one tree on a 1/5 acre plot
   ) |>
+  ungroup() |>
+  # We need STAND_CN for the 1970 stand
   left_join(
-    cfigro_plot |> select(STAND_ID, STAND_CN),
+    cfigro_plot |>
+      filter(INV_YEAR == 1970) |>
+      select(STAND_ID, STAND_CN),
     by = join_by(MasterPlotID == STAND_ID)
   ) |>
   select(
@@ -431,6 +384,8 @@ tmp_estab_1980 <- qryDWSPCFIPlotVisitTreeDetail |>
     HEIGHT = VisitTreeTotalHeight
   )
 
+# Add the 1980 establishment to the establishment from Fred Hunt's
+# thesis to create establishment for the harvest scenarios
 cficop_hvst_estab <- cficop_dflt_estab |>
   mutate(
     STAND_ID = NA,
@@ -441,639 +396,97 @@ cficop_hvst_estab <- cficop_dflt_estab |>
   )
 ```
 
-### Diameter Class
+## *** TODO: Post-Harvest Establishment ***
 
-What's the distribution of trees left behind, by diameter class?
+# Harvest
 
-```{r harvest by diameter class, eval = FALSE}
-qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  left_join(tmp_harvest_history, by = join_by(MasterPlotID, VisitCycle)) |>
-  filter(CFIHarvested) |>
-  left_join(
-    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
-    by = join_by(SpeciesCode == SPCD)
-  ) |>
-  mutate(
-    # Judgment: basal_area intended to be left in harvest is better
-    # represented by ba PRIOR to harvest, than POST harvest. We don't
-    # have BA at the time of harvest, which would be ideal.
-    basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi,
-    diameter_class = ordered(as.integer(conv_unit(dbh_prior, "cm", "in") / 5) * 5)
-  ) |>
-  # Replace na's in status to keep them from propagating
-  replace_na(list(StatusB = "X", Status6 = "X")) |>
-  # Live trees, not recruits
-  filter(StatusB == "L" | StatusB == "R" | Status6 == "L" | Status6 == "R") |>
-  filter(!is.na(diameter_class)) |>
-  group_by(VisitCycle) |>
-  mutate(VisitCycle = paste0(VisitCycle, " (n=", n_distinct(MasterPlotID), ")")) |>
-  ungroup() |>
-  group_by(MasterPlotID, VisitCycle, diameter_class) |>
-  summarize(basal_area = sum(basal_area, na.rm = TRUE), .groups = "keep") |>
-  ungroup() |>
-  ggplot(aes(VisitCycle, basal_area, fill = diameter_class)) +
-  geom_boxplot(outlier.size = 0.1) +
-  coord_cartesian(ylim = c(0, 1)) +
-  theme_bw() +
-  scale_fill_discrete() +
-  ggtitle("Unharvested BA Per Plot by 5\" diameter class") +
-  ylab(bquote("Unharvested BA" ~ (m^2))) +
-  xlab("Visit Cycle (Number of Plots Harvested)")
-```
+FVS provides the ThinDBH keyword to schedule thinning from throughout a
+dbh range for any or all species to a residual basal area (BA) or trees
+per acre (TPA) target.
 
-```{r remaining tpa by diameter class, eval = FALSE}
-remaining_tpa_by_diameter_class <- qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  left_join(tmp_harvest_history, by = join_by(MasterPlotID, VisitCycle)) |>
-  filter(CFIHarvested) |>
-  left_join(
-    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
-    by = join_by(SpeciesCode == SPCD)
-  ) |>
-  mutate(
-    # Judgment: basal_area intended to be left in harvest is better
-    # represented by ba PRIOR to harvest, than POST harvest. We don't
-    # have BA at the time of harvest, which would be ideal.
-    basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi,
-    diameter_class = as.integer(conv_unit(dbh_prior, "cm", "in") / 2) * 2
-  ) |>
-  # Replace na's in status to keep them from propagating
-  replace_na(list(StatusB = "X", Status6 = "X")) |>
-  # Live trees, not recruits
-  filter(StatusB == "L" | StatusB == "R" | Status6 == "L" | Status6 == "R") |>
-  filter(!is.na(diameter_class)) |>
-  filter(diameter_class <= 40) |>
-  group_by(VisitCycle) |>
-  mutate(VisitCycle = paste0(VisitCycle, " (n=", n_distinct(MasterPlotID), ")")) |>
-  ungroup() |>
-  group_by(MasterPlotID, VisitCycle, diameter_class) |>
-  summarize(
-    tpa = n() * 5, .groups = "keep"
-  ) |>
-  ungroup()
+We will provide multiple ThinDBH keywords per stand per timestep,
+describing the target residual trees per acre for that species for that
+dbh range for that stand for that havest; the rest will be harvested.
+Ideally, we'd specify the number of trees to remove, but between
+ingrowth, mortality, and multiple rounds of harvest, we don't actually
+know how many trees FVS will have in the stand at any given time, so we
+can't compute the residual number of trees that would cause the right
+number to be removed. We assume that harvest is to a target resudual
+TPA, and that the amount of harvest is the free variable.
 
-remaining_tpa_by_diameter_class |>
-  mutate(
-    VisitCycle = ordered(VisitCycle),
-    diameter_class = ordered(diameter_class)
-  ) |>
-  ggplot(aes(VisitCycle, tpa, fill = diameter_class)) +
-  geom_boxplot(outlier.size = 0.1) +
-  coord_cartesian(ylim = c(5, 100)) +
-  theme_bw() +
-  scale_y_continuous(transform = "log2") +
-  scale_fill_discrete() +
-  ggtitle("Unharvested TPA Per Plot by 2\" diameter class") +
-  ylab(bquote("Unharvested TPA" ~ (stems %.% acre^-1))) +
-  xlab("Visit Cycle (Number of Plots Harvested)")
+## Harvest Prescription
 
-ideal_tpa_by_diameter_class <- tibble(
-  diameter_class = seq(3, 35, 2),
-  tpa = sapply(0:16, \(i) as.integer(42 / 1.4^i))
-)
-
-
-remaining_tpa_by_diameter_class |>
-  ggplot(aes(diameter_class, tpa)) +
-  geom_boxplot(
-    aes(group = diameter_class),
-    width = 0.7,
-    outlier.size = 0.1
-  ) +
-  geom_step(
-    data = ideal_tpa_by_diameter_class,
-    color = "red"
-  ) +
-  scale_x_continuous(breaks = seq(2,40,2)) +
-  coord_cartesian(xlim = c(6, 20), ylim = c(0, 100)) +
-  annotate("text", x = 18, y = 0, label = "DBq, q=1.4", color = "red") +
-  theme_bw() +
-  ggtitle("Unharvested TPA Per Plot by 2\" diameter class") +
-  ylab(bquote("Unharvested TPA" ~ (stems %.% acre^-1))) +
-  xlab("Diameter Class")
-
-```
-
-```{r remaining tpa by diameter class 2, eval = FALSE}
-remaining_tpa_by_diameter_class <- qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  left_join(tmp_harvest_history, by = join_by(MasterPlotID, VisitCycle)) |>
-  filter(CFIHarvested) |>
-  left_join(
-    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
-    by = join_by(SpeciesCode == SPCD)
-  ) |>
-  mutate(
-    # Judgment: basal_area intended to be left in harvest is better
-    # represented by ba PRIOR to harvest, than POST harvest. We don't
-    # have BA at the time of harvest, which would be ideal.
-    basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi,
-    diameter_class = as.integer(conv_unit(dbh_prior, "cm", "in") / 2) * 2
-  ) |>
-  # Replace na's in status to keep them from propagating
-  replace_na(list(StatusB = "X", Status6 = "X")) |>
-  # Live trees, not recruits
-  filter(StatusB == "L" | StatusB == "R" | Status6 == "L" | Status6 == "R") |>
-  filter(!is.na(diameter_class)) |>
-  filter(diameter_class <= 40) |>
-  group_by(VisitCycle) |>
-  mutate(VisitCycle = paste0(VisitCycle, " (n=", n_distinct(MasterPlotID), ")")) |>
-  ungroup() |>
-  group_by(MasterPlotID, VisitCycle, diameter_class) |>
-  summarize(
-    tpa = n() * 5, .groups = "keep"
-  ) |>
-  ungroup()
-
-starting_tpa <- remaining_tpa_by_diameter_class |>
-  filter(diameter_class == 6) |>
-  ungroup() |>
-  select(MasterPlotID, VisitCycle, starting_tpa = tpa) |>
-  mutate(
-    starting_tpa = 25 * floor(starting_tpa / 25),
-    tpa_class = if_else(
-      starting_tpa < 75, as.character(starting_tpa),
-      "75+"
-    )
-  )
-
-ideal_tpa_by_diameter_class <- lapply(
-  c(0, 25, 50, 75), \(x) {
-    tibble(
-      diameter_class = seq(5, 35, 2),
-      tpa = sapply(0:15, \(i) as.integer((x + 12.5) / 1.4^i)),
-      starting_tpa = x
-    ) |>
-      mutate(
-        tpa_class = if_else(
-          starting_tpa < 75, as.character(starting_tpa),
-          "75+"
-        )
-      )
-  }
-) |>
-  do.call(bind_rows, args = _)
-
-remaining_tpa_by_diameter_class |>
-  left_join(
-    starting_tpa, by = join_by(MasterPlotID, VisitCycle)
-  ) |>
-  replace_na(list(tpa_class = "0")) |>
-  mutate(group = paste(tpa_class, diameter_class)) |>
-  ggplot(aes(diameter_class, tpa)) +
-  geom_boxplot(
-    aes(fill = tpa_class, group = group),
-    outlier.size = 0.1
-  ) +
-  geom_step(
-    data = ideal_tpa_by_diameter_class,
-    aes(color = tpa_class),
-    show.legend = FALSE
-  ) +
-  scale_x_continuous(breaks = seq(2,40,2)) +
-  coord_cartesian(xlim = c(6, 20), ylim = c(0, 100)) +
-  theme_bw() +
-  labs(fill = "6\" TPA") +
-  ggtitle("Unharvested TPA Per Plot by 2\" diameter class") +
-  ylab(bquote("Unharvested TPA" ~ (stems %.% acre^-1))) +
-  xlab("Diameter Class")
-```
-
-### Before / After Ratio
-
-```{r harvest ratio by diameter class, eval = FALSE}
-qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  left_join(tmp_harvest_history, by = join_by(MasterPlotID, VisitCycle)) |>
-  filter(CFIHarvested) |>
-  left_join(
-    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
-    by = join_by(SpeciesCode == SPCD)
-  ) |>
-  mutate(
-    # Judgment: basal_area intended to be left in harvest is better
-    # represented by ba PRIOR to harvest, than POST harvest. We don't
-    # have BA at the time of harvest, which would be ideal.
-    basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi,
-    diameter_class = ordered(as.integer(conv_unit(dbh_prior, "cm", "in") / 5) * 5)
-  ) |>
-  # Live trees, not recruits
-  # Replace na's in status to keep them from propagating
-  replace_na(list(StatusB = "X", Status6 = "X")) |>
-  filter(
-    StatusB == "L" | StatusB == "R" | StatusB == "C" |
-      Status6 == "L" | Status6 == "R" | Status6 == "C"
-  ) |>
-  filter(!is.na(diameter_class)) |>
-  group_by(VisitCycle) |>
-  mutate(VisitCycle = paste0(VisitCycle, " (n=", n_distinct(MasterPlotID), ")")) |>
-  ungroup() |>
-  group_by(MasterPlotID, VisitCycle, diameter_class) |>
-  summarize(
-    pre_harvest_ba = sum(basal_area, na.rm = TRUE),
-    harvested_ba = sum(if_else(StatusB == "C" | Status6 == "C", 0, basal_area), na.rm = TRUE),
-    harvest_fraction = harvested_ba / pre_harvest_ba,
-    .groups = "keep"
-  ) |>
-  ungroup() |>
-  ggplot(aes(VisitCycle, harvest_fraction, fill = diameter_class)) +
-  geom_boxplot(outlier.size = 0.1) +
-  coord_cartesian(ylim = c(0, 1)) +
-  theme_bw() +
-  scale_fill_discrete() +
-  ggtitle("Harvested BA Ratio Per Plot by 5\" diameter class") +
-  ylab(bquote("Harvested BA" ~ (fraction))) +
-  xlab("Visit Cycle (Number of Plots Harvested)")
-```
-
-```{r harvest ratio by genus, eval = FALSE}
-qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  left_join(tmp_harvest_history, by = join_by(MasterPlotID, VisitCycle)) |>
-  filter(CFIHarvested) |>
-  left_join(
-    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
-    by = join_by(SpeciesCode == SPCD)
-  ) |>
-  mutate(
-    # Judgment: basal_area intended to be left in harvest is better
-    # represented by ba PRIOR to harvest, than POST harvest. We don't
-    # have BA at the time of harvest, which would be ideal.
-    basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi
-  ) |>
-  # Replace na's in status to keep them from propagating
-  replace_na(list(StatusB = "X", Status6 = "X")) |>
-  # Live trees, not recruits
-  filter(
-    StatusB == "L" | StatusB == "R" | StatusB == "C" |
-      Status6 == "L" | Status6 == "R" | Status6 == "C"
-  ) |>
-  filter(!is.na(basal_area)) |>
-  group_by(VisitCycle) |>
-  mutate(
-    VisitCycle = paste0(VisitCycle, " (n=", n_distinct(MasterPlotID), ")")
-  ) |>
-  ungroup() |>
-  mutate(
-    VisitCycle = ordered(VisitCycle),
-    GENUS = fct_lump_n(GENUS, n = 5, w = basal_area, other_level = "Other")
-  ) |>
-  group_by(MasterPlotID, VisitCycle, GENUS) |>
-  summarize(
-    pre_harvest_ba = sum(basal_area, na.rm = TRUE),
-    harvested_ba = sum(if_else(StatusB == "C" | Status6 == "C", 0, basal_area), na.rm = TRUE),
-    harvest_fraction = harvested_ba / pre_harvest_ba,
-    .groups = "keep"
-  ) |>
-  ungroup() |>
-  ggplot(aes(VisitCycle, harvest_fraction, fill = GENUS)) +
-  geom_boxplot(outlier.size = 0.1) +
-  coord_cartesian(ylim = c(0, 1)) +
-  theme_bw() +
-  scale_fill_manual(values = eves_colors) +
-  ggtitle("Harvested BA Ratio Per Plot by Genus") +
-  ylab(bquote("Harvested BA" ~ (fraction))) +
-  xlab("Visit Cycle (Number of Plots Harvested)")
-```
-
-### Theoretical Q
-
-```{r theoretical description of what is on the landscape, eval = FALSE}
-x <- tibble(
-  diameter_class = seq(6, 40, 2),
-  tpa = sapply(0:17, \(i) (40 / 1.4^i))
-)
-
-x |>
-  ggplot(aes(diameter_class, tpa)) +
-  geom_line() +
-  geom_point()
-```
-
-## Harvest using ThinDBH
-
-After talking with folks, we thought we were going to harvest by:
-
-- basal area removed, by
-- diameter class (6"), by
-- species, by
-- plot, by
-- time
-
-FVS provides the THINDBH keyword to schedule thinning from throughout a
-dbh range for any or all species to a residual basal area (BA) or trees per
-acre (TPA) target.
-
-We will provide multiple THINDBH keywords per stand per timestep,
-describing the target residual trees per acre of that species in that
-dbh range for that stand; the rest will be harvested. Ideally, we'd
-specify the number of trees to remove, but between ingrowth, mortality,
-and multiple rounds of harvest, we don't actually know how many trees
-FVS will have in the stand at any given time, so we can't compute the
-residual number of trees that would cause the right number to be
-removed.
-
-We could also do this by telling FVS the fraction of trees to remove; we
-know how many were harvested and when, but we don't know how many trees
-were on the landscape at the time of harvest, so we can't compute the
-correct fraction. By looking at cficop_dflt_treelist and
-cficop_none_treelist, we can get a pretty good idea of what FVS thinks
-is there.
-
-### Harvest List
-
-Let's build a list of the number of live trees after each harvest:
+Let's build a list of the number of live trees left after each harvest.
 
 We need:
 
 - In what plot, in what year, what species was harvested
-- for the plot/year/species combo, what trees were left behind?
-- lump those left behind into dbh classes for ThinDBH
-- Trees on the landscape grow at different rates than in FVS;
+- for the plot/year/species combo, how many trees were left behind
+- lump the trees left behind into dbh classes for ThinDBH
 
-it's too hard to try to hit 2" diameter classes, so we use much wider
-6" diameter classes to try to catch more trees.
-
-> Why 6, making the 5" BRK_DBH awkward? Can we use 5" diameter classes?
+Trees on the landscape grow at different rates than in FVS; it's not
+possible to align actual trees in 2" diameter classes with projected
+trees in 2" diameter classes over several decades, so we use much wider
+5" diameter classes to align more actual harvest with simulated harvest.
 
 ```{targets cficop_hvst_tpa, tar_simple = TRUE}
-tmp_harvested <- qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  mutate(
-    YearCut = VisitCycle - YearsSinceLastCut
-  ) |>
-  filter(
-    !is.na(YearCut) & !is.na(dbh_prior)
-  ) |>
-  # When harvest and inventory occur in the same year,
-  # harvest might occur before or after the inventory.
-  # To simplify things, we'll make all harvest happen
-  # before the inventory.
-  # Select the post-harvest inventory as the VisitCycle
-  mutate(
-    VisitCycle = ceiling(YearCut / 10) * 10,
-    DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5
-  ) |>
-  group_by(MasterPlotID, VisitCycle, SpeciesCode, DBH_MIN) |>
-  summarize(YearCut = max(YearCut), .groups = "drop")
-
-cficop_hvst_tpa <- qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  filter(cfi_status_live(VisitTreeStatusCode)) |>
-  filter(!is.na(dbh_prior)) |>
-  filter(MasterPlotID == 10226) |>
+# Find the trees left after each harvest
+cficop_hvst_tpa <- cficop_hvst_observed_remainders |>
   mutate(
     DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5
   ) |>
-  semi_join(
-    tmp_harvested,
-    by = join_by(MasterPlotID, VisitCycle, SpeciesCode, DBH_MIN)
-  ) |>
-  group_by(MasterPlotID, VisitCycle, SpeciesCode, DBH_MIN) |>
+  group_by(MasterPlotID, VisitCycle, FVS_SPCD, DBH_MIN, HarvestYear) |>
   summarize(
     TPA = n() * 5, # Each plot is 1/5 acre
     .groups = "drop"
   ) |>
   # Add back in the things that were harvested down to 0 TPA
-  # This will also add YearCut to the things harvested to >0 TPA
+  # This will also add HarvestYear to the things harvested to >0 TPA
   full_join(
-    tmp_harvested,
-    by = join_by(MasterPlotID, VisitCycle, SpeciesCode, DBH_MIN)
+    cficop_hvst_observed_harvest |>
+      mutate(DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5) |>
+      distinct(MasterPlotID, VisitCycle, FVS_SPCD, DBH_MIN, HarvestYear),
+    by = join_by(MasterPlotID, VisitCycle, FVS_SPCD, DBH_MIN)
   ) |>
-  # The harvest blocks added back will have TPA == NA
-  mutate(
-    DBH_MAX = DBH_MIN + 5,
-    TPA = if_else(is.na(TPA), 0, TPA),
-    BA = 0
-  ) |>
-  # Except seedlings / saplings - remove those from the harvest list
+  # Never harvest things with DBH < 5"
   filter(
     DBH_MIN > 0
+  ) |>
+  mutate(
+    HarvestYear = coalesce(HarvestYear.x, HarvestYear.y),
+    DBH_MAX = DBH_MIN + 5,
+    # Harvests added by the full_join will nave TPA==NA;
+    # there were not trees of this species left in this size range,
+    # so set the residual TPA to 0.
+    TPA = coalesce(TPA, 0),
+    BA = 0 # We're not using BA
   ) |>
   # For prescription-based harvest, our schema is:
   # STAND_CN, TREE_CN, PREV_TRE_CN, YEAR, PRESCRIPTION
   # For DBH-based harvest, our schema is:
   # STAND_CN, YEAR, DBH_MIN, DBH_MAX, SPCD, TPA, BA
-  mutate(
-    YEAR = YearCut
-  ) |>
-  mutate(SpeciesCode = replace_values(
-    SpeciesCode,
-    320 ~ 317, # norway maple -> sugar maple
-    402 ~ 403, # bitternut hickory -> pignut hickory
-    740 ~ 743  # unknown aspen -> bigtooth aspen
-  )) |>
   left_join(
-    species_crosswalk |> select(SPCD, FVS_SPCD),
-    by = join_by(SpeciesCode == SPCD)
-  ) |>
-  filter(!is.na(FVS_SPCD)) |>
-  left_join(
-    cfigro_plot |> filter(INV_YEAR == 1970) |> select(STAND_CN, STAND_ID),
+    cfigro_plot |>
+      filter(INV_YEAR == 1970) |>
+      select(STAND_CN, STAND_ID),
     by = join_by(MasterPlotID == STAND_ID)
   ) |>
   select(
     STAND_CN,
-    YEAR = YearCut,
+    YEAR = HarvestYear,
     DBH_MIN,
     DBH_MAX,
     SPCD = FVS_SPCD,
     TPA,
     BA
-  )
+  ) |>
+  # Arrange this for humans to be able to digest
+  arrange(YEAR, SPCD, DBH_MIN)
 ```
 
-### Post-Harvest Regeneration
+# *** Nik Is Here ***
 
-TODO: Post-harvest there's a bunch of regeneration; find it and insert it.
-
-### FvS_StandInit and FVS_PlotInit
-
-From DBSUserGuide.pdf, Table 3.0.1, we learn the following about table
-structure:
-
--   Stand_CN - optional, but used by queries, so we'll include it
--   Stand_ID - required
--   StandPlot_ID - optional; plot identification code; required by the
-    user interface when populating stand lists from the plot initiation
-    table (PlotInit)
--   Variant - required; set to "ne"
--   Inv_Year - required; set to 1970
--   Latitude - optional
--   Longitude - optional
--   Location - recommended; nearest national forest; takes precedence
-    over Region, forest, District, and Compartment
--   Apsect - recommended; (0 = no meaningful aspect; 360 = north)
--   Slope - recommended
--   ElevFt - recommended; Elevation in feet
--   Basal_Area_Factor - required
--   Inv_Plot_Size - required
--   Brk_DBH - required
--   Num_Plots - recommended; if 0, the number of plots in the stand is
-    determined by counting the numbers [sic] of unique plot
-    identification codes on the tree record data
-
-All other fields are optional.
-
-### FVS_TreeInit
-
-From DBSUserGuide.pdf, Table 3.0.2, we learn the following about table
-structure:
-
--   Stand_CN - optional, but used by queries, so we'll include it
--   Stand_ID - required
--   StandPlot_ID - required to run plots as stands
--   Plot_ID - recommended; plot identification, should be unique for an
-    individual stand but can be repeated for plots in different stands
--   Tree_ID - optional
--   Tree_Count - recommended - the number of trees represented by the
-    tree record; if left blank FVS assumes the tree record represents a
-    single sample tree
--   Species - required
--   DBH or Diameter - required
--   Ht - recommended; total height in feet
--   CrRatio - recommended; values 1-9 are read as crown ratio codes;
-    10-99 as percent
-
-All other fields are optional.
-
-### Generate Tables for UI
-
-```{r, eval = FALSE}
-blank_db <- DBI::dbConnect(
-  RSQLite::SQLite(),
-  file.path("data/fvs/BlankDatabase.db"),
-  flags = RSQLite::SQLITE_RO
-)
-
-fvs_data_db <- DBI::dbConnect(
-  RSQLite::SQLite(),
-  file.path("data/fvs/FVS_Data.db"),
-  flags = RSQLite::SQLITE_RWC
-)
-
-# There are three tables: FVS_PlotInit, FVS_StandInit, and FVS_TreeInit
-
-# FVS_PlotInit
-# We aren't supporting by-plot
-DBI::dbWriteTable(
-  fvs_data_db,
-  "FVS_PlotInit",
-  tbl(blank_db, "FVS_PlotInit") |> collect(),
-  overwrite = TRUE
-)
-
-# FVS_StandInit
-# Grab the structure of the table from the blank database,
-# and make cfigro_plot conform to it
-fvs_standinit <- bind_rows(
-  tbl(blank_db, "FVS_StandInit") |>
-    collect() |>
-    mutate(
-      Stand_CN = character()
-    ),
-  cfigro_plot |>
-    filter(INV_YEAR == 1970) |>
-    mutate(
-      Stand_ID = as.character(STAND_ID),
-      Variant = "ne",
-      Aspect = if_else(SLOPE > 0 & ASPECT == 0, 360, ASPECT),
-      INV_PLOT_SIZE = 385/4, # We don't use microplot data, but there
-      # are 4x6' radius microplots.
-      Sam_Wt = 10
-    ) |>
-    select(
-      Stand_CN = STAND_CN,
-      Stand_ID,
-      StandPlot_ID = STAND_ID,
-      Variant,
-      Inv_Year = INV_YEAR,
-      Latitude = LATITUDE,
-      Longitude = LONGITUDE,
-      Region = REGION,
-      Forest = FOREST,
-      Aspect,
-      Slope = SLOPE,
-      ElevFt = ELEVFT,
-      Basal_Area_Factor = BASAL_AREA_FACTOR,
-      Inv_Plot_Size = INV_PLOT_SIZE,
-      Brk_DBH = BRK_DBH,
-      Num_Plots = NUM_PLOTS,
-      Sam_Wt
-  )
-)
-
-DBI::dbWriteTable(
-  fvs_data_db,
-  "FVS_StandInit",
-  fvs_standinit,
-  overwrite = TRUE
-)
-
-# FVS_TreeInit
-# Grab the structure of the table from the blank database,
-# and make cfigro_trees conform to it
-fvs_treeinit <- bind_rows(
-  tbl(blank_db, "FVS_TreeInit") |>
-    collect(),
-  cfigro_trees |>
-    semi_join(fvs_standinit |> distinct(Stand_CN), by = join_by(STAND_CN == Stand_CN)) |>
-    mutate(
-      Stand_ID = as.character(STAND_ID),
-      Variant = "ne",
-      Aspect = if_else(SLOPE > 0 & ASPECT == 0, 360, ASPECT),
-      Tree_Count = 1
-    ) |>
-    select(
-      Stand_CN = STAND_CN,
-      Stand_ID,
-      Plot_ID = STAND_ID,
-      Tree_CN = TREE_CN,
-#      Tree_ID = TREE_ID,
-      Tree_Count,
-      Species = SPECIES,
-      Diameter = DIAMETER,
-      Ht = HT,
-      Slope = SLOPE,
-      Aspect = ASPECT,
-      TopoCode = TOPOCODE
-  )
-)
-
-DBI::dbWriteTable(
-  fvs_data_db,
-  "FVS_TreeInit",
-  fvs_treeinit,
-  overwrite = TRUE
-)
-
-DBI::dbDisconnect(blank_db)
-DBI::dbDisconnect(fvs_data_db)
-```
-
-## Run FVS
+# Run FVS
 
 Make our best effort at replicating what actually happend in Quabbin.
 
@@ -1131,41 +544,8 @@ tar_target(
 )
 ```
 
-## Load Results
 
-Carbon
-
-```{targets cficop_hvst_carbon, tar_simple = TRUE}
-fvs_read_output(cficop_hvst, "FVS_Carbon") |>
-  group_by(StandID, Year) |> # Combine results from different random seeds
-  summarize(
-    Aboveground_Total_Live = mean(Aboveground_Total_Live),
-    .groups = "keep"
-  ) |>
-  ungroup()
-```
-
-Summary
-
-```{targets cficop_hvst_summary, tar_simple = TRUE}
-fvs_read_output(cficop_hvst, "FVS_Summary2") |>
-  group_by(StandID, Year) |>
-  summarize(
-    BA = mean(BA),
-    Tpa = mean(Tpa),
-    .groups = 'keep'
-  ) |>
-  ungroup()
-```
-
-Cut trees
-
-```{targets cficop_hvst_cutlist, tar_simple = TRUE}
-fvs_read_output(cficop_hvst, "FVS_CutList") |>
-  filter(random_seed == min(random_seed))
-```
-
-### Parse Problems
+# Fault Analysis
 
 What errors and warnings do we get?
 ```{r cficop_hvst_warnings, eval = FALSE}
@@ -1211,34 +591,19 @@ cficop_hvst_warnings <- lapply(cficop_hvst_outfiles, \(filename) {
   filter(text != "********   WARNING:  DATE OF DISTURBANCE IS IGNORED.") |>
   # See below about ignoring this warning
   filter(text != " *** FFE MODEL WARNING: NO INITIAL BASAL AREA")
+
+cficop_hvst_warnings |>
+  nrow()
 ```
 
-Find the distinct warnings
-```{r distinct fvs warnings, eval = FALSE}
-fvs_warnings_distinct <- fvs_warnings |>
-  # Warnings have some leading text, the tag WARNING:,
-  # then descriptive text; if there's a number in the descriptive text,
-  # it's probably pulled from the data, so we chop off the descriptive
-  # text starting at the first number to find the truly distinct warnings
-  mutate(
-    PROBLEM = case_when(
-      grepl("WARNING:", text) ~ sub("^[*. ]*(.*WARNING: [^0-9]+)([0-9].*)?$", "\\1", text),
-      grepl("ERROR:", text) ~ sub("^[*. ]*(.*ERROR: [^0-9]+)([0-9].*)?$", "\\1", text)
-    ),
-    PROBLEM = sub("\\s+$", "", PROBLEM)
-  ) |>
-  distinct(PROBLEM) |>
-  arrange(PROBLEM)
-knitr::kable(fvs_warnings_distinct)
-```
 
-### DATE OF DISTURBANCE IS IGNORED
+## DATE OF DISTURBANCE IS IGNORED
 
 We are using IF / THEN to trigger establishment based on cycle,
 not disturbance. So this is correct, the date of disturbance is
 ignored, and that's what we intended.
 
-### FFE MODEL WARNING: NO INITIAL BASAL AREA
+## FFE MODEL WARNING: NO INITIAL BASAL AREA
 
 This error does not mean there is no initial basal area; it means
 that the cover type could not be determined from crown area.
@@ -1271,39 +636,121 @@ determined.
 Anyway, we can ignore these errors, especially since cover type is
 not used by the NE variant.
 
-### Did it do what we asked?
+## Harvest Directives
 
 FVS will cancel a harvest if it can't meet the target.
 
 How many THINDBH directives did we give?
 
-```{bash, eval = FALSE}
-# I've done this in R before, but don't feel like going and figuring
-# it out again
-grep "ThinDBH" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.key | wc -l
+```{r, eval = FALSE}
+cficop_hvst_directives <- lapply(cficop_hvst_outfiles, \(filename) {
+  partition = filename |>
+    sub("^.*_P(\\d+)_R.*$", "\\1", x = _)
+  read_lines(filename) |>
+    as.data.frame(nm = "text") |>
+    # Filter to just initial STAND ID and WARNING lines
+    filter(
+      grepl("^ +STAND ID=", text) |
+        grepl("BASE     THINDBH .* (DONE|DELETED)", text)
+    ) |>
+    # Parse out the STAND ID and fill it into the following lines
+    mutate(
+      STAND_ID = case_when(
+        grepl("^ +STAND ID=", text) ~ sub("^ +STAND ID= *([^ ]+) .*$", "\\1", text)
+      ),
+      partition = !!partition
+    ) |>
+    fill(STAND_ID) |>
+    # Remove everything but ThinDBH directives
+    filter(
+      grepl("BASE     THINDBH", text)
+    ) |>
+    mutate(
+      STATUS = case_when(
+        grepl("DONE", text) ~ "DONE",
+        grepl("DELETED", text) ~ "DELETED"
+      )
+    )
+}) |>
+  bind_rows()
+
+cficop_hvst_directives |>
+  nrow()
 ```
 
-> 3873
+> 994
 
-```{bash, eval = FALSE}
-grep "DELETED OR CANCELED" data/fvs/FVS_CFICarbonOffsetProgram_HVST/*R43517.out | grep THINDBH | wc -l
+## Canceled Harvest
+
+```{r, eval = FALSE}
+cficop_hvst_directives |>
+  filter(STATUS == "DELETED") |>
+  nrow()
 ```
-> 2242 with 1980 compensation, 2252 without - so canceled 8 more harvests
 
-So, a little over half the harvest was canceled.
-This seems to be:
-1. Trees where actual diameter growth was different enough from modeled
-   diameter growth that it ended up in a different diameter class than
-   harvest specified (lessened by using 6" diameter classes), and
-2. At the low end, different ingrowth rates between actual and modeled.
+> 415
 
-Is it a problem?
+that's about 42% of harvest is deleted or canceled.
 
-Let's compare harvested and remaining TPA and BA.
+## Deep Dive
 
-> Deleted: Analysis of MasterPlotID 10153
+Let's follow one canceled harvest from start to finish.
 
-### Projected vs Observed TPA
+```{r, eval = FALSE}
+cficop_hvst_directives |>
+  filter(STATUS == "DELETED") |>
+  head(1) |>
+  as.list()
+```
+
+This says to thin Red Maple in 1972 in the DBH range 5-10 down to 30TPA.
+
+How many red maple are there in this stand in 1972?
+
+```{r, eval = FALSE}
+cfiabp_trees |>
+  filter(MasterPlotID == 10102) |>
+  filter(VisitCycle == 1970) |>
+  filter(genusp == "ACERRU") |>
+```
+
+# Results
+
+## Load Results
+
+Carbon
+
+```{targets cficop_hvst_carbon, tar_simple = TRUE}
+fvs_read_output(cficop_hvst, "FVS_Carbon") |>
+  group_by(StandID, Year) |> # Combine results from different random seeds
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    .groups = "keep"
+  ) |>
+  ungroup()
+```
+
+Summary
+
+```{targets cficop_hvst_summary, tar_simple = TRUE}
+fvs_read_output(cficop_hvst, "FVS_Summary2") |>
+  group_by(StandID, Year) |>
+  summarize(
+    BA = mean(BA),
+    Tpa = mean(Tpa),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+```
+
+Cut trees
+
+```{targets cficop_hvst_cutlist, tar_simple = TRUE}
+fvs_read_output(cficop_hvst, "FVS_CutList") |>
+  filter(random_seed == min(random_seed))
+```
+
+## Projected vs Observed TPA
 
 ```{r, eval = FALSE}
 observed_trees <- qryDWSPCFIPlotVisitTreeDetail |>
@@ -1535,9 +982,7 @@ measured_harvest |>
   )) |>
   pivot_longer(cols = c(Measured_BA, Projected_BA)) |>
   filter(!is.na(value)) |>
-  group_by(GENUS) |>
-  filter(sum(value) > 5) |>
-  ungroup() |>
+  filter(GENUS %in% c("Acer", "Betula", "Fraxinus", "Pinus", "Quercus", "Tsuga")) |>
   ggplot(aes(Diameter_Class, value, fill = name, group = name)) +
   geom_col(position = "dodge") +
   theme_bw() +
@@ -1631,7 +1076,12 @@ measured_pre_harvest_trees <- qryDWSPCFIPlotVisitTreeDetail |>
 
 cficop_hvst_treelist <- fvs_read_output(cficop_hvst, "FVS_TreeList")
 
-projected_pre_harvest_trees <- cficop_hvst_cutlist |>
+projected_pre_harvest_trees <- cficop_hvst_treelist |>
+   mutate(StandID = as.numeric(StandID)) |>
+  semi_join(
+    pre_harvest_year,
+    by = join_by(StandID == MasterPlotID, Year == PreHarvestYear)
+  ) |>
   mutate(
     SPCD = as.integer(SpeciesFIA),
     Diameter_Class = floor(DBH / 5) * 5,
@@ -1660,32 +1110,32 @@ measured_pre_harvest_trees |>
     projected_pre_harvest_trees,
     by = join_by(GENUS, Diameter_Class)
   ) |>
+  # There's one 45" maple
+  filter(Diameter_Class < 30) |>
   mutate(
         Diameter_Class = paste0(Diameter_Class, " - ", Diameter_Class + 5)
   ) |>
+  filter(GENUS %in% c("Acer", "Betula", "Fraxinus", "Pinus", "Quercus", "Tsuga")) |>
   group_by(GENUS, Diameter_Class) |>
   summarize(
-    Measured_BA = sum(Measured_BA),
-    Projected_BA = sum(Projected_BA),
+    Measured_BA = sum(Measured_BA, na.rm = TRUE),
+    Projected_BA = sum(Projected_BA, na.rm = TRUE),
     .groups = "drop"
   ) |>
   ungroup() |>
-  # There's one 45" maple
-  filter(Diameter_Class < 30) |>
   mutate(Diameter_Class = ordered(
     Diameter_Class,
     c("5 - 10", "10 - 15", "15 - 20", "20 - 25", "25 - 30", "30 - 35")
   )) |>
   pivot_longer(cols = c(Measured_BA, Projected_BA)) |>
   replace_na(list(value = 0)) |>
-  filter(GENUS %in% c("Acer", "Betula", "Fraxinus", "Pinus", "Quercus", "Tsuga")) |>
   ggplot(aes(Diameter_Class, value, fill = name, group = name)) +
   geom_col(position = "dodge") +
   theme_bw() +
   facet_wrap(~GENUS) +
   #scale_y_continuous(transform = "log10") +
   ggtitle("Quabbin CFI Pre-Harvest Basal Area") +
-  xlab("Diameter Class") +
+  xlab("Diameter (inches)") +
   theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
   ylab(bquote("Basal Area" ~(m^2)))
 
@@ -1721,41 +1171,213 @@ measured_pre_harvest_trees |>
 #### By Year
 
 ```{r, eval = FALSE}
-measured_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
+measured_harvest <- cficop_hvst_observed_harvest |>
+  group_by(GENUS, VisitCycle) |>
+  summarize(
+    Observed = n() * 5, # TPA
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  select(GENUS, Year = VisitCycle, Observed)
+
+projected_harvest <- cficop_hvst_cutlist |>
+  mutate(Year = ceiling(Year / 10) * 10) |>
+  left_join(
+    species_crosswalk |> select(FVS_SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SpeciesFVS == FVS_SPCD)
+  ) |>
+  group_by(GENUS, Year) |>
+  summarize(
+    Projected = sum(TPA, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  select(GENUS, Year, Projected)
+
+measured_harvest |>
+  full_join(
+    projected_harvest,
+    by = join_by(GENUS, Year)
+  ) |>
+  filter(GENUS %in% c("Acer", "Betula", "Fraxinus", "Pinus", "Quercus", "Tsuga")) |>
+  pivot_longer(cols = c(Observed, Projected)) |>
+  replace_na(list(value = 0)) |>
+  mutate(Year = sprintf("%d", Year)) |>
+  mutate(value = if_else(value == 0, 1, value)) |>
+  ggplot(aes(Year, value, fill = name)) +
+  geom_col(position = "dodge") +
+#  scale_y_continuous(transform = "log10") +
+  facet_wrap(~GENUS) +
+  theme_bw() +
+  ggtitle("Projected Vs Observed Trees Harvested") +
+  ylab("Number of Trees Harvested") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1))
+
+```
+
+Who is harvesting in 1970???!?!?! The year is celining(HarvestYear/10)*10,
+so that 1970 harvest was *in* 1970.
+
+```{r, eval = FALSE}
+cficop_hvst_tpa |>
+  filter(YEAR == 1970) |>
+  filter(SPCD == "WP")
+```
+
+lol and thos all go to 0 TPA.
+
+Where are these requests coming from?
+
+```{r, eval = FALSE}
+tmp_harvested <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  semi_join(
+    cficop_hvst_tpa |>
+      filter(YEAR == 1970) |>
+      filter(SPCD == "WP") |>
+      mutate(STAND_CN = as.numeric(STAND_CN)),
+    by = join_by(MasterPlotVisitID == STAND_CN)
+  ) |>
+  filter(SpeciesCode == 129) |>
+  mutate(
+    YearCut = VisitCycle - YearsSinceLastCut
+  ) |>
+  filter(StatusB == "C" | Status6 == "C") |>
+  filter(
+    !is.na(YearCut) & !is.na(dbh_prior)
+  ) |>
+  # When harvest and inventory occur in the same year,
+  # harvest might occur before or after the inventory.
+  # To simplify things, we'll make all harvest happen
+  # before the inventory.
+  # Select the post-harvest inventory as the VisitCycle
+  mutate(
+    VisitCycle = ceiling(YearCut / 10) * 10,
+    DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5
+  ) |>
+  group_by(MasterPlotID, VisitCycle, SpeciesCode, DBH_MIN) |>
+  summarize(YearCut = max(YearCut), .groups = "drop")
+```
+
+#### Fate of the White Pine
+
+The projection is under-harvesting white pine; let's see if we can
+track it down.
+
+Pick a plot with lots of observed white pine harvest.
+
+```{r, eval = FALSE}
+SelectedPlotID <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
   cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
   cfi_abp(cfiabp_trees) |>
   filter(StatusB == "C" | Status6 == "B") |>
-  group_by(VisitCycle) |>
+  filter(SpeciesCode == 129) |>
+  group_by(MasterPlotID) |>
   summarize(
-    Observed = n() * 5,
-    .groups = "keep"
+    n = n(),
+    ba = sum(pi * (dbh_prior / 2)^1, na.rm = TRUE),
+    .groups = "drop"
   ) |>
   ungroup() |>
-  select(Year = VisitCycle, Observed)
+  # Pick the plot with the most ba removed
+  slice_max(order_by = ba, n = 1, na_rm = TRUE) |>
+  pull(MasterPlotID)
+```
 
-projected_harvest <- cficop_hvst_cutlist |>
-  mutate(Year = ceiling(Year / 10) * 10) |>
-  group_by(Year) |>
+Let's look at all the trees of interest in this plot.
+
+```{r, eval = FALSE}
+measured_focus_trees <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  filter(MasterPlotID == SelectedPlotID) |>
+  mutate(
+    Diameter_Class = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5,
+    ba = pi * (conv_unit(dbh_prior, "cm", "m") / 2)^2
+  ) |>
+  # Replace na's in status to keep them from propagating
+  replace_na(list(StatusB = "X", Status6 = "X")) |>
+  filter(
+    !is.na(ba) & ba > 0 & (
+      StatusB == "L" |
+        StatusB == "R" |
+        Status6 == "L" |
+        Status6 == "R"
+    )
+  ) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  group_by(GENUS, Diameter_Class, VisitCycle) |>
   summarize(
-    Projected = sum(TPA),
+    Measured_Trees = n(),
+    Measured_BA = sum(ba, na.rm = TRUE),
     .groups = "keep"
   ) |>
   ungroup()
 
-measured_harvest |>
-  full_join(
-    projected_harvest,
-    by = join_by(Year)
+
+cficop_hvst_treelist <- fvs_read_output(cficop_hvst, "FVS_TreeList")
+
+projected_pre_harvest_trees <- cficop_hvst_cutlist |>
+  mutate(
+    SPCD = as.integer(SpeciesFIA),
+    Diameter_Class = floor(DBH / 5) * 5,
+    ba = pi * (conv_unit(DBH, "in", "m") / 2)^2
   ) |>
-  pivot_longer(cols = c(Observed, Projected)) |>
-  mutate(Year = sprintf("%d", Year)) |>
-  ggplot(aes(Year, value, fill = name)) +
+  filter(!is.na(ba) & ba > 0 & DBH >= 5) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SPCD)
+  ) |>
+  group_by(GENUS, Diameter_Class) |>
+  summarize(
+    # Note that FVS can have fractional trees per acre, so it's
+    # important to sum TPA rather than count trees. Divide by 5
+    # because FVS provides a per-acre value and CFI plots are 1/5 acre.
+    Projected_Trees = sum(TPA) / 5,
+    # Since FVS can have fractional trees per acre, we need
+    # to scale BA by the number of trees
+    Projected_BA = sum(ba * TPA) / 5,
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+
+
+measured_focus_trees |>
+#  full_join(
+#    projected_pre_harvest_trees,
+#    by = join_by(GENUS, Diameter_Class)
+#  ) |>
+  filter(GENUS == "Pinus") |>
+  mutate(
+        Diameter_Class = paste0(Diameter_Class, " - ", Diameter_Class + 5)
+  ) |>
+  filter(GENUS %in% c("Acer", "Betula", "Fraxinus", "Pinus", "Quercus", "Tsuga")) |>
+  mutate(Diameter_Class = ordered(
+    Diameter_Class,
+    c("5 - 10", "10 - 15", "15 - 20", "20 - 25", "25 - 30", "30 - 35")
+  )) |>
+  pivot_longer(cols = c(Measured_Trees)) |> #, Projected_Trees)) |>
+  replace_na(list(value = 1)) |>
+  ggplot(aes(Diameter_Class, value, fill = name, group = name)) +
   geom_col(position = "dodge") +
   theme_bw() +
-  ggtitle("Projected Vs Observed Trees Harvested") +
-  ylab("Number of Trees Harvested")
+  facet_wrap(~VisitCycle) +
+  scale_y_continuous(transform = "log10") +
+  ggtitle("Quabbin CFI Pre-Harvest Trees") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  xlab("Diameter (inches)") +
+  ylab("Trees (trees)")
 ```
 
 ### Measured vs. Projected Post-Harvest Trees
