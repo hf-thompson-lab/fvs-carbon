@@ -488,7 +488,23 @@ cficop_hvst_tpa <- cficop_hvst_observed_remainders |>
 
 # Run FVS
 
-Make our best effort at replicating what actually happend in Quabbin.
+Make a best effort at replicating what actually happend in Quabbin.
+
+## ** SAM_WT
+
+There are a few things that play together here:
+
+- Aspect, slope, lat/lon, forest type, etc are per-stand
+- A stand can have multiple plots
+- The STAND_CN is really about the stand
+  - PLOT ID is observed by FVS to figure out how many plots are in the stand
+- Plot design is specified for all plots in the stand
+  - Fixed radius, number of subplots, etc.
+- The acreage of the STAND is specified
+- SAM_WT is (the inverse of) how each plot in the stand should be weighted
+  - If there are 10 plots in a 1000 acre stand, then SAM_WT is 10
+    which will cause each plot to be "expansion factor"ed to 100 acres
+- Since FVS can figure all this out, we can omit SAM_WT
 
 ```{targets cficop_hvst}
 tar_target(
@@ -520,13 +536,13 @@ tar_target(
         ) |>
         mutate(
           ASPECT = if_else(SLOPE > 0 & ASPECT == 0, 360, ASPECT),
-          INV_PLOT_SIZE = 385/4, # We don't use microplot data, but
-          # there are 4x6' radius microplots
-          SAM_WT = 10
+          # We don't use microplot data, but there are 4x6' radius
+          # microplots
+          INV_PLOT_SIZE = 385/4
         ),
       trees = cfigro_trees |>
         filter(DIAMETER > 0),
-      regen = cficop_hvst_estab, # cficop_dflt_estab,  
+      regen = cficop_hvst_estab,
       harvest = cficop_hvst_tpa,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
@@ -543,7 +559,6 @@ tar_target(
   pattern = cross(fvs_randseed, map(fvs_partition))
 )
 ```
-
 
 # Fault Analysis
 
