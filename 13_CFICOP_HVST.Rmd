@@ -484,13 +484,11 @@ cficop_hvst_tpa <- cficop_hvst_observed_remainders |>
   arrange(YEAR, SPCD, DBH_MIN)
 ```
 
-# *** Nik Is Here ***
-
 # Run FVS
 
 Make a best effort at replicating what actually happend in Quabbin.
 
-## ** SAM_WT
+## A Note on SAM_WT
 
 There are a few things that play together here:
 
@@ -560,6 +558,8 @@ tar_target(
 )
 ```
 
+# *** Nik Is Here ***
+
 # Fault Analysis
 
 What errors and warnings do we get?
@@ -610,7 +610,6 @@ cficop_hvst_warnings <- lapply(cficop_hvst_outfiles, \(filename) {
 cficop_hvst_warnings |>
   nrow()
 ```
-
 
 ## DATE OF DISTURBANCE IS IGNORED
 
@@ -707,7 +706,7 @@ cficop_hvst_directives |>
 
 that's about 42% of harvest is deleted or canceled.
 
-## Deep Dive
+### Which Plot
 
 Let's follow one canceled harvest from start to finish.
 
@@ -718,6 +717,10 @@ cficop_hvst_directives |>
   as.list()
 ```
 
+MasterPlotID 10102
+
+### Which Directive
+
 This says to thin Red Maple in 1972 in the DBH range 5-10 down to 30TPA.
 
 How many red maple are there in this stand in 1972?
@@ -727,7 +730,173 @@ cfiabp_trees |>
   filter(MasterPlotID == 10102) |>
   filter(VisitCycle == 1970) |>
   filter(genusp == "ACERRU") |>
+  filter(StatusB == "L" | StatusB == "R") |>
+  mutate(
+    DBH_MIN = floor(conv_unit(dbhcm, "cm", "in") / 5) * 5
+  ) |>
+  filter(DBH_MIN == 5) |>
+  nrow()
 ```
+
+7 trees; 7 * 5 = 35, so 5 TPA / 1 tree per plot would be harvested.
+
+### Directive Check
+
+Next question: does FVS see these trees?
+
+```{text}
+                                                 RO    BO    WP    RM
+                                                ----  ----  ----  ----
+
+NUMBER OF RECORDS PER SPECIES                     11     5     1     6
+```
+
+Huh, nope, it only sees 6 out of 7 RM trees. Where'd the 7th tree go?
+
+### FVS Input Check
+
+Let's check the database.
+```{r, eval = FALSE}
+tmp_input_trees <- fvs_read_input(cficop_hvst, "FVS_TreeInit_Plot") |>
+  semi_join(
+    cfigro_plot |>
+      filter(
+        STAND_ID == 10102,
+        INV_YEAR == 1970
+      ) |>
+      select(STAND_CN),
+    by = join_by(STAND_CN)
+  ) |>
+  filter(
+    STAND_ID == 10102,
+    SPECIES == "RM",
+    DIAMETER < 10
+  ) |>
+  filter(
+    partition == 1,
+    random_seed == min(random_seed)
+  ) |>
+  arrange(TREE_ID)
+
+tmp_input_trees
+```
+
+Huh, only 6 trees in the input.
+
+### Missing Tree
+
+Which is the missing tree?
+
+```{r, eval = FALSE}
+cfiabp_trees |>
+  filter(MasterPlotID == 10102) |>
+  filter(VisitCycle == 1970) |>
+  filter(genusp == "ACERRU") |>
+  filter(StatusB == "L" | StatusB == "R") |>
+  arrange(MasterTreeID)
+```
+
+Going by TreeID, it looks like tree 11 is missing from the input.
+
+It has VisitTreeStatusCode=4, which indicates "Out of population".
+VisitTreeStatusRecCode = 17
+
+StatusB is L; dbhcm is 14.224; dbh_prior = NA; Status6 = L;
+
+### Tree 101020011 (11)
+
+We feed cfigro_trees directly in to the input database. Is it in there?
+
+
+```{r, eval = FALSE}
+cfigro_trees |>
+  filter(
+    STAND_CN == "119700102",
+    SPECIES == "RM",
+    DIAMETER < 10
+  )
+```
+
+Not in there.
+
+So, we have a conflict between VisitTreeStatus and Status6.
+
+Let's mess with cfigro_trees and see where it vanishes.
+
+```{r, eval = FALSE}
+qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+#  filter(VisitTreeStatusCode != 4) |> # Skip missing trees
+  cfi_abp(cfiabp_trees) |>
+  group_by(MasterPlotID, MasterTreeID) |>
+  arrange(VisitCycle) |>
+  mutate(
+    PreviousStatus6 = lag(Status6),
+    PreviousDIAM = lag(VisitTreeDIAM),
+    PreviousHeight = lag(VisitTreeTotalHeight)
+  ) |>
+  ungroup() |>
+  cfi_topocode() |>
+  cfi_history() |>
+  mutate(SpeciesCode = replace_values(
+    SpeciesCode,
+    320 ~ 317, # norway maple -> sugar maple
+    402 ~ 403, # bitternut hickory -> pignut hickory
+    740 ~ 743  # unknown aspen -> bigtooth aspen
+  )) |>
+  left_join(
+    species_crosswalk |> select(SPCD, FVS_SPCD),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  filter(!is.na(FVS_SPCD)) |>
+  filter(MasterTreeID == 101020011) |> View()
+  
+  mutate(
+    STAND_CN = as.character(MasterPlotVisitID),
+    STAND_ID = MasterPlotID,
+    TREE_CN = as.character(VisitTreeNumberDetail),
+    TREE_ID = MasterTreeID,
+    PLOT_ID = 1, # CFI does not use subplots, so all PLOT_IDs are 1
+    INV_YEAR = VisitYear,
+    TREE_COUNT = 1, #conv_unit(1, "acre", "ft2") / (pi * 52.7^2),
+    HISTORY = HISTORY,
+    SPECIES = FVS_SPCD,
+    DIAMETER = VisitTreeDIAM,
+    HT = VisitTreeTotalHeight,
+    # HTTOPK = VisitTreeTotalHeight, # Height to top kill; we don't ahve that
+    # CRRATIO            WAS USED - not available
+    # DAMAGE1            WAS USED - not available
+    # SEVERITY1          WAS USED - not available
+    # DAMAGE2            WAS USED - not available
+    # SEVERITY2          WAS USED - not available
+    # DAMAGE3            WAS USED - not available
+    # SEVERITY3          WAS USED - not avialable
+    # TREEVALUE          WAS USED - X - tree removal priority
+    # PRESCRIPTION       WAS USED - X - tree removal group
+    # AGE                WAS USED - X
+    SLOPE = Slope,
+    ASPECT = Aspect,
+    # PV_CODE            WAS USED - ecoregion? - not used
+    TOPOCODE = TOPOCODE, # See EssentialFVS 5.4.1.2
+    # SITEPREP           WAS USED - ?
+    DG = PreviousDIAM,
+    HTG = PreviousHeight
+  ) |>
+  select(
+    STAND_CN, STAND_ID, TREE_CN, TREE_ID, PLOT_ID,
+    TREE_COUNT, HISTORY, SPECIES, DIAMETER, HT,
+    SLOPE, ASPECT, TOPOCODE, DG, HTG
+  )
+```
+
+It's in there, with HISTORY==6 and no DIAMETER.
+
+Presumably because we're taking DIAMETER from VisitTreeDIAM, and not
+from dbhcm.
+
+Conclusion: Always use StatusB for status, always use dbhcm for diameter.
 
 # Results
 

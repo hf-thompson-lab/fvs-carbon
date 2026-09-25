@@ -1208,12 +1208,20 @@ Substitutions:
 
 ## Trees for FVS
 
+The missing tree mystery:
+
+- There are trees in 1970 with VisitTreeStatusCode == 4, which says
+  they are missing.
+- These trees have StatusB and Status6, diameter, and other such things,
+  which means they're ... not missing.
+- At some point
+
 ```{targets cfigro_trees, tar_simple = TRUE}
 qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
   cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  filter(VisitTreeStatusCode != 4) |> # Skip missing trees
+#  filter(VisitTreeStatusCode != 4) |> # Skip missing trees
   cfi_abp(cfiabp_trees) |>
   group_by(MasterPlotID, MasterTreeID) |>
   arrange(VisitCycle) |>
