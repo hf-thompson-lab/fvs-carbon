@@ -3,18 +3,18 @@ tar_target(cfigro_trees, {
     cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
     cfi_with_tree_info(tblDWSPCFITreesComplete) |>
     cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  #  filter(VisitTreeStatusCode != 4) |> # Skip missing trees
+    cfi_topocode() |>
+    # Need to do history before cfi_abp, since cfi_abp filters trees
+    # to post-1970 and pre-1970 history may be available
+    cfi_history() |>
     cfi_abp(cfiabp_trees) |>
     group_by(MasterPlotID, MasterTreeID) |>
     arrange(VisitCycle) |>
     mutate(
-      PreviousStatus6 = lag(Status6),
-      PreviousDIAM = lag(VisitTreeDIAM),
-      PreviousHeight = lag(VisitTreeTotalHeight)
+      prev_dbhcm = lag(dbhcm),
+      prev_Height = lag(VisitTreeTotalHeight)
     ) |>
     ungroup() |>
-    cfi_topocode() |>
-    cfi_history() |>
     mutate(SpeciesCode = replace_values(
       SpeciesCode,
       320 ~ 317, # norway maple -> sugar maple
@@ -33,10 +33,10 @@ tar_target(cfigro_trees, {
       TREE_ID = MasterTreeID,
       PLOT_ID = 1, # CFI does not use subplots, so all PLOT_IDs are 1
       INV_YEAR = VisitYear,
-      TREE_COUNT = 1, #conv_unit(1, "acre", "ft2") / (pi * 52.7^2),
+      TREE_COUNT = 1,
       HISTORY = HISTORY,
       SPECIES = FVS_SPCD,
-      DIAMETER = VisitTreeDIAM,
+      DIAMETER = conv_unit(coalesce(dbhcm, prev_dbhcm), "cm", "in"),
       HT = VisitTreeTotalHeight,
       # HTTOPK = VisitTreeTotalHeight, # Height to top kill; we don't ahve that
       # CRRATIO            WAS USED - not available
@@ -54,8 +54,8 @@ tar_target(cfigro_trees, {
       # PV_CODE            WAS USED - ecoregion? - not used
       TOPOCODE = TOPOCODE, # See EssentialFVS 5.4.1.2
       # SITEPREP           WAS USED - ?
-      DG = PreviousDIAM,
-      HTG = PreviousHeight
+      DG = conv_unit(prev_dbhcm, "cm", "in"),
+      HTG = prev_Height
     ) |>
     select(
       STAND_CN, STAND_ID, TREE_CN, TREE_ID, PLOT_ID,

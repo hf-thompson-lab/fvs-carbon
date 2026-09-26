@@ -126,14 +126,9 @@ cfi_status_dead <- function(x) {
 
 # cfi_history -------------------------------------------------------------
 
-# Convert CFI Status + ABP Status to FVS History
+# Convert CFI Status to FVS History
 #
-# ABP Status:
-# - L = live now & at prior visit;
-# - R = grew into 6" diameter class since last visit & live now;
-# - D = live at prior visit but dead now;
-# - C = live at prior visit but cut since last visit;
-# - NA = tree that hadn't yet recruited into the 6" minimum or trees that were dead or cut in prior visit(s)
+# CFI live / dead status is described in cfi_status_live()
 #
 # FVS History:
 # - Tree history codes of 0-5 are used to represent live tree records that are proejcted by FVS. FVS does not distinguish between the various live tree codes.
@@ -151,12 +146,64 @@ cfi_history <- function(.data) {
     ungroup() |>
     mutate(
       HISTORY = case_when(
+        # Trees with known status
         cfi_status_live(VisitTreeStatusCode) ~ 1, # Live
         cfi_status_dead(VisitTreeStatusCode) &
           cfi_status_live(PrevTreeStatusCode) ~ 6, # Newly Dead
         cfi_status_dead(VisitTreeStatusCode) &
           cfi_status_dead(PrevTreeStatusCode) ~ 8, # Oldly Dead
-        .default = 6 # Dead, and previous status can't be determined
+        # Trees with unknown status don't change
+        VisitTreeStatusCode == 4 &
+          cfi_status_live(PrevTreeStatusCode) ~ 1, # Presumed live
+        VisitTreeStatusCode == 4 &
+          cfi_status_dead(PrevTreeStatusCode) ~ 8, # Presumed dead
+        .default = 6 # Dead, or previous status can't be determined
+      )
+    )
+}
+
+
+# abp_history -------------------------------------------------------------
+
+# Convert ABP Status to FVS History
+#
+# ABP Status:
+# - L = Live now and at prior visit;
+# - R = Recruited into diameter class since last visit & live now;
+# - D = Dead now but live at prior visit
+# - C = Cut now but live at prior visit
+# - NA = Dead or Cut in prior visit, or
+#        Live but not yet Recruited, or
+#        Missing
+#
+# FVS History:
+# - Tree history codes of 0-5 are used to represent live tree records that are proejcted by FVS. FVS does not distinguish between the various live tree codes.
+# - Tree history codes 6, 7, 8 and 9 indicates types of tree records that are not projected.
+# - The codes 6 and 7 trees are assumed to have died during the mortality observation period. FVS makes no distinction between tree records coded with a tree history of 6 or 7.
+# - The codes 8 and 9 represent trees that have been dead for longer periods of time. These records are included in the inventory list of trees but are not included in stand densities during calibration. FVS makes no distinction between tree records coded with a tree history of 8 or 9.
+#
+# (Essential FVS, 4.2.1 Sample Tree Data Description)
+
+abp_history <- function(.data) {
+  .data |>
+    group_by(MasterTreeID) |>
+    arrange(VisitCycle) |>
+    mutate(PrevStatusB = lag(StatusB)) |>
+    ungroup() |>
+    mutate(
+      HISTORY = case_when(
+        StatusB %in% c("R", "L") ~ 1, # Live
+        StatusB %in% c("D", "C") &
+          PrevStatusB %in% c("R", "L") ~ 6, # Newly Dead
+        StatusB %in% c("D", "C") &
+          PrevStatusB %in% c("R", "L") ~ 8, # Oldly Dead
+        is.na(StatusB) &
+          PrevStatusB %in% c("R", "L") ~ 1, # Presumed Live
+        is.na(StatusB) &
+          PrevStatusB %in% c("D", "C") ~ 8, # Still Dead
+        StatusB %in% c("D", "C") &
+          is.na(PrevStatusB) ~ 6, # Newly Dead
+        .default = 6 # Dead, or previous status can't be determined
       )
     )
 }
