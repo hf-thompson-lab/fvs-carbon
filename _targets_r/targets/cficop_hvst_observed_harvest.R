@@ -22,10 +22,15 @@ tar_target(cficop_hvst_observed_harvest, {
     # If either of StatusB or Status6 is "C", they both are, but
     # this shows the intent
     filter(StatusB == "C" | Status6 == "C") |>
-    # Some trees don't have a value for pre-harvest dbh; ignore them
-    filter(!is.na(dbh_prior)) |>
+    # Accept dbh_prior or dbhcm for harvest dbh; ignore harvested
+    # trees whose diameter can't be determined.
     mutate(
-      basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi,
+      dbh_harvest = coalesce(dbh_prior, dbhcm),
+      DBH_MIN = floor(conv_unit(dbh_harvest, "cm", "in") / 5) * 5
+    ) |>
+    filter(!is.na(dbh_harvest)) |>
+    mutate(
+      basal_area = (conv_unit(dbh_harvest, "cm", "m") / 2)^2 * pi,
       HarvestYear = VisitCycle - YearsSinceLastCut,
       PreHarvestVisitCycle = floor(HarvestYear / 10) * 10
     )

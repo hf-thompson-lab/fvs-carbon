@@ -57,6 +57,16 @@ get_this_rmd_file() |>
 get_this_rmd_file() |>
   tar_objects_defined_in_rmd() |>
   tar_load()
+
+eves_colors <- c(
+  "Other" = "#B4B432",
+  "Fraxinus" = "#CD5C5C",
+  "Betula" = "#8B4513",
+  "Tsuga" = "#5F9EA0",
+  "Acer" = "#DEB887",
+  "Pinus" = "#556B2F",
+  "Quercus" = "#D2691E"
+)
 ```
 
 # Observed Harvest
@@ -65,6 +75,9 @@ We're interested in a few things:
 
 1.  What trees get cut? (when / where / species / size / tpa)
 2.  What trees are left? (when / where / species / size / tpa)
+
+NB: this does not start from cfigro_trees because those are, by definition,
+live trees, and we're interested in cut / killed trees.
 
 ```{targets cficop_hvst_observed_harvest, tar_simple = TRUE}
 cficop_hvst_observed_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
@@ -90,10 +103,15 @@ cficop_hvst_observed_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
   # If either of StatusB or Status6 is "C", they both are, but
   # this shows the intent
   filter(StatusB == "C" | Status6 == "C") |>
-  # Some trees don't have a value for pre-harvest dbh; ignore them
-  filter(!is.na(dbh_prior)) |>
+  # Accept dbh_prior or dbhcm for harvest dbh; ignore harvested
+  # trees whose diameter can't be determined.
   mutate(
-    basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi,
+    dbh_harvest = coalesce(dbh_prior, dbhcm),
+    DBH_MIN = floor(conv_unit(dbh_harvest, "cm", "in") / 5) * 5
+  ) |>
+  filter(!is.na(dbh_harvest)) |>
+  mutate(
+    basal_area = (conv_unit(dbh_harvest, "cm", "m") / 2)^2 * pi,
     HarvestYear = VisitCycle - YearsSinceLastCut,
     PreHarvestVisitCycle = floor(HarvestYear / 10) * 10
   )
@@ -123,6 +141,7 @@ cficop_hvst_observed_harvest |>
   geom_boxplot(outlier.size = 0.1) +
   coord_cartesian(ylim = c(0, 2)) +
   theme_bw() +
+  scale_fill_manual(values = eves_colors) +
   ggtitle("CFI Observed Harvest (BA Per Plot)") +
   ylab(bquote("Harvested BA" ~ (m^2))) +
   xlab("Visit Cycle (Number of Plots Harvested)")
@@ -149,10 +168,83 @@ cficop_hvst_observed_harvest |>
   ggplot(aes(VisitCycle, tpa, fill = GENUS)) +
   geom_boxplot(outlier.size = 0.1) +
   theme_bw() +
+  scale_fill_manual(values = eves_colors) +
   scale_y_continuous(transform = "log10") +
   ggtitle("CFI Observed Harvest (TPA Per Plot)") +
   ylab(bquote("Harvested TPA" ~ (trees %.% acre^-1))) +
   xlab("Visit Cycle (Number of Plots Harvested)")
+```
+
+## By Genus
+
+```{r, eval = FALSE}
+cficop_hvst_observed_harvest |>
+  mutate(
+    Diameter_Class = paste0(DBH_MIN, " - ", DBH_MIN + 5),
+    VisitCycle = paste0(VisitCycle - 10, " - ", VisitCycle),
+    GENUS = fct_other(GENUS, keep = c("Acer", "Betula", "Pinus", "Quercus", "Tsuga"))
+  ) |>
+  group_by(VisitCycle, GENUS, Diameter_Class) |>
+  summarize(
+    Measured_Trees = n(),
+    Measured_BA = sum(basal_area, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  mutate(Diameter_Class = ordered(
+    Diameter_Class,
+    c("5 - 10", "10 - 15", "15 - 20", "20 - 25", "25 - 30")
+  )) |>
+  complete(
+    VisitCycle, Diameter_Class, GENUS,
+    fill = list(Measured_Trees = 1, Measured_BA = 0)
+  ) |>
+  pivot_longer(cols = Measured_BA) |>
+  ggplot(aes(Diameter_Class, value, fill = GENUS, group = GENUS)) +
+  geom_col(position = "dodge") +
+  theme_bw() +
+  scale_fill_manual(values = eves_colors) +
+  facet_wrap(~VisitCycle) +
+  #scale_y_continuous(transform = "log10") +
+  ggtitle("Quabbin CFI Basal Area Harvested") +
+  xlab("Diameter (inches)") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  ylab(bquote("Basal Area harvested" ~(m^2)))
+```
+
+```{r}
+cficop_hvst_observed_harvest |>
+  mutate(
+    Diameter_Class = paste0(DBH_MIN, " - ", DBH_MIN + 5),
+    VisitCycle = paste0(VisitCycle - 10, " - ", VisitCycle),
+    GENUS = fct_other(GENUS, keep = c("Acer", "Betula", "Pinus", "Quercus", "Tsuga"))
+  ) |>
+  group_by(VisitCycle, GENUS, Diameter_Class) |>
+  summarize(
+    Measured_Trees = n(),
+    Measured_BA = sum(basal_area, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  mutate(Diameter_Class = ordered(
+    Diameter_Class,
+    c("5 - 10", "10 - 15", "15 - 20", "20 - 25", "25 - 30")
+  )) |>
+  complete(
+    VisitCycle, Diameter_Class, GENUS,
+    fill = list(Measured_Trees = 1, Measured_BA = 0)
+  ) |>
+  pivot_longer(cols = Measured_Trees) |>
+  ggplot(aes(Diameter_Class, value, fill = GENUS, group = GENUS)) +
+  geom_col(position = "dodge") +
+  theme_bw() +
+  scale_fill_manual(values = eves_colors) +
+  facet_wrap(~VisitCycle) +
+  scale_y_continuous(transform = "log10") +
+  ggtitle("Quabbin CFI Trees Harvested") +
+  xlab("Diameter (inches)") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  ylab(bquote("Trees harvested" ~(trees)))
 ```
 
 ## Multiple Harvest
@@ -199,20 +291,16 @@ To figure this out, we'll:
 - Filter to plot/cycles with harvest
 - sum the ba of what's left
 
+Sawtimber / Poletimber
+- Hardwood break diameter = 11 (or)
+- Softwood break diameter = 9
+
 ```{targets cficop_hvst_observed_remainders, tar_simple = TRUE}
-# What trees are left behind after harvest?
 cficop_hvst_observed_remainders <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
   cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
   cfi_abp(cfiabp_trees) |>
-  inner_join(
-    # Which species are harvested on which plots, in which visit cycles?
-    # Keep only those ones
-    cficop_hvst_observed_harvest |>
-      distinct(MasterPlotID, VisitCycle, SpeciesCode, HarvestYear),
-    by = join_by(MasterPlotID, VisitCycle, SpeciesCode)
-  ) |>
   # Deal with species that FVS doesn't handle
   mutate(SpeciesCode = replace_values(
     SpeciesCode,
@@ -225,19 +313,25 @@ cficop_hvst_observed_remainders <- qryDWSPCFIPlotVisitTreeDetail |>
     by = join_by(SpeciesCode == SPCD)
   ) |>
   filter(!is.na(FVS_SPCD)) |>
-  # At this point we have fully-decorated tree records
-  # Replace na's in status to keep them from propagating
-  replace_na(list(StatusB = "X", Status6 = "X")) |>
   # Live trees, not recruits
   filter(StatusB == "L" | Status6 == "L") |>
-  # Some trees don't have a value for pre-harvest dbh; ignore them
-  filter(!is.na(dbh_prior)) |>
+  mutate(
+    dbh_harvest = coalesce(dbh_prior, dbhcm),
+    DBH_MIN = floor(conv_unit(dbh_harvest, "cm", "in") / 5) * 5
+  ) |>
+  filter(!is.na(dbh_harvest)) |>
+  inner_join(
+    # Which sizes of which species are harvested on which plots, in
+    # which visit cycles? Keep only those ones.
+    cficop_hvst_observed_harvest |>
+      distinct(MasterPlotID, VisitCycle, SpeciesCode, DBH_MIN, HarvestYear),
+    by = join_by(MasterPlotID, VisitCycle, SpeciesCode, DBH_MIN)
+  ) |>
   mutate(
     # Judgment: basal_area intended to be left in harvest is better
     # represented by ba PRIOR to harvest, than POST harvest. We don't
     # have BA at the time of harvest, which would be ideal.
-    basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi,
-    tpa = n() * 5
+    basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi
   )
 ```
 
@@ -296,6 +390,43 @@ cficop_hvst_observed_remainders |>
   ggtitle("CFI Observed Remainders (TPA Per Plot)") +
   ylab(bquote("Harvested TPA" ~ (trees %.% acre^-1))) +
   xlab("Visit Cycle (Number of Plots Harvested)")
+```
+
+## By Genus
+
+```{r}
+cficop_hvst_observed_remainders |>
+  mutate(
+    Diameter_Class = paste0(DBH_MIN, " - ", DBH_MIN + 5),
+    VisitCycle = paste0(VisitCycle - 10, " - ", VisitCycle),
+    GENUS = fct_other(GENUS, keep = c("Acer", "Betula", "Pinus", "Quercus", "Tsuga"))
+  ) |>
+  group_by(VisitCycle, GENUS, Diameter_Class) |>
+  summarize(
+    Measured_Trees = n(),
+    Measured_BA = sum(basal_area, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  mutate(Diameter_Class = ordered(
+    Diameter_Class,
+    c("5 - 10", "10 - 15", "15 - 20", "20 - 25", "25 - 30")
+  )) |>
+  complete(
+    VisitCycle, Diameter_Class, GENUS,
+    fill = list(Measured_Trees = 1, Measured_BA = 0)
+  ) |>
+  pivot_longer(cols = Measured_Trees) |>
+  ggplot(aes(Diameter_Class, value, fill = GENUS, group = GENUS)) +
+  geom_col(position = "dodge") +
+  theme_bw() +
+  scale_fill_manual(values = eves_colors) +
+  facet_wrap(~VisitCycle) +
+  scale_y_continuous(transform = "log10") +
+  ggtitle("Quabbin CFI Trees Unharvested") +
+  xlab("Diameter (inches)") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  ylab(bquote("Trees harvested" ~(trees)))
 ```
 
 # Regeneration
@@ -432,19 +563,15 @@ trees in 2" diameter classes over several decades, so we use much wider
 ```{targets cficop_hvst_tpa, tar_simple = TRUE}
 # Find the trees left after each harvest
 cficop_hvst_tpa <- cficop_hvst_observed_remainders |>
-  mutate(
-    DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5
-  ) |>
   group_by(MasterPlotID, VisitCycle, FVS_SPCD, DBH_MIN, HarvestYear) |>
   summarize(
-    TPA = n() * 5, # Each plot is 1/5 acre
+    TPA = n() * 5,
     .groups = "drop"
   ) |>
   # Add back in the things that were harvested down to 0 TPA
   # This will also add HarvestYear to the things harvested to >0 TPA
   full_join(
     cficop_hvst_observed_harvest |>
-      mutate(DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5) |>
       distinct(MasterPlotID, VisitCycle, FVS_SPCD, DBH_MIN, HarvestYear),
     by = join_by(MasterPlotID, VisitCycle, FVS_SPCD, DBH_MIN)
   ) |>
@@ -459,7 +586,7 @@ cficop_hvst_tpa <- cficop_hvst_observed_remainders |>
     # there were not trees of this species left in this size range,
     # so set the residual TPA to 0.
     TPA = coalesce(TPA, 0),
-    BA = 0 # We're not using BA
+    BA = 0 # We're not using BA; TODO make this NA
   ) |>
   # For prescription-based harvest, our schema is:
   # STAND_CN, TREE_CN, PREV_TRE_CN, YEAR, PRESCRIPTION
@@ -470,6 +597,10 @@ cficop_hvst_tpa <- cficop_hvst_observed_remainders |>
       filter(INV_YEAR == 1970) |>
       select(STAND_CN, STAND_ID),
     by = join_by(MasterPlotID == STAND_ID)
+  ) |>
+  # Remove records for cohorts that weren't harvested
+  filter(
+    !is.na(HarvestYear)
   ) |>
   select(
     STAND_CN,
@@ -702,9 +833,9 @@ cficop_hvst_directives |>
   nrow()
 ```
 
-> 415
+> 408
 
-that's about 42% of harvest is deleted or canceled.
+that's about 41% of harvest is deleted or canceled.
 
 ### Which Plot
 
@@ -712,191 +843,125 @@ Let's follow one canceled harvest from start to finish.
 
 ```{r, eval = FALSE}
 cficop_hvst_directives |>
+  filter(STAND_ID != "10102") |>
   filter(STATUS == "DELETED") |>
   head(1) |>
   as.list()
 ```
 
-MasterPlotID 10102
+MasterPlotID 10150
 
 ### Which Directive
 
-This says to thin Red Maple in 1972 in the DBH range 5-10 down to 30TPA.
+This says to thin Eastern Hemlock in 1977 in the DBH range 5-10 down to
+35TPA, which is 7 remaining trees.
 
-How many red maple are there in this stand in 1972?
+How many eastern hemlock are there in this stand in 1972?
 
 ```{r, eval = FALSE}
 cfiabp_trees |>
-  filter(MasterPlotID == 10102) |>
+  filter(MasterPlotID == 10150) |>
   filter(VisitCycle == 1970) |>
-  filter(genusp == "ACERRU") |>
+  filter(genusp == "TSUGCA") |>
   filter(StatusB == "L" | StatusB == "R") |>
   mutate(
     DBH_MIN = floor(conv_unit(dbhcm, "cm", "in") / 5) * 5
   ) |>
-  filter(DBH_MIN == 5) |>
-  nrow()
+  filter(DBH_MIN == 5)
 ```
 
-7 trees; 7 * 5 = 35, so 5 TPA / 1 tree per plot would be harvested.
+7 trees; 7 * 5 = 35, so there are no trees to harvest.
 
-### Directive Check
+### Harvest Inputs
 
-Next question: does FVS see these trees?
+Does the directive match what we determined?
 
-```{text}
-                                                 RO    BO    WP    RM
-                                                ----  ----  ----  ----
-
-NUMBER OF RECORDS PER SPECIES                     11     5     1     6
+```{r}
+cfigro_plot |> filter(STAND_ID == 10150)
 ```
 
-Huh, nope, it only sees 6 out of 7 RM trees. Where'd the 7th tree go?
-
-### FVS Input Check
-
-Let's check the database.
-```{r, eval = FALSE}
-tmp_input_trees <- fvs_read_input(cficop_hvst, "FVS_TreeInit_Plot") |>
-  semi_join(
-    cfigro_plot |>
-      filter(
-        STAND_ID == 10102,
-        INV_YEAR == 1970
-      ) |>
-      select(STAND_CN),
-    by = join_by(STAND_CN)
-  ) |>
-  filter(
-    STAND_ID == 10102,
-    SPECIES == "RM",
-    DIAMETER < 10
-  ) |>
-  filter(
-    partition == 1,
-    random_seed == min(random_seed)
-  ) |>
-  arrange(TREE_ID)
-
-tmp_input_trees
+```{r}
+cficop_hvst_tpa |>
+  filter(STAND_CN == "119700150")
 ```
 
-Huh, only 6 trees in the input.
+Yup, we say to harvest down to 35 TPA.
 
-### Missing Tree
+How many trees to we think were not harvested, and why?
 
-Which is the missing tree?
+```{r}
+cficop_hvst_observed_remainders |>
+  filter(MasterPlotID == 10150) |>
+  filter(dbh_prior < conv_unit(10, "in", "cm"))
+```
 
-```{r, eval = FALSE}
+7 remainder trees.
+
+How many trees were on the stand in 1970?
+
+```{r}
 cfiabp_trees |>
-  filter(MasterPlotID == 10102) |>
-  filter(VisitCycle == 1970) |>
-  filter(genusp == "ACERRU") |>
-  filter(StatusB == "L" | StatusB == "R") |>
-  arrange(MasterTreeID)
+  filter(
+    MasterPlotID == 10150,
+    VisitCycle == 1970,
+    genusp == "TSUGCA",
+    dbhcm < conv_unit(10, "in", "cm"),
+    StatusB %in% c("R", "L")
+  )
+  
 ```
 
-Going by TreeID, it looks like tree 11 is missing from the input.
+7 trees.
 
-It has VisitTreeStatusCode=4, which indicates "Out of population".
-VisitTreeStatusRecCode = 17
+How many trees do we think we're harvesting?
 
-StatusB is L; dbhcm is 14.224; dbh_prior = NA; Status6 = L;
+```{r}
+cficop_hvst_observed_harvest |>
+  filter(MasterPlotID == 10150)
 
-### Tree 101020011 (11)
+```
 
-We feed cfigro_trees directly in to the input database. Is it in there?
+2 trees.
 
+Huh. We're harvesting trees 6 and 16, but those aren't in the <10" inventory.
 
-```{r, eval = FALSE}
+Are they in tehre at all?
+
+```{r}
+cfiabp_trees |>
+  filter(
+    MasterPlotID == 10150,
+    VisitCycle == 1970,
+    genusp == "TSUGCA"
+  ) |>
+  filter(MasterTreeID %in% c(101500006, 101500016))
+
+```
+
+These were cut in 1970.
+VisitTreeStatusCode = 1
+StatusB is L
+Status6 is L
+dbhcm is 32.004 / 29.718, which is 12.6 and 11.7 inches, which
+is why they don't show up in the <10" inventory.
+
+dbh_prior is NA
+
+So it looks like we're not adding trees cut in 1970 to the inventory.
+
+Are they in our inventory?
+
+```{r}
 cfigro_trees |>
   filter(
-    STAND_CN == "119700102",
-    SPECIES == "RM",
-    DIAMETER < 10
+    STAND_CN == "119800150",
+    TREE_ID %in% c(101500006, 101500016)
   )
 ```
 
-Not in there.
+They're both in there with HISTORY=1, DIAMETER=NA, and DG filled in.
 
-So, we have a conflict between VisitTreeStatus and Status6.
-
-Let's mess with cfigro_trees and see where it vanishes.
-
-```{r, eval = FALSE}
-qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-#  filter(VisitTreeStatusCode != 4) |> # Skip missing trees
-  cfi_abp(cfiabp_trees) |>
-  group_by(MasterPlotID, MasterTreeID) |>
-  arrange(VisitCycle) |>
-  mutate(
-    PreviousStatus6 = lag(Status6),
-    PreviousDIAM = lag(VisitTreeDIAM),
-    PreviousHeight = lag(VisitTreeTotalHeight)
-  ) |>
-  ungroup() |>
-  cfi_topocode() |>
-  cfi_history() |>
-  mutate(SpeciesCode = replace_values(
-    SpeciesCode,
-    320 ~ 317, # norway maple -> sugar maple
-    402 ~ 403, # bitternut hickory -> pignut hickory
-    740 ~ 743  # unknown aspen -> bigtooth aspen
-  )) |>
-  left_join(
-    species_crosswalk |> select(SPCD, FVS_SPCD),
-    by = join_by(SpeciesCode == SPCD)
-  ) |>
-  filter(!is.na(FVS_SPCD)) |>
-  filter(MasterTreeID == 101020011) |> View()
-  
-  mutate(
-    STAND_CN = as.character(MasterPlotVisitID),
-    STAND_ID = MasterPlotID,
-    TREE_CN = as.character(VisitTreeNumberDetail),
-    TREE_ID = MasterTreeID,
-    PLOT_ID = 1, # CFI does not use subplots, so all PLOT_IDs are 1
-    INV_YEAR = VisitYear,
-    TREE_COUNT = 1, #conv_unit(1, "acre", "ft2") / (pi * 52.7^2),
-    HISTORY = HISTORY,
-    SPECIES = FVS_SPCD,
-    DIAMETER = VisitTreeDIAM,
-    HT = VisitTreeTotalHeight,
-    # HTTOPK = VisitTreeTotalHeight, # Height to top kill; we don't ahve that
-    # CRRATIO            WAS USED - not available
-    # DAMAGE1            WAS USED - not available
-    # SEVERITY1          WAS USED - not available
-    # DAMAGE2            WAS USED - not available
-    # SEVERITY2          WAS USED - not available
-    # DAMAGE3            WAS USED - not available
-    # SEVERITY3          WAS USED - not avialable
-    # TREEVALUE          WAS USED - X - tree removal priority
-    # PRESCRIPTION       WAS USED - X - tree removal group
-    # AGE                WAS USED - X
-    SLOPE = Slope,
-    ASPECT = Aspect,
-    # PV_CODE            WAS USED - ecoregion? - not used
-    TOPOCODE = TOPOCODE, # See EssentialFVS 5.4.1.2
-    # SITEPREP           WAS USED - ?
-    DG = PreviousDIAM,
-    HTG = PreviousHeight
-  ) |>
-  select(
-    STAND_CN, STAND_ID, TREE_CN, TREE_ID, PLOT_ID,
-    TREE_COUNT, HISTORY, SPECIES, DIAMETER, HT,
-    SLOPE, ASPECT, TOPOCODE, DG, HTG
-  )
-```
-
-It's in there, with HISTORY==6 and no DIAMETER.
-
-Presumably because we're taking DIAMETER from VisitTreeDIAM, and not
-from dbhcm.
-
-Conclusion: Always use StatusB for status, always use dbhcm for diameter.
+Looks like I need to be more diligent filling in diameter!
 
 # Results
 

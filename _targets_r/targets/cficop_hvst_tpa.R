@@ -1,19 +1,15 @@
 tar_target(cficop_hvst_tpa, {
   # Find the trees left after each harvest
   cficop_hvst_tpa <- cficop_hvst_observed_remainders |>
-    mutate(
-      DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5
-    ) |>
     group_by(MasterPlotID, VisitCycle, FVS_SPCD, DBH_MIN, HarvestYear) |>
     summarize(
-      TPA = n() * 5, # Each plot is 1/5 acre
+      TPA = n() * 5,
       .groups = "drop"
     ) |>
     # Add back in the things that were harvested down to 0 TPA
     # This will also add HarvestYear to the things harvested to >0 TPA
     full_join(
       cficop_hvst_observed_harvest |>
-        mutate(DBH_MIN = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5) |>
         distinct(MasterPlotID, VisitCycle, FVS_SPCD, DBH_MIN, HarvestYear),
       by = join_by(MasterPlotID, VisitCycle, FVS_SPCD, DBH_MIN)
     ) |>
@@ -28,7 +24,7 @@ tar_target(cficop_hvst_tpa, {
       # there were not trees of this species left in this size range,
       # so set the residual TPA to 0.
       TPA = coalesce(TPA, 0),
-      BA = 0 # We're not using BA
+      BA = 0 # We're not using BA; TODO make this NA
     ) |>
     # For prescription-based harvest, our schema is:
     # STAND_CN, TREE_CN, PREV_TRE_CN, YEAR, PRESCRIPTION
@@ -39,6 +35,10 @@ tar_target(cficop_hvst_tpa, {
         filter(INV_YEAR == 1970) |>
         select(STAND_CN, STAND_ID),
       by = join_by(MasterPlotID == STAND_ID)
+    ) |>
+    # Remove records for cohorts that weren't harvested
+    filter(
+      !is.na(HarvestYear)
     ) |>
     select(
       STAND_CN,
