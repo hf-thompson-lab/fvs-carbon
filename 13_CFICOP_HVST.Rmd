@@ -1064,26 +1064,11 @@ whereas CFI inventory only captures trees >5.6"
 How does harvest compare to survey?
 
 ```{r hvst vs srvy, eval = FALSE}
-measured_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  mutate(
-    Year = VisitCycle - YearsSinceLastCut,
-    ba = pi * (conv_unit(dbh_prior, "cm", "m") / 2)^2
-  ) |>
-  # Replace na's in status to keep them from propagating
-  replace_na(list(StatusB = "X", Status6 = "X")) |>
-  filter(!is.na(ba) & ba > 0 & StatusB == "C" | Status6 == "B") |>
-  left_join(
-    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
-    by = join_by(SpeciesCode == SPCD)
-  ) |>
+measured_harvest <- cficop_hvst_observed_harvest |>
   group_by(GENUS) |>
   summarize(
     Measured_Trees = n(),
-    Measured_BA = sum(ba, na.rm = TRUE),
+    Measured_BA = sum(basal_area, na.rm = TRUE),
     .groups = "keep"
   ) |>
   ungroup()
@@ -1169,28 +1154,14 @@ measured_harvest |>
 
 
 ```{r, eval = FALSE}
-measured_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
+measured_harvest <- cficop_hvst_observed_harvest |>
   mutate(
-    Year = VisitCycle - YearsSinceLastCut,
-    Diameter_Class = floor(conv_unit(dbh_prior, "cm", "in") / 5) * 5,
-    Diameter_Class = paste0(Diameter_Class, " - ", Diameter_Class + 5),
-    ba = pi * (conv_unit(dbh_prior, "cm", "m") / 2)^2
-  ) |>
-  # Replace na's in status to keep them from propagating
-  replace_na(list(StatusB = "X", Status6 = "X")) |>
-  filter(!is.na(ba) & ba > 0 & StatusB == "C" | Status6 == "B") |>
-  left_join(
-    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
-    by = join_by(SpeciesCode == SPCD)
+    Diameter_Class = paste0(DBH_MIN, " - ", DBH_MIN + 5)
   ) |>
   group_by(GENUS, Diameter_Class) |>
   summarize(
     Measured_Trees = n(),
-    Measured_BA = sum(ba, na.rm = TRUE),
+    Measured_BA = sum(basal_area, na.rm = TRUE),
     .groups = "keep"
   ) |>
   ungroup()
