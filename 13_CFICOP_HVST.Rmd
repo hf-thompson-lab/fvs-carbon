@@ -823,7 +823,7 @@ cficop_hvst_directives |>
   nrow()
 ```
 
-> 994
+> 745
 
 ## Canceled Harvest
 
@@ -833,9 +833,9 @@ cficop_hvst_directives |>
   nrow()
 ```
 
-> 408
+> 220
 
-that's about 41% of harvest is deleted or canceled.
+that's about 30% of harvest is deleted or canceled.
 
 ### Which Plot
 
@@ -845,123 +845,333 @@ Let's follow one canceled harvest from start to finish.
 cficop_hvst_directives |>
   filter(STAND_ID != "10102") |>
   filter(STATUS == "DELETED") |>
-  head(1) |>
+  slice_head(n = 2) |>
+  slice_tail(n = 1) |>
   as.list()
 ```
 
-MasterPlotID 10150
+MasterPlotID 10153
 
 ### Which Directive
 
-This says to thin Eastern Hemlock in 1977 in the DBH range 5-10 down to
-35TPA, which is 7 remaining trees.
+This says to thin White Pine in the DBH range 20-25 down to
+5TPA, which is 1 remaining tree.
 
-How many eastern hemlock are there in this stand in 1972?
+How many white pine are there in this stand in 1993?
 
 ```{r, eval = FALSE}
 cfiabp_trees |>
-  filter(MasterPlotID == 10150) |>
-  filter(VisitCycle == 1970) |>
-  filter(genusp == "TSUGCA") |>
+  filter(MasterPlotID == 10153) |>
+  filter(VisitCycle == 1990) |>
+  filter(genusp == "PINUST") |>
   filter(StatusB == "L" | StatusB == "R") |>
   mutate(
     DBH_MIN = floor(conv_unit(dbhcm, "cm", "in") / 5) * 5
   ) |>
-  filter(DBH_MIN == 5)
+  filter(DBH_MIN == 20)
 ```
 
-7 trees; 7 * 5 = 35, so there are no trees to harvest.
+2 trees; 2 * 5 = 10, so there is 1 tree to harvest.
 
 ### Harvest Inputs
 
 Does the directive match what we determined?
 
 ```{r}
-cfigro_plot |> filter(STAND_ID == 10150)
+cfigro_plot |> filter(STAND_ID == 10153)
 ```
 
 ```{r}
 cficop_hvst_tpa |>
-  filter(STAND_CN == "119700150")
+  filter(STAND_CN == "119700153")
 ```
 
-Yup, we say to harvest down to 35 TPA.
+Yup, we say to harvest down to 5 TPA.
 
 How many trees to we think were not harvested, and why?
 
 ```{r}
 cficop_hvst_observed_remainders |>
-  filter(MasterPlotID == 10150) |>
-  filter(dbh_prior < conv_unit(10, "in", "cm"))
+  filter(MasterPlotID == 10153) |>
+  filter(dbh_prior >= conv_unit(20, "in", "cm")) |>
+  filter(dbh_prior < conv_unit(25, "in", "cm")) |>
+  filter(FVS_SPCD == "WP")
 ```
 
-7 remainder trees.
+1 remainder tree. That's correct.
 
-How many trees were on the stand in 1970?
+How many trees were on the stand in 1993?
 
 ```{r}
 cfiabp_trees |>
   filter(
-    MasterPlotID == 10150,
-    VisitCycle == 1970,
-    genusp == "TSUGCA",
-    dbhcm < conv_unit(10, "in", "cm"),
+    MasterPlotID == 10153,
+    VisitCycle == 1990,
+    genusp == "PINUST",
+    dbhcm >= conv_unit(20, "in", "cm"),
+    dbhcm < conv_unit(25, "in", "cm"),
     StatusB %in% c("R", "L")
   )
   
 ```
 
-7 trees.
+2 trees.
 
 How many trees do we think we're harvesting?
 
 ```{r}
 cficop_hvst_observed_harvest |>
-  filter(MasterPlotID == 10150)
+  filter(MasterPlotID == 10153) |>
+  filter(dbh_prior >= conv_unit(20, "in", "cm")) |>
+  filter(dbh_prior < conv_unit(25, "in", "cm")) |>
+  filter(FVS_SPCD == "WP")
 
 ```
 
-2 trees.
+1 tree. That's correct.
 
-Huh. We're harvesting trees 6 and 16, but those aren't in the <10" inventory.
+### FVS Status
 
-Are they in tehre at all?
+How many trees does FVS think are available on the plot at this time?
 
 ```{r}
-cfiabp_trees |>
-  filter(
-    MasterPlotID == 10150,
-    VisitCycle == 1970,
-    genusp == "TSUGCA"
+# This is big, ~2G+
+cficop_hvst_treelist <- fvs_read_output(cficop_hvst, "FVS_TreeList")
+```
+
+```{r}
+projected_pre_harvest_trees <- cficop_hvst_treelist |>
+  mutate(StandID = as.numeric(StandID)) |>
+  filter(StandID == 10153, Year >= 1990, Year < 2000) |>
+  mutate(
+    SPCD = as.integer(SpeciesFIA),
+    Diameter_Class = floor(DBH / 5) * 5,
+    ba = pi * (conv_unit(DBH, "in", "m") / 2)^2
   ) |>
-  filter(MasterTreeID %in% c(101500006, 101500016))
-
-```
-
-These were cut in 1970.
-VisitTreeStatusCode = 1
-StatusB is L
-Status6 is L
-dbhcm is 32.004 / 29.718, which is 12.6 and 11.7 inches, which
-is why they don't show up in the <10" inventory.
-
-dbh_prior is NA
-
-So it looks like we're not adding trees cut in 1970 to the inventory.
-
-Are they in our inventory?
-
-```{r}
-cfigro_trees |>
   filter(
-    STAND_CN == "119800150",
-    TREE_ID %in% c(101500006, 101500016)
+    DBH >= 15,
+#    DBH < 30,
+    SpeciesFVS == "WP"
+  ) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SPCD)
   )
 ```
 
-They're both in there with HISTORY=1, DIAMETER=NA, and DG filled in.
+There are no white pine between 20 and 25in in 1990. But there are a bunch of trees that are close.
 
-Looks like I need to be more diligent filling in diameter!
+```{r}
+projected_pre_harvest_trees |>
+  mutate(
+    DBH_1993 = DBH + DG * 3 / 10
+  ) |>
+  filter(DBH_1993 > 20) |>
+  summarize(
+    TPA = sum(TPA)
+  )
+```
+
+So we have 5.4 TPA of PIST > 20" DBH in 1993, and we need at least 5 to
+harvest. Looks like FVS won't harvest if there's not at least one tree?
+Who knows!
+
+Fair chance this is us getting unlucky and the other big tree dying
+from other causes prior to harvest.
+
+### History of PIST
+
+```{r}
+measured_harvest <- cficop_hvst_observed_harvest |>
+  mutate(
+    Diameter_Class = paste0(DBH_MIN, " - ", DBH_MIN + 5),
+    VisitCycle = paste0(VisitCycle - 10, " - ", VisitCycle)
+  ) |>
+  filter(GENUS == "Pinus") |>
+  group_by(Diameter_Class, VisitCycle) |>
+  summarize(
+    Measured_Trees = n(),
+    Measured_BA = sum(basal_area, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+projected_harvest <- cficop_hvst_cutlist |>
+  mutate(
+    SPCD = as.integer(SpeciesFIA),
+    Diameter_Class = floor(DBH / 5) * 5,
+    Diameter_Class = paste0(Diameter_Class, " - ", Diameter_Class + 5),
+    VisitCycle = ceiling(Year / 10) * 10,
+    VisitCycle = paste0(VisitCycle - 10, " - ", VisitCycle),
+    ba = pi * (conv_unit(DBH, "in", "m") / 2)^2
+  ) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SPCD)
+  ) |>
+  filter(GENUS == "Pinus") |>
+  group_by(Diameter_Class, VisitCycle) |>
+  summarize(
+    # Note that FVS can have fractional trees per acre, so it's
+    # important to sum TPA rather than count trees. Divide by 5
+    # because FVS provides a per-acre value and CFI plots are 1/5 acre.
+    Projected_Trees = sum(TPA) / 5,
+    # Since FVS can have fractional trees per acre, we need
+    # to scale BA by the number of trees
+    Projected_BA = sum(ba * TPA) / 5,
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+measured_harvest |>
+  full_join(
+    projected_harvest,
+    by = join_by(Diameter_Class, VisitCycle)
+  ) |>
+  mutate(Diameter_Class = ordered(
+    Diameter_Class,
+    c("5 - 10", "10 - 15", "15 - 20", "20 - 25", "25 - 30")
+  )) |>
+  replace_na(list(Measured_BA = 0, Projected_BA = 0)) |>
+  pivot_longer(cols = c(Measured_BA, Projected_BA)) |>
+  ggplot(aes(Diameter_Class, value, fill = name, group = name)) +
+  geom_col(position = "dodge") +
+  theme_bw() +
+  facet_wrap(~VisitCycle) +
+  #scale_y_continuous(transform = "log10") +
+  ggtitle("Quabbin CFI Basal Area Harvested (PIST)") +
+  xlab("Diameter (inches)") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  ylab(bquote("Basal Area harvested" ~(m^2)))
+
+measured_harvest |>
+  full_join(
+    projected_harvest,
+    by = join_by(Diameter_Class, VisitCycle)
+  ) |>
+  mutate(Diameter_Class = ordered(
+    Diameter_Class,
+    c("5 - 10", "10 - 15", "15 - 20", "20 - 25", "25 - 30")
+  )) |>
+  replace_na(list(Measured_Trees = 1, Projected_Trees = 1)) |>
+  pivot_longer(cols = c(Measured_Trees, Projected_Trees)) |>
+  ggplot(aes(Diameter_Class, value, fill = name, group = name)) +
+  geom_col(position = "dodge") +
+  theme_bw() +
+  facet_wrap(~VisitCycle) +
+  scale_y_continuous(transform = "log10") +
+  ggtitle("Quabbin CFI Trees Harvested (PIST)") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  xlab("Diameter (inches)") +
+  ylab("Trees Harvested (trees)")
+```
+
+
+```{r}
+measured_trees <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  # Live trees and recruits
+  filter(StatusB == "L" | StatusB == "R") |>
+  # Deal with species that FVS doesn't handle
+  mutate(SpeciesCode = replace_values(
+    SpeciesCode,
+    320 ~ 317, # norway maple -> sugar maple
+    402 ~ 403, # bitternut hickory -> pignut hickory
+    740 ~ 743  # unknown aspen -> bigtooth aspen
+  )) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, FVS_SPCD),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  filter(!is.na(FVS_SPCD)) |>
+  mutate(
+    basal_area = (conv_unit(dbhcm, "cm", "m") / 2)^2 * pi,
+    DBH_MIN = floor(conv_unit(dbhcm, "cm", "in") / 5) * 5,
+    Diameter_Class = paste0(DBH_MIN, " - ", DBH_MIN + 5)
+  ) |>
+  filter(DBH_MIN < 40) |>
+  filter(GENUS == "Pinus") |>
+  group_by(Diameter_Class, VisitCycle) |>
+  summarize(
+    Measured_Trees = n(),
+    Measured_BA = sum(basal_area, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+projected_trees <- cficop_hvst_treelist |>
+  filter(Year <= 2020) |>
+  filter(DBH >= 5, DBH < 40) |>
+  mutate(
+    SPCD = as.integer(SpeciesFIA),
+    Diameter_Class = floor(DBH / 5) * 5,
+    Diameter_Class = paste0(Diameter_Class, " - ", Diameter_Class + 5),
+    VisitCycle = Year,
+    ba = pi * (conv_unit(DBH, "in", "m") / 2)^2
+  ) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS),
+    by = join_by(SPCD)
+  ) |>
+  filter(GENUS == "Pinus") |>
+  group_by(Diameter_Class, VisitCycle) |>
+  summarize(
+    # Note that FVS can have fractional trees per acre, so it's
+    # important to sum TPA rather than count trees. Divide by 5
+    # because FVS provides a per-acre value and CFI plots are 1/5 acre.
+    Projected_Trees = sum(TPA) / 5,
+    # Since FVS can have fractional trees per acre, we need
+    # to scale BA by the number of trees
+    Projected_BA = sum(ba * TPA) / 5,
+    .groups = "keep"
+  ) |>
+  ungroup()
+
+measured_trees |>
+  full_join(
+    projected_trees,
+    by = join_by(Diameter_Class, VisitCycle)
+  ) |>
+  mutate(Diameter_Class = ordered(
+    Diameter_Class,
+    seq(5, 35, 5) |> lapply(\(x) paste0(x, " - ", x + 5)) |> unlist()
+  )) |>
+  replace_na(list(Measured_BA = 0, Projected_BA = 0)) |>
+  pivot_longer(cols = c(Measured_BA, Projected_BA)) |>
+  ggplot(aes(Diameter_Class, value, fill = name, group = name)) +
+  geom_col(position = "dodge") +
+  theme_bw() +
+  facet_wrap(~VisitCycle) +
+  #scale_y_continuous(transform = "log10") +
+  ggtitle("Quabbin CFI Total Basal Area (PIST)") +
+  xlab("Diameter (inches)") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  ylab(bquote("Basal Area" ~(m^2)))
+
+measured_trees |>
+  full_join(
+    projected_trees,
+    by = join_by(Diameter_Class, VisitCycle)
+  ) |>
+  mutate(Diameter_Class = ordered(
+    Diameter_Class,
+    seq(5, 35, 5) |> lapply(\(x) paste0(x, " - ", x + 5)) |> unlist()
+  )) |>
+  replace_na(list(Measured_Trees = 1, Projected_Trees = 1)) |>
+  pivot_longer(cols = c(Measured_Trees, Projected_Trees)) |>
+  ggplot(aes(Diameter_Class, value, fill = name, group = name)) +
+  geom_col(position = "dodge") +
+  theme_bw() +
+  facet_wrap(~VisitCycle) +
+  #scale_y_continuous(transform = "log10") +
+  ggtitle("Quabbin CFI Total Trees (PIST)") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  xlab("Diameter (inches)") +
+  ylab("Total Trees (trees)")
+```
 
 # Results
 
