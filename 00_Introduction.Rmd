@@ -74,6 +74,37 @@ tar_option_set(
 tar_source()
 ```
 
+# FVS Preparation
+
+This project uses the FVSne variant.
+
+Compiled using the default settings, this may fail on some of the
+configurations supplied in this project with an error such as:
+
+```
+Fortran runtime warning: Floating point 'denormal operand' exception not supported.
+```
+
+or
+
+```
+Program received signal SIGILL: Illegal instruction.
+```
+
+The solution to these issues :
+Change gfortran compile flags from:
+```
+-ffpe-trap=invalid,zero,underflow,overflow,denormal
+```
+to
+```
+-ffpe-trap=invalid,zero,overflow
+```
+
+This is because MacOS running on Apple Silicon doesn't handle denormal
+or underflow traps. In both cases the values will be snapped to 0, so
+results are the same with tese traps disabled.
+
 # Database Preparation
 
 This project depends heavily on the SQLite version of the FIA data, distributed
