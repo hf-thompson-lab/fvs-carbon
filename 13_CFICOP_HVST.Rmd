@@ -444,6 +444,10 @@ track, so we don't need to do anything beyond 1980. So let's add 1980
 establishment as a one-off. We use actual trees, with height when
 available.
 
+Note that we do not subtract the background regeneration from this;
+background regeneration is put in as seedlings, these trees are put
+in as saplings (with height) and so will establish much sooner.
+
 ```{targets cficop_hvst_estab, tar_simple = TRUE}
 # Find 1970 trees; we'll remove these from 1980
 tmp_trees_1970 <- qryDWSPCFIPlotVisitTreeDetail |>
