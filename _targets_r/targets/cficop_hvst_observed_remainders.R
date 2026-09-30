@@ -17,7 +17,7 @@ tar_target(cficop_hvst_observed_remainders, {
     ) |>
     filter(!is.na(FVS_SPCD)) |>
     # Live trees, not recruits
-    filter(StatusB == "L" | Status6 == "L") |>
+    filter(StatusB == "L") |>
     mutate(
       dbh_harvest = coalesce(dbh_prior, dbhcm),
       DBH_MIN = floor(conv_unit(dbh_harvest, "cm", "in") / 5) * 5

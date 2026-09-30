@@ -18,10 +18,8 @@ tar_target(cficop_hvst_observed_harvest, {
     filter(!is.na(FVS_SPCD)) |>
     # At this point we have fully-decorated tree records
     # Replace na's in status to keep them from propagating
-    replace_na(list(StatusB = "X", Status6 = "X")) |>
-    # If either of StatusB or Status6 is "C", they both are, but
-    # this shows the intent
-    filter(StatusB == "C" | Status6 == "C") |>
+    replace_na(list(StatusB = "X")) |>
+    filter(StatusB == "C") |>
     # Accept dbh_prior or dbhcm for harvest dbh; ignore harvested
     # trees whose diameter can't be determined.
     mutate(

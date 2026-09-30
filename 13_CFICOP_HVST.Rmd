@@ -99,10 +99,8 @@ cficop_hvst_observed_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
   filter(!is.na(FVS_SPCD)) |>
   # At this point we have fully-decorated tree records
   # Replace na's in status to keep them from propagating
-  replace_na(list(StatusB = "X", Status6 = "X")) |>
-  # If either of StatusB or Status6 is "C", they both are, but
-  # this shows the intent
-  filter(StatusB == "C" | Status6 == "C") |>
+  replace_na(list(StatusB = "X")) |>
+  filter(StatusB == "C") |>
   # Accept dbh_prior or dbhcm for harvest dbh; ignore harvested
   # trees whose diameter can't be determined.
   mutate(
@@ -314,7 +312,7 @@ cficop_hvst_observed_remainders <- qryDWSPCFIPlotVisitTreeDetail |>
   ) |>
   filter(!is.na(FVS_SPCD)) |>
   # Live trees, not recruits
-  filter(StatusB == "L" | Status6 == "L") |>
+  filter(StatusB == "L") |>
   mutate(
     dbh_harvest = coalesce(dbh_prior, dbhcm),
     DBH_MIN = floor(conv_unit(dbh_harvest, "cm", "in") / 5) * 5
@@ -1255,8 +1253,8 @@ pre_harvest_year <- qryDWSPCFIPlotVisitTreeDetail |>
     PreHarvestYear = floor(HarvestYear / 10) * 10
   ) |>
   # Replace na's in status to keep them from propagating
-  replace_na(list(StatusB = "X", Status6 = "X")) |>
-  filter(!is.na(dbh_prior) & dbh_prior > 0 & StatusB == "C" | Status6 == "B") |>
+  replace_na(list(StatusB = "X")) |>
+  filter(!is.na(dbh_prior) & dbh_prior > 0 & StatusB == "C") |>
   filter(!is.na(PreHarvestYear)) |>
   distinct(MasterPlotID, PreHarvestYear)
 
@@ -1274,14 +1272,9 @@ measured_pre_harvest_trees <- qryDWSPCFIPlotVisitTreeDetail |>
     ba = pi * (conv_unit(dbh_prior, "cm", "m") / 2)^2
   ) |>
   # Replace na's in status to keep them from propagating
-  replace_na(list(StatusB = "X", Status6 = "X")) |>
+  replace_na(list(StatusB = "X")) |>
   filter(
-    !is.na(ba) & ba > 0 & (
-      StatusB == "L" |
-        StatusB == "R" |
-        Status6 == "L" |
-        Status6 == "R"
-    )
+    !is.na(ba) & ba > 0 & (StatusB == "L" | StatusB == "R")
   ) |>
   left_join(
     species_crosswalk |> select(SPCD, GENUS, SPECIES, COMMON_NAME),
