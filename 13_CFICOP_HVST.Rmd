@@ -212,7 +212,7 @@ cficop_hvst_observed_harvest |>
   ylab(bquote("Basal Area harvested" ~(m^2)))
 ```
 
-```{r}
+```{r, eval = FALSE}
 cficop_hvst_observed_harvest |>
   mutate(
     Diameter_Class = paste0(DBH_MIN, " - ", DBH_MIN + 5),
@@ -394,7 +394,7 @@ cficop_hvst_observed_remainders |>
 
 ## By Genus
 
-```{r}
+```{r, eval = FALSE}
 cficop_hvst_observed_remainders |>
   mutate(
     Diameter_Class = paste0(DBH_MIN, " - ", DBH_MIN + 5),
@@ -448,7 +448,7 @@ Note that we do not subtract the background regeneration from this;
 background regeneration is put in as seedlings, these trees are put
 in as saplings (with height) and so will establish much sooner.
 
-```{targets cficop_hvst_estab, tar_simple = TRUE}
+```{targets cficop_hvst_estab_1980, tar_simple = TRUE}
 # Find 1970 trees; we'll remove these from 1980
 tmp_trees_1970 <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
@@ -463,13 +463,13 @@ tmp_trees_1970 <- qryDWSPCFIPlotVisitTreeDetail |>
   )
 
 # Find 1980 trees, less those that were around in 1970
-tmp_estab_1980 <- qryDWSPCFIPlotVisitTreeDetail |>
+cficop_hvst_estab_1980 <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
   cfi_with_tree_info(tblDWSPCFITreesComplete) |>
   cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
   cfi_abp(cfiabp_trees) |>
   # Live trees and recruits
-  filter(StatusB == "L" | StatusB == "R" | Status6 == "L" | Status6 == "R") |>
+  filter(StatusB == "L" | StatusB == "R") |>
   # Only trees that were around in 1980
   filter(
     VisitCycle == 1980
@@ -499,13 +499,17 @@ tmp_estab_1980 <- qryDWSPCFIPlotVisitTreeDetail |>
     VisitTreeTotalHeight = if_else(
       VisitTreeTotalHeight == 0, NA, VisitTreeTotalHeight
     ),
-    VisitTreeTotalHeight = if_else(
+    VisitTreeTotalHeight = floor(if_else(
       is.na(VisitTreeTotalHeight),
       mean(VisitTreeTotalHeight, na.rm = TRUE),
       VisitTreeTotalHeight
-    ),
+    )),
     DENSITY = 5  # trees per acre for one tree on a 1/5 acre plot
   ) |>
+  ungroup() |>
+  # Consolidate redundant records
+  group_by(MasterPlotID, VisitCycle, FVS_SPCD, VisitTreeTotalHeight) |>
+  summarize(DENSITY = sum(DENSITY), .groups = "drop") |>
   ungroup() |>
   # We need STAND_CN for the 1970 stand
   left_join(
@@ -522,20 +526,122 @@ tmp_estab_1980 <- qryDWSPCFIPlotVisitTreeDetail |>
     DENSITY,
     HEIGHT = VisitTreeTotalHeight
   )
+```
 
-# Add the 1980 establishment to the establishment from Fred Hunt's
-# thesis to create establishment for the harvest scenarios
+## Post-Harvest Establishment
+
+It can take a while for post-harvest trees to reach establishment
+diameter. For each plot harvested, look at establishment in the
+two inventories post-harvest, and turn those into post-harvest
+establishment.
+
+It doesn't matter what species was harvested; harvest'll open up space
+for everything.
+
+As we did for 1980 establishment, we do not subtract the background
+regeneration from this; background regeneration is put in as seedlings,
+these trees are put in as saplings (with height) and so will establish
+much sooner.
+
+```{targets cficop_hvst_estab_post_harvest, tar_simple = TRUE}
+ tmp_post_harvest_plots <- cficop_hvst_observed_harvest |>
+  distinct(MasterPlotID, VisitCycle) |>
+  # Add in the post-post-harvest visit cycle
+  mutate(VisitCycleAfter = VisitCycle + 10) |>
+  pivot_longer(cols = c(VisitCycle, VisitCycleAfter), values_to = "VisitCycle") |>
+  # This will have introduced duplicates if a plot was harvested in two
+  # consecutive VisitCycles
+  distinct(MasterPlotID, VisitCycle) |>
+  # Don't do 1980; those are captured above
+  filter(VisitCycle != 1980)
+
+cficop_hvst_estab_post_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  # Only recruits
+  filter(StatusB == "R") |>
+  # Only trees that establish in post-harvest plots
+  semi_join(
+    tmp_post_harvest_plots,
+    by = join_by(MasterPlotID, VisitCycle)
+  ) |>
+  # Deal with species that FVS doesn't handle
+  mutate(SpeciesCode = replace_values(
+    SpeciesCode,
+    320 ~ 317, # norway maple -> sugar maple
+    402 ~ 403, # bitternut hickory -> pignut hickory
+    740 ~ 743  # unknown aspen -> bigtooth aspen
+  )) |>
+  left_join(
+    species_crosswalk |> select(SPCD, FVS_SPCD),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  filter(!is.na(FVS_SPCD)) |>
+  # Tree height - some trees have it, some don't.
+  # Impute mean height of those that have it for missing values
+  group_by(FVS_SPCD) |>
+  mutate(
+    # A height of 0 is a missing value; fix that.
+    VisitTreeTotalHeight = if_else(
+      VisitTreeTotalHeight == 0, NA, VisitTreeTotalHeight
+    ),
+    VisitTreeTotalHeight = floor(if_else(
+      is.na(VisitTreeTotalHeight),
+      mean(VisitTreeTotalHeight, na.rm = TRUE),
+      VisitTreeTotalHeight
+    )),
+    DENSITY = 5  # trees per acre for one tree on a 1/5 acre plot
+  ) |>
+  # Replase NaN HEIGHTs with 0 to avoid errors
+  replace_na(list(VisitTreeTotalHeight = 0)) |> 
+  ungroup() |>
+  # Consolidate redundant records
+  group_by(MasterPlotID, VisitCycle, FVS_SPCD, VisitTreeTotalHeight) |>
+  summarize(DENSITY = sum(DENSITY), .groups = "drop") |>
+  ungroup() |>
+  # We need STAND_CN for the appropriate stand
+  # We need STAND_CN for the 1970 stand
+  left_join(
+    cfigro_plot |>
+      filter(INV_YEAR == 1970) |>
+      select(STAND_ID, STAND_CN),
+    by = join_by(MasterPlotID == STAND_ID)
+  ) |>
+  select(
+    STAND_ID = MasterPlotID,
+    STAND_CN,
+    YEAR = VisitCycle,
+    SPECIES = FVS_SPCD,
+    DENSITY,
+    HEIGHT = VisitTreeTotalHeight
+  )
+```
+
+## Combined Establishment
+
+Combine:
+
+- establishment from Fred Hunt's thesis
+- 1980 establishment
+- post-harvest establishemtn
+
+to create one big table of establishment for the harvest scenarios.
+
+```{targets cficop_hvst_estab, tar_simple = TRUE}
 cficop_hvst_estab <- cficop_dflt_estab |>
   mutate(
     STAND_ID = NA,
     HEIGHT = 0
   ) |>
   union_all(
-    tmp_estab_1980
+    cficop_hvst_estab_1980
+  ) |>
+  union_all(
+    cficop_hvst_estab_post_harvest
   )
 ```
-
-## *** TODO: Post-Harvest Establishment ***
 
 # Harvest
 
@@ -940,9 +1046,9 @@ So overall TPA in the modeled plots goes up a lot compared to what's observed.
 A lot of this is likely because the model can see all trees down to seedlings,
 whereas CFI inventory only captures trees >5.6"
 
-### Meas vs. Proj harvested
+## Meas vs. Proj harvested
 
-#### By Genus
+### By Genus
 
 How does harvest compare to survey?
 
@@ -1033,7 +1139,7 @@ measured_harvest |>
 ```
 
 
-#### By Diameter Class
+### By Diameter Class
 
 
 ```{r, eval = FALSE}
@@ -1121,14 +1227,13 @@ measured_harvest |>
   theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
   xlab("Diameter (inches)") +
   ylab("Trees Harvested (trees)")
-
 ```
 
 Looks OK, but we're generally harvesting less than measured.
 
 Let's see what size trees FVS thought were there at harvest.
 
-#### Pre-Harvest Trees
+### Pre-Harvest Trees
 
 Treelist is big, ~4G
 
@@ -1280,7 +1385,7 @@ measured_pre_harvest_trees |>
   ylab("Trees (trees)")
 ```
 
-#### By Year
+### By Year
 
 ```{r, eval = FALSE}
 measured_harvest <- cficop_hvst_observed_harvest |>
