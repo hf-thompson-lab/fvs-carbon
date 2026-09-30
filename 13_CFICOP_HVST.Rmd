@@ -5,7 +5,7 @@ output: html_document
 
 # Intro
 
-This is split out of 12_CFICOP.Rmd because that was getting too big. 
+Attempt to reproduce actual harvest in Quabbin, 1970 - 2000.
 
 # Setup
 
