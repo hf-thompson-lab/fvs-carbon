@@ -45,8 +45,12 @@ tar_target(cficop_hvst_estab, {
     # Impute mean height of those that have it for missing values
     group_by(FVS_SPCD) |>
     mutate(
+      # A height of 0 is a missing value; fix that.
       VisitTreeTotalHeight = if_else(
-        is.na(VisitTreeTotalHeight) | VisitTreeTotalHeight == 0,
+        VisitTreeTotalHeight == 0, NA, VisitTreeTotalHeight
+      ),
+      VisitTreeTotalHeight = if_else(
+        is.na(VisitTreeTotalHeight),
         mean(VisitTreeTotalHeight, na.rm = TRUE),
         VisitTreeTotalHeight
       ),
