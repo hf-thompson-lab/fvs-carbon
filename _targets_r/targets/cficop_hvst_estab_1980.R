@@ -57,10 +57,11 @@ tar_target(cficop_hvst_estab_1980, {
       DENSITY = 5  # trees per acre for one tree on a 1/5 acre plot
     ) |>
     ungroup() |>
-    # Consolidate redundant records
-    group_by(MasterPlotID, VisitCycle, FVS_SPCD, VisitTreeTotalHeight) |>
-    summarize(DENSITY = sum(DENSITY), .groups = "drop") |>
-    ungroup() |>
+  # DO NOT CONSOLIDATE REDUNDANT RECORDS - it makes FVS crash
+  #  # Consolidate redundant records
+  #  group_by(MasterPlotID, VisitCycle, FVS_SPCD, VisitTreeTotalHeight) |>
+  #  summarize(DENSITY = sum(DENSITY), .groups = "drop") |>
+  #  ungroup() |>
     # We need STAND_CN for the 1970 stand
     left_join(
       cfigro_plot |>

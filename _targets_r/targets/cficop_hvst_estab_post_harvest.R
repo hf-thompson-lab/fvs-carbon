@@ -52,10 +52,11 @@ tar_target(cficop_hvst_estab_post_harvest, {
     # Replase NaN HEIGHTs with 0 to avoid errors
     replace_na(list(VisitTreeTotalHeight = 0)) |> 
     ungroup() |>
-    # Consolidate redundant records
-    group_by(MasterPlotID, VisitCycle, FVS_SPCD, VisitTreeTotalHeight) |>
-    summarize(DENSITY = sum(DENSITY), .groups = "drop") |>
-    ungroup() |>
+  # DO NOT CONSOLIDATE REDUNDANT RECORDS - it makes FVS crash
+  #  # Consolidate redundant records
+  #  group_by(MasterPlotID, VisitCycle, FVS_SPCD, VisitTreeTotalHeight) |>
+  #  summarize(DENSITY = sum(DENSITY), .groups = "drop") |>
+  #  ungroup() |>
     # We need STAND_CN for the appropriate stand
     # We need STAND_CN for the 1970 stand
     left_join(
