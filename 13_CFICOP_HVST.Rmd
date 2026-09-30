@@ -1122,6 +1122,13 @@ Let's see what size trees FVS thought were there at harvest.
 
 #### Pre-Harvest Trees
 
+Treelist is big, ~4G
+
+```{r, eval = FALSE}
+cficop_hvst_treelist <- fvs_read_output(cficop_hvst, "FVS_TreeList") |>
+  filter(random_seed == min(random_seed))
+```
+
 ```{r, eval = FALSE}
 pre_harvest_year <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
