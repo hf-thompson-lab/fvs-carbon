@@ -1433,6 +1433,59 @@ measured_harvest |>
 
 ```
 
+
+```{r, eval = FALSE}
+measured_harvest <- cficop_hvst_observed_harvest |>
+  group_by(GENUS, VisitCycle) |>
+  summarize(
+    Observed = sum(basal_area * 5), # m^2 / acre
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  select(GENUS, VisitCycle, Observed)
+
+projected_harvest <- cficop_hvst_cutlist |>
+  mutate(
+    basal_area = pi * (conv_unit(DBH, "in", "m") / 2)^2,
+    # CAVEAT:
+    # FVS Cuts trees in year 0 of a cycle;
+    # CFI VisitCycle is year 10 of a cycle
+    # Therefore FVS year cut is CFI VisitCycle - 10
+    VisitCycle = Year + 10
+  ) |>
+  left_join(
+    species_crosswalk |> select(FVS_SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SpeciesFVS == FVS_SPCD)
+  ) |>
+  group_by(GENUS, VisitCycle) |>
+  summarize(
+    Projected = sum(basal_area * TPA, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  select(GENUS, VisitCycle, Projected)
+
+measured_harvest |>
+  full_join(
+    projected_harvest,
+    by = join_by(GENUS, VisitCycle)
+  ) |>
+  filter(GENUS %in% c("Acer", "Betula", "Fraxinus", "Pinus", "Quercus", "Tsuga")) |>
+  pivot_longer(cols = c(Observed, Projected)) |>
+  replace_na(list(value = 0)) |>
+  mutate(Year = sprintf("%d", VisitCycle)) |>
+  mutate(value = if_else(value == 0, 1, value)) |>
+  ggplot(aes(Year, value, fill = name)) +
+  geom_col(position = "dodge") +
+#  scale_y_continuous(transform = "log10") +
+  facet_wrap(~GENUS) +
+  theme_bw() +
+  ggtitle("Projected Vs Observed Basal Area Harvested") +
+  ylab(bquote("Basal Area Harvested" ~(m^2))) +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1))
+
+```
+
 ### Measured vs. Projected Post-Harvest Trees
 
 cficop_hvst_tpa is the tpa that we requested that FVS leave behind.
