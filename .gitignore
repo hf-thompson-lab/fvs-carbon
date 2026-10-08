@@ -58,9 +58,13 @@ rsconnect/
 # MacOS Metadata
 .DS_Store
 
+# Local configuration files
+config/
+
 # Intermediate datasets
 data/fvs
 data/intermediate
+data/images
 
 # targets local object store
 _targets/

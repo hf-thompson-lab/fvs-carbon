@@ -1,0 +1,683 @@
+---
+title: "14_CFICOP_BL53"
+output: html_document
+---
+
+# Intro
+
+Create a COP Baseline using the data from:
+
+> Station, N.F.E., 1956. The Timber Resource in Massachusetts. Upper
+> Darby, PA: U.S. Department of Agriculture, Forest Service,
+> Northeastern Forest Experiment Station. 45 p.
+
+# Setup
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(targets)
+  library(tarchetypes)
+  library(tidyverse)
+  library(measurements)
+})
+tar_source()
+
+## Load targets results from other documents ----
+
+tar_load(fiadb)
+tar_load(species_crosswalk)
+tar_load(fvs_num_partitions)
+tar_load(fvs_partition)
+tar_load(fvs_randseed)
+tar_load(cfigro_estab)
+tar_load(cfigro_none_growth)
+tar_load(cficop_estab)
+tar_load(cficop_dflt_estab)
+
+## Preload everything from 11_CFIGrowOnly.Rmd ----
+
+get_this_rmd_file() |>
+  str_replace(basename(get_this_rmd_file()), "11_CFIGrowOnly.Rmd") |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+
+## Preload everything from 12_CFICOP.Rmd ----
+
+get_this_rmd_file() |>
+  str_replace(basename(get_this_rmd_file()), "12_CFICOP.Rmd") |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+
+## Preload everything from 13_CFICOP_HVST.Rmd ----
+
+get_this_rmd_file() |>
+  str_replace(basename(get_this_rmd_file()), "13_CFICOP_HVST.Rmd") |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+
+## Preload targets results from this document ----
+
+# When tar_make() has already built the objects defined in this document,
+# run this block to pre-load them. You can then skip running ```{targets}
+# blocks.
+
+get_this_rmd_file() |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+
+eves_colors <- c(
+  "Other" = "#B4B432",
+  "Fraxinus" = "#CD5C5C",
+  "Betula" = "#8B4513",
+  "Tsuga" = "#5F9EA0",
+  "Acer" = "#DEB887",
+  "Pinus" = "#556B2F",
+  "Quercus" = "#D2691E"
+)
+```
+
+# Context
+
+Timber use in MA steady for 20yr prior to 1950
+
+I n 1952, almost 21 million cubic f e e t of i n d u s t r i a l timber
+products and almost 9 m i l l i o n cubic f e e t of fuelwood were c u t
+from Massadhusetts forests.
+
+Table 1:
+
+```{r}
+table_1 <- tribble(
+  ~Type, ~Species, ~Thousand_bd_ft, ~Pct,
+  "Softwood", "White and red pine", 59722, 53,
+  "Softwood", "Hemlock", 17082, 15,
+  "Softwood", "Spruce and fir", 6792, 6,
+  "Softwood", "Other softwoods", 149, NA,
+  "Softwood", "Total", 83745, 74,
+  "Hardwood", "Oaks", 11231, 10,
+  "Hardwood", "Birch-beech-maple", 10059, 9,
+  "Hardwood", "Other hard hardwoods", 2153, 2,
+  "Hardwood", "Paper birch", 3210, 3,
+  # Other Soft Hardwoods includes:
+  # red maple, aspen, basswood, and yellow-poplar
+  "Hardwood", "Other soft hardwoods", 2638, 2,
+  "Hardwood", "Total", 29291, 26,
+  "All", "Species", 113036, 100
+)
+```
+
+## Annual Cut of Growing Stock
+
+The 1952 output of timber products, almost 30 million cubic feet,
+required a cut of about 26 million cubic feet of growing stock (table
+2). In addition, some 7 million cubic feet of timber products -- almost
+half of this was for fuelwood -- were obtained from cull trees, dead
+trees, hardwood limbs, and plant residues. On the other hand, almost 3
+million cubic feet of growing stock were cut but were left in the woods
+as waste. This logging residue consisted chiefly of volume in upper
+stems.
+
+In terms of sawtimber volume, the 1952 cut was 86 million board feet.
+All but 5 percent of the sawtimber volume logged was for sawlog
+production. Most of the volume not used for sawlogs was made into
+pulpwood.
+
+Thus, almost all the wood used by the forst industries is supplied from
+the growing stock; fuelwood is the only major product that is derived
+chiefly from other materials such as cull trees and sawmill residues.
+Less than a third of the volume cut for fuelwood comes from growing
+stock.
+
+## The Supply of Standing Timber
+
+### Growth exceeds Cut
+
+In sharp contrast to the 1952 cut of 26 million cubic feet of growing
+stock, the net growth was 80 million cubic feet (table 3). The harvest
+in 1952 was only one-third of the growth, chiefly because of the poor
+quality of the native timber and the relatively limited markets for
+hardwood.
+
+The volume of sawtimber also increased during 1952. Although w39 million
+board feet were added to timber stands through sawtimber growth, only 86
+million board feet were cut. The cut was 62 percent of the board-foot
+growth.
+
+Average annual losses due to fire, windthrow, insect and disease damage,
+and suppression were deducted to obtain these net-growth estimates. (NO
+specific deductions were made in this report for the estimated los of 50
+million board feet, mostly whit pine, due to hurricanes Carol and Edna
+in 1954. However, mortality was calculated in an average annual basis,
+so it includes some allowance for losses of this kind.) The volume of
+ingrowth (saplings that become poletimber or poletimber that became
+sawtimber during 1952) was included in the net annual growth estimates
+(table 4).
+
+```{r}
+table_5 <- tribble(
+~SizeClass, ~SpeciesGroup, ~AnnualCut, ~NetGrowth,
+"Sawtimber", "Softwoods", 13879, 21500,
+"Sawtimber", "Hardwoods", 5226, 16100,
+"Poletimber", "Softwoods", 1602, 3700,
+"Poletimber", "Hardwoods", 4987, 39200
+) 
+```
+
+Forest Growing Stock
+
+Growing stock is the volume of sound wood in the main stems of all
+sawtimber and poletimber trees, from a 1-foot stump to a 4-inch top
+inside bark. This volume is estimated to be about 1.9 billion cubic feet
+(table 7). More than one-half of it (58 percent) is found in poletimber
+trees. Since 0.5 billion cubic feet of sound wood -- in cull trees and
+hardwood limbs -- are not counted as forest growing stock, all together
+there are 2.4 billion cubic feet of sound wood on the commercial forest
+land.
+
+Sawtimber Volume
+
+The sawlog portions of sawtimber trees, amounting to 0.6 billion cubic
+feet of sound wood, account for one-third of the growing stock. Measured
+according to the International ¼-inch rule (which approximates lumber
+tally), this material is equivalent to about 2.7 billion board feet.
+
+```{r}
+table_8 <- tribble(
+~SpeciesGroup, ~Species, ~Sawtimber, ~GrowingStock,
+# values in million board feet
+# White pine includes a small amount of red (Norway) pine
+"Softwoods", "White pine", 858, 344,
+"Softwoods", "Pitch pine", 36, 47,
+"Softwoods", "Hemlock", 381, 205,
+"Softwoods", "Other softwoods", 24, 35,
+"Hardwoods", "White oaks", 102, 98,
+"Hardwoods", "Northern red oak", 405, 357,
+"Hardwoods", "Other red oaks", 101, 36,
+"Hardwoods", "Yellow birch", 42, 50,
+"Hardwoods", "Sugar maple", 165, 111,
+"Hardwoods", "Soft maples", 173, 260,
+"Hardwoods", "Beech", 69, 49,
+"Hardwoods", "Ash", 46, 46,
+"Hardwoods", "Paper birch", 50, 72,
+"Hardwoods", "Sweet birch", 36, 42,
+"Hardwoods", "Other hardwoods", 171, 119
+)
+```
+
+The average volume per acre of all sawtimber stands in Massachusetts is
+3600 board feet per acre. Many of the sawtimber stands contain barely
+enough sawtimber (1,500 board feet per acre) to rate as sawtimber
+stands. Loggers will not go into forest stands that have so little
+sawtimber unless the volume is in softwoods; therefore some of the
+sawtimber volume is in sawtimber stands that are not profitable to log
+under present conditions. Even more important than this, about 1.2
+billion board feet of sawtimber (47 percent of the total) is scattered
+through poletimber stands and seedling-and-sapling stands that will be
+inoperable for sawtimber for some time to come (table 9).
+
+Thus, only a portion of the sawtimber in Massachusetts is now
+merchantable. Less than half of the total board-foot volume is in the
+readily acceptable species, located in stands that loggers regard as
+operable timber. These operable stands are widely scattered about the
+state, and many are small in area.
+
+p 12:
+For sawtimber trees, the cut is much closer to growth. In terms of
+sawtimber volume, the board-foot cut of softwoods is more than 90
+percent of the net annual growth, but the board-foot cut of
+hardwoods is only one-third of their growth.
+
+Condition of the Forests
+
+There are almost 3.3 million acres of forest land in Massachusetts
+(table 12). Practically all o fit is commercial forest land. About
+18,000 acres of productive forest land are reserved from timber cutting,
+mostly in watersheds and state county reservations. Another 11,300 acres
+of forest land are classed as unproductive, chiefly because of poor soil
+conditions.
+
+```{r}
+# Values in thousand acres
+# Area Forested 1928 includes abandoned fields and pastures coming up to brush
+# and scattered tree growth, and referred to as transition land.
+# Area Forested 1953 includes noncommercial forest land
+table_13 <- tribble(
+~County, ~TotalLandArea, ~AreaForested1928, ~AreaForested1953,
+"Barnstable", 255360, 175518, 165000,
+"Berkshire", 602880, 400398, 449100,
+"Bristol", 355840, 226240, 224900,
+"Essex", 320000, 148718, 138200,
+"Franklin", 452480, 302161, 345800,
+"Hampden", 397440, 268963, 263400,
+"Hampshire", 337920, 236141, 229100,
+"Middlesex", 530560, 341287, 311200,
+"Norfolk", 254720, 166571, 144300,
+"Plymouth", 424960, 304133, 292100,
+"Worcester", 970240, 632534, 666500,
+"Dukes, Nantucket & Suffolk", 132480, 61616, 58000
+)
+```
+
+```{r}
+table_14 <- tribble(
+# Area is in thousand acres
+~ForestType, ~Area,
+"White pine", 298,
+"White pine-hardwood", 149,
+"Hemlock", 115,
+"Pitch pine", 114,
+"Pitch pine-oak", 51,
+"Spruce-fir", 22,
+"Tamarack-Slack spruce", 6,
+"Oak-pitch pine", 46,
+"Red oak", 934,
+"Oak-white pine", 221,
+"White oak", 117,
+"Scrub oak", 27,
+"Chestnut oak", 19,
+"Eastern redcedar", 7,
+"Ash-elm-maple", 227,
+"Atlantic white-cedar", 8,
+"Sugar maple-beech-yellow birch", 470,
+"Hardwood-spruce-fir", 50,
+"Aspen-gray birch", 264,
+"Paper birch", 21
+) 
+```
+
+```{r}
+table_15 <- tribble(
+  # Area is in Thousand acres
+  # Sawtimber is in Million bd.ft.
+  # Growing stock is in Million cu.ft.
+  ~ForestType, ~Area, ~Sawtimber, ~GrowingStock,
+  "White pine types", 447, 721, 336,
+  "Hemlock", 115, 271, 156,
+  "Pitch pine types", 165, 20, 30,
+  "Other softwood types", 43, 19, 27,
+  "Red oak", 934, 400, 434,
+  "Sugar maple-beech-yellow birch", 470,713, 434,
+  "Aspen-gray birch-paper birch", 285, 71, 84,
+  "Ash-elm-maple", 277, 80, 115,
+  "Oak-white pine", 221, 131, 103,
+  "White oak", 117, 51, 40,
+  "Other hardwood types", 185, 182, 112
+)
+```
+
+Oak forests occupy two-fifths of commercial forest land. They average
+only 460 board feet per acre. Other forest types average 860 board feet
+per acre.
+
+White pine are scattered through hardwood stands. Stands in which white
+pine dominates cover one-seventh of the commercial forest land. White
+pine and other softwood stands average better than 1,300 board feet per
+acre.
+
+10, 12, and 14 inches are "small" sawtimber diameter classes
+
+Over half of softwood sawtimber volume is in small diameter classes Over
+60 percent of hardwood sawtimber volume is in 12 and 14 inch classes
+
+growing stock is 6-inch and larger diameter classes
+
+85 percent of the private ownerships are less than 100 acres in size.
+They account for 38 percent of the State's commercial forestland. Only
+five holdings are larger than 5,000 acres.
+
+Forest type definitions in the appendix.
+
+# MINHARV
+
+Specifies the minimum acceptable harvest standards for board-foot
+volume, merchantable cubic-foot volume, Ba/acre, or total cubic foot
+volume. Accumulated removals across all thinnings in a cycle must exceed
+the standards or no thinnings will be implemented.
+
+# Board Feet
+
+When do stands reach the board-foot minimum?
+
+There are two situations:
+
+1.  The number of board feet in softwoods exceeds 1500/acre
+2.  The total number of board feet in the stand exceeds some other
+    mininum
+
+The board-foot minimum for hardwood or mixed stands is TBD
+
+## Meets or Exceeds
+
+Sadly, FVS_Stats_Species only contains info for the initial stand, so we
+need to build it from the treelist.
+
+```{r}
+cficop_none_treelist <- fvs_read_output(cficop_none, "FVS_TreeList")
+```
+
+```{r}
+meets_or_exceeds <- cficop_none_treelist |>
+  mutate(SpeciesFIA = as.integer(SpeciesFIA)) |>
+  left_join(
+    species_crosswalk |>
+      select(SPCD, HARD_SOFT),
+    by = join_by(SpeciesFIA == SPCD)
+  ) |>
+  mutate(
+    size_class = size_class(DBH, HARD_SOFT)
+  ) |>
+  group_by(Year, StandID, HARD_SOFT, size_class) |>
+  summarize(
+    BoardFeet = sum(BdFt * TPA),
+    .groups = "drop"
+  )
+```
+
+```{r}
+meets_or_exceeds |>
+  filter(Year < 2021) |>
+  filter(size_class == "sawtimber") |>
+  mutate(meets = BoardFeet > 1500) |>
+  ggplot(aes(Year, fill = HARD_SOFT)) +
+  geom_bar(position = "dodge") +
+  theme_bw() +
+  ggtitle("CFI plots with >1500 Board Feet/Acre of Sawtimber") +
+  ylab("Number of Plots") +
+  labs(fill = NULL)
+```
+
+Let's look just at white and red pine, which are preferred for harvest.
+
+```{r}
+meets_or_exceeds <- cficop_none_treelist |>
+  mutate(SpeciesFIA = as.integer(SpeciesFIA)) |>
+  left_join(
+    species_crosswalk |>
+      select(SPCD, HARD_SOFT),
+    by = join_by(SpeciesFIA == SPCD)
+  ) |>
+  mutate(
+    size_class = size_class(DBH, HARD_SOFT),
+    wood_type = case_when(
+      SpeciesFIA == 125 | SpeciesFIA == 129 ~ "Red/White Pine",
+      HARD_SOFT == "SOFTWOOD" ~ "Other Softwood",
+      .default = "Hardwood"
+    )
+  ) |>
+  filter(size_class == "sawtimber") |>
+  group_by(Year, StandID, wood_type) |>
+  summarize(
+    BoardFeet = sum(BdFt * TPA),
+    .groups = "drop"
+  )
+```
+
+```{r}
+meets_or_exceeds |>
+  filter(Year < 2021) |>
+  mutate(meets = BoardFeet > 1500) |>
+  filter(meets) |>
+  ggplot(aes(Year, fill = wood_type)) +
+  geom_bar(position = "dodge") +
+  theme_bw() +
+  ggtitle("CFI plots with >1500 Board Feet/Acre of Sawtimber") +
+  ylab("Number of Plots") +
+  labs(fill = NULL) +
+  scale_x_continuous(breaks = seq(1970, 2020, 10))
+```
+
+```{r}
+meets_or_exceeds |>
+  filter(Year < 2021) |>
+  mutate(meets = BoardFeet > 3000) |>
+  filter(meets) |>
+  ggplot(aes(Year, fill = wood_type)) +
+  geom_bar(position = "dodge") +
+  theme_bw() +
+  ggtitle("CFI plots with >3000 Board Feet/Acre of Sawtimber") +
+  ylab("Number of Plots") +
+  labs(fill = NULL) +
+  scale_x_continuous(breaks = seq(1970, 2020, 10))
+```
+
+We can't harvest more in a year than local sawmills can handle. NERS
+Figure 1 covers this; the approximate location of the Quabbin watershed
+is outlined in blue. Many sawmills are adjacent to the
+watershed, and show a capacity for 2,000+ thousand board feet
+per year (over 2 million board feet per year). At 1500 bd ft/acre,
+we can harvest 1300 acres/year without exceding sawmill capacity.
+
+```{r, echo = FALSE}
+knitr::include_graphics("data/images/NERS Figure 1.png")
+```
+
+# Map
+
+## Plot Harvest Year
+
+```{r}
+plot_harvest_year <- meets_or_exceeds |>
+  filter(wood_type == "Red/White Pine") |>
+  filter(BoardFeet > 1500) |>
+  group_by(StandID) |>
+  slice_min(Year) |>
+  ungroup() |>
+  mutate(MasterPlotID = as.numeric(StandID)) |>
+  select(MasterPlotID, HarvestYear = Year)
+```
+
+## Plot Used
+
+Map all the plots, including the ones not used in this study.
+
+```{r}
+plots_for_map <- tblDWSPCFIPlotsComplete |>
+  filter(Watershed == 1) |>
+  filter(!is.na(GPSLatitude) & !is.na(GPSLongitude)) |>
+  select(MasterPlotID, lat = GPSLatitude, lon = GPSLongitude) |>
+  left_join(
+    cfigro_plot |>
+      filter(INV_YEAR == 1970) |>
+      mutate(plot_used = "Used") |>
+      select(STAND_ID, plot_used),
+    by = join_by(MasterPlotID == STAND_ID)
+  ) |>
+  left_join(
+    plot_harvest_year,
+    by = join_by(MasterPlotID)
+  ) |>
+  replace_na(list(plot_used = "Not Used")) |>
+  terra::vect()
+
+plots_ext <- plots_for_map |>
+  terra::buffer(2 * 1000) |>
+  terra::ext()
+
+```
+
+## Basemap Tiles
+
+Download a pretty background for the map
+
+```{r}
+# Download tiles
+basemap_filename <- file.path(
+  "data/raw/osm",
+  paste0("basemap_quabbin.tif")
+)
+if (!file.exists(basemap_filename)) {
+  apikey = read_lines(file.path("config", "carto_apikey.txt"))
+  
+  basemap_area <- plots_ext |>
+    terra::vect(crs = plots_for_map)
+  
+  basemap_web <- basemap_area |>
+    terra::project(crs("epsg:3857")) |> # use webmercator
+    st_as_sf()
+  
+  # For zoom levels, see:
+  # https://wiki.openstreetmap.org/wiki/Zoom_levels
+  basemap <- maptiles::get_tiles(
+    basemap_web,
+    provider = "Esri.WorldTopoMap",
+    apikey = apikey,
+    # let get_tiles() work out the zoom automatically
+    zoom = 11,
+    crop = TRUE
+  )
+  
+  terra::writeRaster(basemap, basemap_filename, overwrite = TRUE)
+} else {
+  basemap <- terra::rast(basemap_filename)
+}
+```
+
+## The Map
+
+```{r plot grow-only plots, eval = FALSE}
+ggplot() +
+  geom_spatraster_rgb(data = basemap) +
+  geom_polygon(
+    data = map_data("state", "Massachusetts"),
+    aes(x = long, y = lat, group = group),
+    color = "black", fill = "transparent"
+  ) +
+  geom_spatvector(
+    data = plots_for_map,
+    # Color will be the year it gets harvested in baseline
+    aes(color = HarvestYear, shape = plot_used),
+    size = 1.5
+  ) +
+  scale_shape_manual(
+    name = "Plot Status",
+    values = c(
+      "Used" = 19, # circle
+      "Not Used" = 1 # open circle
+    )
+  ) +
+  annotation_scale(
+    location = "br",
+    pad_x = unit(0.45, "cm"),
+    pad_y = unit(0.1, "cm")
+  ) +
+  annotation_north_arrow(
+    location = "tr",
+    width = unit(1, "cm"),
+    pad_x = unit(-0.25, "cm"),
+    pad_y = unit(0.1, "cm"),
+    style = north_arrow_minimal,
+    which_north = "true"
+  ) +
+  coord_sf(
+    xlim = c(plots_ext$xmin, plots_ext$xmax),
+    ylim = c(plots_ext$ymin, plots_ext$ymax),
+    crs = crs(plots_for_map)
+  ) +
+  scale_color_viridis_c(
+    option = "turbo",
+    begin = 0.1
+  ) +
+  theme_bw(base_size = 9) +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  ggtitle("CFI plots 1957 Baseline Harvest") +
+  xlab("Longitude") +
+  ylab("Latitude")
+```
+
+```{r}
+ggsave("cfi_baseline_1957.png", dpi = 600, width = 10, units = "cm")
+```
+
+
+## Compare To Reality
+
+```{r}
+plots_for_map <- tblDWSPCFIPlotsComplete |>
+  filter(Watershed == 1) |>
+  filter(!is.na(GPSLatitude) & !is.na(GPSLongitude)) |>
+  select(MasterPlotID, lat = GPSLatitude, lon = GPSLongitude) |>
+  left_join(
+    cfigro_plot |>
+      filter(INV_YEAR == 1970) |>
+      mutate(plot_used = "Used") |>
+      select(STAND_ID, plot_used),
+    by = join_by(MasterPlotID == STAND_ID)
+  ) |>
+  left_join(
+    cficop_hvst_tpa |>
+      distinct(STAND_CN, YEAR) |>
+      left_join(
+        cfigro_plot |>
+          select(STAND_CN, STAND_ID) |>
+          mutate(MasterPlotID = as.numeric(STAND_ID)) |>
+          select(MasterPlotID, STAND_CN),
+        by = join_by(STAND_CN)
+      ) |>
+      select(MasterPlotID, HarvestYear = YEAR),
+    by = join_by(MasterPlotID)
+  ) |>
+  replace_na(list(plot_used = "Not Used")) |>
+  terra::vect()
+
+plots_ext <- plots_for_map |>
+  terra::buffer(2 * 1000) |>
+  terra::ext()
+
+```
+
+
+```{r plot grow-only plots, eval = FALSE}
+ggplot() +
+  geom_spatraster_rgb(data = basemap) +
+  geom_polygon(
+    data = map_data("state", "Massachusetts"),
+    aes(x = long, y = lat, group = group),
+    color = "black", fill = "transparent"
+  ) +
+  geom_spatvector(
+    data = plots_for_map,
+    # Color will be the year it gets harvested in baseline
+    aes(color = HarvestYear, shape = plot_used),
+    size = 1.5
+  ) +
+  scale_shape_manual(
+    name = "Plot Status",
+    values = c(
+      "Used" = 19, # circle
+      "Not Used" = 1 # open circle
+    )
+  ) +
+  annotation_scale(
+    location = "br",
+    pad_x = unit(0.45, "cm"),
+    pad_y = unit(0.1, "cm")
+  ) +
+  annotation_north_arrow(
+    location = "tr",
+    width = unit(1, "cm"),
+    pad_x = unit(-0.25, "cm"),
+    pad_y = unit(0.1, "cm"),
+    style = north_arrow_minimal,
+    which_north = "true"
+  ) +
+  coord_sf(
+    xlim = c(plots_ext$xmin, plots_ext$xmax),
+    ylim = c(plots_ext$ymin, plots_ext$ymax),
+    crs = crs(plots_for_map)
+  ) +
+  scale_color_viridis_c(
+    option = "turbo",
+    begin = 0.1
+  ) +
+  theme_bw(base_size = 9) +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  ggtitle("CFI plots Actual Harvest") +
+  xlab("Longitude") +
+  ylab("Latitude")
+```
+
+
+```{r}
+ggsave("cfi_actual.png", dpi = 600, width = 10, units = "cm")
+```
+
