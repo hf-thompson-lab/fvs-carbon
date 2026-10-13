@@ -776,7 +776,7 @@ the status at simulation start time.
 Let's get a breakdown of plots by whether they had no trees in
 1970, were harvested, disturbed, or both
 
-```{r}
+```{r, eval = FALSE}
 # All the plots we're using
 cficop_plot_sibling |>
   left_join(cfigro_plot_disturbed, by = join_by(MasterPlotID)) |>
@@ -982,7 +982,7 @@ tar_target(
 
 ## Load Results
 
-Carbon
+### Carbon
 
 ```{targets cficop_none_carbon, tar_simple = TRUE}
 fvs_read_output(cficop_none, "FVS_Carbon") |>
@@ -994,7 +994,7 @@ fvs_read_output(cficop_none, "FVS_Carbon") |>
   ungroup()
 ```
 
-Summary
+### Summary
 
 ```{targets cficop_none_summary, tar_simple = TRUE}
 fvs_read_output(cficop_none, "FVS_Summary2") |>
@@ -1005,6 +1005,14 @@ fvs_read_output(cficop_none, "FVS_Summary2") |>
     .groups = 'keep'
   ) |>
   ungroup()
+```
+
+### Tree List
+
+Some things want the tree list; materialize it.
+
+```{targets cficop_none_treelist, tar_simple = TRUE}
+fvs_read_output(cficop_none, "FVS_TreeList")
 ```
 
 ## BA Over Time
