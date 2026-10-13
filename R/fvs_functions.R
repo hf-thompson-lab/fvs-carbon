@@ -131,15 +131,44 @@ fvs_Estab <- function(rows) {
   }
 }
 
-fvs_ThinDBH <- function(rows) {
-  yardloss <- function(years) {
-    # YardLoss: Designates a portion of a harvest to be left in the woods.
-    # Field 1: Year; YardLoss needs to come after Thin*
-    # Field 2: Proportion of cut stems left in the stand
-    # Field 3: Proportion of left stems that are down
-    # Field 4: Proportion of branch wood left from removed stems
-    lapply(years, \(year) fvs_kwd("YardLoss", year, 0, 0, 1))
+fvs_YardLoss <- function(years) {
+  # YardLoss: Designates a portion of a harvest to be left in the woods.
+  # Field 1: Year; YardLoss needs to come after Thin*
+  # Field 2: Proportion of cut stems left in the stand
+  # Field 3: Proportion of left stems that are down
+  # Field 4: Proportion of branch wood left from removed stems
+  lapply(years, \(year) fvs_kwd("YardLoss", year, 0, 0, 1))
+}
+
+
+fvs_ThinATA <- function(rows) {
+  thinata <- function(row) {
+    year <- row["YEAR"]
+    target_tpa <- row["TARGET_TPA"]
+    dbh_min <- row["DBH_MIN"]
+    dbh_max <- row["DBH_MAX"]
+    if ("PERCENT" %in% names(row) & !is.na(row["PERCENT"])) {
+      percent <- row["PERCENT"] # CUTEFF - Efficiency, 0 - 1
+    } else {
+      percent <- 1
+    }
+    # ThinATA fields:
+    # 1 - year
+    # 2 - target TPA
+    # 3 - efficiency (0 - 1; 1)
+    # 4 - smallest dbh (>=; 0)
+    # 5 - largest dbh (<; 999)
+    # 6 - smallest height (>=; 0)
+    # 7 - largest height (<; 999)
+    fvs_kwd("ThinATA", year, target_tpa, percent, dbh_min, dbh_max)
   }
+  c(
+    apply(rows, 1, thinata),
+    fvs_YardLoss(unique(rows$YEAR))
+  )
+}
+
+fvs_ThinDBH <- function(rows) {
   thindbh <- function(row) {
     year <- row["YEAR"]
     dbh_min <- row["DBH_MIN"]
@@ -164,7 +193,7 @@ fvs_ThinDBH <- function(rows) {
   }
   c(
     apply(rows, 1, thindbh),
-    yardloss(unique(rows$YEAR))
+    fvs_YardLoss(unique(rows$YEAR))
   )
 }
 
@@ -193,6 +222,8 @@ fvs_thin <- function(rows) {
     c()
   } else if ("PRESCRIPTION" %in% names(rows)) {
     fvs_ThinPRSC(rows)
+  } else if ("TARGET_TPA" %in% names(rows)) {
+    fvs_ThinATA(rows)
   } else if ("DBH_MIN" %in% names(rows)) {
     fvs_ThinDBH(rows)
   } else {

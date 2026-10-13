@@ -1,5 +1,5 @@
 ---
-title: "14_CFICOP_BL53"
+title: "14_CFICOP_BL56"
 output: html_document
 ---
 
@@ -18,6 +18,9 @@ suppressPackageStartupMessages({
   library(targets)
   library(tarchetypes)
   library(tidyverse)
+  library(terra)
+  library(tidyterra)
+  library(ggspatial)
   library(measurements)
 })
 tar_source()
@@ -61,9 +64,9 @@ get_this_rmd_file() |>
 # run this block to pre-load them. You can then skip running ```{targets}
 # blocks.
 
-get_this_rmd_file() |>
-  tar_objects_defined_in_rmd() |>
-  tar_load()
+#get_this_rmd_file() |>
+#  tar_objects_defined_in_rmd() |>
+#  tar_load()
 
 eves_colors <- c(
   "Other" = "#B4B432",
@@ -86,7 +89,7 @@ from Massadhusetts forests.
 
 Table 1:
 
-```{r}
+```{r, eval = FALSE}
 table_1 <- tribble(
   ~Type, ~Species, ~Thousand_bd_ft, ~Pct,
   "Softwood", "White and red pine", 59722, 53,
@@ -153,7 +156,7 @@ ingrowth (saplings that become poletimber or poletimber that became
 sawtimber during 1952) was included in the net annual growth estimates
 (table 4).
 
-```{r}
+```{r, eval = FALSE}
 table_5 <- tribble(
 ~SizeClass, ~SpeciesGroup, ~AnnualCut, ~NetGrowth,
 "Sawtimber", "Softwoods", 13879, 21500,
@@ -181,7 +184,7 @@ feet of sound wood, account for one-third of the growing stock. Measured
 according to the International ¼-inch rule (which approximates lumber
 tally), this material is equivalent to about 2.7 billion board feet.
 
-```{r}
+```{r, eval = FALSE}
 table_8 <- tribble(
 ~SpeciesGroup, ~Species, ~Sawtimber, ~GrowingStock,
 # values in million board feet
@@ -236,7 +239,7 @@ mostly in watersheds and state county reservations. Another 11,300 acres
 of forest land are classed as unproductive, chiefly because of poor soil
 conditions.
 
-```{r}
+```{r, eval = FALSE}
 # Values in thousand acres
 # Area Forested 1928 includes abandoned fields and pastures coming up to brush
 # and scattered tree growth, and referred to as transition land.
@@ -258,7 +261,7 @@ table_13 <- tribble(
 )
 ```
 
-```{r}
+```{r, eval = FALSE}
 table_14 <- tribble(
 # Area is in thousand acres
 ~ForestType, ~Area,
@@ -285,7 +288,7 @@ table_14 <- tribble(
 ) 
 ```
 
-```{r}
+```{r, eval = FALSE}
 table_15 <- tribble(
   # Area is in Thousand acres
   # Sawtimber is in Million bd.ft.
@@ -327,6 +330,43 @@ five holdings are larger than 5,000 acres.
 
 Forest type definitions in the appendix.
 
+## Minimum Cutting Practice Standards
+
+Possibly from:
+
+> Massachusetts Forest Cutting Practices Act of 1943 (enacted as Chapter 539 of the Acts of 1943, codifying M.G.L. Chapter 132, §§ 40–46)
+
+These standards required:
+
+- If an area was clearcut, leave seed trees (4 - 6 thrifty, well-distributed
+seed trees per acre of commercial species at least 10-12 inches DBH), UNLESS
+adequate regeneration is already established
+- Minimum diameter cutting guides by forest type
+- Young growth protection - avoid unnecessary damage to saplings,
+poles, and seed trees
+- Slash disposal - clear back from property boundaries, public roads,
+and water bodies to minimize fire risk
+
+Minimum DBH
+
+- Eastern White Pine - 12
+
+  - Except in poor stands or dense pine-hemlock mixes, when it was 10
+  
+- Oak, Northern Hardwoods - 12 to 14
+
+  - "high value" - northern red oak, sugar maple, white ash, black cherry - it's 14
+  
+Residual Stand Density
+
+- 200 - 300 vigorous saplings and poles 2-6 dbh
+
+- guidelines "advise against" removing more thatn 35% - 50% of the
+  merchantable volume in a single partial cutting cycle
+  
+in 1982, these went from advisory to mandatory
+
+
 # MINHARV
 
 Specifies the minimum acceptable harvest standards for board-foot
@@ -351,11 +391,7 @@ The board-foot minimum for hardwood or mixed stands is TBD
 Sadly, FVS_Stats_Species only contains info for the initial stand, so we
 need to build it from the treelist.
 
-```{r}
-cficop_none_treelist <- fvs_read_output(cficop_none, "FVS_TreeList")
-```
-
-```{r}
+```{r, eval = FALSE}
 meets_or_exceeds <- cficop_none_treelist |>
   mutate(SpeciesFIA = as.integer(SpeciesFIA)) |>
   left_join(
@@ -373,7 +409,7 @@ meets_or_exceeds <- cficop_none_treelist |>
   )
 ```
 
-```{r}
+```{r, eval = FALSE}
 meets_or_exceeds |>
   filter(Year < 2021) |>
   filter(size_class == "sawtimber") |>
@@ -388,7 +424,7 @@ meets_or_exceeds |>
 
 Let's look just at white and red pine, which are preferred for harvest.
 
-```{r}
+```{r, eval = FALSE}
 meets_or_exceeds <- cficop_none_treelist |>
   mutate(SpeciesFIA = as.integer(SpeciesFIA)) |>
   left_join(
@@ -399,12 +435,22 @@ meets_or_exceeds <- cficop_none_treelist |>
   mutate(
     size_class = size_class(DBH, HARD_SOFT),
     wood_type = case_when(
-      SpeciesFIA == 125 | SpeciesFIA == 129 ~ "Red/White Pine",
+      SpeciesFIA == 125 | # Red Pine
+        SpeciesFIA == 129 ~ # Eastern White Pine
+        "Red/White Pine",
+      SpeciesFIA == 833 | # Northern Red Oak
+        SpeciesFIA == 318 | # Sugar Maple
+        SpeciesFIA == 541 | # White Ash
+        SpeciesFIA == 762 ~ # Black Cherry
+        "High-Value Hardwood",
       HARD_SOFT == "SOFTWOOD" ~ "Other Softwood",
-      .default = "Hardwood"
+      .default = "Other Hardwood"
+    ),
+    big_enough = if_else(
+      wood_type == "High-Value Hardwood", DBH >= 14, DBH >= 12
     )
   ) |>
-  filter(size_class == "sawtimber") |>
+  filter(big_enough) |>
   group_by(Year, StandID, wood_type) |>
   summarize(
     BoardFeet = sum(BdFt * TPA),
@@ -412,7 +458,7 @@ meets_or_exceeds <- cficop_none_treelist |>
   )
 ```
 
-```{r}
+```{r, eval = FALSE}
 meets_or_exceeds |>
   filter(Year < 2021) |>
   mutate(meets = BoardFeet > 1500) |>
@@ -426,7 +472,7 @@ meets_or_exceeds |>
   scale_x_continuous(breaks = seq(1970, 2020, 10))
 ```
 
-```{r}
+```{r, eval = FALSE}
 meets_or_exceeds |>
   filter(Year < 2021) |>
   mutate(meets = BoardFeet > 3000) |>
@@ -447,7 +493,7 @@ watershed, and show a capacity for 2,000+ thousand board feet
 per year (over 2 million board feet per year). At 1500 bd ft/acre,
 we can harvest 1300 acres/year without exceding sawmill capacity.
 
-```{r, echo = FALSE}
+```{r, eval = FALSE, echo = FALSE}
 knitr::include_graphics("data/images/NERS Figure 1.png")
 ```
 
@@ -455,9 +501,9 @@ knitr::include_graphics("data/images/NERS Figure 1.png")
 
 ## Plot Harvest Year
 
-```{r}
+```{r, eval = FALSE}
 plot_harvest_year <- meets_or_exceeds |>
-  filter(wood_type == "Red/White Pine") |>
+  filter(wood_type == "Red/White Pine" | wood_type == "High-Value Hardwood") |>
   filter(BoardFeet > 1500) |>
   group_by(StandID) |>
   slice_min(Year) |>
@@ -470,7 +516,7 @@ plot_harvest_year <- meets_or_exceeds |>
 
 Map all the plots, including the ones not used in this study.
 
-```{r}
+```{r, eval = FALSE}
 plots_for_map <- tblDWSPCFIPlotsComplete |>
   filter(Watershed == 1) |>
   filter(!is.na(GPSLatitude) & !is.na(GPSLongitude)) |>
@@ -499,7 +545,7 @@ plots_ext <- plots_for_map |>
 
 Download a pretty background for the map
 
-```{r}
+```{r, eval = FALSE}
 # Download tiles
 basemap_filename <- file.path(
   "data/raw/osm",
@@ -575,6 +621,7 @@ ggplot() +
   ) +
   scale_color_viridis_c(
     option = "turbo",
+    na.value = "gray75",
     begin = 0.1
   ) +
   theme_bw(base_size = 9) +
@@ -584,15 +631,15 @@ ggplot() +
   ylab("Latitude")
 ```
 
-```{r}
+```{r, eval = FALSE}
 ggsave("cfi_baseline_1957.png", dpi = 600, width = 10, units = "cm")
 ```
 
 
 ## Compare To Reality
 
-```{r}
-plots_for_map <- tblDWSPCFIPlotsComplete |>
+```{r, eval = FALSE}
+plots_for_map_reality <- tblDWSPCFIPlotsComplete |>
   filter(Watershed == 1) |>
   filter(!is.na(GPSLatitude) & !is.na(GPSLongitude)) |>
   select(MasterPlotID, lat = GPSLatitude, lon = GPSLongitude) |>
@@ -618,15 +665,11 @@ plots_for_map <- tblDWSPCFIPlotsComplete |>
   ) |>
   replace_na(list(plot_used = "Not Used")) |>
   terra::vect()
-
-plots_ext <- plots_for_map |>
-  terra::buffer(2 * 1000) |>
-  terra::ext()
-
 ```
 
 
-```{r plot grow-only plots, eval = FALSE}
+
+```{r, eval = FALSE}
 ggplot() +
   geom_spatraster_rgb(data = basemap) +
   geom_polygon(
@@ -635,7 +678,7 @@ ggplot() +
     color = "black", fill = "transparent"
   ) +
   geom_spatvector(
-    data = plots_for_map,
+    data = plots_for_map_reality,
     # Color will be the year it gets harvested in baseline
     aes(color = HarvestYear, shape = plot_used),
     size = 1.5
@@ -667,6 +710,7 @@ ggplot() +
   ) +
   scale_color_viridis_c(
     option = "turbo",
+    na.value = "gray75",
     begin = 0.1
   ) +
   theme_bw(base_size = 9) +
@@ -677,7 +721,143 @@ ggplot() +
 ```
 
 
-```{r}
+```{r, eval = FALSE}
 ggsave("cfi_actual.png", dpi = 600, width = 10, units = "cm")
+```
+
+## Plots that never make it
+
+```{r, eval = FALSE}
+plots_for_map |>
+  as.data.frame() |>
+  filter(is.na(HarvestYear))
+```
+
+First one is plot 10163
+
+```{r, eval = FALSE}
+meets_or_exceeds |>
+  filter(StandID == "10163")
+```
+
+Yeah, never makes it to the 1500 board foot high-value threshold.
+Probably these plots would be harvested if they're adjacent to a high-
+value plot and they have >1500 board feet of lower value wood.
+
+# Acres
+
+p28 "Most of these [private] ownerships--particularly those of 100 acres
+or more--can be managed for timber production with little or not conflict
+with other owner interests."
+
+So probably harvest 100 acres minimum, when they get to 1500 bd ft/acre,
+which is 150,000 bs ft per harvest (minimum).
+
+Bah, let's ignore acres for now, and just harvest plots.
+
+# Harvest Schedule
+
+Most of the harvest (THIN) keywords don't allow species to be specified,
+and I need per-species control.
+
+```{r, eval = FALSE}
+tribble(
+  ~keyword, ~species, ~description,
+  "ThinABA", "No", "Thin from Above to Basal Area",
+  "ThinATA", "No", "Thin from Above to Trees per Acre",
+  "ThinAuto", "No", "Thin Automatically",
+  "ThinBBA", "No", "Thin from Below to Basal Area",
+  "ThinBTA", "No", "Thin from Below to Trees per Acre",
+  "ThinCC", "Yes", "Thin to Canopy Cover",
+  "ThinDBH", "Yes", "Thin in DBH Range",
+  "ThinHT", "Yes", "Thin in Height Range",
+  "ThinMIST", "No", "Thin trees with dwarf Mistletoe",
+  "ThinPRSC", "N/A", "Thin by Prescription",
+  "ThinPT", "Yes", "Thin by Point",
+  "ThinQFA", "Yes", "Thin Quad-Factor Approach",
+  "ThinRDEN", "Yes", "Thin to Relative Density (Northwest variant)",
+  "ThinRDSL", "Yes", "Thin to Relative Density (Northeast variant)",
+  "ThinSDI", "Yes", "Thin to Stand Density Index"
+) |>
+  knitr::kable()
+```
+
+In general, I don't want to do priority by species - if it's a big tree
+of a preferred species, I want it removed for wood; if it's a big tree
+of a non-preferred species, I want it removed to make room for trees
+of preferred species.
+
+I think I'll go simple and ThinATA everything down to 14" DBH. I may
+need to play games to keep some trees of each species, but if CUTEFF
+is 0.5, that should happen on its own.
+
+```{targets cficop_bl56_thinata, tar_simple = TRUE}
+cficop_bl56_thinata <- cficop_none_treelist |>
+  mutate(SpeciesFIA = as.integer(SpeciesFIA)) |>
+  mutate(
+    wood_type = case_when(
+      SpeciesFIA == 125 | # Red Pine
+        SpeciesFIA == 129 ~ # Eastern White Pine
+        "Red/White Pine",
+      SpeciesFIA == 833 | # Northern Red Oak
+        SpeciesFIA == 318 | # Sugar Maple
+        SpeciesFIA == 541 | # White Ash
+        SpeciesFIA == 762 ~ # Black Cherry
+        "High-Value Hardwood",
+      .default = "Other"
+    )
+  ) |>
+  filter(wood_type == "Red/White Pine" | wood_type == "High-Value Hardwood") |>
+  # We're only harvesting 14" and bigger
+  filter(DBH >= 14) |>
+  # This finds the year when EITHER the valuable softwood or hardwood
+  # reaches 1500 bd ft / acre; it's probably valid to harvest when the
+  # COMBINED bd ft / acred reaches 1500 bd ft / acre
+  group_by(Year, StandID, wood_type) |>
+  summarize(
+    BoardFeet = sum(BdFt * TPA),
+    .groups = "drop"
+  ) |>
+  filter(BoardFeet > 1500) |>
+  group_by(StandID) |>
+  # First year over 1500 bd ft / acre is the harvest year
+  slice_min(Year) |>
+  ungroup() |>
+  mutate(MasterPlotID = as.numeric(StandID)) |>
+  select(MasterPlotID, HarvestYear = Year) |>
+  # Harvest in the HarvestYear, and 20 years later
+  mutate(
+    HarvestPlus20 = HarvestYear + 20,
+    HarvestPlus40 = HarvestYear + 40
+  ) |>
+  pivot_longer(!MasterPlotID, values_to = "HarvestYear") |>
+  select(MasterPlotID, HarvestYear) |>
+  filter(HarvestYear <= 2020) |>
+  mutate(
+    TARGET_TPA = 5, # MA Guidelines; since CUTEFF = 0.5, this can probably be 0
+    DBH_MIN = 14, # MA Guidelines
+    DBH_MAX = 999, # No upper bound
+    PERCENT = 0.5 # MA guidelines
+  ) |>
+  # For ThinATA, our schema is:
+  # STAND_CN, YEAR, TARGET_TPA, PERCENT, DBH_MIN, DBH_MAX
+  # Not Implemented: HEIGHT_MIN, HEIGHT_MAX
+  # Get STAND_CN
+  left_join(
+    cfigro_plot |>
+      filter(INV_YEAR == 1970) |>
+      select(STAND_CN, STAND_ID),
+    by = join_by(MasterPlotID == STAND_ID)
+  ) |>
+  select(
+    STAND_CN,
+    YEAR = HarvestYear,
+    TARGET_TPA,
+    PERCENT,
+    DBH_MIN,
+    DBH_MAX
+  ) |>
+  # Arrange this for humans to be able to digest
+  arrange(STAND_CN, YEAR)
 ```
 
