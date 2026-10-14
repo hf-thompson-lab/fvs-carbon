@@ -878,7 +878,7 @@ tar_target(
     fvsbin_dir <- "~/bin" # TODO: put these in a config file
     fvs_variant <- "FVSne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
-    title <- "CFICarbonOffsetProgram"
+    title <- "CFICOP"
     mgmt_id <- "BL56"
     project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
     if (!dir.exists(project_dir)) {
@@ -923,3 +923,119 @@ tar_target(
   pattern = cross(fvs_randseed, map(fvs_partition))
 )
 ```
+
+# Results
+
+## Load Results
+
+### Carbon
+
+```{targets cficop_bl56_carbon, tar_simple = TRUE}
+cficop_bl56_carbon <- fvs_read_output(cficop_bl56, "FVS_Carbon") |>
+  group_by(StandID, Year) |> # Combine results from different random seeds
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    .groups = "keep"
+  ) |>
+  ungroup()
+```
+
+### Summary
+
+```{targets cficop_bl56_summary, tar_simple = TRUE}
+cficop_bl56_summary <- fvs_read_output(cficop_bl56, "FVS_Summary2") |>
+  group_by(StandID, Year) |>
+  summarize(
+    BA = mean(BA),
+    Tpa = mean(Tpa),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+```
+
+### Cutlist
+
+```{targets cficop_bl56_cutlist, tar_simple = TRUE}
+cficop_bl56_cutlist <- fvs_read_output(cficop_bl56, "FVS_CutList") |>
+  filter(random_seed == min(random_seed))
+```
+
+## Carbon Over Time
+
+```{r cficop_bl56_carbon vs year, eval = FALSE}
+cficop_bl56_carbon |>
+  mutate(Series = paste0("1956 Baseline, n=", n_distinct(StandID))) |>
+  union_all(
+    cficop_srvy_carbon |>
+      mutate(Series = paste0("Actual, n=", n_distinct(StandID)))
+  ) |>
+  union_all(
+    cficop_hvst_carbon |>
+      mutate(Series = paste0("IFM, n=", n_distinct(StandID)))
+  ) |>
+  union_all(
+    cficop_dflt_carbon |>
+      mutate(Series = paste0("Default, n=", n_distinct(StandID)))
+  ) |>
+  mutate(Year = as.character(Year)) |>
+  ggplot(aes(Year, Aboveground_Total_Live, fill = Series)) +
+  geom_boxplot(outlier.size = 0.5) +
+  theme_bw() +
+  ggtitle("CFI 1956 Baseline") +
+  ylab(bquote("Aboveground Live Carbon " ~ (`Mg C` %.% hectare^-1)))
+```
+
+## Scenario Plots
+
+I use this a lot; capture it as a thing:
+
+```{r cficop_bl56_carbon_cmp, eval = FALSE}
+cficop_bl56_carbon_cmp <- cficop_bl56_carbon |>
+  mutate(name = "1956 Baseline", method = "Projected") |>
+  union_all(
+    cficop_dflt_carbon |>
+      mutate(name = "Default", method = "Projected")
+  ) |>
+  union_all(
+    cficop_srvy_carbon |>
+      mutate(name = "Actual", method = "Measured")
+  ) |>
+  union_all(
+    cficop_hvst_carbon |>
+      mutate(name = "IFM", method = "Projected")
+  ) |>
+  rename(
+    value = Aboveground_Total_Live
+  )
+
+cficop_bl56_carbon_cmp_summary <- cficop_bl56_carbon_cmp |>
+  group_by(Year, name, method) |>
+  summarize(
+    n = n(),
+    mean = mean(value, na.rm = TRUE),
+    ymin = mean(value, na.rm = TRUE) - 1.96 * sd(value) / sqrt(n),
+    ymax = mean(value, na.rm = TRUE) + 1.96 * sd(value) / sqrt(n),
+    .groups = "drop"
+  )
+```
+
+```{r, eval = FALSE}
+cficop_bl56_carbon_cmp_summary |>
+  ggplot(aes(Year, mean, color = name)) +
+  geom_line(aes(linetype = method)) +
+  geom_point() +
+  theme_bw(base_size = 14) +
+  theme(aspect.ratio = 1) +
+  scale_linetype_manual(
+    name = "Method",
+    values = c("Projected" = "dashed", "Measured" = "solid"),
+    guide = guide_legend(order = 2)
+  ) +
+  scale_y_continuous(limits = c(48, 150)) +
+  labs(
+    title = "Projected vs. Measured Carbon"
+  ) +
+  xlab("Year") +
+  ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
+```
+

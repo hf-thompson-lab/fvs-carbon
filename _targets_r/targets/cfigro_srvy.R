@@ -33,7 +33,7 @@ tar_target(
     fvsbin_dir <- "~/bin" # TODO: put these in a config file
     fvs_variant <- "FVSne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
-    title <- "CFIGrowOnly"
+    title <- "CFIGRO"
     mgmt_id <- "SRVY"
 
     # We communicate with FVS through files. FVSOnline shows a model in which

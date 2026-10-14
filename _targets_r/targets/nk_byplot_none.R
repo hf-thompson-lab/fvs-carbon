@@ -2,7 +2,7 @@ tar_target(nk_byplot_none, {
   fvsbin_dir <- "~/bin" # TODO: put these in a config file
   fvs_variant <- "FVSne"      # TODO: put these in a config file
   data_dir <- "data/fvs"
-  title <- "NKByPlot"
+  title <- "NKPLOT"
   mgmt_id <- "NONE"
   
   # We communicate with FVS through files. FVSOnline shows a model in which

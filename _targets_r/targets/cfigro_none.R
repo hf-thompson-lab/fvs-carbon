@@ -12,7 +12,7 @@ tar_target(
     fvsbin_dir <- "~/bin" # TODO: put these in a config file
     fvs_variant <- "FVSne"      # TODO: put these in a config file
     data_dir <- "data/fvs"
-    title <- "CFIGrowOnly"
+    title <- "CFIGRO"
     mgmt_id <- "NONE"
     project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
     if (!dir.exists(project_dir)) {
