@@ -25,9 +25,9 @@ tar_target(cficop_bl56_thinata, {
       BoardFeet = sum(BdFt * TPA),
       .groups = "drop"
     ) |>
-    filter(BoardFeet > 1500) |>
+    filter(BoardFeet > 3000) |>
     group_by(StandID) |>
-    # First year over 1500 bd ft / acre is the harvest year
+    # First year over 3000 bd ft / acre is the harvest year
     slice_min(Year) |>
     ungroup() |>
     mutate(MasterPlotID = as.numeric(StandID)) |>
@@ -41,10 +41,10 @@ tar_target(cficop_bl56_thinata, {
     select(MasterPlotID, HarvestYear) |>
     filter(HarvestYear <= 2020) |>
     mutate(
-      TARGET_TPA = 5, # MA Guidelines; since CUTEFF = 0.5, this can probably be 0
+      TARGET_TPA = 0, # MA Guidelines say 5 per species; since CUTEFF = 0.5, this can be 0
+      PERCENT = 0.5, # MA guidelines
       DBH_MIN = 14, # MA Guidelines
-      DBH_MAX = 999, # No upper bound
-      PERCENT = 0.5 # MA guidelines
+      DBH_MAX = 999 # No upper bound
     ) |>
     # For ThinATA, our schema is:
     # STAND_CN, YEAR, TARGET_TPA, PERCENT, DBH_MIN, DBH_MAX
