@@ -674,14 +674,15 @@ fvs_run <- function(
     random_seed = random_seed
   )
 
-  # Return the name of the keyword file and output database
-  fvs <- processx::process$new(
-    file.path(normalizePath(fvsbin_dir), fvs_variant),
-    paste0("--keywordfile=", basename(fvs_keyword_filename)),
+  # Do the actual running
+  fvs <- processx::run(
+    command = file.path(normalizePath(fvsbin_dir), fvs_variant),
+    args = paste0("--keywordfile=", basename(fvs_keyword_filename)),
+    error_on_status = FALSE,
     wd = dirname(fvs_keyword_filename)
   )
-  fvs$wait()
 
+  # Return the name of the keyword file and output database
   tibble::tibble(
     title = title,
     mgmt_id = mgmt_id,
@@ -701,7 +702,9 @@ fvs_run <- function(
     } else {
       NA
     },
-    exit_status = fvs$get_exit_status(),
+    exit_status = fvs$status,
+    stdout = fvs$stdout,
+    stderr = fvs$stderr,
     output = fvs_output_filename,
     keyword_file = fvs_keyword_filename,
     input_db = fvs_input_db,
