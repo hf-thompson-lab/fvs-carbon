@@ -35,18 +35,12 @@ tar_load(fvs_num_partitions)
 tar_load(fvs_partition)
 tar_load(fvs_randseed)
 tar_load(fvsne_states)
-tar_load(cfigro_bai_model)
-tar_load(cfigro_estab)
-tar_load(cfigro_none_growth)
-tar_load(cficop_estab)
-tar_load(cficop_dflt_estab)
 
-## Preload everything from 11_CFIGrowOnly.Rmd ----
-
-get_this_rmd_file() |>
-  str_replace(basename(get_this_rmd_file()), "11_CFIGrowOnly.Rmd") |>
+normalizePath("10_CFIGRO.Rmd") |>
   tar_objects_defined_in_rmd() |>
   tar_load()
+
+tar_load(cficop_dflt_estab)
 
 ## Preload targets results from this document ----
 
@@ -329,7 +323,7 @@ cficop_hvst_observed_remainders <- qryDWSPCFIPlotVisitTreeDetail |>
     # Judgment: basal_area intended to be left in harvest is better
     # represented by ba PRIOR to harvest, than POST harvest. We don't
     # have BA at the time of harvest, which would be ideal.
-    basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi
+    basal_area = (conv_unit(coalesce(dbh_prior, dbhcm), "cm", "m") / 2)^2 * pi
   )
 ```
 
@@ -357,6 +351,7 @@ cficop_hvst_observed_remainders |>
   geom_boxplot(outlier.size = 0.1) +
   coord_cartesian(ylim = c(0, 2)) +
   theme_bw() +
+  scale_fill_manual(values = eves_colors) +
   ggtitle("CFI Observed Remainders (BA Per Plot)") +
   ylab(bquote("Harvested BA" ~ (m^2))) +
   xlab("Visit Cycle (Number of Plots Harvested)")
@@ -385,6 +380,7 @@ cficop_hvst_observed_remainders |>
   geom_boxplot(outlier.size = 0.1) +
   theme_bw() +
   scale_y_continuous(transform = "log10") +
+  scale_fill_manual(values = eves_colors) +
   ggtitle("CFI Observed Remainders (TPA Per Plot)") +
   ylab(bquote("Harvested TPA" ~ (trees %.% acre^-1))) +
   xlab("Visit Cycle (Number of Plots Harvested)")
@@ -674,6 +670,11 @@ possible to align actual trees in 2" diameter classes with projected
 trees in 2" diameter classes over several decades, so we use much wider
 5" diameter classes to align more actual harvest with simulated harvest.
 
+##** TODO Nik:
+
+* Adding 10 years to the harvest makes it line up better; why?
+* It's still earlier than observed, why?
+
 ```{targets cficop_hvst_tpa, tar_simple = TRUE}
 # Find the trees left after each harvest
 cficop_hvst_tpa <- cficop_hvst_observed_remainders |>
@@ -694,7 +695,8 @@ cficop_hvst_tpa <- cficop_hvst_observed_remainders |>
     DBH_MIN > 0
   ) |>
   mutate(
-    HarvestYear = coalesce(HarvestYear.x, HarvestYear.y),
+    # HACK: Adding 10 years to harvest makes it line up better with observed
+    HarvestYear = coalesce(HarvestYear.x, HarvestYear.y) + 10,
     DBH_MAX = DBH_MIN + 5,
     # Harvests added by the full_join will nave TPA==NA;
     # there were not trees of this species left in this size range,

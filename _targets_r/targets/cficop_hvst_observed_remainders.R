@@ -34,6 +34,6 @@ tar_target(cficop_hvst_observed_remainders, {
       # Judgment: basal_area intended to be left in harvest is better
       # represented by ba PRIOR to harvest, than POST harvest. We don't
       # have BA at the time of harvest, which would be ideal.
-      basal_area = (conv_unit(dbh_prior, "cm", "m") / 2)^2 * pi
+      basal_area = (conv_unit(coalesce(dbh_prior, dbhcm), "cm", "m") / 2)^2 * pi
     )
 })
