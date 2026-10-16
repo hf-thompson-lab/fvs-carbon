@@ -64,9 +64,9 @@ get_this_rmd_file() |>
 # run this block to pre-load them. You can then skip running ```{targets}
 # blocks.
 
-#get_this_rmd_file() |>
-#  tar_objects_defined_in_rmd() |>
-#  tar_load()
+get_this_rmd_file() |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
 
 eves_colors <- c(
   "Other" = "#B4B432",
@@ -960,6 +960,113 @@ cficop_bl56_cutlist <- fvs_read_output(cficop_bl56, "FVS_CutList") |>
   filter(random_seed == min(random_seed))
 ```
 
+## Harvest
+
+### Trees by Year
+
+```{r, eval = FALSE}
+observed_harvest <- cficop_hvst_observed_harvest |>
+  group_by(GENUS, VisitCycle) |>
+  summarize(
+    Observed = n() * 5, # TPA
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  select(GENUS, VisitCycle, Observed)
+
+bl56_harvest <- cficop_bl56_cutlist |>
+  mutate(
+    # CAVEAT:
+    # FVS Cuts trees in year 0 of a cycle;
+    # CFI VisitCycle is year 10 of a cycle
+    # Therefore FVS year cut is CFI VisitCycle - 10
+    VisitCycle = Year
+  ) |>
+  left_join(
+    species_crosswalk |> select(FVS_SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SpeciesFVS == FVS_SPCD)
+  ) |>
+  group_by(GENUS, VisitCycle) |>
+  summarize(
+    `1956 Baseline` = sum(TPA, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  select(GENUS, VisitCycle, `1956 Baseline`)
+
+observed_harvest |>
+  full_join(
+    bl56_harvest,
+    by = join_by(GENUS, VisitCycle)
+  ) |>
+  filter(GENUS %in% c("Acer", "Betula", "Fraxinus", "Pinus", "Quercus", "Tsuga")) |>
+  pivot_longer(cols = c(Observed, `1956 Baseline`)) |>
+  replace_na(list(value = 0)) |>
+  mutate(Year = sprintf("%d", VisitCycle)) |>
+  mutate(value = if_else(value == 0, 1, value)) |>
+  ggplot(aes(Year, value, fill = name)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~GENUS) +
+  theme_bw() +
+  ggtitle("Baseline Vs Observed Trees Harvested") +
+  ylab("Number of Trees Harvested") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1))
+
+```
+
+### BA by Year
+
+
+```{r, eval = FALSE}
+observed_harvest <- cficop_hvst_observed_harvest |>
+  group_by(GENUS, VisitCycle) |>
+  summarize(
+    Observed = sum(basal_area * 5), # m^2 / acre
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  select(GENUS, VisitCycle, Observed)
+
+bl56_harvest <- cficop_bl56_cutlist |>
+  mutate(
+    basal_area = pi * (conv_unit(DBH, "in", "m") / 2)^2,
+    # CAVEAT:
+    # FVS Cuts trees in year 0 of a cycle;
+    # CFI VisitCycle is year 10 of a cycle
+    # Therefore FVS year cut is CFI VisitCycle - 10
+    VisitCycle = Year
+  ) |>
+  left_join(
+    species_crosswalk |> select(FVS_SPCD, GENUS, SPECIES, COMMON_NAME),
+    by = join_by(SpeciesFVS == FVS_SPCD)
+  ) |>
+  group_by(GENUS, VisitCycle) |>
+  summarize(
+    `1956 Baseline` = sum(basal_area * TPA, na.rm = TRUE),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  select(GENUS, VisitCycle, `1956 Baseline`)
+
+observed_harvest |>
+  full_join(
+    bl56_harvest,
+    by = join_by(GENUS, VisitCycle)
+  ) |>
+  filter(GENUS %in% c("Acer", "Betula", "Fraxinus", "Pinus", "Quercus", "Tsuga")) |>
+  pivot_longer(cols = c(Observed, `1956 Baseline`)) |>
+  replace_na(list(value = 0)) |>
+  mutate(Year = sprintf("%d", VisitCycle)) |>
+  mutate(value = if_else(value == 0, 1, value)) |>
+  ggplot(aes(Year, value, fill = name)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~GENUS) +
+  theme_bw() +
+  ggtitle("Baseline Vs Observed Basal Area Harvested") +
+  ylab(bquote("Basal Area Harvested" ~(m^2))) +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1))
+```
+
 ## Carbon Over Time
 
 ```{r cficop_bl56_carbon vs year, eval = FALSE}
@@ -1002,7 +1109,25 @@ cficop_bl56_carbon_cmp <- cficop_bl56_carbon |>
   ) |>
   union_all(
     cficop_hvst_carbon |>
-      mutate(name = "IFM", method = "Projected")
+      mutate(name = "Actual (Modeled)", method = "Projected")
+  ) |>
+  union_all(
+    cficop_none_bai |>
+      select(StandID, Starting_Carbon, Projected_Carbon, Adjusted_AGLCF) |>
+      group_by(StandID) |>
+      summarize(
+        Starting_Carbon = min(Starting_Carbon, na.rm = TRUE),
+        Adjusted_AGLCF = mean(Adjusted_AGLCF, na.rm = TRUE),
+        .groups = "drop"
+      ) |>
+      cross_join(
+        tibble(Year = seq(1970, 2020, 10))
+      ) |>
+      mutate(
+        Aboveground_Total_Live = Starting_Carbon + Adjusted_AGLCF * (Year - 1970)
+      ) |>
+      select(StandID, Year, Aboveground_Total_Live) |>
+      mutate(name = "Best Estimate", method = "Projected")
   ) |>
   rename(
     value = Aboveground_Total_Live
@@ -1019,21 +1144,72 @@ cficop_bl56_carbon_cmp_summary <- cficop_bl56_carbon_cmp |>
   )
 ```
 
+### IFM vs Baseline
+
 ```{r, eval = FALSE}
 cficop_bl56_carbon_cmp_summary |>
+  filter(name %in% c("1956 Baseline", "Actual (Modeled)", "Actual")) |>
   ggplot(aes(Year, mean, color = name)) +
   geom_line(aes(linetype = method)) +
   geom_point() +
   theme_bw(base_size = 14) +
   theme(aspect.ratio = 1) +
   scale_linetype_manual(
-    name = "Method",
+    name = NULL,
     values = c("Projected" = "dashed", "Measured" = "solid"),
     guide = guide_legend(order = 2)
   ) +
-  scale_y_continuous(limits = c(48, 150)) +
+  coord_cartesian(ylim = c(45, 150)) +
   labs(
-    title = "Projected vs. Measured Carbon"
+    title = "Quabbin CFI Carbon Projection",
+    color = NULL
+  ) +
+  xlab("Year") +
+  ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
+```
+
+#### First 5 Stands
+
+```{r}
+cficop_bl56_carbon_cmp |>
+  filter(name %in% c("Actual (Modeled)", "Actual")) |>
+  # slice_min(order_by = StandID, n = 3 * 6 * 2) |>
+  filter(StandID %in% base::sample(cfigro_plot$STAND_ID, 3)) |>
+  ggplot(aes(Year, value, color = StandID)) +
+  geom_line(aes(linetype = name)) +
+  geom_point() +
+  theme_bw(base_size = 14) +
+  theme(aspect.ratio = 1) +
+#  coord_cartesian(ylim = c(45, 150)) +
+  labs(
+    title = "Quabbin CFI Carbon Projection",
+    linetype = NULL
+  ) +
+  xlab("Year") +
+  ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
+```
+
+
+### No Harvest vs Baseline
+
+
+```{r, eval = FALSE}
+cficop_bl56_carbon_cmp_summary |>
+  filter(name %in% c("1956 Baseline", "Default", "Best Estimate")) |>
+  ggplot(aes(Year, mean, color = name)) +
+  geom_line(aes(linetype = method)) +
+  geom_point() +
+  theme_bw(base_size = 14) +
+  theme(aspect.ratio = 1) +
+  scale_linetype_manual(
+    name = NULL,
+    values = c("Projected" = "dashed", "Measured" = "solid"),
+    guide = guide_legend(order = 2)
+  ) +
+  coord_cartesian(ylim = c(45, 150)) +
+  labs(
+    title = "Quabbin CFI Carbon Projection",
+    color = NULL
   ) +
   xlab("Year") +
   ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
