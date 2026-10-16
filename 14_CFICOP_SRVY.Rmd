@@ -1,5 +1,5 @@
 ---
-title: "12_CFICOP"
+title: "CFICOP_SRVY"
 output: html_document
 ---
 
@@ -32,13 +32,7 @@ tar_load(fvs_partition)
 tar_load(fvs_randseed)
 tar_load(fvsne_states)
 
-get_this_rmd_file() |>
-  str_replace(basename(get_this_rmd_file()), "10_CFIGRO.Rmd") |>
-  tar_objects_defined_in_rmd() |>
-  tar_load()
-
-get_this_rmd_file() |>
-  str_replace(basename(get_this_rmd_file()), "11_CFICOP_NONE.Rmd") |>
+normalizePath("10_CFIGRO.Rmd") |>
   tar_objects_defined_in_rmd() |>
   tar_load()
 
@@ -49,23 +43,6 @@ get_this_rmd_file() |>
 get_this_rmd_file() |>
   tar_objects_defined_in_rmd() |>
   tar_load()
-
-## Eve's Colors ----
-
-#colors1 <- c("indianred3", "chocolate2", "goldenrod2", "yellow3", "olivedrab")
-eves_colors <- c(
-  "Other" = "#B4B432",
-  "Fraxinus" = "#CD5C5C",
-  "Betula" = "#8B4513",
-  "Tsuga" = "#5F9EA0",
-  "Acer" = "#DEB887",
-  "Pinus" = "#556B2F",
-  "Quercus" = "#D2691E"
-)
-#colors3 <- c("darkorange4", "goldenrod3", "darkolivegreen")
-
-## My Colors ----
-series_colors <- RColorBrewer::brewer.pal(5, "Set1")
 ```
 
 # CFICOP_SRVY

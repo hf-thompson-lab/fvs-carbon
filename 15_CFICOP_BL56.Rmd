@@ -1,5 +1,5 @@
 ---
-title: "14_CFICOP_BL56"
+title: "CFICOP_BL56"
 output: html_document
 ---
 
@@ -32,29 +32,24 @@ tar_load(species_crosswalk)
 tar_load(fvs_num_partitions)
 tar_load(fvs_partition)
 tar_load(fvs_randseed)
-tar_load(cfigro_estab)
-tar_load(cfigro_none_growth)
-tar_load(cficop_estab)
-tar_load(cficop_dflt_estab)
 
-## Preload everything from 11_CFIGrowOnly.Rmd ----
-
-get_this_rmd_file() |>
-  str_replace(basename(get_this_rmd_file()), "11_CFIGrowOnly.Rmd") |>
+normalizePath("10_CFIGRO.Rmd") |>
   tar_objects_defined_in_rmd() |>
   tar_load()
 
-## Preload everything from 12_CFICOP.Rmd ----
-
-get_this_rmd_file() |>
-  str_replace(basename(get_this_rmd_file()), "12_CFICOP.Rmd") |>
+normalizePath("11_CFICOP_NONE.Rmd") |>
   tar_objects_defined_in_rmd() |>
   tar_load()
 
-## Preload everything from 13_CFICOP_HVST.Rmd ----
+normalizePath("12_CFICOP_DFLT.Rmd") |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
 
-get_this_rmd_file() |>
-  str_replace(basename(get_this_rmd_file()), "13_CFICOP_HVST.Rmd") |>
+normalizePath("13_CFICOP_HVST.Rmd") |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+
+normalizePath("14_CFICOP_SRVY.Rmd") |>
   tar_objects_defined_in_rmd() |>
   tar_load()
 
@@ -67,24 +62,14 @@ get_this_rmd_file() |>
 get_this_rmd_file() |>
   tar_objects_defined_in_rmd() |>
   tar_load()
-
-eves_colors <- c(
-  "Other" = "#B4B432",
-  "Fraxinus" = "#CD5C5C",
-  "Betula" = "#8B4513",
-  "Tsuga" = "#5F9EA0",
-  "Acer" = "#DEB887",
-  "Pinus" = "#556B2F",
-  "Quercus" = "#D2691E"
-)
 ```
 
 # Context
 
 Timber use in MA steady for 20yr prior to 1950
 
-I n 1952, almost 21 million cubic f e e t of i n d u s t r i a l timber
-products and almost 9 m i l l i o n cubic f e e t of fuelwood were c u t
+I n 1952, almost 21 million cubic feet of industrial timber
+products and almost 9 million cubic feet of fuelwood were cut
 from Massadhusetts forests.
 
 Table 1:
@@ -1170,7 +1155,7 @@ cficop_bl56_carbon_cmp_summary |>
 
 #### First 5 Stands
 
-```{r}
+```{r, eval = FALSE}
 cficop_bl56_carbon_cmp |>
   filter(name %in% c("Actual (Modeled)", "Actual")) |>
   # slice_min(order_by = StandID, n = 3 * 6 * 2) |>

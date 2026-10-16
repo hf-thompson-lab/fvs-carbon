@@ -1,5 +1,5 @@
 ---
-title: "12_CFICOP"
+title: "CFICOP_NONE"
 output: html_document
 ---
 
@@ -31,9 +31,6 @@ tar_load(fvs_num_partitions)
 tar_load(fvs_partition)
 tar_load(fvs_randseed)
 tar_load(fvsne_states)
-tar_load(cfigro_bai_model)
-tar_load(cfigro_estab)
-tar_load(cfigro_none_growth)
 
 normalizePath("10_CFIGRO.Rmd") |>
   tar_objects_defined_in_rmd() |>
