@@ -1,7 +1,7 @@
 tar_target(cfigro_estab, {
   cycle_length <- 10
   plots_per_acre <- 5
-  survey_period <- 50
+  survey_period <- 30 # 1990 - 2020
   minimum_sane_height_for_a_5inch_dbh_tree <- 10
   
   # Trees to use for modeling height estimation
@@ -27,9 +27,14 @@ tar_target(cfigro_estab, {
     group_by(SpeciesCode) |>
     mutate(SPECIES_MIN_HT = min(VisitTreeTotalHeight, na.rm = TRUE), .groups = "keep") |>
     ungroup() |>
+    # 1970 and 1980 have huge influxes of trees that we're dealing with
+    # separately, so don't double count those.
+    # filter recruits to after 1980.
+    filter(VisitCycle >= 1990) |>
     group_by(MasterPlotID, SpeciesCode) |>
     summarize(
-      DENSITY = n() * plots_per_acre * cycle_length / survey_period, # Stems per acre per 10-year interval
+      # Stems per acre per 10-year interval
+      DENSITY = n() * plots_per_acre * cycle_length / survey_period,
       HEIGHT = min(VisitTreeTotalHeight, na.rm = TRUE),
       SPECIES_MIN_HT = min(SPECIES_MIN_HT)
     ) |>

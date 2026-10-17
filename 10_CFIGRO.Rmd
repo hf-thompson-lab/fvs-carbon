@@ -1,5 +1,5 @@
 ---
-title: "10_CFIGRO"
+title: "CFIGRO"
 output: html_document
 ---
 
@@ -17,10 +17,11 @@ suppressPackageStartupMessages({
   library(ggpmisc) # for stat_poly_eq
 })
 tar_source()
+```
 
+Preload targets results
 
-## Load targets results from other documents
-
+```{r preload, eval = FALSE}
 tar_load(fiadb)
 tar_load(fvsne_states)
 tar_load(species_crosswalk)
@@ -32,13 +33,27 @@ tar_load(fvs_partition)
 tar_load(fvs_randseed)
 tar_load(nrsres_model)
 
-## Preload targets results from this document
-
 get_this_rmd_file() |>
   tar_objects_defined_in_rmd() |>
   tar_load()
 ```
 
+# Intro
+
+CFIGRO - best-effort to model undisturbed CFI plots.
+
+This model uses:
+
+* Actual 1970 trees
+* Actual establishment in 1980 and beyond
+* Actual mortality and ingrowth for calibrations
+
+Plots that are harvested or disturbed are excluded. This leaves 31 plots.
+
+Management strategies:
+
+* NONE - no disturbance
+* SRVY - runs FVS for a 1-year timestep on each survey to get its interpretation of biomass, carbon, etc.
 
 # Stands
 
@@ -1177,7 +1192,7 @@ CFI Terrain Position:
 There are some species in CFI that FVS doesn't handle; make a
 substitution table.
 
-```{r}
+```{r, eval = FALSE}
 tblDWSPCFITreesComplete |>
   distinct(SpeciesCode) |>
   mutate(SpeciesCode = replace_values(
@@ -1205,6 +1220,7 @@ Substitutions:
   - No other species in this genus
 - Unknown tree
   - No information to go on
+
 
 ## Trees for FVS
 
@@ -1447,7 +1463,7 @@ for individual trees in the regen table.
 ```{targets cfigro_estab, tar_simple = TRUE}
 cycle_length <- 10
 plots_per_acre <- 5
-survey_period <- 50
+survey_period <- 30 # 1990 - 2020
 minimum_sane_height_for_a_5inch_dbh_tree <- 10
 
 # Trees to use for modeling height estimation
@@ -1473,9 +1489,14 @@ qryDWSPCFIPlotVisitTreeDetail |>
   group_by(SpeciesCode) |>
   mutate(SPECIES_MIN_HT = min(VisitTreeTotalHeight, na.rm = TRUE), .groups = "keep") |>
   ungroup() |>
+  # 1970 and 1980 have huge influxes of trees that we're dealing with
+  # separately, so don't double count those.
+  # filter recruits to after 1980.
+  filter(VisitCycle >= 1990) |>
   group_by(MasterPlotID, SpeciesCode) |>
   summarize(
-    DENSITY = n() * plots_per_acre * cycle_length / survey_period, # Stems per acre per 10-year interval
+    # Stems per acre per 10-year interval
+    DENSITY = n() * plots_per_acre * cycle_length / survey_period,
     HEIGHT = min(VisitTreeTotalHeight, na.rm = TRUE),
     SPECIES_MIN_HT = min(SPECIES_MIN_HT)
   ) |>
