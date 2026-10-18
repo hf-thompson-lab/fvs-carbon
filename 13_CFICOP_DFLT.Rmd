@@ -48,9 +48,10 @@ normalizePath("10_CFIGRO.Rmd") |>
   tar_objects_defined_in_rmd() |>
   tar_load()
 
-normalizePath("11_CFICOP_NONE.Rmd") |>
-  tar_objects_defined_in_rmd() |>
-  tar_load()
+tar_load(cficop_none)
+tar_load(cficop_none_carbon)
+
+tar_load(cficop_srvy_carbon)
 
 get_this_rmd_file() |>
   tar_objects_defined_in_rmd() |>
@@ -456,7 +457,7 @@ tar_target(
 )
 ```
 
-## Load Results
+# Load Results
 
 Carbon
 
@@ -483,3 +484,87 @@ fvs_read_output(cficop_dflt, "FVS_Summary2") |>
   ungroup()
 ```
 
+# Compare
+
+How does default compare to NONE and SRVY?
+
+
+```{r cficop_dflt_carbon_cmp, eval = FALSE}
+cficop_dflt_carbon_cmp <- cficop_dflt_carbon |>
+  mutate(name = "DFLT", method = "Projected") |>
+  union_all(
+    cficop_none_carbon |>
+      mutate(name = "NONE", method = "Projected")
+  ) |>
+  union_all(
+    cficop_srvy_carbon |>
+      mutate(name = "SRVY", method = "Measured")
+  ) |>
+  union_all(
+    cficop_none_bai |>
+      select(StandID, Starting_Carbon, Projected_Carbon, Adjusted_AGLCF) |>
+      group_by(StandID) |>
+      summarize(
+        Starting_Carbon = min(Starting_Carbon, na.rm = TRUE),
+        Adjusted_AGLCF = mean(Adjusted_AGLCF, na.rm = TRUE),
+        .groups = "drop"
+      ) |>
+      cross_join(
+        tibble(Year = seq(1970, 2020, 10))
+      ) |>
+      mutate(
+        Aboveground_Total_Live = Starting_Carbon + Adjusted_AGLCF * (Year - 1970)
+      ) |>
+      select(StandID, Year, Aboveground_Total_Live) |>
+      mutate(name = "Best Estimate", method = "Projected")
+  ) |>
+  rename(
+    value = Aboveground_Total_Live
+  )
+
+cficop_dflt_carbon_cmp_summary <- cficop_dflt_carbon_cmp |>
+  group_by(Year, name, method) |>
+  summarize(
+    n = n(),
+    mean = mean(value, na.rm = TRUE),
+    ymin = mean(value, na.rm = TRUE) - 1.96 * sd(value) / sqrt(n),
+    ymax = mean(value, na.rm = TRUE) + 1.96 * sd(value) / sqrt(n),
+    .groups = "drop"
+  )
+```
+
+
+## Boxplot
+
+```{r cficop_dflt_carbon vs year, eval = FALSE}
+ cficop_dflt_carbon_cmp |>
+  mutate(group = paste(Year, name)) |>
+  ggplot(aes(Year, value, fill = name, group = group)) +
+  geom_boxplot(outlier.size = 0.5) +
+  theme_bw() +
+  ggtitle("CFI Carbon Compare") +
+  ylab(bquote("Aboveground Live Carbon " ~ (`Mg C` %.% hectare^-1)))
+```
+
+### Mean Lines
+
+```{r, eval = FALSE}
+cficop_dflt_carbon_cmp_summary |>
+  ggplot(aes(Year, mean, color = name)) +
+  geom_line(aes(linetype = method)) +
+  geom_point() +
+  theme_bw(base_size = 14) +
+  theme(aspect.ratio = 1) +
+  scale_linetype_manual(
+    name = NULL,
+    values = c("Projected" = "dashed", "Measured" = "solid"),
+    guide = guide_legend(order = 2)
+  ) +
+  coord_cartesian(ylim = c(45, 150)) +
+  labs(
+    title = "Quabbin CFI Carbon Projection",
+    color = NULL
+  ) +
+  xlab("Year") +
+  ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
+```
