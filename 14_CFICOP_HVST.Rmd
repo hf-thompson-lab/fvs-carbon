@@ -523,6 +523,7 @@ cficop_hvst_estab_1980 <- qryDWSPCFIPlotVisitTreeDetail |>
   )
 ```
 
+
 ## Post-Harvest Establishment
 
 It can take a while for post-harvest trees to reach establishment
@@ -631,9 +632,9 @@ cficop_hvst_estab <- cficop_dflt_estab |>
     STAND_ID = NA,
     HEIGHT = 0
   ) |>
-  union_all(
-    cficop_hvst_estab_1980
-  ) |>
+#  union_all(
+#    cficop_hvst_estab_1980
+#  ) |>
   union_all(
     cficop_hvst_estab_post_harvest
   )
@@ -785,8 +786,7 @@ tar_target(
           # microplots
           INV_PLOT_SIZE = 385/4
         ),
-      trees = cfigro_trees |>
-        filter(DIAMETER > 0),
+      trees = cficop_hvst_trees,
       regen = cficop_hvst_estab,
       harvest = cficop_hvst_tpa,
       num_partitions = fvs_num_partitions,
