@@ -38,7 +38,13 @@ tar_load(fvs_partition)
 tar_load(fvs_randseed)
 tar_load(fvsne_states)
 
+normalizePath("10_CFIGRO.Rmd") |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
 
+tar_load(cficop_none_bai)
+tar_load(cficop_dflt_carbon)
+tar_load(cficop_srvy_carbon)
 
 get_this_rmd_file() |>
   tar_objects_defined_in_rmd() |>
@@ -573,10 +579,10 @@ possible to align actual trees in 2" diameter classes with projected
 trees in 2" diameter classes over several decades, so we use much wider
 5" diameter classes to align more actual harvest with simulated harvest.
 
-## ** TODO Nik:
-
-* Adding 10 years to the harvest makes it line up better; why?
-* It's still earlier than observed, why?
+Note that FVS says "all stand thinning requests scheduled within a
+cycle occur at the beginning of the cycle"; therefore, a thinning
+request requested for 1979 will be done in 1970, unless there is a
+cycle break at 1979.
 
 ```{targets cficop_hvst_tpa, tar_simple = TRUE}
 # Find the trees left after each harvest
@@ -598,8 +604,7 @@ cficop_hvst_tpa <- cficop_hvst_observed_remainders |>
     DBH_MIN > 0
   ) |>
   mutate(
-    # HACK: Adding 10 years to harvest makes it line up better with observed
-    HarvestYear = coalesce(HarvestYear.x, HarvestYear.y) + 10,
+    HarvestYear = coalesce(HarvestYear.x, HarvestYear.y),
     DBH_MAX = DBH_MIN + 5,
     # Harvests added by the full_join will nave TPA==NA;
     # there were not trees of this species left in this size range,
@@ -799,7 +804,13 @@ not used by the NE variant.
 
 ## Harvest Directives
 
-FVS will cancel a harvest if it can't meet the target.
+FVS will cancel a harvest if it can't meet the target, for example,
+if we're harvesting down to 5 TPA but there are <5TPA in the stand.
+
+Many of the harvest directives we issue go down to 0 TPA, because
+a species was harvested and we detected 0 TPA post-harvest in the
+plot, but we don't filter out cases where there were no trees in the
+DBH range before the harvest.
 
 How many THINDBH directives did we give?
 
@@ -839,7 +850,7 @@ cficop_hvst_directives |>
   nrow()
 ```
 
-> 1161
+> 1080
 
 ## Canceled Harvest
 
@@ -849,10 +860,9 @@ cficop_hvst_directives |>
   nrow()
 ```
 
-> 341
+> 340
 
-that's about 30% of harvest is deleted or canceled.
-
+that's about 31% of harvest is deleted or canceled.
 
 # Results
 
@@ -890,7 +900,12 @@ fvs_read_output(cficop_hvst, "FVS_CutList") |>
   filter(random_seed == min(random_seed))
 ```
 
-## Projected vs Observed TPA
+# Analysis
+
+
+## Projected vs Observed BA
+
+It's not clear that this analysis is useful.
 
 ```{r, eval = FALSE}
 observed_trees <- qryDWSPCFIPlotVisitTreeDetail |>
@@ -901,21 +916,27 @@ observed_trees <- qryDWSPCFIPlotVisitTreeDetail |>
   filter(cfi_status_live(VisitTreeStatusCode)) |>
   mutate(
     Scenario = "Observed",
-    MasterPlotID = as.character(MasterPlotID)
+    MasterPlotID = as.character(MasterPlotID),
+    # FVS Basal Area is in square feet per acre
+    basal_area = pi * (conv_unit(dbhcm, "cm", "ft") / 2)^2
   ) |>
   group_by(MasterPlotID, VisitCycle) |>
-  summarize(Tpa = n() * 5, .groups = "drop") |>
+  summarize(
+    # plots are 1/5 acre, so 1 tree = 5 TPA
+    basal_area = sum(basal_area) * 5,
+    .groups = "drop"
+  ) |>
   select(
     StandID = MasterPlotID,
     VisitCycle,
-    Observed = Tpa
+    Observed = basal_area
   )
 
 observed_trees |>
   full_join(
     cficop_hvst_summary |>
       filter(Year %% 10 == 0) |>
-      select(StandID, VisitCycle = Year, Projected = Tpa),
+      select(StandID, VisitCycle = Year, Projected = BA),
     by = join_by(StandID, VisitCycle)
   ) |>
   mutate(VisitCycle = as.character(VisitCycle)) |>
@@ -924,14 +945,14 @@ observed_trees |>
   ggplot(aes(VisitCycle, value, fill = name)) +
   geom_boxplot(outlier.size = 0.1) +
   theme_bw() +
-  ggtitle("Projected vs. Observed Tree Density") +
-  ylab(bquote(trees %.% acre^-1))
+  ggtitle("Projected vs. Observed Basal Area") +
+  ylab(bquote("ft"^2 %.% acre^-1))
 
 observed_trees |>
   full_join(
     cficop_hvst_summary |>
       filter(Year %% 10 == 0) |>
-      select(StandID, VisitCycle = Year, Projected = Tpa),
+      select(StandID, VisitCycle = Year, Projected = BA),
     by = join_by(StandID, VisitCycle)
   ) |>
   complete(StandID, VisitCycle, fill = list(Observed = 0, Projected = 0)) |>
@@ -942,15 +963,205 @@ observed_trees |>
   ggplot(aes(VisitCycle, Surplus)) +
   geom_boxplot(outlier.size = 0.1) +
   theme_bw() +
-  ggtitle("Surplus trees by inventory") +
-  ylab(bquote(trees %.% acre^-1))
+  ggtitle("Surplus Basal Area by Inventory") +
+  ylab(bquote("ft"^2 %.% acre^-1))
 ```
 
-So overall TPA in the modeled plots goes up a lot compared to what's observed.
-A lot of this is likely because the model can see all trees down to seedlings,
+So overall BA in the modeled plots goes up a bit compared to what's observed.
+Some of this is likely because the model can see all trees down to seedlings,
 whereas CFI inventory only captures trees >5.6"
 
-## Meas vs. Proj harvested
+## Carbon
+
+```{r cficop_hvst_carbon_cmp, eval = FALSE}
+cficop_hvst_carbon_cmp <- cficop_hvst_carbon |>
+  filter(Year %% 10 == 0) |>
+  mutate(name = "HVST", method = "Projected") |>
+  union_all(
+    cficop_dflt_carbon |>
+      mutate(name = "DFLT", method = "Projected")
+  ) |>
+  union_all(
+    cficop_srvy_carbon |>
+      mutate(name = "SRVY", method = "Measured")
+  ) |>
+  union_all(
+    cficop_none_bai |>
+      select(StandID, Starting_Carbon, Projected_Carbon, Adjusted_AGLCF) |>
+      group_by(StandID) |>
+      summarize(
+        Starting_Carbon = min(Starting_Carbon, na.rm = TRUE),
+        Adjusted_AGLCF = mean(Adjusted_AGLCF, na.rm = TRUE),
+        .groups = "drop"
+      ) |>
+      cross_join(
+        tibble(Year = seq(1970, 2020, 10))
+      ) |>
+      mutate(
+        Aboveground_Total_Live = Starting_Carbon + Adjusted_AGLCF * (Year - 1970)
+      ) |>
+      select(StandID, Year, Aboveground_Total_Live) |>
+      mutate(name = "Best Estimate", method = "Projected")
+  ) |>
+  rename(
+    value = Aboveground_Total_Live
+  )
+
+cficop_hvst_carbon_cmp_summary <- cficop_hvst_carbon_cmp |>
+  group_by(Year, name, method) |>
+  summarize(
+    n = n(),
+    mean = mean(value, na.rm = TRUE),
+    ymin = mean(value, na.rm = TRUE) - 1.96 * sd(value) / sqrt(n),
+    ymax = mean(value, na.rm = TRUE) + 1.96 * sd(value) / sqrt(n),
+    .groups = "drop"
+  )
+```
+
+
+### Boxplot
+
+```{r cficop_hvst_carbon vs year, eval = FALSE}
+ cficop_hvst_carbon_cmp |>
+  mutate(group = paste(Year, name)) |>
+  ggplot(aes(Year, value, fill = name, group = group)) +
+  geom_boxplot(outlier.size = 0.5) +
+  theme_bw() +
+  ggtitle("CFI Carbon Compare") +
+  ylab(bquote("Aboveground Live Carbon " ~ (`Mg C` %.% hectare^-1)))
+```
+
+### Mean Lines
+
+```{r, eval = FALSE}
+cficop_hvst_carbon_cmp_summary |>
+  ggplot(aes(Year, mean, color = name)) +
+  geom_line(aes(linetype = method)) +
+  geom_point() +
+  theme_bw(base_size = 14) +
+  theme(aspect.ratio = 1) +
+  scale_linetype_manual(
+    name = NULL,
+    values = c("Projected" = "dashed", "Measured" = "solid"),
+    guide = guide_legend(order = 2)
+  ) +
+  coord_cartesian(ylim = c(45, 150)) +
+  labs(
+    title = "Quabbin CFI Carbon Projection",
+    color = NULL
+  ) +
+  xlab("Year") +
+  ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
+```
+
+## Harvest Timing
+
+### Sample Plots
+
+```{r, eval = FALSE}
+cficop_hvst_carbon_cmp |>
+  filter(name %in% c("HVST", "SRVY")) |>
+  slice_min(order_by = StandID, n = 3 * 6 * 2) |>
+  #filter(StandID %in% base::sample(cfigro_plot$STAND_ID, 3)) |>
+  ggplot(aes(Year, value, color = StandID)) +
+  geom_line(aes(linetype = name)) +
+  geom_point() +
+  theme_bw(base_size = 14) +
+  theme(aspect.ratio = 1) +
+#  coord_cartesian(ylim = c(45, 150)) +
+  labs(
+    title = "Quabbin CFI Carbon Projection",
+    linetype = NULL
+  ) +
+  xlab("Year") +
+  ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
+```
+
+It looks like plots are being harvested ~10 years too early.
+
+### Cutlist vs. Directive
+
+Our understanding of actual hoarvest is embodied in cficop_hvst_observed_harvest.
+
+We can get what FVS actually did from cficop_hvst_cutlist.
+
+```{r}
+hvst_obs <- cficop_hvst_observed_harvest |>
+  distinct(MasterPlotID, HarvestYear) |>
+  select(StandID = MasterPlotID, Year = HarvestYear) |>
+  group_by(StandID) |>
+  arrange(Year) |>
+  mutate(num_harvests = row_number()) |>
+  ungroup() |>
+  complete(StandID, Year = seq(1960, 2020, 10)) |>
+  mutate(num_harvests = if_else(Year == 1960, 0, num_harvests)) |>
+  group_by(StandID) |>
+  arrange(Year) |>
+  fill(num_harvests, .direction = "down") |>
+  mutate(
+    StandID = as.character(StandID),
+    name = "observed"
+  )
+
+hvst_fvs <- cficop_hvst_cutlist |>
+  distinct(StandID, Year) |>
+  group_by(StandID) |>
+  arrange(Year) |>
+  mutate(num_harvests = row_number()) |>
+  ungroup() |>
+  complete(StandID, Year = seq(1960, 2020, 10)) |>
+  mutate(num_harvests = if_else(Year == 1960, 0, num_harvests)) |>
+  group_by(StandID) |>
+  arrange(Year) |>
+  fill(num_harvests, .direction = "down") |>
+  mutate(name = "projected")
+
+hvst_obs |>
+  union_all(hvst_fvs) |>
+  filter(StandID %in% c("10100", "10102")) |>
+  ggplot(aes(Year, num_harvests, color = StandID, linetype = name)) +
+  geom_step(position = position_dodge(width = 1)) +
+  theme_bw()
+
+```
+
+OK, Harvest lines up perfectly, but carbon does not. What's up with that?
+
+### Raw
+
+
+```{r}
+hvst_carbon_raw <- fvs_read_output(cficop_hvst, "FVS_Carbon") |>
+  filter(random_seed == min(random_seed))
+tar_load(cficop_srvy)
+srvy_carbon_raw <- fvs_read_output(cficop_srvy, "FVS_Carbon")
+```
+
+
+Let's look at stands 10100 and 10102.
+
+```{r}
+hvst_carbon_raw |>
+  mutate(Method = "Projected") |>
+  union_all(
+    srvy_carbon_raw |>
+      mutate(Method = "Measured")
+  ) |>
+  filter(StandID %in% c("10100", "10102")) |>
+  ggplot(aes(Year, Aboveground_Total_Live, color = StandID)) +
+  geom_line(aes(linetype = Method)) +
+  geom_point() +
+  theme_bw(base_size = 14) +
+  theme(aspect.ratio = 1) +
+  labs(
+    title = "Quabbin CFI Carbon Projection",
+    linetype = NULL
+  ) +
+  xlab("Year") +
+  ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
+```
+
+## Harvest Volume
 
 ### By Genus
 

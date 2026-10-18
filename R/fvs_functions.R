@@ -160,7 +160,10 @@ fvs_ThinATA <- function(rows) {
     # 5 - largest dbh (<; 999)
     # 6 - smallest height (>=; 0)
     # 7 - largest height (<; 999)
-    fvs_kwd("ThinATA", year, target_tpa, percent, dbh_min, dbh_max)
+    c(
+      fvs_kwd("CycleAt", year),
+      fvs_kwd("ThinATA", year, target_tpa, percent, dbh_min, dbh_max)
+    )
   }
   c(
     apply(rows, 1, thinata),
@@ -189,7 +192,10 @@ fvs_ThinDBH <- function(rows) {
     # 5 - species (0)
     # 6 - target TPA (0)
     # 7 - target BA (0)
-    fvs_kwd("ThinDBH", year, dbh_min, dbh_max, percent, spcd, tpa, ba)
+    c(
+      fvs_kwd("CycleAt", year),
+      fvs_kwd("ThinDBH", year, dbh_min, dbh_max, percent, spcd, tpa, ba)
+    )
   }
   c(
     apply(rows, 1, thindbh),

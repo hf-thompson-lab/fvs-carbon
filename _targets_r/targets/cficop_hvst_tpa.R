@@ -18,8 +18,7 @@ tar_target(cficop_hvst_tpa, {
       DBH_MIN > 0
     ) |>
     mutate(
-      # HACK: Adding 10 years to harvest makes it line up better with observed
-      HarvestYear = coalesce(HarvestYear.x, HarvestYear.y) + 10,
+      HarvestYear = coalesce(HarvestYear.x, HarvestYear.y),
       DBH_MAX = DBH_MIN + 5,
       # Harvests added by the full_join will nave TPA==NA;
       # there were not trees of this species left in this size range,
