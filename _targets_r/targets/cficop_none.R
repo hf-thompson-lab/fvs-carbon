@@ -25,15 +25,8 @@ tar_target(
           cficop_plot_sibling,
           by = join_by(STAND_ID == MasterPlotID)
         ),
-#        left_join(
-#          cficop_sam_wt |> select(STAND_ID = MasterPlotID, SAM_WT = AcresPerPlot),
-#          by = join_by(STAND_ID)
-#        ),
       trees = cfigro_trees,
       regen = cficop_estab,
-#      calibration = cfigro_none_growth,
-#      calib_mort = cfigro_none_death,
-#      calib_years = 10,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
       random_seed = fvs_randseed

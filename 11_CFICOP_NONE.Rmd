@@ -22,9 +22,11 @@ suppressPackageStartupMessages({
   library(patchwork) # for n-up ggplot
 })
 tar_source()
+```
 
-## Load targets results from other documents ----
+Preload targets results:
 
+```{r preload, eval = FALSE}
 tar_load(fiadb)
 tar_load(species_crosswalk)
 tar_load(fvs_num_partitions)
@@ -47,21 +49,45 @@ get_this_rmd_file() |>
   tar_load()
 ```
 
-# MODEL ALL\* THE PLOTS!!!
+# Intro
+
+CFICOP - Run all the plots in ways that are interesting for Carbon Offset Projects.
+
+Scenarios:
+
+* NONE - Like CFIGRO_NONE, but run 277 plots
+* DFLT - How would someone in 1970 have run FVS using as many defaults as possible?
+* HVST - Replicate actual harvest as close a possible in FVS
+* SRVY - Like CFIGRO_SRVY, but run 277 plots
+* BL56 - Baseline defined using 1956 report data
 
 We want to:
 
-- Model all the plots grow-only
+- Model all the plots grow-only.
+  - We don't have harvest information except on Audrey's plots, so we'll
+    actually just use her 283 plots. So it's not *all* of all the plots, but
+    it's all the plots for which we have good data.
 - Apply the model of residuals to get an idea of how much FVS might have
   over-projected
 - Look at harvest, and how much carbon is actually on the landscape
 - Multiply by area to get an idea of what COP would be, etc.
 
-\* We don't have harvest information except on Audrey's plots, so we'll
-actually just use her 283 plots. So it's not *all* of all the plots, but
-it's all the plots for which we have good data.
+This restricts FVS initial data to what's available in 1970, mostly.
+
+* Growth & Mortality calibration is what's visible in 1970
+* Establishment is from plot matching: plots that are harvested or
+  disturbed are matched with undisturbed plots, and get the establishment
+  from those.
+* Sapling / seedling would have required a census; this is simulated
+  from 1980 establishment.
+
+# Plots
+
+cfigro_plot has all 283 plots.
 
 ## Stands
+
+Plots are arranged in stands.
 
 From Barker Plotkin 2025:
 
@@ -210,15 +236,13 @@ quabbin_cover_types |>
   arrange(desc(acres))
 ```
 
-## Plots
+Until someone says otherwise, we'll treat the entire area as one stand.
 
-cfigro_plot has all 283 plots.
-
-## Trees
+# Trees
 
 cfigro_tree has trees for all 283 plots.
 
-### All the plots?
+## All the plots?
 
 We only need trees in 1970; can we use all the plots?
 
@@ -234,7 +258,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
   nrow()
 ```
 
-There are 337 plots with trees in 1970; the 65 additional plots dont's
+There are 337 plots with trees in 1970; the 65 additional plots don't
 seem worth the extra effort.
 
 For the manuscript, "Many plot locations in the Quabbin watershed were
@@ -244,7 +268,7 @@ consistent. There were 337 plots with trees in 1970; of these, detailed
 information on harvest and disturbance is available on 277
 [Barker-Plotkin 2024]."
 
-### Size Distribution in 1970
+## Tree DBH Distribution in 1970
 
 ```{r, eval = FALSE}
 qryDWSPCFIPlotVisitTreeDetail |>
@@ -267,12 +291,13 @@ qryDWSPCFIPlotVisitTreeDetail |>
   geom_boxplot(outlier.size = 0.1) +
   theme_bw() +
   coord_cartesian(ylim = c(0, 400)) +
-  ggtitle("Tree Size Distribution in 1970") +
+  ggtitle("Tree DBH Distribution in 1970") +
   xlab("Diameter at Breast Height (inches)") +
   ylab(bquote(trees %.% acre^-1))
 ```
 
-## Regeneration
+
+# Regeneration
 
 We ignored harvest in CFIGRO; can we continue to ignore it?
 
@@ -312,7 +337,7 @@ with each other. For available seeds from trees on the plot, we can
 match plots by BA of the major species, then use the establishment from
 the matched / sibling plot.
 
-### Plot Matching
+## Plot Matching
 
 Start simple - minimize the delta in the three major species. We can
 leave "Other" alone.
@@ -550,7 +575,7 @@ ggplot() +
 
 ```
 
-### Map of the Area
+## Map of the Area
 
 ```{r plot grow-only plots, eval = FALSE}
 tmp_matched_plots <- matched_plots |>
@@ -594,7 +619,7 @@ ggplot() +
   labs(color = "Dominant Species")
 ```
 
-### Plots for Plotting
+## Plots for Plotting
 
 Create a table to facilitate plotting plots on a plot
 
@@ -701,7 +726,7 @@ tmp_plot_fingerprint <- tmp_trees |>
 
 ```
 
-### Copy CFIGRO Estab
+## Copy CFIGRO Estab
 
 We'll duplicate cfigro_estab from the reference plots to their sibling
 plots.
@@ -732,17 +757,17 @@ cficop_plot_sibling |>
   )
 ```
 
-### Growth
+## Growth
 
 cfigro_none_growth is tree-specific; for each tree within a plot,
 provide the diameter and height 10 years from the simulation start time.
 
-### Mortality
+## Mortality
 
 cfigro_none_death is tree-specific; for each tree within a plot, provide
 the status at simulation start time.
 
-## Harvested, Disturbed, No Trees
+# Harvested, Disturbed, No Trees
 
 Let's get a breakdown of plots by whether they had no trees in 1970,
 were harvested, disturbed, or both
@@ -764,7 +789,7 @@ cficop_plot_sibling |>
   theme_minimal(base_size = 20)
 ```
 
-## Watershed Area
+# Watershed Area
 
 I think I need to get a polygon for the watershed / districts, then use
 land cover to find the forested area ... in 1970. Which I can't. Unless
@@ -934,15 +959,8 @@ tar_target(
           cficop_plot_sibling,
           by = join_by(STAND_ID == MasterPlotID)
         ),
-#        left_join(
-#          cficop_sam_wt |> select(STAND_ID = MasterPlotID, SAM_WT = AcresPerPlot),
-#          by = join_by(STAND_ID)
-#        ),
       trees = cfigro_trees,
       regen = cficop_estab,
-#      calibration = cfigro_none_growth,
-#      calib_mort = cfigro_none_death,
-#      calib_years = 10,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
       random_seed = fvs_randseed
@@ -959,9 +977,9 @@ tar_target(
 )
 ```
 
-## Load Results
+# Results
 
-### Carbon
+## Carbon
 
 ```{targets cficop_none_carbon, tar_simple = TRUE}
 fvs_read_output(cficop_none, "FVS_Carbon") |>
@@ -973,7 +991,7 @@ fvs_read_output(cficop_none, "FVS_Carbon") |>
   ungroup()
 ```
 
-### Summary
+## Summary
 
 ```{targets cficop_none_summary, tar_simple = TRUE}
 fvs_read_output(cficop_none, "FVS_Summary2") |>
@@ -986,15 +1004,7 @@ fvs_read_output(cficop_none, "FVS_Summary2") |>
   ungroup()
 ```
 
-### Tree List
-
-Some things want the tree list; materialize it.
-
-```{targets cficop_none_treelist, tar_simple = TRUE}
-fvs_read_output(cficop_none, "FVS_TreeList")
-```
-
-## BA Over Time
+# BA Over Time
 
 ```{r plot ba over time, eval = FALSE}
 cficop_none_summary |>
@@ -1023,7 +1033,7 @@ cficop_none_summary |>
 
 ```
 
-## Carbon Over Time
+# Carbon Over Time
 
 ```{r plot carbon over time, eval = FALSE}
 cficop_none_carbon |>
@@ -1046,7 +1056,7 @@ cficop_none_carbon |>
   ylab(bquote("Aboveground Live Carbon " ~ (`Mg C` %.% hectare^-1)))
 ```
 
-## Error Model
+# Error Model
 
 We need: cfigro_bai_task\$select( c("Acer_rubrum", "LAT",
 "Pinus_strobus", "Projected_BA", "Projected_Tph", "Quercus_rubra",
@@ -1208,7 +1218,7 @@ cficop_none_bai |>
   ggtitle("CFI Quabbin All Plots 50 year Aboveground Live Carbon Flux Projection")
 ```
 
-## Error Distribution
+# Error Distribution
 
 ```{r plot cficop error distribution, eval = FALSE}
 cficop_none_bai |>
