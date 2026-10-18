@@ -1838,7 +1838,6 @@ fvs_read_output(cfigro_none, "FVS_Summary2") |>
   ungroup()
 ```
 
-
 ## Load Results
 
 Load the output from all FVS partitions into a single dataframe
