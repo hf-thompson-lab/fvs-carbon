@@ -682,6 +682,10 @@ fvs_run <- function(
     wd = dirname(fvs_keyword_filename)
   )
 
+  if (fvs$status < 0) {
+    stop(fvs$stderr)
+  }
+
   # Return the name of the keyword file and output database
   tibble::tibble(
     title = title,
