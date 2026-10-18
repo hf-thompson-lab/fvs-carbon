@@ -23,16 +23,26 @@ suppressPackageStartupMessages({
 })
 tar_source()
 
-## Load targets results from other documents ----
+eves_colors <- c(
+  "Other" = "#B4B432",
+  "Fraxinus" = "#CD5C5C",
+  "Betula" = "#8B4513",
+  "Tsuga" = "#5F9EA0",
+  "Acer" = "#DEB887",
+  "Pinus" = "#556B2F",
+  "Quercus" = "#D2691E"
+)
+```
 
+Preload targets results
+
+```{r preload, eval = FALSE}
 tar_load(fiadb)
 tar_load(species_crosswalk)
 tar_load(fvs_num_partitions)
 tar_load(fvs_partition)
 tar_load(fvs_randseed)
 tar_load(fvsne_states)
-
-## Preload everything from 11_CFIGrowOnly.Rmd ----
 
 normalizePath("10_CFIGRO.Rmd") |>
   tar_objects_defined_in_rmd() |>
@@ -42,24 +52,21 @@ normalizePath("11_CFICOP_NONE.Rmd") |>
   tar_objects_defined_in_rmd() |>
   tar_load()
 
-## Preload targets results from this document ----
-
-# When tar_make() has already built the objects defined in this document,
-# run this block to pre-load them. You can then skip running ```{targets}
-# blocks.
-
 get_this_rmd_file() |>
   tar_objects_defined_in_rmd() |>
   tar_load()
 ```
 
-# CFICOP_DFLT
+# Intro
 
 Like CFIGRO_NONE, this uses FVS default parameters. The real difference
 is in establishment: this uses a combination of Fred Hunt's observed
 regeneration, and a guess at saplings to represent the 1980 influx.
 
-## Regeneration
+CFICOP_DFLT is intended to serve as "how would someone have set
+up a grow-only scenario in FVS in 1970".
+
+# Regeneration
 
 Ignore plot-specificc regeneration. use a spatial average over the first
 survey period to see how many trees of each species establish in each
@@ -69,39 +76,15 @@ Regeneration in Quabbin is fraught. Regen was suppressed in areas from
 1960 into the 1990s by excessive deer browse; hunting was re-introduced
 in the 1990s to reduce the deer population.
 
-### 1980 Model Year
+There's very little info on regeneration / establishment, so we need
+to reconstruct it. We'll use the best available info for background
+rates for regeneration.
 
-Can we use trees that establish in the 1970-1980 cycle to represent
-"what would a manager's perspective be on establishment in 1970?".
+## All Plots
 
-Start by finding all the trees that establish:
+Look at recruitment across all plots:
 
-```{r cfiabp_estab, eval = FALSE}
-cfiabp_estab <- qryDWSPCFIPlotVisitTreeDetail |>
-  filter(VisitTreeStatusCode == 1) |>
-  left_join(
-    tblDWSPCFIPlotVisitsComplete |>
-      select(MasterPlotID, VisitCycle, MasterPlotVisitID),
-    by = join_by(MasterPlotVisitID)
-  ) |>
-  left_join( 
-    tblDWSPCFITreesComplete |> select(MasterTreeID, SpeciesCode),
-    by = join_by(MasterTreeID)
-  ) |>
-  inner_join(
-    cfiabp_trees |>
-      distinct(MasterPlotID, VisitCycle, MasterTreeID, StatusB),
-    by = join_by(MasterPlotID, VisitCycle, MasterTreeID)
-  ) |>
-  filter(StatusB == "R")
-```
-
-### CFI Establishment By Year
-
-Let's look at establishment rate - this will be how many trees establish
-per 0.2 acre plot in a 10-year interval, on grow-only plots.
-
-```{r establisment rate, eval = FALSE}
+```{r establishment by species in all plots, eval = FALSE}
 cfiabp_estab |>
   left_join(
     cfigro_plot_harvested,
@@ -111,49 +94,38 @@ cfiabp_estab |>
     cfigro_plot_disturbed,
     by = join_by(MasterPlotID)
   ) |>
-  filter(!CFIHarvested & !CFIDisturbed) |>
-  group_by(MasterPlotID, VisitCycle) |>
-  summarize(rate = n(), .groups = "keep") |>
-  ungroup() |>
-  # Convert rate to trees per acre per year
-  mutate(rate = rate * 5 / 10) |>
-  ggplot(aes(factor(VisitCycle), rate)) +
-  geom_boxplot() +
+  left_join(
+    species_crosswalk,
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  mutate(
+    VisitCycle = as.character(VisitCycle),
+    GENUS = if_else(GENUS == "Tree", "Other", GENUS)
+  ) |>
+  mutate(GENUS = fct_lump(GENUS, n = 5, other_level = "Other")) |>
+  group_by(VisitCycle, GENUS, MasterPlotID) |>
+  summarize(n = n(), .groups = "drop_last") |>
+  summarize(n = mean(n), .groups = "drop_last") |>
+  ggplot(aes(VisitCycle, n, fill = GENUS, group = GENUS)) +
+  geom_col() +
   theme_bw() +
-  ggtitle("Grow-Only Quabbin CFI Plot Establisment Rate") +
-  ylab("New 5\"dbh trees per acre per year") +
-  xlab("Inventory Year")
-  
+  scale_fill_manual(name = "Genus", values = eves_colors) +
+  ggtitle("Quabbin CFI Recruitment in All Plots") +
+  ylab("Number of Trees Recruited per Plot")
 ```
 
-This says "no" - 1980 establishment rate is roughly 5x that of 2020.
-1990 is still double.
+Some notes:
 
-```{r establishment per cycle, eval = FALSE}
-cfiabp_estab |>
-  left_join(
-    cfigro_plot_harvested,
-    by = join_by(MasterPlotID)
-  ) |>
-  left_join(
-    cfigro_plot_disturbed,
-    by = join_by(MasterPlotID)
-  ) |>
-  filter(!CFIHarvested & !CFIDisturbed) |>
-  group_by(MasterPlotID, VisitCycle) |>
-  summarize(rate = n(), .groups = "keep") |>
-  ungroup() |>
-  mutate(rate = rate * 5 / 10) |>
-  group_by(VisitCycle) |>
-  summarize(rate = mean(rate))
-```
+* 1970 can be discredited; plots were relocated in 1970, and this appears
+  to include newly inventoried trees on relocated plots as "recruits".
+* 1980 cannot be discredited; apparently there were a lot of saplings
+  on the landscape in 1970, and a lot of these recruit in 1980.
+* 1990 is still a bit elevated
+* 2000 and after appear steady.
 
-### CFI Grow-Only Recruitment
+## Grow-Only Plots
 
-Maybe we can use Hunt's data for seedling establishment. To do this,
-we'd create a stems-per-acre NATURAL block that omits height; the
-omission of height says these are seedlings, and FVS should figure
-things out from there.
+Compare to recruitment on grow-only plots
 
 ```{r establishment by species, eval = FALSE}
 cfiabp_estab |>
@@ -172,60 +144,48 @@ cfiabp_estab |>
   mutate(GENUS = if_else(GENUS == "Tree", "Other", GENUS)) |>
   filter(!CFIHarvested & !CFIDisturbed) |>
   mutate(GENUS = fct_lump(GENUS, n = 5, other_level = "Other")) |>
-  ggplot(aes(VisitCycle, fill = GENUS, group = GENUS)) +
-  geom_bar() +
+  group_by(VisitCycle, GENUS, MasterPlotID) |>
+  summarize(n = n(), .groups = "drop_last") |>
+  summarize(n = mean(n), .groups = "drop_last") |>
+  ggplot(aes(VisitCycle, n, fill = GENUS, group = GENUS)) +
+  geom_col() +
   theme_bw() +
+  scale_fill_manual(name = "Genus", values = eves_colors) +
   ggtitle("Quabbin CFI Recruitment in Grow-Only Plots") +
-  ylab("Number of Trees Recruited")
+  ylab("Number of Trees Recruited per Plot")
 ```
 
-### CFI All Recruitment
+Recruitment is about the same in All Plots as it is in Grow-Only plots.
 
-```{r establishment by species in all plots, eval = FALSE}
-cfiabp_estab |>
-  left_join(
-    cfigro_plot_harvested,
-    by = join_by(MasterPlotID)
-  ) |>
-  left_join(
-    cfigro_plot_disturbed,
-    by = join_by(MasterPlotID)
-  ) |>
-  left_join(
-    species_crosswalk,
-    by = join_by(SpeciesCode == SPCD)
-  ) |>
-  mutate(GENUS = if_else(GENUS == "Tree", "Other", GENUS)) |>
-#  filter(!CFIHarvested & !CFIDisturbed) |>
-  mutate(GENUS = fct_lump(GENUS, n = 5, other_level = "Other")) |>
-  ggplot(aes(VisitCycle, fill = GENUS, group = GENUS)) +
-  geom_bar() +
-  theme_bw() +
-  ggtitle("Quabbin CFI Recruitment in All Plots") +
-  ylab("Number of Trees Recruited")
-```
-
-### Fred Hunt's Table 13
+## Fred Hunt's Establishment Survey
 
 Fred Hunt's 1961 Master's Thesis at UMass Amherst describes a general
 rate of 254 stems of "establishment" per acre; we can use this number,
 distributed according to his table 13, to set up background
 establishment.
 
-Table 13. Reproduction by Species
-
-Here is a reproduction of Fred Hunt's table 13 showing reproduction in
+Here is Fred Hunt's Table 13 showing reproduction in
 1960, from Brian Keevan, personal communication, June 12 2025.
 
-Keevan notes: \> "Note that Hunt decided to call anything from 3 foot
-tall to 4.9” \> diameter ‘reproduction’."
+Keevan notes:
+
+> "Note that Hunt decided to call anything from 3 foot tall to 4.9”
+> diameter ‘reproduction’."
 
 Hunt left some species unspecified; we substitute the most common in
-Quabbin for these: - Red maple = red maple - Oak = northern red oak -
-white pine = eastern white pine - black birch = sweet birch - white ash
-= white ash - red pine = red pine - other birch = paper birch - other
-hardwoods = black cherry - sugar maple = sugar maple - spruce = red
-spruce
+Quabbin for these. As an alternative, we could allocate them according
+to observed species frequency.
+
+- Red maple = red maple
+- Oak = northern red oak 
+- white pine = eastern white pine
+- black birch = sweet birch
+- white ash = white ash
+- red pine = red pine
+- other birch = paper birch
+- other hardwoods = black cherry
+- sugar maple = sugar maple
+- spruce = red spruce
 
 ```{targets cficop_dflt_estab, tar_simple = TRUE}
 tibble(
@@ -270,7 +230,188 @@ tibble(
   arrange(desc(DENSITY))
 ```
 
-## Run FVS
+```{r, eval = FALSE}
+cficop_dflt_estab |>
+  rename(FVS_SPCD = SPECIES) |>
+  left_join(
+    species_crosswalk |>
+      select(FVS_SPCD, SCIENTIFIC_NAME),
+    by = join_by(FVS_SPCD)
+  ) |>
+  select(
+    `Scientific Name` = SCIENTIFIC_NAME,
+    Density = DENSITY
+  ) |>
+  knitr::kable(caption = "Table 13. Reproduction by Species")
+```
+
+This is a point-in-time observation; there is no clear path to
+converting this point-in-time observation into a recruitment
+rate.
+
+As a start, this can be put into FVS as establishment in each cycle,
+which FVS will interpret as seedlings. This distribution will be refilled
+each cycle, so every 10 years.
+
+# Trees
+
+CFI does not have seedling or sapling data. Since we lack this data
+in 1970, we need to simulate the recruitment survey a landowner might
+have done in order to set up the model.
+
+We'll do this by walking established trees back through the surveys.
+
+## 1980 ingrowth as 1970 Saplings
+
+The CFI data lacks seedlings and saplings, so the 1970 inventory
+is misssing a whole bunch of trees <5" DBH that establish in the
+1980 inventory (and 1990, but more on that later).
+
+There are a few ways to try to deal with this:
+
+* Put the trees in as 1980 establishment. This doesn't work for
+  simulations that alter what establishment might look like in 1980.
+* Put them in as saplings of estimated size in 1970. We'll do this.
+
+There are also some 1970 saplings that establish in the 1990 inventory;
+we'll try to hit those separately.
+
+We can get estimated size by:
+
+1. Take CFICOP_NONE treelist - FVS will have simulated growth of
+   many trees, so we should be able to see them at small sizes.
+2. Look at them at size of establishment: DBH > 5" and (DBH - DG) < 5"
+3. (DBH - DG) was their size in the previous survey.
+
+We can then take trees that establish in 1980, and either set their
+size to mean(DBH - DG), or to DBH - mean(DG). The latter gives us
+more of a distribution in size.
+
+## ** TODO Nik:
+
+Is this fixed by using 6" as the break dbh?
+* Not fixed, but reduced - from 50% to 25% of recruits were missed
+
+There are about 350 trees whose DBH in 1980 is too big for them to 
+have not recruited in 1970. This appears to be a survey error.
+I think the right thing to do is to make them be saplings of the
+right size in 1970. Doing this requires changing the approach to
+saplings - instead of 1980DBH - DG, they need to be 5" - 1/2 DG.
+
+Note that in 1970, minimum DBH (hardwood and softwood) was 6"; in
+1980 that dropped to 5.6".
+
+Note that roughly 50% of the 1980 recruits are big enough that they
+should have been in the 1970 inventory - e.g. 14" DBH.
+
+* This is a True Fact about the 1970 inventory - it missed ~1307 trees,
+  which comes to ~5 trees per plot.
+* The intent here is to simulate a sapling survey, so filter those out
+* Separately, we can back-propagate the missing trees to see what
+  impact they have.
+  
+```{targets cficop_dflt_saplings, tar_simple = TRUE}
+# Grab FVS modeled growth for recruits from CFICOP_NONE -
+# this has all the plots with no harvest or disturbance.
+# Note that we want all the random seeds; they'll give a more
+# informative distribution of DBH and DG
+tmp_dg_estab <- fvs_read_output(cficop_none, "FVS_TreeList") |>
+  # Too small to be in the previous inventory
+  filter((DBH - DG) < 6) |>
+  # Big enough to be in this inventory
+  filter(DBH >= 6) |>
+  group_by(SpeciesFVS) |>
+  summarise(
+    DG = mean(DG),
+    .groups = "drop"
+  ) |>
+  mutate(
+    # FVS (& FIA) use 1/10 inch accuracy
+    DG = ceiling(DG * 10) / 10
+  )
+
+# Find recruits that were saplings in 1970
+cficop_dflt_saplings <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  cfi_topocode() |>
+  # Only recruits
+  filter(Status6 == "R") |>
+  # Deal with species that FVS doesn't handle
+  mutate(SpeciesCode = replace_values(
+    SpeciesCode,
+    320 ~ 317, # norway maple -> sugar maple
+    402 ~ 403, # bitternut hickory -> pignut hickory
+    740 ~ 743  # unknown aspen -> bigtooth aspen
+  )) |>
+  left_join(
+    species_crosswalk |> select(SPCD, FVS_SPCD),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  filter(!is.na(FVS_SPCD)) |>
+  # Back-project their diameter
+  left_join(
+    tmp_dg_estab,
+    by = join_by(FVS_SPCD == SpeciesFVS)
+  ) |>
+  # Some species, e.g. Red Pine ("RN") don't get DG;
+  # fill in a non-crazy default (0.1"/year)
+  mutate(
+    DG = coalesce(DG, 1),
+    cycles_since_1970 = (VisitCycle - 1970) / 10,
+    DIAMETER = conv_unit(dbhcm, "cm", "in") - cycles_since_1970 * DG,
+    # Diameter in decimal inches
+    DIAMETER = floor(DIAMETER *  10) / 10
+  ) |>
+  filter(DIAMETER >= 1 & DIAMETER < 5) |>
+  mutate(
+    STAND_CN = as.character(MasterPlotVisitID),
+    STAND_ID = MasterPlotID,
+    TREE_CN = as.character(VisitTreeNumberDetail),
+    TREE_ID = MasterTreeID,
+    PLOT_ID = 1, # CFI does not use subplots, so all PLOT_IDs are 1
+    INV_YEAR = 1970,
+    TREE_COUNT = 1,
+    HISTORY = 1, # Live tree
+    SPECIES = FVS_SPCD,
+    DIAMETER,
+    HT = NA,
+    # HTTOPK = VisitTreeTotalHeight, # Height to top kill; we don't ahve that
+    # CRRATIO            WAS USED - not available
+    # DAMAGE1            WAS USED - not available
+    # SEVERITY1          WAS USED - not available
+    # DAMAGE2            WAS USED - not available
+    # SEVERITY2          WAS USED - not available
+    # DAMAGE3            WAS USED - not available
+    # SEVERITY3          WAS USED - not avialable
+    # TREEVALUE          WAS USED - X - tree removal priority
+    # PRESCRIPTION       WAS USED - X - tree removal group
+    # AGE                WAS USED - X
+    SLOPE = Slope,
+    ASPECT = Aspect,
+    # PV_CODE            WAS USED - ecoregion? - not used
+    TOPOCODE = TOPOCODE, # See EssentialFVS 5.4.1.2
+    # SITEPREP           WAS USED - ?
+    DG = NA,
+    HTG = NA
+  ) |>
+  select(
+    STAND_CN, STAND_ID, TREE_CN, TREE_ID, PLOT_ID,
+    TREE_COUNT, HISTORY, SPECIES, DIAMETER, HT,
+    SLOPE, ASPECT, TOPOCODE, DG, HTG
+  )
+```
+
+## Combined Trees
+
+```{targets cficop_dflt_trees, tar_simple = TRUE}
+cficop_dflt_trees <- cfigro_trees |>
+  union_all(cficop_dflt_saplings)
+```
+
+# Run FVS
 
 This should be simple; there's no calibration.
 
@@ -297,7 +438,7 @@ tar_target(
       title = title,
       mgmt_id = mgmt_id,
       stands = cfigro_plot,
-      trees = cfigro_trees,
+      trees = cficop_dflt_trees,
       regen = cficop_dflt_estab,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,

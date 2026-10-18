@@ -20,7 +20,7 @@ tar_target(
       title = title,
       mgmt_id = mgmt_id,
       stands = cfigro_plot,
-      trees = cfigro_trees,
+      trees = cficop_dflt_trees,
       regen = cficop_dflt_estab,
       num_partitions = fvs_num_partitions,
       partition = fvs_partition,
