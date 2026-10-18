@@ -31,8 +31,7 @@ tar_target(
           # microplots
           INV_PLOT_SIZE = 385/4
         ),
-      trees = cfigro_trees |>
-        filter(DIAMETER > 0),
+      trees = cficop_dflt_trees,
       regen = cficop_hvst_estab,
       harvest = cficop_hvst_tpa,
       num_partitions = fvs_num_partitions,

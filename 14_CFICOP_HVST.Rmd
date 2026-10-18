@@ -26,9 +26,11 @@ suppressPackageStartupMessages({
   library(patchwork) # for n-up ggplot
 })
 tar_source()
+```
 
-## Load targets results from other documents ----
+Preload targets results
 
+```{r}
 tar_load(fiadb)
 tar_load(species_crosswalk)
 tar_load(fvs_num_partitions)
@@ -36,17 +38,7 @@ tar_load(fvs_partition)
 tar_load(fvs_randseed)
 tar_load(fvsne_states)
 
-normalizePath("10_CFIGRO.Rmd") |>
-  tar_objects_defined_in_rmd() |>
-  tar_load()
 
-tar_load(cficop_dflt_estab)
-
-## Preload targets results from this document ----
-
-# When tar_make() has already built the objects defined in this document,
-# run this block to pre-load them. You can then skip running ```{targets}
-# blocks.
 
 get_this_rmd_file() |>
   tar_objects_defined_in_rmd() |>
@@ -425,104 +417,15 @@ cficop_hvst_observed_remainders |>
 
 # Regeneration
 
-## 1980 Establishment
+## Seedlings & Saplings
 
-The 1970 inventory does not have saplings or seedlings, which will
-cause under-recruitement in 1980.
+For 1970 saplings and seedlings, we can use the CFICOP_DFLT trees,
+which includes future ingrowth back-projected to 1970 to simulate
+a sapling survey.
 
-Rather than try to turn 1980 ingrowth into 1970 saplings, which would
-require figuring out a survival rate, we can represent the 1970 sapling
-population by actual 1980 ingrowth. By 1980, the 1970 seedlings in the
-background establishment should have created a sapling pool that FVS can
-track, so we don't need to do anything beyond 1980. So let's add 1980
-establishment as a one-off. We use actual trees, with height when
-available.
+## Background
 
-Note that we do not subtract the background regeneration from this;
-background regeneration is put in as seedlings, these trees are put
-in as saplings (with height) and so will establish much sooner.
-
-```{targets cficop_hvst_estab_1980, tar_simple = TRUE}
-# Find 1970 trees; we'll remove these from 1980
-tmp_trees_1970 <- qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  filter(
-    VisitCycle == 1970
-  ) |>
-  select(
-    MasterPlotID, MasterTreeID
-  )
-
-# Find 1980 trees, less those that were around in 1970
-cficop_hvst_estab_1980 <- qryDWSPCFIPlotVisitTreeDetail |>
-  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
-  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
-  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
-  cfi_abp(cfiabp_trees) |>
-  # Live trees and recruits
-  filter(StatusB == "L" | StatusB == "R") |>
-  # Only trees that were around in 1980
-  filter(
-    VisitCycle == 1980
-  ) |>
-  # Not trees that were around in 1970
-  anti_join(
-    tmp_trees_1970,
-    by = join_by(MasterPlotID, MasterTreeID)
-  ) |>
-  # Deal with species that FVS doesn't handle
-  mutate(SpeciesCode = replace_values(
-    SpeciesCode,
-    320 ~ 317, # norway maple -> sugar maple
-    402 ~ 403, # bitternut hickory -> pignut hickory
-    740 ~ 743  # unknown aspen -> bigtooth aspen
-  )) |>
-  left_join(
-    species_crosswalk |> select(SPCD, FVS_SPCD),
-    by = join_by(SpeciesCode == SPCD)
-  ) |>
-  filter(!is.na(FVS_SPCD)) |>
-  # Tree height - some trees have it, some don't.
-  # Impute mean height of those that have it for missing values
-  group_by(FVS_SPCD) |>
-  mutate(
-    # A height of 0 is a missing value; fix that.
-    VisitTreeTotalHeight = if_else(
-      VisitTreeTotalHeight == 0, NA, VisitTreeTotalHeight
-    ),
-    VisitTreeTotalHeight = floor(if_else(
-      is.na(VisitTreeTotalHeight),
-      mean(VisitTreeTotalHeight, na.rm = TRUE),
-      VisitTreeTotalHeight
-    )),
-    DENSITY = 5  # trees per acre for one tree on a 1/5 acre plot
-  ) |>
-  ungroup() |>
-# DO NOT CONSOLIDATE REDUNDANT RECORDS - it makes FVS crash
-#  # Consolidate redundant records
-#  group_by(MasterPlotID, VisitCycle, FVS_SPCD, VisitTreeTotalHeight) |>
-#  summarize(DENSITY = sum(DENSITY), .groups = "drop") |>
-#  ungroup() |>
-  # We need STAND_CN for the 1970 stand
-  left_join(
-    cfigro_plot |>
-      filter(INV_YEAR == 1970) |>
-      select(STAND_ID, STAND_CN),
-    by = join_by(MasterPlotID == STAND_ID)
-  ) |>
-  select(
-    STAND_ID = MasterPlotID,
-    STAND_CN,
-    YEAR = VisitCycle,
-    SPECIES = FVS_SPCD,
-    DENSITY,
-    HEIGHT = VisitTreeTotalHeight
-  )
-```
-
+For background regeneration we can use Fred Hunt's observations.
 
 ## Post-Harvest Establishment
 
@@ -534,10 +437,12 @@ establishment.
 It doesn't matter what species was harvested; harvest'll open up space
 for everything.
 
-As we did for 1980 establishment, we do not subtract the background
-regeneration from this; background regeneration is put in as seedlings,
+We do not subtract the background regeneration from this;
+background regeneration is put in as seedlings,
 these trees are put in as saplings (with height) and so will establish
 much sooner.
+
+## ** TODO nik: does this conflict with cficop_dflt_trees?
 
 ```{targets cficop_hvst_estab_post_harvest, tar_simple = TRUE}
  tmp_post_harvest_plots <- cficop_hvst_observed_harvest |>
@@ -632,9 +537,6 @@ cficop_hvst_estab <- cficop_dflt_estab |>
     STAND_ID = NA,
     HEIGHT = 0
   ) |>
-#  union_all(
-#    cficop_hvst_estab_1980
-#  ) |>
   union_all(
     cficop_hvst_estab_post_harvest
   )
@@ -671,7 +573,7 @@ possible to align actual trees in 2" diameter classes with projected
 trees in 2" diameter classes over several decades, so we use much wider
 5" diameter classes to align more actual harvest with simulated harvest.
 
-##** TODO Nik:
+## ** TODO Nik:
 
 * Adding 10 years to the harvest makes it line up better; why?
 * It's still earlier than observed, why?
@@ -786,7 +688,7 @@ tar_target(
           # microplots
           INV_PLOT_SIZE = 385/4
         ),
-      trees = cficop_hvst_trees,
+      trees = cficop_dflt_trees,
       regen = cficop_hvst_estab,
       harvest = cficop_hvst_tpa,
       num_partitions = fvs_num_partitions,

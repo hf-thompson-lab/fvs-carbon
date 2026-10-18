@@ -5,9 +5,6 @@ tar_target(cficop_hvst_estab, {
       HEIGHT = 0
     ) |>
     union_all(
-      cficop_hvst_estab_1980
-    ) |>
-    union_all(
       cficop_hvst_estab_post_harvest
     )
 })
