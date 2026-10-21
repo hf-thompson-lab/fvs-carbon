@@ -484,6 +484,13 @@ fvs_read_output(cficop_dflt, "FVS_Summary2") |>
   ungroup()
 ```
 
+TreeList
+
+```{targets cficop_dflt_treelist, tar_simple = TRUE}
+cficop_dflt_treelist <- fvs_read_output(cficop_dflt, "FVS_TreeList") |>
+  filter(random_seed == min(random_seed))
+```
+
 # Compare
 
 How does default compare to NONE and SRVY?
