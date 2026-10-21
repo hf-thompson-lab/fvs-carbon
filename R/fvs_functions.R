@@ -131,6 +131,13 @@ fvs_Estab <- function(rows) {
   }
 }
 
+fvs_CycleAt <- function(years) {
+  # CycleAt: Split a cycle at a year.
+  # Field 1: Year
+  lapply(years, \(year) fvs_kwd("CycleAt", year))
+}
+
+
 fvs_YardLoss <- function(years) {
   # YardLoss: Designates a portion of a harvest to be left in the woods.
   # Field 1: Year; YardLoss needs to come after Thin*
@@ -160,13 +167,11 @@ fvs_ThinATA <- function(rows) {
     # 5 - largest dbh (<; 999)
     # 6 - smallest height (>=; 0)
     # 7 - largest height (<; 999)
-    c(
-      fvs_kwd("CycleAt", year),
-      fvs_kwd("ThinATA", year, target_tpa, percent, dbh_min, dbh_max)
-    )
+    fvs_kwd("ThinATA", year, target_tpa, percent, dbh_min, dbh_max)
   }
   c(
     apply(rows, 1, thinata),
+    fvs_CycleAt(unique(rows$YEAR)),
     fvs_YardLoss(unique(rows$YEAR))
   )
 }
@@ -184,6 +189,12 @@ fvs_ThinDBH <- function(rows) {
     } else {
       percent <- 1
     }
+    if (is.na(tpa)) {
+      tpa <- ""
+    }
+    if (is.na(ba)) {
+      ba <- ""
+    }
     # ThinDBH fields:
     # 1 - year
     # 2 - smallest dbh (>=; 0)
@@ -192,13 +203,11 @@ fvs_ThinDBH <- function(rows) {
     # 5 - species (0)
     # 6 - target TPA (0)
     # 7 - target BA (0)
-    c(
-      fvs_kwd("CycleAt", year),
-      fvs_kwd("ThinDBH", year, dbh_min, dbh_max, percent, spcd, tpa, ba)
-    )
+    fvs_kwd("ThinDBH", year, dbh_min, dbh_max, percent, spcd, tpa, ba)
   }
   c(
     apply(rows, 1, thindbh),
+    fvs_CycleAt(unique(rows$YEAR)),
     fvs_YardLoss(unique(rows$YEAR))
   )
 }
