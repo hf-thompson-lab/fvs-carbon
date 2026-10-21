@@ -16,13 +16,13 @@ tar_target(cficop_hvst_observed_harvest, {
       by = join_by(SpeciesCode == SPCD)
     ) |>
     filter(!is.na(FVS_SPCD)) |>
-    # At this point we have fully-decorated tree records
-    # Replace na's in status to keep them from propagating
-    replace_na(list(StatusB = "X")) |>
+    # At this point we have fully-decorated tree records;
+    # filter to just C ("cut") trees
     filter(StatusB == "C") |>
     # Accept dbh_prior or dbhcm for harvest dbh; ignore harvested
     # trees whose diameter can't be determined.
     mutate(
+      DBH = conv_unit(dbhcm, "cm", "in"),
       dbh_harvest = coalesce(dbh_prior, dbhcm),
       DBH_MIN = floor(conv_unit(dbh_harvest, "cm", "in") / 5) * 5
     ) |>
