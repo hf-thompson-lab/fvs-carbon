@@ -24,9 +24,11 @@ suppressPackageStartupMessages({
   library(measurements)
 })
 tar_source()
+```
 
-## Load targets results from other documents ----
+Preload targets results
 
+```{r, eval = FALSE}
 tar_load(fiadb)
 tar_load(species_crosswalk)
 tar_load(fvs_num_partitions)
@@ -41,23 +43,17 @@ normalizePath("11_CFICOP_NONE.Rmd") |>
   tar_objects_defined_in_rmd() |>
   tar_load()
 
-normalizePath("12_CFICOP_DFLT.Rmd") |>
+normalizePath("12_CFICOP_SRVY.Rmd") |>
   tar_objects_defined_in_rmd() |>
   tar_load()
 
-normalizePath("13_CFICOP_HVST.Rmd") |>
+normalizePath("13_CFICOP_DFLT.Rmd") |>
   tar_objects_defined_in_rmd() |>
   tar_load()
 
-normalizePath("14_CFICOP_SRVY.Rmd") |>
+normalizePath("14_CFICOP_HVST.Rmd") |>
   tar_objects_defined_in_rmd() |>
   tar_load()
-
-## Preload targets results from this document ----
-
-# When tar_make() has already built the objects defined in this document,
-# run this block to pre-load them. You can then skip running ```{targets}
-# blocks.
 
 get_this_rmd_file() |>
   tar_objects_defined_in_rmd() |>
@@ -68,9 +64,9 @@ get_this_rmd_file() |>
 
 Timber use in MA steady for 20yr prior to 1950
 
-I n 1952, almost 21 million cubic feet of industrial timber
+In 1952, almost 21 million cubic feet of industrial timber
 products and almost 9 million cubic feet of fuelwood were cut
-from Massadhusetts forests.
+from Massachusetts forests.
 
 Table 1:
 
@@ -319,9 +315,11 @@ Forest type definitions in the appendix.
 
 Possibly from:
 
-> Massachusetts Forest Cutting Practices Act of 1943 (enacted as Chapter 539 of the Acts of 1943, codifying M.G.L. Chapter 132, §§ 40–46)
+> Massachusetts Forest Cutting Practices Act of 1943
+> (enacted as Chapter 539 of the Acts of 1943, codifying M.G.L.
+> Chapter 132, §§ 40–46)
 
-These standards required:
+These standards require:
 
 - If an area was clearcut, leave seed trees (4 - 6 thrifty, well-distributed
 seed trees per acre of commercial species at least 10-12 inches DBH), UNLESS
@@ -351,7 +349,6 @@ Residual Stand Density
   
 in 1982, these went from advisory to mandatory
 
-
 # MINHARV
 
 Specifies the minimum acceptable harvest standards for board-foot
@@ -377,7 +374,7 @@ Sadly, FVS_Stats_Species only contains info for the initial stand, so we
 need to build it from the treelist.
 
 ```{r, eval = FALSE}
-meets_or_exceeds <- cficop_none_treelist |>
+meets_or_exceeds <- cficop_dflt_treelist |>
   mutate(SpeciesFIA = as.integer(SpeciesFIA)) |>
   left_join(
     species_crosswalk |>
@@ -410,7 +407,7 @@ meets_or_exceeds |>
 Let's look just at white and red pine, which are preferred for harvest.
 
 ```{r, eval = FALSE}
-meets_or_exceeds <- cficop_none_treelist |>
+meets_or_exceeds <- cficop_dflt_treelist |>
   mutate(SpeciesFIA = as.integer(SpeciesFIA)) |>
   left_join(
     species_crosswalk |>
@@ -611,13 +608,13 @@ ggplot() +
   ) +
   theme_bw(base_size = 9) +
   theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
-  ggtitle("CFI plots 1957 Baseline Harvest") +
+  ggtitle("CFI plots 1956 Baseline Harvest") +
   xlab("Longitude") +
   ylab("Latitude")
 ```
 
 ```{r, eval = FALSE}
-ggsave("cfi_baseline_1957.png", dpi = 600, width = 10, units = "cm")
+ggsave("cfi_baseline_1956.png", dpi = 600, width = 10, units = "cm")
 ```
 
 
@@ -781,7 +778,7 @@ if they can't take <1500 bd ft / acre, we need 3000 bd ft / acre in
 order to harvest.
 
 ```{targets cficop_bl56_thinata, tar_simple = TRUE}
-cficop_bl56_thinata <- cficop_none_treelist |>
+cficop_bl56_thinata <- cficop_dflt_treelist |>
   mutate(SpeciesFIA = as.integer(SpeciesFIA)) |>
   mutate(
     wood_type = case_when(
@@ -1063,6 +1060,7 @@ cficop_bl56_carbon |>
   ) |>
   union_all(
     cficop_hvst_carbon |>
+      filter(Year %% 10 == 0) |>
       mutate(Series = paste0("IFM, n=", n_distinct(StandID)))
   ) |>
   union_all(
@@ -1094,6 +1092,7 @@ cficop_bl56_carbon_cmp <- cficop_bl56_carbon |>
   ) |>
   union_all(
     cficop_hvst_carbon |>
+      filter(Year %% 10 == 0) |>
       mutate(name = "Actual (Modeled)", method = "Projected")
   ) |>
   union_all(

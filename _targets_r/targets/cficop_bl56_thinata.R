@@ -1,5 +1,5 @@
 tar_target(cficop_bl56_thinata, {
-  cficop_bl56_thinata <- cficop_none_treelist |>
+  cficop_bl56_thinata <- cficop_dflt_treelist |>
     mutate(SpeciesFIA = as.integer(SpeciesFIA)) |>
     mutate(
       wood_type = case_when(
