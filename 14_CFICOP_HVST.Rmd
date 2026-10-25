@@ -1238,6 +1238,7 @@ measured_harvest |>
     Diameter_Class,
     c("5 - 10", "10 - 15", "15 - 20", "20 - 25", "25 - 30")
   )) |>
+  filter(!is.na(Diameter_Class)) |>
   complete(
     Diameter_Class, GENUS,
     fill = list(Measured_Trees = 1, Projected_Trees = 1)

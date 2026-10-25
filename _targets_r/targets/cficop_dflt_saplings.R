@@ -10,12 +10,8 @@ tar_target(cficop_dflt_saplings, {
     filter(DBH >= 6) |>
     group_by(SpeciesFVS) |>
     summarise(
-      DG = mean(DG),
+      DG = mean(DG * TPA), # FVS has fractional trees
       .groups = "drop"
-    ) |>
-    mutate(
-      # FVS (& FIA) use 1/10 inch accuracy
-      DG = ceiling(DG * 10) / 10
     )
   
   # Find recruits that were saplings in 1970
@@ -26,7 +22,8 @@ tar_target(cficop_dflt_saplings, {
     cfi_abp(cfiabp_trees) |>
     cfi_topocode() |>
     # Only recruits
-    filter(Status6 == "R") |>
+    filter(VisitCycle >= 1980) |>
+    filter(StatusB == "R") |>
     # Deal with species that FVS doesn't handle
     mutate(SpeciesCode = replace_values(
       SpeciesCode,
@@ -47,13 +44,14 @@ tar_target(cficop_dflt_saplings, {
     # Some species, e.g. Red Pine ("RN") don't get DG;
     # fill in a non-crazy default (0.1"/year)
     mutate(
+      DBH = conv_unit(dbhcm, "cm", "in"),
       DG = coalesce(DG, 1),
       cycles_since_1970 = (VisitCycle - 1970) / 10,
-      DIAMETER = conv_unit(dbhcm, "cm", "in") - cycles_since_1970 * DG,
+      DIAMETER = DBH - cycles_since_1970 * DG,
       # Diameter in decimal inches
       DIAMETER = floor(DIAMETER *  10) / 10
     ) |>
-    filter(DIAMETER >= 1 & DIAMETER < 5) |>
+    filter(DIAMETER >= 1 & DIAMETER < 6) |>
     mutate(
       STAND_CN = as.character(MasterPlotVisitID),
       STAND_ID = MasterPlotID,

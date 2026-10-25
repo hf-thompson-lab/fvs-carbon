@@ -81,6 +81,28 @@ There's very little info on regeneration / establishment, so we need
 to reconstruct it. We'll use the best available info for background
 rates for regeneration.
 
+### ABP Establishment
+
+```{r cfiabp_estab, eval = FALSE}
+cfiabp_estab <- qryDWSPCFIPlotVisitTreeDetail |>
+  filter(VisitTreeStatusCode == 1) |>
+  left_join(
+    tblDWSPCFIPlotVisitsComplete |>
+      select(MasterPlotID, VisitCycle, MasterPlotVisitID),
+    by = join_by(MasterPlotVisitID)
+  ) |>
+  left_join(
+    tblDWSPCFITreesComplete |> select(MasterTreeID, SpeciesCode),
+    by = join_by(MasterTreeID)
+  ) |>
+  inner_join(
+    cfiabp_trees |>
+      distinct(MasterPlotID, VisitCycle, MasterTreeID, StatusB),
+    by = join_by(MasterPlotID, VisitCycle, MasterTreeID)
+  ) |>
+  filter(StatusB == "R")
+```
+
 ## All Plots
 
 Look at recruitment across all plots:
@@ -262,11 +284,11 @@ have done in order to set up the model.
 
 We'll do this by walking established trees back through the surveys.
 
-## 1980 ingrowth as 1970 Saplings
+## Post-1970 ingrowth as 1970 Saplings
 
 The CFI data lacks seedlings and saplings, so the 1970 inventory
-is misssing a whole bunch of trees <5" DBH that establish in the
-1980 inventory (and 1990, but more on that later).
+is misssing a whole bunch of trees <6" DBH that establish in the
+1980 inventory and later.
 
 There are a few ways to try to deal with this:
 
@@ -281,36 +303,13 @@ We can get estimated size by:
 
 1. Take CFICOP_NONE treelist - FVS will have simulated growth of
    many trees, so we should be able to see them at small sizes.
-2. Look at them at size of establishment: DBH > 5" and (DBH - DG) < 5"
+2. Look at them at size of establishment: DBH > 6" and (DBH - DG) < 6"
 3. (DBH - DG) was their size in the previous survey.
 
 We can then take trees that establish in 1980, and either set their
 size to mean(DBH - DG), or to DBH - mean(DG). The latter gives us
 more of a distribution in size.
 
-## ** TODO Nik:
-
-Is this fixed by using 6" as the break dbh?
-* Not fixed, but reduced - from 50% to 25% of recruits were missed
-
-There are about 350 trees whose DBH in 1980 is too big for them to 
-have not recruited in 1970. This appears to be a survey error.
-I think the right thing to do is to make them be saplings of the
-right size in 1970. Doing this requires changing the approach to
-saplings - instead of 1980DBH - DG, they need to be 5" - 1/2 DG.
-
-Note that in 1970, minimum DBH (hardwood and softwood) was 6"; in
-1980 that dropped to 5.6".
-
-Note that roughly 50% of the 1980 recruits are big enough that they
-should have been in the 1970 inventory - e.g. 14" DBH.
-
-* This is a True Fact about the 1970 inventory - it missed ~1307 trees,
-  which comes to ~5 trees per plot.
-* The intent here is to simulate a sapling survey, so filter those out
-* Separately, we can back-propagate the missing trees to see what
-  impact they have.
-  
 ```{targets cficop_dflt_saplings, tar_simple = TRUE}
 # Grab FVS modeled growth for recruits from CFICOP_NONE -
 # this has all the plots with no harvest or disturbance.
@@ -323,12 +322,8 @@ tmp_dg_estab <- fvs_read_output(cficop_none, "FVS_TreeList") |>
   filter(DBH >= 6) |>
   group_by(SpeciesFVS) |>
   summarise(
-    DG = mean(DG),
+    DG = mean(DG * TPA), # FVS has fractional trees
     .groups = "drop"
-  ) |>
-  mutate(
-    # FVS (& FIA) use 1/10 inch accuracy
-    DG = ceiling(DG * 10) / 10
   )
 
 # Find recruits that were saplings in 1970
@@ -339,7 +334,8 @@ cficop_dflt_saplings <- qryDWSPCFIPlotVisitTreeDetail |>
   cfi_abp(cfiabp_trees) |>
   cfi_topocode() |>
   # Only recruits
-  filter(Status6 == "R") |>
+  filter(VisitCycle >= 1980) |>
+  filter(StatusB == "R") |>
   # Deal with species that FVS doesn't handle
   mutate(SpeciesCode = replace_values(
     SpeciesCode,
@@ -360,13 +356,14 @@ cficop_dflt_saplings <- qryDWSPCFIPlotVisitTreeDetail |>
   # Some species, e.g. Red Pine ("RN") don't get DG;
   # fill in a non-crazy default (0.1"/year)
   mutate(
+    DBH = conv_unit(dbhcm, "cm", "in"),
     DG = coalesce(DG, 1),
     cycles_since_1970 = (VisitCycle - 1970) / 10,
-    DIAMETER = conv_unit(dbhcm, "cm", "in") - cycles_since_1970 * DG,
+    DIAMETER = DBH - cycles_since_1970 * DG,
     # Diameter in decimal inches
     DIAMETER = floor(DIAMETER *  10) / 10
   ) |>
-  filter(DIAMETER >= 1 & DIAMETER < 5) |>
+  filter(DIAMETER >= 1 & DIAMETER < 6) |>
   mutate(
     STAND_CN = as.character(MasterPlotVisitID),
     STAND_ID = MasterPlotID,
@@ -405,11 +402,131 @@ cficop_dflt_saplings <- qryDWSPCFIPlotVisitTreeDetail |>
   )
 ```
 
+## Post-1970 trees as 1970 trees
+
+There are about 350 trees whose DBH in 1980 is too big for them to 
+have not recruited in 1970. This appears to be a survey error.
+Translate them into 1970 trees with appropriate diameters.
+
+Note that in 1970, minimum DBH (hardwood and softwood) was 6"; in
+1980 that dropped to 5.6".
+
+Note that roughly 50% of the 1980 recruits are big enough that they
+should have been in the 1970 inventory - e.g. 14" DBH.
+
+* This is a True Fact about the 1970 inventory - it missed ~1307 trees,
+  which comes to ~5 trees per plot.
+* The intent here is to simulate a sapling survey, so filter those out
+* Separately, we can back-propagate the missing trees to see what
+  impact they have.
+  
+```{targets cficop_dflt_trees_missing, tar_simple = TRUE}
+# Grab FVS modeled growth for recruits from CFICOP_NONE -
+# this has all the plots with no harvest or disturbance.
+# Note that we want all the random seeds; they'll give a more
+# informative distribution of DBH and DG
+tmp_dg_estab <- fvs_read_output(cficop_none, "FVS_TreeList") |>
+  # Big enough to have been in the previous inventory
+  filter((DBH - DG) >= 6) |>
+  # Group into 6" diameter ranges
+  mutate(DBH_MIN = 6 * floor(DBH / 6)) |>
+  group_by(SpeciesFVS, DBH_MIN) |>
+  summarise(
+    DG = mean(DG * TPA),
+    .groups = "drop"
+  )
+
+# Find recruits that were missed in 1970
+cficop_dflt_trees_missing <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  cfi_topocode() |>
+  # Only recruits
+  filter(StatusB == "R") |>
+  filter(VisitCycle >= 1980) |>
+  # Deal with species that FVS doesn't handle
+  mutate(
+    SpeciesCode = replace_values(
+      SpeciesCode,
+      320 ~ 317, # norway maple -> sugar maple
+      402 ~ 403, # bitternut hickory -> pignut hickory
+      740 ~ 743  # unknown aspen -> bigtooth aspen
+    ),
+    DBH = conv_unit(dbhcm, "cm", "in"),
+    DBH_MIN = 6 * floor(DBH / 6)
+  ) |>
+  left_join(
+    species_crosswalk |> select(SPCD, FVS_SPCD),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  filter(!is.na(FVS_SPCD)) |>
+  # Back-project their diameter
+  left_join(
+    tmp_dg_estab,
+    by = join_by(FVS_SPCD == SpeciesFVS, DBH_MIN)
+  ) |>
+  # Some species, e.g. Red Pine ("RN") don't get DG;
+  # fill in a non-crazy default (0.1"/year)
+  mutate(
+    DG = coalesce(DG, 1),
+    cycles_since_1970 = (VisitCycle - 1970) / 10,
+    DIAMETER = DBH - cycles_since_1970 * DG,
+    # Diameter in decimal inches
+    DIAMETER = floor(DIAMETER *  10) / 10
+  ) |>
+  filter(DIAMETER >= 6) |>
+  mutate(
+    STAND_CN = as.character(MasterPlotVisitID),
+    STAND_ID = MasterPlotID,
+    TREE_CN = as.character(VisitTreeNumberDetail),
+    TREE_ID = MasterTreeID,
+    PLOT_ID = 1, # CFI does not use subplots, so all PLOT_IDs are 1
+    INV_YEAR = 1970,
+    TREE_COUNT = 1,
+    HISTORY = 1, # Live tree
+    SPECIES = FVS_SPCD,
+    DIAMETER,
+    HT = NA,
+    # HTTOPK = VisitTreeTotalHeight, # Height to top kill; we don't ahve that
+    # CRRATIO            WAS USED - not available
+    # DAMAGE1            WAS USED - not available
+    # SEVERITY1          WAS USED - not available
+    # DAMAGE2            WAS USED - not available
+    # SEVERITY2          WAS USED - not available
+    # DAMAGE3            WAS USED - not available
+    # SEVERITY3          WAS USED - not avialable
+    # TREEVALUE          WAS USED - X - tree removal priority
+    # PRESCRIPTION       WAS USED - X - tree removal group
+    # AGE                WAS USED - X
+    SLOPE = Slope,
+    ASPECT = Aspect,
+    # PV_CODE            WAS USED - ecoregion? - not used
+    TOPOCODE = TOPOCODE, # See EssentialFVS 5.4.1.2
+    # SITEPREP           WAS USED - ?
+    DG = NA,
+    HTG = NA
+  ) |>
+  select(
+    STAND_CN, STAND_ID, TREE_CN, TREE_ID, PLOT_ID,
+    TREE_COUNT, HISTORY, SPECIES, DIAMETER, HT,
+    SLOPE, ASPECT, TOPOCODE, DG, HTG
+  )
+```
+
+
 ## Combined Trees
 
 ```{targets cficop_dflt_trees, tar_simple = TRUE}
 cficop_dflt_trees <- cfigro_trees |>
-  union_all(cficop_dflt_saplings)
+  union_all(cficop_dflt_saplings) |>
+  union_all(cficop_dflt_trees_missing) |>
+  group_by(STAND_ID) |>
+  # TREE_ID needs to be unique; we could try to be clever and
+  # preserve MasterTreeID where possible, but it's not worth it.
+  mutate(TREE_ID = row_number()) |>
+  ungroup()
 ```
 
 # Run FVS
@@ -568,6 +685,29 @@ cficop_dflt_carbon_cmp_summary |>
     guide = guide_legend(order = 2)
   ) +
   coord_cartesian(ylim = c(45, 150)) +
+  labs(
+    title = "Quabbin CFI Carbon Projection",
+    color = NULL
+  ) +
+  xlab("Year") +
+  ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
+```
+
+
+```{r, eval = FALSE}
+cficop_dflt_carbon_cmp_summary |>
+  filter(Year == 1970) |>
+  ggplot(aes(Year, mean, color = name)) +
+  geom_line(aes(linetype = method)) +
+  geom_point(position = position_dodge(width = 0.1)) +
+  theme_bw(base_size = 14) +
+  theme(aspect.ratio = 1) +
+  scale_linetype_manual(
+    name = NULL,
+    values = c("Projected" = "dashed", "Measured" = "solid"),
+    guide = guide_legend(order = 2)
+  ) +
+#  coord_cartesian(ylim = c(45, 150)) +
   labs(
     title = "Quabbin CFI Carbon Projection",
     color = NULL
