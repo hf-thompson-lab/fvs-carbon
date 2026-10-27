@@ -76,6 +76,10 @@ tar_source()
 
 # FVS Preparation
 
+This project uses the FVS model. It is one of the most usable and
+readily available models; see e.g. CARB:
+https://ww2.arb.ca.gov/our-work/programs/compliance-offset-program/compliance-offset-protocols/us-forest-projects/models
+
 This project uses the FVSne variant.
 
 Compiled using the default settings, this may fail on some of the
