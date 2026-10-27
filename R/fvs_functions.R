@@ -516,6 +516,7 @@ fvs_keywordfile_section <- function(
     growth,
     RannSeed,
     fvs_kwd("Stats"),
+    fvs_kwd("FIAVBC"), # FIA Volume, Biomass, Carbon
     fvs_kwd("CutList", 0),
     fvs_kwd("ATrtList", 0),
     fvs_kwd("TreeList", 0),
@@ -542,6 +543,10 @@ fvs_keywordfile_section <- function(
     fvs_kwd("RegRepts"),
     fvs_kwd("Summary", 2),
     fvs_kwd("TreeLiDB", 2),
+    fvs_kwd("VBCATRDB"), # FVS_FIAVBC_ATRTList
+    fvs_kwd("VBCCUTDB"), # FVS_FIAVBC_CutList
+    fvs_kwd("VBCSUMDB"), # FVS_FIAVBC_Summary
+    fvs_kwd("VBCTRLDB"), # FVS_FIAVBC_TreeList
     fvs_kwd("End"), # Database
     fvs_thin(harvest),
     fvs_Estab(regen),

@@ -26,6 +26,7 @@ tar_target(cfigro_plot, {
       INV_YEAR = VisitYear,
       REGION = 9,
       FOREST = 22,
+      ECOREGION = "221Ah",
       LONGITUDE = GPSLongitude,
       LATITUDE = GPSLatitude,
       AGE = NA,
@@ -41,7 +42,7 @@ tar_target(cfigro_plot, {
       COUNTY = COUNTYCD
     ) |>
     select(
-      STAND_CN, STAND_ID, INV_YEAR, REGION, STATE, COUNTY, FOREST,
+      STAND_CN, STAND_ID, INV_YEAR, REGION, STATE, COUNTY, FOREST, ECOREGION,
       LONGITUDE, LATITUDE, ASPECT, SLOPE, ELEVFT, AGE,
       BASAL_AREA_FACTOR, INV_PLOT_SIZE, BRK_DBH, NUM_PLOTS,
       SAM_WT, FIRST_YEAR, LAST_YEAR

@@ -356,6 +356,42 @@ fia_tbl(fiadb, "PLOTGEOM", \(.data, con) {
 
 FVS location 922, White Mountain National Forest
 
+## Ecosubsection
+
+The DBS User Guide says:
+
+> Ecological unit code. This can be a subsection code from Cleland et al.
+> 2007 and McNab and Keyser 2011 or a section code based on Nowacki et
+> al. 2002. These codes are used in the SN variant and for any variant when
+> the FIAVBC keyword is in use.
+
+
+```{r, eval = FALSE}
+usfs_ecosub <- terra::vect(file.path(
+  "/vsizip",
+  "data/raw/Ecosys_EcomapSubsections_2007.gdb.zip",
+  "Ecosys_EcomapSubsections_2007.gdb"
+)) |>
+  # These come in EPSG:4269, which is a meters projection
+  # for North America. Convert to lat/lon like everything else.
+  # Note that EPSG:4269 is NAD83, whereas EPSG:4326 is WGS84,
+  # so this re-projection is not meter accurate.
+  terra::project(crs("epsg:4326"))
+```
+
+```{r, eval = FALSE}
+cfigro_ecosub <- cfigro_plot |>
+  terra::vect() |>
+  terra::intersect(usfs_ecosub) |>
+  as.data.frame() |>
+  distinct(MAP_UNIT_SYMBOL)
+usfs_ecosub |>
+  as.data.frame() |>
+  semi_join(cfigro_ecosub, by = join_by(MAP_UNIT_SYMBOL))
+```
+
+221Ah, Worcester-Monadnock Plateau
+
 ## Watershed
 
 The DCR Division of Water Supply Protection (DWSP) maintains CFI plots
@@ -1112,6 +1148,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
     INV_YEAR = VisitYear,
     REGION = 9,
     FOREST = 22,
+    ECOREGION = "221Ah",
     LONGITUDE = GPSLongitude,
     LATITUDE = GPSLatitude,
     AGE = NA,
@@ -1127,7 +1164,7 @@ qryDWSPCFIPlotVisitTreeDetail |>
     COUNTY = COUNTYCD
   ) |>
   select(
-    STAND_CN, STAND_ID, INV_YEAR, REGION, STATE, COUNTY, FOREST,
+    STAND_CN, STAND_ID, INV_YEAR, REGION, STATE, COUNTY, FOREST, ECOREGION,
     LONGITUDE, LATITUDE, ASPECT, SLOPE, ELEVFT, AGE,
     BASAL_AREA_FACTOR, INV_PLOT_SIZE, BRK_DBH, NUM_PLOTS,
     SAM_WT, FIRST_YEAR, LAST_YEAR
@@ -2955,4 +2992,43 @@ adjusted_population_mean |>
   scale_fill_discrete(name = "95% CI")
 ```
 
+# FFE vs FIAVBC
+
+```{r, eval = FALSE}
+cfigro_none_fiavbc_carbon <- fvs_read_output(cfigro_none, "FVS_FIAVBC_Summary") |>
+  group_by(StandID, Year) |> # Combine results from different random seeds
+  summarize(
+    AbvGrdCarb = mean(AbvGrdCarb),
+    .groups = "keep"
+  ) |>
+  ungroup()
+```
+
+FIAVBC is tons per acre; FFE is tonnes per hectare
+
+```{r}
+cfigro_none_carbon |>
+  select(StandID, Year, value = Aboveground_Total_Live) |>
+  mutate(name = "Jenkins") |>
+  union_all(
+    cfigro_none_fiavbc_carbon |>
+      select(StandID, Year, value = AbvGrdCarb) |>
+      mutate(
+        name = "FIAVBC",
+        value = conv_multiunit(value, "short_ton / acre", "Mg / hectare")
+      )
+  ) |>
+  filter(Year %% 10 == 0) |>
+  group_by(Year, name) |>
+  summarize(value = mean(value), .groups = "drop") |>
+  ungroup() |>
+  ggplot(aes(Year, value, color = name)) +
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  ggtitle("CFI Grow-Only Biomass Calculation Compare") +
+  ylab(bquote(`Mg C` %.% ha^-1)) +
+  xlab("Year") +
+  coord_cartesian(ylim = c(0, NA))
+```
 
