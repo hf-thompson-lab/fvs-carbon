@@ -1050,6 +1050,13 @@ observed_harvest |>
 
 ## Carbon Over Time
 
+Use consistent colors
+```{r}
+mgmt_ids <- c("NONE", "DFLT", "HVST", "SRVY", "BL56", "BEST")
+nicknames <- c("None", "Default", "Actual (Modeled)", "Actual", "1956 Baseline", "Best Estimate")
+series_colors <- RColorBrewer::brewer.pal(length(mgmt_ids), "Set1")
+```
+
 ```{r cficop_bl56_carbon vs year, eval = FALSE}
 cficop_bl56_carbon |>
   mutate(Series = paste0("1956 Baseline, n=", n_distinct(StandID))) |>
@@ -1130,6 +1137,7 @@ cficop_bl56_carbon_cmp_summary <- cficop_bl56_carbon_cmp |>
 ### IFM vs Baseline
 
 ```{r, eval = FALSE}
+
 cficop_bl56_carbon_cmp_summary |>
   filter(name %in% c("1956 Baseline", "Actual (Modeled)", "Actual")) |>
   ggplot(aes(Year, mean, color = name)) +
@@ -1141,6 +1149,10 @@ cficop_bl56_carbon_cmp_summary |>
     name = NULL,
     values = c("Projected" = "dashed", "Measured" = "solid"),
     guide = guide_legend(order = 2)
+  ) +
+  scale_color_manual(
+    name = NULL,
+    values = `names<-`(series_colors, nicknames)
   ) +
   coord_cartesian(ylim = c(45, 150)) +
   labs(
