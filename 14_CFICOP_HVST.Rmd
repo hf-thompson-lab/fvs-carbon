@@ -169,22 +169,10 @@ cficop_hvst_observed_harvest |>
 
 ```{r, eval = FALSE}
 cficop_hvst_observed_harvest |>
-#  group_by(VisitCycle) |>
-#  mutate(
-#    HarvestYear = paste0(HarvestYear, " (n=", n_distinct(MasterPlotID), ")")
-#  ) |>
-#  ungroup() |>
-  mutate(
-    GENUS = fct_lump_n(GENUS, n = 5, w = basal_area, other_level = "Other"),
-#    HarvestYear = ordered(HarvestYear)
-  ) |>
-  group_by(MasterPlotID, HarvestYear, GENUS) |>
-  summarize(
-    basal_area = sum(basal_area, na.rm = TRUE),
-    tpa = n() * 5,
-    n = n(),
-    .groups = "keep"
-  ) |>
+#  semi_join(cfigro_plot, by = join_by(MasterPlotID == STAND_ID)) |>
+  distinct(MasterPlotID, HarvestYear) |>
+  group_by(HarvestYear) |>
+  summarize(n = n()) |>
   ungroup() |>
   ggplot(aes(HarvestYear, n, group = HarvestYear)) +
   geom_col(fill = "blue") +
