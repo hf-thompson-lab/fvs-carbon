@@ -35,17 +35,55 @@ tar_load(cfigro_bai_model)
 tar_load(cfigro_estab)
 tar_load(cfigro_none_growth)
 
-for (mgmt_id in c("NONE", "DFLT", "HVST", "SRVY")) {
+mgmt_ids <- c("NONE", "DFLT", "HVST", "SRVY", "BL56")
+mgmt_methods <- tibble(
+  mgmt_id = mgmt_ids,
+  method = c("Projected", "Projected", "Projected", "Measured", "Projected")
+)
+mgmt_desc <- tibble(
+  mgmt_id = mgmt_ids,
+  desc = c(
+    "Grow-Only",
+    "Default",
+    "Actual (Modeled)",
+    "Actual",
+    "1956 Baseline"
+  )
+)
+
+for (mgmt_id in mgmt_ids) {
   f = list.files(pattern = paste0("*_CFICOP_", mgmt_id, ".Rmd"))
-  get_this_rmd_file() |>
-    str_replace(basename(get_this_rmd_file()), f) |>
+  normalizePath(f) |>
     tar_objects_defined_in_rmd() |>
     tar_load()
 }
 
-get_this_rmd_file() |>
-  tar_objects_defined_in_rmd() |>
-  tar_load()
+# Add a best estimate management ID
+
+cficop_best_carbon <- cficop_none_bai |>
+  select(StandID, Starting_Carbon, Projected_Carbon, Adjusted_AGLCF) |>
+  group_by(StandID) |>
+  summarize(
+    Starting_Carbon = min(Starting_Carbon, na.rm = TRUE),
+    Adjusted_AGLCF = mean(Adjusted_AGLCF, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  cross_join(
+    tibble(Year = seq(1970, 2020, 10))
+  ) |>
+  mutate(
+    Aboveground_Total_Live = Starting_Carbon + Adjusted_AGLCF * (Year - 1970)
+  ) |>
+  select(StandID, Year, Aboveground_Total_Live)
+
+mgmt_ids <- append(mgmt_ids, "BEST")
+mgmt_methods[nrow(mgmt_methods) + 1, ] <- list("BEST", "Projected")
+mgmt_desc[nrow(mgmt_desc) + 1, ] <- list("BEST", "Grow-only, best estimate")
+
+
+#get_this_rmd_file() |>
+#  tar_objects_defined_in_rmd() |>
+#  tar_load()
 
 ## Eve's Colors ----
 
@@ -59,13 +97,14 @@ eves_colors <- c(
   "Pinus" = "#556B2F",
   "Quercus" = "#D2691E"
 )
-#colors3 <- c("darkorange4", "goldenrod3", "darkolivegreen")
 
 ## My Colors ----
-series_colors <- RColorBrewer::brewer.pal(5, "Set1")
+series_colors <- RColorBrewer::brewer.pal(length(mgmt_ids), "Set1")
 ```
 
 # Carbon on the Landscape
+
+TODDO: this is probably not useful
 
 -   Treat the 277 plots as a sample (by area?)
 -   For the sample, we can compute the Standard Error of the Mean (SEM)
@@ -88,57 +127,27 @@ acres, so 0.1%
 
 ## Summary Dataframe
 
-I use this a lot; capture it as a thing:
-```{r cficop_cmp_carbon, eval = FALSE}
-cficop_cmp_carbon <- cficop_none_carbon |>
-  rename(`Site Calibrated` = Aboveground_Total_Live) |>
-  left_join(
-    cficop_dflt_carbon |>
-      rename(Default = Aboveground_Total_Live),
-    by = join_by(StandID, Year)
-  ) |>
-  left_join(
-    cficop_srvy_carbon |>
-      rename(`All Plots` = Aboveground_Total_Live),
-    by = join_by(StandID, Year)
-  ) |>
-  left_join(
-    cficop_none_bai |>
-      select(StandID, Starting_Carbon, Projected_Carbon, Adjusted_AGLCF) |>
-      group_by(StandID) |>
-      summarize(
-        Starting_Carbon = min(Starting_Carbon, na.rm = TRUE),
-        Adjusted_AGLCF = mean(Adjusted_AGLCF, na.rm = TRUE),
-        .groups = "drop"
-      ),
-    by = join_by(StandID)
-  ) |>
-  mutate(
-    `Best Estimate` = Starting_Carbon + Adjusted_AGLCF * (Year - 1970)
-  ) |>
-  select(-c("Starting_Carbon", "Adjusted_AGLCF")) |>
-  pivot_longer(-c("StandID", "Year")) |>
-  union_all(
-    cfigro_srvy_carbon |>
-      select(StandID, Year, `Undisturbed (31)` = Aboveground_Total_Live) |>
-      pivot_longer(-c("StandID", "Year"))
-  ) |>
-  mutate(
-    method = name |> recode_values(
-      "Default" ~ "Projected",
-      "Site Calibrated" ~ "Projected",
-      "Best Estimate" ~ "Projected",
-      "Undisturbed (31)" ~ "Measured",
-      "All Plots" ~ "Measured"
-    ),
-    name = ordered(
-      name,
-      levels = c("All Plots", "Undisturbed (31)", "Default", "Site Calibrated", "Best Estimate")
-    )
-  )
+CFICOP_NONE has the correct set of plots, e.g. it removes the plots
+that don't have a sibling. Filter all management IDs to only those
+plots.
 
-cficop_cmp_carbon_summary <- cficop_cmp_carbon |>
-  group_by(Year, name, method) |>
+Create the canonical dataframe of carbon.
+
+```{r cficop_cmp_carbon, eval = FALSE}
+cficop_nlyz_carbon <- lapply(mgmt_ids, \(mgmt_id) {
+  get(paste0("cficop_", tolower(mgmt_id), "_carbon")) |>
+    filter(Year %% 10 == 0) |>
+    mutate(mgmt_id = !!mgmt_id) |>
+    left_join(mgmt_methods, by = join_by(mgmt_id))
+}) |>
+  bind_rows() |>
+  group_by(StandID) |>
+  filter(any(mgmt_id == "NONE")) |>
+  ungroup()
+
+cficop_nlyz_carbon_summary <- cficop_nlyz_carbon |>
+  rename(value = Aboveground_Total_Live) |>
+  group_by(mgmt_id, Year, method) |>
   summarize(
     n = n(),
     mean = mean(value, na.rm = TRUE),
@@ -148,7 +157,392 @@ cficop_cmp_carbon_summary <- cficop_cmp_carbon |>
   )
 ```
 
-## Population Mean
+# Graph It
+
+```{r}
+cficop_nlyz_carbon_summary |>
+  ggplot(aes(Year, mean, color = mgmt_id)) +
+  geom_line(aes(linetype = method)) +
+  geom_point() +
+  theme_bw(base_size = 14) +
+  theme(aspect.ratio = 1) +
+  scale_linetype_manual(
+    name = NULL,
+    values = c("Projected" = "dashed", "Measured" = "solid"),
+    guide = guide_legend(order = 2)
+  ) +
+  coord_cartesian(ylim = c(45, 150)) +
+  labs(
+    title = "Quabbin CFI Carbon Projection",
+    color = NULL
+  ) +
+  xlab("Year") +
+  ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
+
+```
+
+# Bootstrapping
+
+## NRS-18
+
+NRS-18 says:
+
+Using Forest Inventory and Analysis Data to Estimate Coefficient of
+Variation and Number of Sampling Plots
+
+* Download data (http://ncrs2.fs.fed.us/4801/fiadb/) and apply biomass equations
+and expansion factors (see section 4.1) for the specific area and forest type of
+interest. Sum to obtain plot level results.
+
+* Calculate mean carbon stocks across the dataset or optionally across strata of
+interest, then calculate standard deviation and the coefficient of variation.
+
+* The minimum number of plots required for monitoring is calculated by solving
+for n in the formula for the confidence interval (CI). Target ± 7 to 8 percent of the
+mean as a reasonable level of precision (this accounts for the sampling error
+only; sources of error such as measurement error and model error likely will
+account for 10 to 20 percent of total error thus, a target of ± 7 to 8 percent CI
+of the mean for sampling will result in a total error for the confidence interval of
+about 10 percent of the mean).
+
+$n = (s \times 2.1)/(mean \times 0.08)^2$
+
+where s = standard deviation
+
+let's look at mean and sd of carbon stocks in Quabbin in 1970:
+
+```{r}
+cficop_nlyz_carbon |>
+  filter(mgmt_id == "SRVY") |>
+  filter(Year == 1970) |>
+  summarize(
+    mean = mean(Aboveground_Total_Live),
+    sd = sd(Aboveground_Total_Live)
+  )
+```
+
+Mean is 51.14, sd is 21.24.
+
+```{r}
+(21.24 * 2.1)/(51.14 * 0.08)^2
+```
+
+which says 3 plots, which nobody is going to accept.
+
+If the whole thing is squared:
+
+```{r}
+((21.24 * 2.1)/(51.14 * 0.08))^2
+```
+
+we get 119 plots, but this doesn't give 99 for CV=41.
+
+Coefficient of variation is
+([standard deviation * 100] / mean)
+
+```{r}
+((21.24 * 100) / 50)
+```
+
+42; in the sample table, Illinois has a CV of 41, for 99 plots.
+
+NRS-18 also says that, for a 50-year projection, use "Large", which would
+be 99 for Illinois, and 45 for Ohio.
+
+## 100 Plots
+
+What kinds of games could be played by selecting a subset of stands?
+
+```{r, eval = FALSE}
+# We can get a correlated sample by using a dataframe with all management IDs
+tmp_carbon <- cficop_nlyz_carbon |>
+  pivot_wider(
+    id_cols = c(StandID, Year),
+    values_from = Aboveground_Total_Live,
+    names_from = mgmt_id
+  )
+
+plot_carbon_100 <- lapply(1:10000, \(x) {
+  tmp_stands <- tmp_carbon |>
+    distinct(StandID) |>
+    sample_n(size = 100, replace = FALSE)
+
+  tmp_carbon |>
+    semi_join(tmp_stands, by = join_by(StandID)) |>
+    group_by(Year) |>
+    summarize(
+      NONE = mean(NONE),
+      DFLT = mean(DFLT),
+      HVST = mean(HVST),
+      SRVY = mean(SRVY),
+      BL56 = mean(BL56),
+      BEST = mean(BEST)
+    ) |>
+    mutate(Sample = x)
+}) |>
+  do.call(rbind, args = _)
+
+# Compute Percentile boostrap CIs
+plot_carbon_100_ci <- plot_carbon_100 |>
+  pivot_longer(all_of(mgmt_ids)) |>
+  group_by(Year, name) |>
+  summarize(
+    lower_bound = min(value),
+    lower_ci = quantile(value, probs = 0.025),
+    middle_ci = quantile(value, probs = 0.5),
+    upper_ci = quantile(value, probs = 0.975),
+    upper_bound = max(value),
+    .groups = "drop"
+  ) |>
+  mutate(
+    dummy = "95% CI"
+  )
+```
+
+### Distribution by Management ID
+
+```{r}
+plot_carbon_100 |>
+  filter(Year == 2020) |>
+  pivot_longer(!c(Year, Sample)) |>
+  left_join(mgmt_desc, by = join_by(name == mgmt_id)) |>
+  ggplot(aes(value)) +
+  geom_density(aes(fill = desc), alpha = 0.5) +
+  theme_bw() +
+  scale_fill_manual(
+    name = NULL,
+    values = `names<-`(series_colors, mgmt_desc$desc)
+  ) +
+  ggtitle("Bootstrapped C distribution (2020)") +
+  xlab(bquote("Aboveground Live Carbon" ~ (`Mg C` %.% hectare^-1)))
+```
+
+
+```{r}
+plot_carbon_100 |>
+  filter(Year == 2020) |>
+  pivot_longer(!c(Year, Sample)) |>
+  filter(name %in% c("BEST", "DFLT", "NONE", "SRVY")) |>
+  left_join(mgmt_desc, by = join_by(name == mgmt_id)) |>
+  ggplot(aes(value)) +
+  geom_density(aes(fill = desc), alpha = 0.5) +
+  theme_bw() +
+  scale_fill_manual(
+    name = NULL,
+    values = `names<-`(series_colors, mgmt_desc$desc)
+  ) +
+  coord_cartesian(xlim = c(90, 140)) +
+  ggtitle("Bootstrapped C distribution (2020, ss=100)") +
+  xlab(bquote("Aboveground Live Carbon" ~ (`Mg C` %.% hectare^-1))) +
+  labs(fill = NULL)
+```
+
+
+```{r}
+plot_carbon_100 |>
+  filter(Year == 2020) |>
+  pivot_longer(!c(Year, Sample)) |>
+  filter(name %in% c("HVST", "BL56", "SRVY")) |>
+  left_join(mgmt_desc, by = join_by(name == mgmt_id)) |>
+  ggplot(aes(value)) +
+  geom_density(aes(fill = desc), alpha = 0.5) +
+  theme_bw() +
+  scale_fill_manual(
+    name = NULL,
+    values = `names<-`(series_colors, mgmt_desc$desc)
+  ) +
+#  coord_cartesian(xlim = c(90, 140)) +
+  ggtitle("Bootstrapped C distribution (2020, ss=100)") +
+  xlab(bquote("Aboveground Live Carbon" ~ (`Mg C` %.% hectare^-1))) +
+  labs(fill = NULL)
+```
+
+### Delta Distribution
+
+```{r}
+plot_carbon_100 |>
+  mutate(
+    `Modeled - Baseline` = HVST - BL56,
+    `Actual - Baseline` = SRVY - BL56
+  ) |>
+  filter(Year == 2020) |>
+  pivot_longer(!c(Year, Sample)) |>
+  filter(name %in% c("Modeled - Baseline", "Actual - Baseline")) |>
+  ggplot(aes(value)) +
+  geom_density(aes(fill = name), alpha = 0.5) +
+  theme_bw() +
+  ggtitle("Correlated Sample C Delta Distribution (2020, ss=100)") +
+  xlab(bquote("Additionality" ~ (`Mg C` %.% hectare^-1))) +
+  labs(fill = NULL)
+
+```
+
+## 50 Plots
+
+
+What kinds of games could be played by selecting a subset of stands?
+
+```{r, eval = FALSE}
+plot_carbon_50 <- lapply(1:10000, \(x) {
+  tmp_stands <- tmp_carbon |>
+    distinct(StandID) |>
+    sample_n(size = 50, replace = FALSE)
+
+  tmp_carbon |>
+    semi_join(tmp_stands, by = join_by(StandID)) |>
+    group_by(Year) |>
+    summarize(
+      NONE = mean(NONE),
+      DFLT = mean(DFLT),
+      HVST = mean(HVST),
+      SRVY = mean(SRVY),
+      BL56 = mean(BL56),
+      BEST = mean(BEST)
+    ) |>
+    mutate(Sample = x)
+}) |>
+  do.call(rbind, args = _)
+
+# Compute Percentile boostrap CIs
+plot_carbon_50_ci <- plot_carbon_50 |>
+  pivot_longer(all_of(mgmt_ids)) |>
+  group_by(Year, name) |>
+  summarize(
+    lower_bound = min(value),
+    lower_ci = quantile(value, probs = 0.025),
+    middle_ci = quantile(value, probs = 0.5),
+    upper_ci = quantile(value, probs = 0.975),
+    upper_bound = max(value),
+    .groups = "drop"
+  ) |>
+  mutate(
+    dummy = "95% CI"
+  )
+```
+
+TODO: what is the delta between things for the various samples?
+
+### Distribution by Management ID
+
+```{r}
+plot_carbon_50 |>
+  filter(Year == 2020) |>
+  pivot_longer(!c(Year, Sample)) |>
+  left_join(mgmt_desc, by = join_by(name == mgmt_id)) |>
+  ggplot(aes(value)) +
+  geom_density(aes(fill = desc), alpha = 0.5) +
+  theme_bw() +
+  scale_fill_manual(
+    name = NULL,
+    values = `names<-`(series_colors, mgmt_desc$desc)
+  ) +
+  ggtitle("Bootstrapped C distribution (2020, ss=50)") +
+  xlab(bquote("Aboveground Live Carbon" ~ (`Mg C` %.% hectare^-1)))
+```
+
+
+```{r}
+plot_carbon_50 |>
+  filter(Year == 2020) |>
+  pivot_longer(!c(Year, Sample)) |>
+  filter(name %in% c("BEST", "DFLT", "NONE", "SRVY")) |>
+  left_join(mgmt_desc, by = join_by(name == mgmt_id)) |>
+  ggplot(aes(value)) +
+  geom_density(aes(fill = desc), alpha = 0.5) +
+  theme_bw() +
+  scale_fill_manual(
+    name = NULL,
+    values = `names<-`(series_colors, mgmt_desc$desc)
+  ) +
+  coord_cartesian(xlim = c(80, 150)) +
+  ggtitle("Bootstrapped C distribution (2020, ss=50)") +
+  xlab(bquote("Aboveground Live Carbon" ~ (`Mg C` %.% hectare^-1))) +
+  labs(fill = NULL)
+```
+
+
+```{r}
+plot_carbon_50 |>
+  filter(Year == 2020) |>
+  pivot_longer(!c(Year, Sample)) |>
+  filter(name %in% c("HVST", "BL56", "SRVY")) |>
+  left_join(mgmt_desc, by = join_by(name == mgmt_id)) |>
+  ggplot(aes(value)) +
+  geom_density(aes(fill = desc), alpha = 0.5) +
+  theme_bw() +
+  scale_fill_manual(
+    name = NULL,
+    values = `names<-`(series_colors, mgmt_desc$desc)
+  ) +
+#  coord_cartesian(xlim = c(80, 150)) +
+  ggtitle("Bootstrapped C distribution (2020, ss=50)") +
+  xlab(bquote("Aboveground Live Carbon" ~ (`Mg C` %.% hectare^-1))) +
+  labs(fill = NULL)
+```
+
+### Delta Distribution
+
+```{r}
+plot_carbon_50 |>
+  mutate(
+    `Modeled - Baseline` = HVST - BL56,
+    `Actual - Baseline` = SRVY - BL56
+  ) |>
+  filter(Year == 2020) |>
+  pivot_longer(!c(Year, Sample)) |>
+  filter(name %in% c("Modeled - Baseline", "Actual - Baseline")) |>
+  ggplot(aes(value)) +
+  geom_density(aes(fill = name), alpha = 0.5) +
+  theme_bw() +
+  ggtitle("Correlated Sample C Delta Distribution (2020, ss=50)") +
+  xlab(bquote("Additionality" ~ (`Mg C` %.% hectare^-1))) +
+  labs(fill = NULL)
+```
+
+
+## Old Stuff
+
+```{r}
+plot_carbon_bootstrap |>
+#  filter(name %in% c("All Plots", "Grow Only")) |>
+  ggplot(aes(value, color = name)) +
+  geom_density() +
+  geom_vline(
+    data = plot_carbon_ci |>
+      filter(name %in% c("Default", "Site Calibrated", "Best Estimate")),
+#      filter(name %in% c("All Plots", "Grow Only")),
+    mapping = aes(xintercept = lower_ci, color = name, linetype = dummy)
+  ) +
+  geom_vline(
+    data = plot_carbon_ci |>
+      filter(name %in% c("Default", "Site Calibrated", "Best Estimate")),
+#      filter(name %in% c("All Plots", "Grow Only")),
+    mapping = aes(xintercept = upper_ci, color = name, linetype = dummy),
+    linetype = "dashed"
+  ) +
+  scale_color_manual(
+    name = "Scenario",
+    values = c(
+      "Default" = series_colors[1],
+      "Site Calibrated" = series_colors[2],
+      "Undisturbed (31)" = series_colors[3],
+      "Best Estimate" = series_colors[4],
+      "All Plots" = series_colors[5]
+    ),
+    guide = guide_legend(order = 1)
+  ) +
+  scale_linetype_manual(
+    name = NULL,
+    values = c("95% CI" = "dashed"),
+    guide = guide_legend(order = 2)
+  ) +
+  facet_wrap(~Year) +
+  theme_bw() + ggtitle("Bootstrap CI (sample size=10, n=10000)") +
+  xlab(bquote("Aboveground Live Carbon" ~ (`Mg C` %.% hectare^-1)))
+```
+
+
+# Population Mean
 
 So, let's look at distribution of biomass in our 277 plot sample:
 
@@ -504,111 +898,6 @@ all_dbhdist |>
   xlab("Diameter Class (inches)") +
   ylab(bquote(trees %.% acre^-1))
 ```
-
-# Bootstrapping
-
-## 95% CI for 2020 Carbon
-
-Quabbin has 55760 forested acres. By FIA standards, we need one plot
-per 6,000 acres, so that's 9.3 plots, round up to 10. From our 277 plots,
-we'll take repeated samples of 10 plots (with replacement) to get a
-distribution of the mean.
-
-```{r, eval = FALSE}
-tmp_carbon <- cficop_cmp_carbon |>
-  pivot_wider(id_cols = c("StandID", "Year"))
-
-# We can get a correlated sample for the series that use all plots
-plot_carbon_all_plots <- lapply(1:10000, \(x) {
-  tmp_carbon |>
-    group_by(Year) |>
-    sample_n(size = 10, replace = TRUE) |>
-    summarize(
-      Default = mean(Default),
-      `Site Calibrated` = mean(`Site Calibrated`),
-      `Best Estimate` = mean(`Best Estimate`),
-      `All Plots` = mean(`All Plots`)
-    ) |>
-    mutate(Sample = x)
-}) |>
-  do.call(rbind, args = _)
-
-# Add in an independent sample for Grow Only
-tmp_carbon_grow_only <- tmp_carbon |>
-  filter(!is.na(`Undisturbed (31)`))
-plot_carbon_grow_only <- lapply(1:10000, \(x) {
-  tmp_carbon_grow_only |>
-    group_by(Year) |>
-    sample_n(size = 10, replace = TRUE) |>
-    summarize(
-      `Undisturbed (31)` = mean(`Undisturbed (31)`)
-    ) |>
-    mutate(Sample = x)
-}) |>
-  do.call(rbind, args = _)
-
-plot_carbon_bootstrap <- plot_carbon_all_plots |>
-  left_join(plot_carbon_grow_only, by = join_by(Year, Sample)) |>
-  pivot_longer(-c("Year", "Sample")) |>
-  mutate(
-    name = ordered(
-      name,
-      levels = c("Default", "Site Calibrated", "Undisturbed (31)", "Best Estimate", "All Plots")
-    )
-  )
-
-# Compute Percentile boostrap CIs
-plot_carbon_ci <- plot_carbon_bootstrap |>
-  group_by(Year, name) |>
-  summarize(
-    lower_ci = quantile(value, probs = 0.025),
-    middle_ci = quantile(value, probs = 0.5),
-    upper_ci = quantile(value, probs = 0.975),
-    .groups = "drop"
-  ) |>
-  mutate(
-    dummy = "95% CI"
-  )
-
-plot_carbon_bootstrap |>
-  filter(name %in% c("Default", "Site Calibrated", "Best Estimate")) |>
-#  filter(name %in% c("All Plots", "Grow Only")) |>
-  ggplot(aes(value, color = name)) +
-  geom_density() +
-  geom_vline(
-    data = plot_carbon_ci |>
-      filter(name %in% c("Default", "Site Calibrated", "Best Estimate")),
-#      filter(name %in% c("All Plots", "Grow Only")),
-    mapping = aes(xintercept = lower_ci, color = name, linetype = dummy)
-  ) +
-  geom_vline(
-    data = plot_carbon_ci |>
-      filter(name %in% c("Default", "Site Calibrated", "Best Estimate")),
-#      filter(name %in% c("All Plots", "Grow Only")),
-    mapping = aes(xintercept = upper_ci, color = name, linetype = dummy),
-    linetype = "dashed"
-  ) +
-  scale_color_manual(
-    name = "Scenario",
-    values = c(
-      "Default" = series_colors[1],
-      "Site Calibrated" = series_colors[2],
-      "Undisturbed (31)" = series_colors[3],
-      "Best Estimate" = series_colors[4],
-      "All Plots" = series_colors[5]
-    ),
-    guide = guide_legend(order = 1)
-  ) +
-  scale_linetype_manual(
-    name = NULL,
-    values = c("95% CI" = "dashed"),
-    guide = guide_legend(order = 2)
-  ) +
-  facet_wrap(~Year) +
-  theme_bw() + ggtitle("Bootstrap CI (sample size=10, n=10000)") +
-  xlab(bquote("Aboveground Live Carbon" ~ (`Mg C` %.% hectare^-1)))
-```
-
 
 # Imaginary COP
 
