@@ -357,7 +357,7 @@ plot_carbon_100 |>
   labs(fill = NULL)
 ```
 
-### Delta Distribution
+### Attitionality Distribution
 
 ```{r}
 plot_carbon_100 |>
@@ -370,11 +370,33 @@ plot_carbon_100 |>
   filter(name %in% c("Modeled - Baseline", "Actual - Baseline")) |>
   ggplot(aes(value)) +
   geom_density(aes(fill = name), alpha = 0.5) +
+  coord_cartesian(xlim=c(-25, 25)) +
   theme_bw() +
   ggtitle("Correlated Sample C Delta Distribution (2020, ss=100)") +
   xlab(bquote("Additionality" ~ (`Mg C` %.% hectare^-1))) +
   labs(fill = NULL)
 
+```
+
+### Reversal Distribution
+
+```{r}
+plot_carbon_100 |>
+  mutate(
+    `Modeled - Baseline` = HVST - BL56,
+    `Actual - Baseline` = SRVY - BL56,
+    Reversals = `Actual - Baseline` - `Modeled - Baseline`
+  ) |>
+  filter(Year == 2020) |>
+  pivot_longer(!c(Year, Sample)) |>
+  filter(name %in% c("Reversals")) |>
+  ggplot(aes(value)) +
+  geom_density(aes(fill = name), alpha = 0.5) +
+  coord_cartesian(xlim=c(-30, 5)) +
+  theme_bw() +
+  ggtitle("Correlated Sample Reversal Distribution (2020, ss=100)") +
+  xlab(bquote("Reversals" ~ (`Mg C` %.% hectare^-1))) +
+  labs(fill = NULL)
 ```
 
 ## 50 Plots
@@ -493,6 +515,7 @@ plot_carbon_50 |>
   filter(name %in% c("Modeled - Baseline", "Actual - Baseline")) |>
   ggplot(aes(value)) +
   geom_density(aes(fill = name), alpha = 0.5) +
+  coord_cartesian(xlim=c(-25, 25)) +
   theme_bw() +
   ggtitle("Correlated Sample C Delta Distribution (2020, ss=50)") +
   xlab(bquote("Additionality" ~ (`Mg C` %.% hectare^-1))) +
@@ -500,6 +523,26 @@ plot_carbon_50 |>
 ```
 
 
+### Reversal Distribution
+
+```{r}
+plot_carbon_50 |>
+  mutate(
+    `Modeled - Baseline` = HVST - BL56,
+    `Actual - Baseline` = SRVY - BL56,
+    Reversals = `Actual - Baseline` - `Modeled - Baseline`
+  ) |>
+  filter(Year == 2020) |>
+  pivot_longer(!c(Year, Sample)) |>
+  filter(name %in% c("Reversals")) |>
+  ggplot(aes(value)) +
+  geom_density(aes(fill = name), alpha = 0.5) +
+  coord_cartesian(xlim=c(-30, 5)) +
+  theme_bw() +
+  ggtitle("Correlated Sample Reversal Distribution (2020, ss=50)") +
+  xlab(bquote("Reversals" ~ (`Mg C` %.% hectare^-1))) +
+  labs(fill = NULL)
+```
 ## Old Stuff
 
 ```{r}
