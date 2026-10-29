@@ -18,7 +18,7 @@ cfi_with_visit_info <- function(.data, tblDWSPCFIPlotVisitsComplete) {
   .data |>
     left_join(
       tblDWSPCFIPlotVisitsComplete |>
-        select(MasterPlotVisitID, MasterPlotID, Watershed, VisitCycle, VisitYear),
+        select(MasterPlotVisitID, MasterPlotID, Watershed, VisitCycle, VisitYear, VisitCoverType),
       by = join_by(MasterPlotVisitID)
     )
 }

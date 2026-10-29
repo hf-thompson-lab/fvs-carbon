@@ -1,0 +1,873 @@
+---
+title: "CFICOP_FIA"
+output: html_document
+---
+
+# Intro
+
+Create a COP Baseline using FIA data the USDA Bioregions around Quabbin.
+
+# Setup
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(targets)
+  library(tarchetypes)
+  library(tidyverse)
+  library(terra)
+  library(tidyterra)
+  library(sf)
+  library(rnaturalearth)
+  library(ggspatial)
+  library(measurements)
+})
+tar_source()
+```
+
+Preload targets results
+
+```{r, eval = FALSE}
+tar_load(fiadb)
+tar_load(species_crosswalk)
+tar_load(fvs_num_partitions)
+tar_load(fvs_partition)
+tar_load(fvs_randseed)
+
+tar_load(fvsne_states)
+
+tar_load(nrsgro_plot)
+
+get_this_rmd_file() |>
+  tar_objects_defined_in_rmd() |>
+  tar_load()
+```
+
+# Context
+
+There are no FIA plots in the Northeast until the 1980s, and then
+only a handful until the 2000s.
+
+Let's see what we can do to build a baseline of harvest from
+the FIA data.
+
+## USFS Ecosubsections
+
+FIA references USFS Ecosubsections, which similiar to but not the same
+as EPA ecoregions. I'll work with USFS Ecosubsections, since this is
+both defensible and easier.
+
+## Quabbin Subsections
+
+Quabbin Reservoir is in USFS Ecosubsection 221Ah. Following Finzi 2020
+and extending the comparable range north, I will also look at USFS
+Ecosubsections M211Bd and 221Ai in southern New Hampshire.
+
+221Ai is the Gulf of Maine Coastal Plain; it has a distinct ecology
+from the inland hills, plateaus and plains, so I will exclude it.
+
+```{r, eval = FALSE}
+usfs_ecosub <- terra::vect(file.path(
+  "/vsizip",
+  "data/raw/Ecosys_EcomapSubsections_2007.gdb.zip",
+  "Ecosys_EcomapSubsections_2007.gdb"
+)) |>
+  # These come in EPSG:4269, which is a meters projection
+  # for North America. Convert to lat/lon like everything else.
+  # Note that EPSG:4269 is NAD83, whereas EPSG:4326 is WGS84,
+  # so this re-projection is not meter accurate.
+  terra::project(crs("epsg:4326"))
+```
+
+## FIA Plots
+
+When did we get plots in each ecoregion of interest?
+```{r, eval = FALSE}
+fia_plots_filtered(fiadb, plots = NULL, filter = \(.data, con) {
+  .data |>
+    filter(ECOSUBCD %in% c("M211Bd", "221Ah")) |>
+    group_by(STATECD, COUNTYCD, PLOT) |>
+    filter(INVYR == min(INVYR, na.rm = TRUE)) |>
+    ungroup() |>
+    group_by(ECOSUBCD, INVYR) |>
+    summarize(n = n(), .groups = "drop")
+}) |>
+  group_by(ECOSUBCD) |>
+  mutate(n = cumsum(n)) |>
+  ggplot(aes(INVYR, n, color = ECOSUBCD)) +
+  geom_step() +
+  theme_bw() +
+  coord_cartesian(xlim = c(1970, 2020), ylim = c(0, NA)) +
+  ggtitle("Number of FIA plots in Ecosub M211Bd and 221Ah") +
+  ylab("Number of Plots") +
+  xlab("Year")
+```
+
+## Map
+
+```{r, eval = FALSE}
+fvsne_states_map <- fvsne_states |>
+  distinct(STATE_NAME) |>
+  rename(region = STATE_NAME) |>
+  _$region |>
+  map_data("state", region = _)
+
+fvsne_ecosub_map <- usfs_ecosub |>
+  filter(MAP_UNIT_SYMBOL %in% c("M211Bd", "221Ah"))
+
+map_ext <- fvsne_ecosub_map |>
+  terra::buffer(50 * 1000) |>
+  terra::ext()
+
+lakes_north_america <- ne_download(
+  scale = 10, type = "lakes_north_america", category = "physical"
+)
+fvsne_bbox <- st_as_sfc(
+  st_bbox(fvsne_ecosub_map |> terra::buffer(50*1000))
+)
+st_crs(fvsne_bbox) <- "WGS84"
+sf_use_s2(FALSE)
+lakes_ecosub <- lakes_north_america[
+  st_intersects(lakes_north_america, fvsne_bbox, sparse = FALSE),
+]
+
+plot_location_tmp <- fia_plots_filtered(
+  fiadb, plots = NULL, filter = \(.data, con) {
+    .data |>
+      filter(ECOSUBCD %in% c("M211Bd", "221Ah")) |>
+      group_by(STATECD, COUNTYCD, PLOT) |>
+      filter(INVYR == min(INVYR, na.rm = TRUE)) |>
+      ungroup()
+  }
+) |>
+  filter_add_stand_id() |>
+  select(STAND_ID, CN, LAT, LON, ELEV, ECOSUBCD) |>
+  rename(
+    StandID = STAND_ID,
+    group = CN,
+    lat = LAT,
+    long = LON,
+    elev = ELEV
+  )
+
+ggplot() +
+  geom_spatvector(
+    data = fvsne_ecosub_map,
+    mapping = aes(group = MAP_UNIT_SYMBOL, fill = MAP_UNIT_NAME),
+    inherit.aes = FALSE
+  ) +
+  geom_sf(
+    data = lakes_ecosub,
+    fill = "blue",
+    inherit.aes = FALSE
+  ) +
+  geom_polygon(
+    data = fvsne_states_map,
+    mapping = aes(long, lat, group = group),
+    fill = "transparent",
+    color = "black"
+  ) +
+  geom_point(
+    data = plot_location_tmp,
+    mapping = aes(long, lat, group = group),
+    size = 0.5,
+    color = "white"
+  ) +
+  geom_point(
+    data = plot_location_tmp,
+    mapping = aes(long, lat, group = group),
+    size = 0.1,
+    color = "black"
+  ) +
+  scale_fill_viridis_d() +
+  coord_sf(
+    crs = "epsg:4326",
+    xlim = c(map_ext$xmin, map_ext$xmax),
+    ylim = c(map_ext$ymin, map_ext$ymax)
+  ) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(
+    location = "br",
+    #width = unit(1, "cm"),
+    style = north_arrow_minimal,
+    pad_x = unit(-0.25, "cm"),
+    pad_y = unit(0.65, "cm"),
+    which_north = "true"
+  ) +
+  theme_bw() +
+#  theme(legend.position = "bottom") +
+  ggtitle("FIA Plots in USFS Ecosubsections") +
+  labs(fill = "Ecosubsection")
+
+#remove(plot_location_tmp)
+```
+
+How many?
+
+```{r, eval = FALSE}
+plot_location_tmp |>
+  left_join(
+    usfs_ecosub |> as.data.frame(), by = join_by(ECOSUBCD == MAP_UNIT_SYMBOL)
+  ) |>
+  group_by(MAP_UNIT_NAME) |>
+  summarize(n = n()) |>
+  knitr::kable()
+```
+
+So a little over 500 plots by the end.
+
+## Harvest
+
+How many of these plots ever get harvested?
+
+```{r, eval = FALSE}
+get_harvested_plots <- function() {
+  con <- DBI::dbConnect(RSQLite::SQLite(), fiadb, flags = RSQLite::SQLITE_RO)
+  on.exit(DBI::dbDisconnect(con), add = TRUE, after = FALSE)
+
+  plots_harvested_bycond <- tbl(con, "COND") |>
+    group_by(STATECD, COUNTYCD, PLOT, INVYR) |>
+    filter(
+      sum(
+        if_else(!is.na(TRTCD1) & TRTCD1 == 10, 1,
+          if_else(!is.na(TRTCD2) & TRTCD2 == 10, 1,
+            if_else(!is.na(TRTCD3) & TRTCD3 == 10, 1, 0)
+          )
+        ),
+        na.rm = TRUE
+      ) > 0
+    ) |>
+    ungroup() |>
+    inner_join(
+        tbl(con, "PLOT") |>
+        filter(ECOSUBCD %in% c("M211Bd", "221Ah")),
+        by = join_by(STATECD, COUNTYCD, PLOT, INVYR)
+    ) |>
+    collect()
+}
+  
+plot_harvested_tmp <- get_harvested_plots()
+```
+
+```{r, eval = FALSE}
+plot_harvested_tmp |>
+  distinct(STATECD, COUNTYCD, PLOT) |>
+  nrow()
+```
+
+So, 52 plots were harvested
+
+```{r, eval = FALSE}
+plot_harvested_tmp |>
+  distinct(STATECD, COUNTYCD, PLOT, INVYR) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  filter(n() > 1) |>
+  ungroup() |>
+  nrow()
+```
+
+12 are harvested more than once
+
+```{r, eval = FALSE}
+plot_harvested_tmp |>
+  distinct(STATECD, COUNTYCD, PLOT, CONDID) |>
+  nrow()
+```
+
+71 conditions; unclear from this whether any plots have harvest on
+a subset of their conditions, and whether unharvested conditions
+are forested.
+
+# Forest Type
+
+What forest type do the harvested plots have?
+
+```{r, eval = FALSE}
+cond_harvested_tmp <- fia_conds(fiadb, plot_harvested_tmp)
+```
+
+```{r, eval = FALSE}
+cond_harvested_tmp |>
+  ggplot(aes(FORTYPE)) +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1))
+```
+
+That's a bunch of NA FORTYPEs; what up?
+
+```{r, eval = FALSE}
+cond_harvested_tmp |> filter(is.na(FORTYPE)) |> distinct(FORTYPCD, FLDTYPCD, ALSTKCD)
+```
+
+So we genuinely don't know what's on those conditions.
+
+Do the other conditions on those plots have forest types?
+
+```{r, eval = FALSE}
+cond_harvested_tmp |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  mutate(any_missing_fortype = any(is.na(FORTYPCD))) |>
+  slice_max(if_else(is.na(FORTYPCD), 0, FORTYPCD)) |>
+  ungroup() |>
+  filter(any_missing_fortype) |>
+  distinct(FORTYPCD, FLDTYPCD, ALSTKCD)
+```
+
+So, other conditions on those plots do have forest type.
+We can use those as a proxy. Let's aggregate by plot.
+
+```{r, eval = FALSE}
+cond_harvested_tmp |>
+  filter(!is.na(FORTYPCD)) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  slice_min(FORTYPCD) |>
+  ungroup() |>
+  ggplot(aes(fct_infreq(FORTYPE))) +
+  geom_bar(fill = "blue") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  ggtitle("FIA Plots Harvested near Quabbin") +
+  xlab("Forest Type") +
+  ylab("Number of Plots")
+```
+
+Other than eastern white pine, these look like opportune harvests.
+They all fit the forest types seen in quabbin.
+So I'll take the rate of harvest of all these forest types in FIA.
+
+## All Plots
+
+How well do these harvested plots represent plots in the area?
+
+```{r, eval = FALSE}
+cficop_fia_plots <- fia_plots_filtered(fiadb, plots = NULL, filter = \(.data, con) {
+  .data |>
+    filter(ECOSUBCD %in% c("M211Bd", "221Ah")) |>
+    filter(INVYR >= 2000 & INVYR <= 2025)
+})
+```
+
+```{r, eval = FALSE}
+cficop_fia_plots |>
+  fia_conds(fiadb, plots = _) |>
+  filter(!is.na(FORTYPCD)) |>
+  group_by(STATECD, COUNTYCD, PLOT) |>
+  slice_min(FORTYPCD) |>
+  ungroup() |>
+  ggplot(aes(fct_infreq(FORTYPE))) +
+  geom_bar(fill = "blue") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  ggtitle("FIA Plots near Quabbin") +
+  xlab("Forest Type") +
+  ylab("Number of Plots")
+```
+
+## FIA Forest Types
+
+Should be able to plot those at the same time
+
+```{r, eval = FALSE}
+cficop_fia_plots |>
+  anti_join(plot_harvested_tmp, by = join_by(STATECD, COUNTYCD, PLOT)) |>
+  fia_conds(fiadb, plots = _) |>
+  mutate(
+    STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT),
+    harvested = "not harvested"
+  ) |>
+  select(STAND_ID, FORTYPCD, FORTYPE, harvested) |>
+  union_all(
+    cond_harvested_tmp |>
+      mutate(
+        STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT),
+        harvested = "harvested"
+      ) |>
+      select(STAND_ID, FORTYPCD, FORTYPE, harvested)
+  ) |>
+  filter(!is.na(FORTYPCD)) |>
+  group_by(STAND_ID) |>
+  slice_min(FORTYPCD) |>
+  ungroup() |>
+  mutate(
+    harvested = ordered(harvested, levels = c("not harvested", "harvested"))
+  ) |>
+  ggplot(aes(fct_infreq(FORTYPE), fill = harvested)) +
+  geom_bar(position = position_dodge(preserve = "single")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  ggtitle("FIA Plots near Quabbin") +
+  xlab("Forest Type") +
+  ylab("Number of Plots") +
+  labs(fill = NULL)
+```
+
+## CFI Forest Types
+
+What do we have for CFI forest types?
+
+```{r, eval = FALSE}
+tar_load(qryDWSPCFIPlotVisitTreeDetail)
+tar_load(tblDWSPCFIPlotVisitsComplete)
+tar_load(tblDWSPCFITreesComplete)
+tar_load(tblDWSPCFIPlotsComplete)
+tar_load(cfiabp_trees)
+tblSuppPlotForestTypeCodes <- readxl::read_excel("data/raw/DWSP_CFI/tblSuppPlotForestTypeCodes.xlsx")
+cfi_plots_with_cover_type <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  semi_join(
+    cfiabp_trees,
+    by = join_by(MasterPlotID)
+  ) |>
+#  cfi_abp(cfiabp_trees) |>
+#  View()
+  left_join(
+    tblSuppPlotForestTypeCodes,
+    by = join_by(VisitCoverType == CoverTypeCode)
+  ) |>
+  group_by(MasterPlotID) |>
+  arrange(rev(VisitCycle)) |>
+  slice_head(n = 1) |>
+  ungroup()
+```
+
+```{r, eval = FALSE}
+tar_load(cficop_hvst_observed_harvest)
+cfi_plots_with_cover_type |>
+  left_join(
+    cficop_hvst_observed_harvest |>
+      distinct(MasterPlotID) |>
+      mutate(harvested = "harvested"),
+    by = join_by(MasterPlotID)
+  ) |>
+  replace_na(list(harvested = "not harvested")) |>
+  select(MasterPlotID, VisitCoverType, ForestTypeDesc, harvested) |>
+  mutate(
+    harvested = ordered(harvested, levels = c("not harvested", "harvested"))
+  ) |>
+  ggplot(aes(fct_infreq(ForestTypeDesc), fill = harvested)) +
+  geom_bar(position = position_dodge(preserve = "single")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  ggtitle("CFI Plots near Quabbin") +
+  xlab("Forest Type") +
+  ylab("Number of Plots") +
+  labs(fill = NULL)
+```
+
+# Harvest Frequency & Intensity
+
+## Frequency
+
+How frequently is a plot harvested?
+
+```{r, eval = FALSE}
+plot_harvested_tmp |>
+  mutate(
+    STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT),
+    HRVYR = case_when(
+      !is.na(TRTCD1) & TRTCD1 == 10 ~ TRTYR1,
+      !is.na(TRTCD2) & TRTCD2 == 10 ~ TRTYR2,
+      !is.na(TRTCD3) & TRTCD3 == 10 ~ TRTYR3,
+      .default = INVYR
+    )
+  ) |>
+  distinct(STAND_ID, HRVYR) |>
+  group_by(STAND_ID) |>
+  arrange(HRVYR) |>
+  mutate(harvest_interval = HRVYR - lag(HRVYR)) |>
+  ungroup() |>
+  filter(!is.na(harvest_interval)) |>
+  ggplot(aes(harvest_interval)) +
+  geom_bar(fill = "blue") +
+  scale_x_continuous(breaks = 1:12) +
+  theme_bw() +
+  ggtitle("FIA Harvest Interval") +
+  xlab("Years between Harvest") +
+  ylab("Number of plots")
+```
+
+## Intensity
+
+```{r, eval = FALSE}
+cficop_fia_trees_tmp <- plot_harvested_tmp |>
+  fia_trees(fiadb, plots = _)
+```
+
+```{r, eval = FALSE}
+harvest_intensity <- cficop_fia_trees_tmp |>
+  mutate(
+    STAND_ID = sprintf("%04d%03d%05d", STATECD, COUNTYCD, PLOT),
+    harvested = STATUSCD == 3,
+    live = STATUSCD == 1 | PREV_STATUS_CD == 1,
+    live = coalesce(live, harvested)
+  ) |>
+  filter(live | harvested) |>
+  group_by(STAND_ID, INVYR) |>
+  summarize(
+    num_live = sum(if_else(live, 1, 0)),
+    num_harvested = sum(if_else(harvested, 1, 0)),
+    .groups = "drop"
+  ) |>
+  ungroup() |>
+  mutate(
+    harvest_intensity = num_harvested / (num_harvested + num_live)
+  ) |>
+  filter(harvest_intensity > 0)
+```
+
+```{r, eval = FALSE}
+harvest_intensity |>
+  ggplot(aes(harvest_intensity)) +
+  geom_histogram(binwidth = 0.05, boundary = 0, fill = "blue") +
+  theme_bw() +
+  ggtitle("FIA Harvest Intensity") +
+  ylab("Number of Plots") +
+  xlab("Fraction of stems harvested")
+```
+
+## Pre-harvest Board Feet
+
+### ** TODO nik: find FIA board feet of lumber
+
+Find out how many board feet of different lumber classes are
+available
+
+## Conclusion
+
+We'll harvest all forest types at 25% intensity every 20 years.
+
+```{targets cficop_fia_thinata, tar_simple = TRUE}
+cficop_fia_thinata <- cficop_dflt_treelist |>
+  mutate(SpeciesFIA = as.integer(SpeciesFIA)) |>
+  mutate(
+    wood_type = case_when(
+      SpeciesFIA == 125 | # Red Pine
+        SpeciesFIA == 129 ~ # Eastern White Pine
+        "Red/White Pine",
+      SpeciesFIA == 833 | # Northern Red Oak
+        SpeciesFIA == 318 | # Sugar Maple
+        SpeciesFIA == 541 | # White Ash
+        SpeciesFIA == 762 ~ # Black Cherry
+        "High-Value Hardwood",
+      .default = "Other"
+    )
+  ) |>
+  filter(wood_type == "Red/White Pine" | wood_type == "High-Value Hardwood") |>
+  # We're only harvesting 14" and bigger
+  filter(DBH >= 14) |>
+  # This finds the year when EITHER the valuable softwood or hardwood
+  # reaches 1500 bd ft / acre; it's probably valid to harvest when the
+  # COMBINED bd ft / acred reaches 1500 bd ft / acre
+  group_by(Year, StandID, wood_type) |>
+  summarize(
+    BoardFeet = sum(BdFt * TPA),
+    .groups = "drop"
+  ) |>
+  filter(BoardFeet > 1500 / 0.25) |>
+  group_by(StandID) |>
+  slice_min(Year) |>
+  ungroup() |>
+  mutate(MasterPlotID = as.numeric(StandID)) |>
+  select(MasterPlotID, HarvestYear = Year) |>
+  # Harvest in the HarvestYear, and 20 years later
+  mutate(
+    HarvestPlus20 = HarvestYear + 20,
+    HarvestPlus40 = HarvestYear + 40
+  ) |>
+  pivot_longer(!MasterPlotID, values_to = "HarvestYear") |>
+  select(MasterPlotID, HarvestYear) |>
+  filter(HarvestYear <= 2020) |>
+  mutate(
+    TARGET_TPA = 0,
+    PERCENT = 0.25,
+    DBH_MIN = 14, # MA Guidelines
+    DBH_MAX = 999 # No upper bound
+  ) |>
+  # For ThinATA, our schema is:
+  # STAND_CN, YEAR, TARGET_TPA, PERCENT, DBH_MIN, DBH_MAX
+  # Not Implemented: HEIGHT_MIN, HEIGHT_MAX
+  # Get STAND_CN
+  left_join(
+    cfigro_plot |>
+      filter(INV_YEAR == 1970) |>
+      select(STAND_CN, STAND_ID),
+    by = join_by(MasterPlotID == STAND_ID)
+  ) |>
+  select(
+    STAND_CN,
+    YEAR = HarvestYear,
+    TARGET_TPA,
+    PERCENT,
+    DBH_MIN,
+    DBH_MAX
+  ) |>
+  # Arrange this for humans to be able to digest
+  arrange(STAND_CN, YEAR)
+```
+
+# Run FVS
+
+What happens with the baseline scenario as set up by the 1956 NERS
+report?
+
+```{targets cficop_fia}
+tar_target(
+  cficop_fia,
+  {
+    timestep <- 10 # years; determined by FVSne variant
+    fvsbin_dir <- "~/bin" # TODO: put these in a config file
+    fvs_variant <- "FVSne"      # TODO: put these in a config file
+    data_dir <- "data/fvs"
+    title <- "CFICOP"
+    mgmt_id <- "BL56"
+    project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+    if (!dir.exists(project_dir)) {
+      dir.create(project_dir)
+    }
+    
+    fvs_run(
+      fvsbin_dir = fvsbin_dir,
+      fvs_variant = fvs_variant,
+      project_dir = project_dir,
+      fiadb = NULL,
+      title = title,
+      mgmt_id = mgmt_id,
+      stands = cfigro_plot |>
+        # Filter out the 6 plots that do not get a sibling
+        semi_join(
+          cficop_plot_sibling,
+          by = join_by(STAND_ID == MasterPlotID)
+        ) |>
+        mutate(
+          ASPECT = if_else(SLOPE > 0 & ASPECT == 0, 360, ASPECT),
+          # We don't use microplot data, but there are 4x6' radius
+          # microplots
+          INV_PLOT_SIZE = 385/4
+        ),
+      trees = cficop_dflt_trees,
+      regen = cficop_dflt_estab,
+      harvest = cficop_fia_thinata,
+      num_partitions = fvs_num_partitions,
+      partition = fvs_partition,
+      random_seed = fvs_randseed
+    )
+  },
+  # iteration = "vector" branches execution for each partition value (see below)
+  iteration = "vector",
+  # cross() and map() are unparsed targets:: functions here.
+  # cross() ensures that every combination of values for its arguments is processed
+  # map() distributes each value of its argument to a separate sub-target (branch)
+  # so cross(randseed, map(partition)) will run each partition in a separate branch,
+  # and each branch will run with each value of randseed
+  pattern = cross(fvs_randseed, map(fvs_partition))
+)
+```
+
+# Results
+
+## Load Results
+
+### Carbon
+
+```{targets cficop_fia_carbon, tar_simple = TRUE}
+cficop_fia_carbon <- fvs_read_output(cficop_fia, "FVS_Carbon") |>
+  group_by(StandID, Year) |> # Combine results from different random seeds
+  summarize(
+    Aboveground_Total_Live = mean(Aboveground_Total_Live),
+    .groups = "keep"
+  ) |>
+  ungroup()
+```
+
+### Summary
+
+```{targets cficop_fia_summary, tar_simple = TRUE}
+cficop_fia_summary <- fvs_read_output(cficop_fia, "FVS_Summary2") |>
+  group_by(StandID, Year) |>
+  summarize(
+    BA = mean(BA),
+    Tpa = mean(Tpa),
+    .groups = 'keep'
+  ) |>
+  ungroup()
+```
+
+### Cutlist
+
+```{targets cficop_fia_cutlist, tar_simple = TRUE}
+cficop_fia_cutlist <- fvs_read_output(cficop_fia, "FVS_CutList") |>
+  filter(random_seed == min(random_seed))
+```
+
+
+# Carbon Over Time
+
+```{r cficop_fia_carbon vs year, eval = FALSE}
+tar_load(cficop_bl56_carbon)
+tar_load(cficop_srvy_carbon)
+tar_load(cficop_hvst_carbon)
+tar_load(cficop_dflt_carbon)
+
+cficop_fia_carbon |>
+  mutate(Series = paste0("FIA Baseline, n=", n_distinct(StandID))) |>
+  union_all(
+    cficop_bl56_carbon |>
+      mutate(Series = paste0("1956 Baseline, n=", n_distinct(StandID)))
+  ) |>
+  union_all(
+    cficop_srvy_carbon |>
+      mutate(Series = paste0("Actual, n=", n_distinct(StandID)))
+  ) |>
+  union_all(
+    cficop_hvst_carbon |>
+      filter(Year %% 10 == 0) |>
+      mutate(Series = paste0("IFM, n=", n_distinct(StandID)))
+  ) |>
+  union_all(
+    cficop_dflt_carbon |>
+      mutate(Series = paste0("Default, n=", n_distinct(StandID)))
+  ) |>
+  mutate(Year = as.character(Year)) |>
+  ggplot(aes(Year, Aboveground_Total_Live, fill = Series)) +
+  geom_boxplot(outlier.size = 0.5) +
+  theme_bw() +
+  ggtitle("CFI 1956 Baseline") +
+  ylab(bquote("Aboveground Live Carbon " ~ (`Mg C` %.% hectare^-1)))
+```
+
+## Scenario Plots
+
+I use this a lot; capture it as a thing:
+
+```{r cficop_bl56_carbon_cmp, eval = FALSE}
+cficop_fia_carbon_cmp <- cficop_fia_carbon |>
+  mutate(name = "FIA Baseline", method = "Projected") |>
+  union_all(
+    cficop_bl56_carbon |>
+      mutate(name = "1956 Baseline", method = "Projected")
+  ) |>
+  union_all(
+    cficop_dflt_carbon |>
+      mutate(name = "Grow-Only", method = "Projected")
+  ) |>
+  union_all(
+    cficop_srvy_carbon |>
+      mutate(name = "Actual", method = "Measured")
+  ) |>
+  union_all(
+    cficop_hvst_carbon |>
+      filter(Year %% 10 == 0) |>
+      mutate(name = "Actual (Modeled)", method = "Projected")
+  ) |>
+  rename(
+    value = Aboveground_Total_Live
+  )
+
+cficop_fia_carbon_cmp_summary <- cficop_fia_carbon_cmp |>
+  group_by(Year, name, method) |>
+  summarize(
+    n = n(),
+    mean = mean(value, na.rm = TRUE),
+    ymin = mean(value, na.rm = TRUE) - 1.96 * sd(value) / sqrt(n),
+    ymax = mean(value, na.rm = TRUE) + 1.96 * sd(value) / sqrt(n),
+    .groups = "drop"
+  )
+```
+
+### IFM vs Baseline
+
+```{r, eval = FALSE}
+cficop_fia_carbon_cmp_summary |>
+#  filter(name %in% c("1956 Baseline", "Actual (Modeled)", "Actual")) |>
+  ggplot(aes(Year, mean, color = name)) +
+  geom_line(aes(linetype = method)) +
+  geom_point() +
+  theme_bw(base_size = 14) +
+  theme(aspect.ratio = 1) +
+  scale_linetype_manual(
+    name = NULL,
+    values = c("Projected" = "dashed", "Measured" = "solid"),
+    guide = guide_legend(order = 2)
+  ) +
+  coord_cartesian(ylim = c(45, 150)) +
+  labs(
+    title = "Quabbin CFI Carbon Projection",
+    color = NULL
+  ) +
+  xlab("Year") +
+  ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
+```
+
+
+### IFM vs Baseline
+
+```{r, eval = FALSE}
+cficop_fia_carbon_cmp_summary |>
+  filter(name %in% c("FIA Baseline", "1956 Baseline", "Grow-Only", "Actual")) |>
+  ggplot(aes(Year, mean, color = name)) +
+  geom_line(aes(linetype = method)) +
+  geom_point() +
+  theme_bw(base_size = 14) +
+  theme(aspect.ratio = 1) +
+  scale_linetype_manual(
+    name = NULL,
+    values = c("Projected" = "dashed", "Measured" = "solid"),
+    guide = guide_legend(order = 2)
+  ) +
+  coord_cartesian(ylim = c(45, 150)) +
+  labs(
+    title = "Quabbin CFI Carbon Projection",
+    color = NULL
+  ) +
+  xlab("Year") +
+  ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
+```
+
+#### First 5 Stands
+
+```{r, eval = FALSE}
+cficop_bl56_carbon_cmp |>
+  filter(name %in% c("Actual (Modeled)", "Actual")) |>
+  # slice_min(order_by = StandID, n = 3 * 6 * 2) |>
+  filter(StandID %in% base::sample(cfigro_plot$STAND_ID, 3)) |>
+  ggplot(aes(Year, value, color = StandID)) +
+  geom_line(aes(linetype = name)) +
+  geom_point() +
+  theme_bw(base_size = 14) +
+  theme(aspect.ratio = 1) +
+#  coord_cartesian(ylim = c(45, 150)) +
+  labs(
+    title = "Quabbin CFI Carbon Projection",
+    linetype = NULL
+  ) +
+  xlab("Year") +
+  ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
+```
+
+
+### No Harvest vs Baseline
+
+
+```{r, eval = FALSE}
+cficop_bl56_carbon_cmp_summary |>
+  filter(name %in% c("1956 Baseline", "Default", "Best Estimate")) |>
+  ggplot(aes(Year, mean, color = name)) +
+  geom_line(aes(linetype = method)) +
+  geom_point() +
+  theme_bw(base_size = 14) +
+  theme(aspect.ratio = 1) +
+  scale_linetype_manual(
+    name = NULL,
+    values = c("Projected" = "dashed", "Measured" = "solid"),
+    guide = guide_legend(order = 2)
+  ) +
+  coord_cartesian(ylim = c(45, 150)) +
+  labs(
+    title = "Quabbin CFI Carbon Projection",
+    color = NULL
+  ) +
+  xlab("Year") +
+  ylab(bquote("Aboveground Live Carbon" ~(`Mg C` %.% ha^-1)))
+```
+
