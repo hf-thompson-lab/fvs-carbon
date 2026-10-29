@@ -96,7 +96,7 @@ cficop_hvst_observed_harvest <- qryDWSPCFIPlotVisitTreeDetail |>
   # trees whose diameter can't be determined.
   mutate(
     DBH = conv_unit(dbhcm, "cm", "in"),
-    dbh_harvest = coalesce(dbh_prior, dbhcm),
+    dbh_harvest = coalesce(dbhcm, dbh_prior),
     DBH_MIN = floor(conv_unit(dbh_harvest, "cm", "in") / 5) * 5
   ) |>
   filter(!is.na(dbh_harvest)) |>
@@ -163,6 +163,45 @@ cficop_hvst_observed_harvest |>
   ggtitle("CFI Observed Harvest (TPA Per Plot)") +
   ylab(bquote("Harvested TPA" ~ (trees %.% acre^-1))) +
   xlab("Visit Cycle (Number of Plots Harvested)")
+```
+
+## By HarvestYear
+
+```{r, eval = FALSE}
+cficop_hvst_observed_harvest |>
+#  group_by(VisitCycle) |>
+#  mutate(
+#    HarvestYear = paste0(HarvestYear, " (n=", n_distinct(MasterPlotID), ")")
+#  ) |>
+#  ungroup() |>
+  mutate(
+    GENUS = fct_lump_n(GENUS, n = 5, w = basal_area, other_level = "Other"),
+#    HarvestYear = ordered(HarvestYear)
+  ) |>
+  group_by(MasterPlotID, HarvestYear, GENUS) |>
+  summarize(
+    basal_area = sum(basal_area, na.rm = TRUE),
+    tpa = n() * 5,
+    n = n(),
+    .groups = "keep"
+  ) |>
+  ungroup() |>
+  ggplot(aes(HarvestYear, n, group = HarvestYear)) +
+  geom_col(fill = "blue") +
+#  coord_cartesian(ylim = c(0, 2)) +
+  theme_bw() +
+#  scale_fill_manual(values = eves_colors) +
+  ggtitle("CFI Observed Harvest") +
+  ylab("Number of plots harvested") +
+  theme(axis.text.x = element_text(angle = -30, hjust = 0, vjust = 1)) +
+  xlab("Harvest Year")
+```
+
+```{r}
+cficop_hvst_observed_harvest |>
+  distinct(MasterPlotID, HarvestYear) |>
+  filter(HarvestYear < 1980) |>
+  nrow()
 ```
 
 ## By Genus
@@ -1444,3 +1483,63 @@ measured_remainders |>
   ylab(bquote("Post-Harvest Trees" ~ (trees)))
 ```
 
+# Scatterplot
+
+Look at carbon delta in projected vs actual
+
+```{r, eval = FALSE}
+cficop_hvst_carbon_delta <- cficop_hvst_carbon_cmp |>
+  group_by(StandID, name, method) |>
+  arrange(Year) |>
+  mutate(delta = value - lag(value)) |>
+  filter(!is.na(delta)) |>
+  pivot_wider(id_cols = c(StandID, Year), values_from = delta) |>
+  left_join(
+    cficop_hvst_observed_harvest |>
+      mutate(
+        StandID = as.character(MasterPlotID),
+        harvested = "harvested"
+      ) |>
+      select(StandID, Year = VisitCycle, harvested),
+    by = join_by(StandID, Year)
+  ) |>
+  replace_na(list(harvested = "not harvested"))
+```
+
+## 1970 to 1980
+
+```{r}
+ cficop_hvst_carbon_delta |>
+  filter(Year == 1980) |>
+  ggplot(aes(SRVY, HVST)) +
+  geom_hline(yintercept = 0, color = "darkgray") +
+  geom_vline(xintercept = 0, color = "darkgray") +
+  geom_abline(slope = 1, intercept = c(0, 0), linetype = "dashed") +
+  geom_point(aes(color = harvested), alpha = 0.5) +
+  coord_cartesian(xlim = c(-50, 50), ylim = c(-50, 50)) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  ggtitle("Observed vs. Modeled Carbon Delta from 1970 to 1980") +
+  xlab(bquote("Observed Delta " ~ (`Mg C` %.% ha^-1))) +
+  ylab(bquote("Modeled Delta " ~ (`Mg C` %.% ha^-1))) +
+  labs(color = NULL)
+```
+
+## 1980 to 1990
+
+```{r}
+ cficop_hvst_carbon_delta |>
+  filter(Year == 1990) |>
+  ggplot(aes(SRVY, HVST)) +
+  geom_hline(yintercept = 0, color = "darkgray") +
+  geom_vline(xintercept = 0, color = "darkgray") +
+  geom_abline(slope = 1, intercept = c(0, 0), linetype = "dashed") +
+  geom_point(aes(color = harvested), alpha = 0.5) +
+  coord_cartesian(xlim = c(-50, 50), ylim = c(-50, 50)) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  ggtitle("Observed vs. Modeled Carbon Delta from 1980 to 1990") +
+  xlab(bquote("Observed Delta " ~ (`Mg C` %.% ha^-1))) +
+  ylab(bquote("Modeled Delta " ~ (`Mg C` %.% ha^-1))) +
+  labs(color = NULL)
+```
