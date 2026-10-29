@@ -612,7 +612,6 @@ cficop_dflt_treelist <- fvs_read_output(cficop_dflt, "FVS_TreeList") |>
 
 How does default compare to NONE and SRVY?
 
-
 ```{r cficop_dflt_carbon_cmp, eval = FALSE}
 cficop_dflt_carbon_cmp <- cficop_dflt_carbon |>
   mutate(name = "DFLT", method = "Projected") |>
