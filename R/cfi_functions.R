@@ -123,7 +123,6 @@ cfi_status_dead <- function(x) {
 }
 
 
-
 # cfi_history -------------------------------------------------------------
 
 # Convert CFI Status to FVS History
@@ -152,9 +151,9 @@ cfi_history <- function(.data) {
           cfi_status_live(PrevTreeStatusCode) ~ 6, # Newly Dead
         cfi_status_dead(VisitTreeStatusCode) &
           cfi_status_dead(PrevTreeStatusCode) ~ 8, # Oldly Dead
-        # Trees with unknown status don't change
+        # Trees with unknown status were cut or otherwise removed
         VisitTreeStatusCode == 4 &
-          cfi_status_live(PrevTreeStatusCode) ~ 1, # Presumed live
+          cfi_status_live(PrevTreeStatusCode) ~ 9, # Presumed cut
         VisitTreeStatusCode == 4 &
           cfi_status_dead(PrevTreeStatusCode) ~ 8, # Presumed dead
         .default = 6 # Dead, or previous status can't be determined
