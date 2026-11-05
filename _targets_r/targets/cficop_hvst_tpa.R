@@ -1,16 +1,9 @@
 tar_target(cficop_hvst_tpa, {
   # Find the trees left after each harvest
   cficop_hvst_tpa <- cficop_hvst_observed_remainders |>
-    filter(DBH > 5) |>
     group_by(MasterPlotID, VisitCycle, FVS_SPCD, HarvestYear) |>
     summarize(
-      # TPA is (fractional) trees per acre
-      # BA is square feet per acre
-      # DBH is diameter in inches
-      # So compute each tree's BA, multiply by its TPA, then sum
-      BA_remainder = sum(TPA * pi * (DBH / 12 / 2)^2),
-      # Ignored for now
-      TPA_remainder = sum(TPA),
+      TPA_remainder = n() * 5,
       .groups = "drop"
     ) |>
     # Add back in the things that were harvested down to 0 TPA
@@ -31,8 +24,6 @@ tar_target(cficop_hvst_tpa, {
       DBH_MIN = 5,
       DBH_MAX = 999,
       PERCENT = TPA_harvest / (TPA_harvest + TPA_remainder),
-      # FVS under-harvests by about 40%, so goose PERCENT
-      PERCENT = if_else(PERCENT + 0.2 > 1, 1, PERCENT + 0.2),
       TPA = 0, # CUTEFF says how many trees to actually harvest
       BA = NA # We're not using BA
     ) |>
@@ -47,9 +38,7 @@ tar_target(cficop_hvst_tpa, {
       by = join_by(MasterPlotID == STAND_ID)
     ) |>
     # Remove records for cohorts that weren't harvested
-    filter(
-      !is.na(HarvestYear)
-    ) |>
+    filter(PERCENT > 0.01) |>
     select(
       STAND_CN,
       YEAR = HarvestYear,
