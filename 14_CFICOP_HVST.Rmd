@@ -185,7 +185,7 @@ cficop_hvst_observed_harvest |>
   xlab("Harvest Year")
 ```
 
-```{r}
+```{r, eval = FALSE}
 cficop_hvst_observed_harvest |>
   distinct(MasterPlotID, HarvestYear) |>
   filter(HarvestYear < 1980) |>
@@ -313,33 +313,44 @@ Sawtimber / Poletimber
 - Softwood break diameter = 9
 
 ```{targets cficop_hvst_observed_remainders, tar_simple = TRUE}
-# Go by the trees that FVS can see; it's more reliable than the CFI inventory
-cficop_hvst_observed_remainders <- fvs_read_output(cficop_srvy, "FVS_TreeList") |>
-  filter(DBH >= 5) |>
-  mutate(
-    # DG is unreliable; don't try to guess DBH at time of harvest
-    dbh_harvest = DBH,
-    DBH_MIN = floor(DBH / 5) * 5,
-    MasterPlotID = as.integer(StandID),
-    VisitCycle = Year,
-    SpeciesCode = as.integer(SpeciesFIA)
-  ) |>
-  inner_join(
-    # Which sizes of which species are harvested on which plots, in
-    # which visit cycles? Keep only those ones.
-    cficop_hvst_observed_harvest |>
-      distinct(MasterPlotID, VisitCycle, SpeciesCode, HarvestYear),
-    by = join_by(MasterPlotID, VisitCycle, SpeciesCode)
-  ) |>
+cficop_hvst_observed_remainders <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  # Deal with species that FVS doesn't handle
+  mutate(SpeciesCode = replace_values(
+    SpeciesCode,
+    320 ~ 317, # norway maple -> sugar maple
+    402 ~ 403, # bitternut hickory -> pignut hickory
+    740 ~ 743  # unknown aspen -> bigtooth aspen
+  )) |>
   left_join(
     species_crosswalk |> select(SPCD, GENUS, SPECIES, FVS_SPCD),
     by = join_by(SpeciesCode == SPCD)
   ) |>
+  filter(!is.na(FVS_SPCD)) |>
+  # At this point we have fully-decorated tree records;
+  # filter to trees that are either Live or Dead, but
+  # not Cut or Recruit
+  filter(StatusB %in% c("L", "D")) |>
+  # Accept dbh_prior or dbhcm for dbh at the time of harvest; ignore
+  # trees whose diameter can't be determined.
   mutate(
-    # Judgment: basal_area intended to be left in harvest is better
-    # represented by ba PRIOR to harvest, than POST harvest. We don't
-    # have BA at the time of harvest, which would be ideal.
-    basal_area = (conv_unit(DBH, "in", "m") / 2)^2 * pi
+    DBH = conv_unit(dbhcm, "cm", "in"),
+    dbh_harvest = coalesce(dbhcm, dbh_prior),
+    DBH_MIN = floor(conv_unit(dbh_harvest, "cm", "in") / 5) * 5
+  ) |>
+  filter(!is.na(dbh_harvest)) |>
+  mutate(
+    basal_area = (conv_unit(dbh_harvest, "cm", "m") / 2)^2 * pi,
+    # HarvestYear isn't reset if the plot isn't harvested
+    HarvestYear = if_else(
+      CutSinceLastVisit,
+      VisitCycle - YearsSinceLastCut,
+      NA
+    ),
+    PreHarvestVisitCycle = floor(HarvestYear / 10) * 10
   )
 ```
 
@@ -495,16 +506,9 @@ CFI.
 ```{targets cficop_hvst_tpa, tar_simple = TRUE}
 # Find the trees left after each harvest
 cficop_hvst_tpa <- cficop_hvst_observed_remainders |>
-  filter(DBH > 5) |>
   group_by(MasterPlotID, VisitCycle, FVS_SPCD, HarvestYear) |>
   summarize(
-    # TPA is (fractional) trees per acre
-    # BA is square feet per acre
-    # DBH is diameter in inches
-    # So compute each tree's BA, multiply by its TPA, then sum
-    BA_remainder = sum(TPA * pi * (DBH / 12 / 2)^2),
-    # Ignored for now
-    TPA_remainder = sum(TPA),
+    TPA_remainder = n() * 5,
     .groups = "drop"
   ) |>
   # Add back in the things that were harvested down to 0 TPA
@@ -525,8 +529,6 @@ cficop_hvst_tpa <- cficop_hvst_observed_remainders |>
     DBH_MIN = 5,
     DBH_MAX = 999,
     PERCENT = TPA_harvest / (TPA_harvest + TPA_remainder),
-    # FVS under-harvests by about 40%, so goose PERCENT
-    PERCENT = if_else(PERCENT + 0.2 > 1, 1, PERCENT + 0.2),
     TPA = 0, # CUTEFF says how many trees to actually harvest
     BA = NA # We're not using BA
   ) |>
@@ -541,9 +543,7 @@ cficop_hvst_tpa <- cficop_hvst_observed_remainders |>
     by = join_by(MasterPlotID == STAND_ID)
   ) |>
   # Remove records for cohorts that weren't harvested
-  filter(
-    !is.na(HarvestYear)
-  ) |>
+  filter(PERCENT > 0.01) |>
   select(
     STAND_CN,
     YEAR = HarvestYear,
@@ -1488,15 +1488,61 @@ cficop_hvst_carbon_delta <- cficop_hvst_carbon_cmp |>
         StandID = as.character(MasterPlotID),
         harvested = "harvested"
       ) |>
-      select(StandID, Year = VisitCycle, harvested),
+      select(StandID, Year = VisitCycle, harvested) |>
+      distinct(),
     by = join_by(StandID, Year)
   ) |>
   replace_na(list(harvested = "not harvested"))
 ```
 
+Why are there missing values?
+
+```{r, eval = FALSE}
+cficop_hvst_carbon_delta |>
+  filter(is.na(HVST)) |>
+  arrange(StandID, Year)
+```
+
+First stand that's missing data from the HVST projection is 10255.
+
+```{r, eval = FALSE}
+cficop_hvst_carbon |> filter(StandID == 10255)
+```
+
+It's entirely missing. Is this one of the stands we filtered out?
+
+```{r, eval = FALSE}
+tar_load(cficop_plot_sibling)
+cficop_plot_sibling |>
+  filter(MasterPlotID == 10255)
+```
+
+Yup, this is one without a sibling. Let's remove all of those.
+
+```{r, eval = FALSE}
+cficop_hvst_carbon_delta |>
+  semi_join(
+    cficop_plot_sibling |>
+      mutate(StandID = as.character(MasterPlotID)),
+    by = join_by(StandID)
+  ) |>
+  filter(is.na(HVST))
+```
+
+OK, that explains the NULLs.
+
+```{r, eval = FALSE}
+cficop_hvst_carbon_delta <- cficop_hvst_carbon_delta |>
+  semi_join(
+    cficop_plot_sibling |>
+      mutate(StandID = as.character(MasterPlotID)),
+    by = join_by(StandID)
+  )
+```
+
 ## 1970 to 1980
 
-```{r}
+```{r, eval = FALSE}
  cficop_hvst_carbon_delta |>
   filter(Year == 1980) |>
   ggplot(aes(SRVY, HVST)) +
@@ -1515,7 +1561,7 @@ cficop_hvst_carbon_delta <- cficop_hvst_carbon_cmp |>
 
 ## 1980 to 1990
 
-```{r}
+```{r, eval = FALSE}
  cficop_hvst_carbon_delta |>
   filter(Year == 1990) |>
   ggplot(aes(SRVY, HVST)) +
@@ -1531,3 +1577,226 @@ cficop_hvst_carbon_delta <- cficop_hvst_carbon_cmp |>
   ylab(bquote("Modeled Delta " ~ (`Mg C` %.% ha^-1))) +
   labs(color = NULL)
 ```
+
+## Pick a Plot
+
+From the 1970 - 1980 range, let's pick a plot that doesn't make sense and see what happened.
+
+```{r, eval = FALSE}
+ cficop_hvst_carbon_delta |>
+  filter(Year == 1980) |>
+  filter(harvested == "harvested") |> # plot was harvested
+  filter(SRVY > 0) |> # surveyed C went up
+  filter(HVST < 0) |> # modeled C went down
+  arrange(desc(SRVY - HVST))
+```
+
+So plot 10906 has a huge difference. What up?
+
+```{r, eval = FALSE}
+cficop_hvst_observed_harvest |>
+  filter(MasterPlotID == 10906) |>
+  filter(VisitCycle == 1980) |>
+  select(MasterTreeID, StatusB)
+```
+
+Looks like 18 trees were cut. What fraction of trees in the plot is this?
+
+```{r, eval = FALSE}
+cficop_hvst_observed_remainders |>
+  filter(MasterPlotID == 10906) |>
+  filter(VisitCycle == 1980)
+```
+
+Remainders don't make sense; that's a lot of fractional trees from FVS.
+
+## Alternate Remainders
+
+Let's compute remainders from CFI instead of FVS
+
+```{r cficop_hvst_observed_remainders2, tar_simple = TRUE, eval = FALSE}
+cficop_hvst_observed_remainders2 <- qryDWSPCFIPlotVisitTreeDetail |>
+  cfi_with_visit_info(tblDWSPCFIPlotVisitsComplete) |>
+  cfi_with_tree_info(tblDWSPCFITreesComplete) |>
+  cfi_with_plot_info(tblDWSPCFIPlotsComplete) |>
+  cfi_abp(cfiabp_trees) |>
+  # Deal with species that FVS doesn't handle
+  mutate(SpeciesCode = replace_values(
+    SpeciesCode,
+    320 ~ 317, # norway maple -> sugar maple
+    402 ~ 403, # bitternut hickory -> pignut hickory
+    740 ~ 743  # unknown aspen -> bigtooth aspen
+  )) |>
+  left_join(
+    species_crosswalk |> select(SPCD, GENUS, SPECIES, FVS_SPCD),
+    by = join_by(SpeciesCode == SPCD)
+  ) |>
+  filter(!is.na(FVS_SPCD)) |>
+  # At this point we have fully-decorated tree records;
+  # filter to trees that are either Live or Dead, but
+  # not Cut or Recruit
+  filter(StatusB %in% c("L", "D")) |>
+  # Accept dbh_prior or dbhcm for dbh at the time of harvest; ignore
+  # trees whose diameter can't be determined.
+  mutate(
+    DBH = conv_unit(dbhcm, "cm", "in"),
+    dbh_harvest = coalesce(dbhcm, dbh_prior),
+    DBH_MIN = floor(conv_unit(dbh_harvest, "cm", "in") / 5) * 5
+  ) |>
+  filter(!is.na(dbh_harvest)) |>
+  mutate(
+    basal_area = (conv_unit(dbh_harvest, "cm", "m") / 2)^2 * pi,
+    # HarvestYear isn't reset if the plot isn't harvested
+    HarvestYear = if_else(
+      CutSinceLastVisit,
+      VisitCycle - YearsSinceLastCut,
+      NA
+    ),
+    PreHarvestVisitCycle = floor(HarvestYear / 10) * 10
+  )
+```
+
+
+
+What are the observed remainders?
+
+```{r, eval = FALSE}
+cficop_hvst_observed_remainders2 |>
+  filter(MasterPlotID == 10906) |>
+  filter(VisitCycle == 1980) |>
+  select(MasterTreeID, StatusB, VisitCycle, HarvestYear)
+```
+
+That's a lot easier to think about.
+
+How do they compare, in TPA for harvest?
+
+```{r, eval = FALSE}
+# Find the trees left after each harvest
+cficop_hvst_tpa2 <- cficop_hvst_observed_remainders2 |>
+  filter(MasterPlotID == 10906) |>
+  group_by(MasterPlotID, VisitCycle, FVS_SPCD, HarvestYear) |>
+  summarize(
+    TPA_remainder = n() * 5,
+    .groups = "drop"
+  ) |>
+  # Add back in the things that were harvested down to 0 TPA
+  # This will also add HarvestYear to the things harvested to >0 TPA
+  full_join(
+    cficop_hvst_observed_harvest |>
+      filter(MasterPlotID == 10906) |>
+      group_by(MasterPlotID, VisitCycle, FVS_SPCD, HarvestYear) |>
+      summarize(
+        TPA_harvest = n() * 5,
+        .groups = "drop"
+      ),
+    by = join_by(MasterPlotID, VisitCycle, FVS_SPCD)
+  ) |>
+  mutate(
+    HarvestYear = coalesce(HarvestYear.x, HarvestYear.y),
+    TPA_remainder = coalesce(TPA_remainder, 0),
+    TPA_harvest = coalesce(TPA_harvest, 0),
+    DBH_MIN = 5,
+    DBH_MAX = 999,
+    PERCENT = TPA_harvest / (TPA_harvest + TPA_remainder),
+    TPA = 0, # CUTEFF says how many trees to actually harvest
+    BA = NA # We're not using BA
+  ) |>
+  # For prescription-based harvest, our schema is:
+  # STAND_CN, TREE_CN, PREV_TRE_CN, YEAR, PRESCRIPTION
+  # For DBH-based harvest, our schema is:
+  # STAND_CN, YEAR, DBH_MIN, DBH_MAX, CUTEFF, SPCD, TPA, BA
+  left_join(
+    cfigro_plot |>
+      filter(INV_YEAR == 1970) |>
+      select(STAND_CN, STAND_ID),
+    by = join_by(MasterPlotID == STAND_ID)
+  ) |>
+  # Remove records for cohorts that weren't harvested
+  filter(PERCENT > 0.01) |>
+  select(
+    STAND_CN,
+    YEAR = HarvestYear,
+    DBH_MIN,
+    DBH_MAX,
+    PERCENT,
+    SPCD = FVS_SPCD,
+    TPA,
+    BA
+  ) |>
+  # Arrange this for humans to be able to digest
+  arrange(YEAR, SPCD, DBH_MIN)
+```
+
+```{r, eval = FALSE}
+cficop_hvst_tpa |>
+  filter(STAND_CN == "119700906")
+```
+
+```{r, eval = FALSE}
+cficop_hvst_tpa2 |>
+  filter(STAND_CN == "119700906")
+```
+
+OK, looks like I can switch to specifying remainders from CFI data,
+since those are real close.
+
+Next question, why did FVS lose C, but SRVY gained it?
+
+## Whence the missing C?
+
+How much carbon is in the remainders?
+
+We can't get to the carbon, but we can look at remainders vs. SRVY vs HVST
+
+```{r, eval = FALSE}
+tar_load(cficop_srvy_summary)
+cficop_hvst_observed_remainders |>
+  filter(MasterPlotID == 10906) |>
+  filter(VisitCycle == 1980) |>
+  summarize(
+    TPA = sum(TPA),
+    basal_area = sum(basal_area)
+  ) |>
+  mutate(
+    name = "remainders"
+  ) |>
+  union_all(
+    cficop_hvst_observed_remainders2 |>
+      filter(MasterPlotID == 10906) |>
+      filter(VisitCycle == 1980) |>
+      summarize(
+        TPA = n() * 5,
+        basal_area = sum(basal_area)
+      ) |>
+      mutate(
+        name = "remainders2"
+      )
+  ) |>
+  union_all(
+    cficop_hvst_summary |>
+      filter(StandID == "10906") |>
+      filter(Year == 1980) |>
+      summarize(
+        basal_area = sum(conv_unit(BA, "ft2", "m2")),
+        TPA = sum(Tpa)
+      ) |>
+      mutate(
+        name = "HVST"
+      )
+  ) |>
+  union_all(
+    cficop_srvy_summary |>
+      filter(StandID == "10906") |>
+      filter(Year == 1980) |>
+      summarize(
+        basal_area = sum(conv_unit(BA, "ft2", "m2")),
+        TPA = sum(Tpa)
+      ) |>
+      mutate(
+        name = "SRVY"
+      )
+  )
+```
+
+

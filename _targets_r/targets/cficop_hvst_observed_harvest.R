@@ -23,7 +23,7 @@ tar_target(cficop_hvst_observed_harvest, {
     # trees whose diameter can't be determined.
     mutate(
       DBH = conv_unit(dbhcm, "cm", "in"),
-      dbh_harvest = coalesce(dbh_prior, dbhcm),
+      dbh_harvest = coalesce(dbhcm, dbh_prior),
       DBH_MIN = floor(conv_unit(dbh_harvest, "cm", "in") / 5) * 5
     ) |>
     filter(!is.na(dbh_harvest)) |>
