@@ -1156,7 +1156,7 @@ cficop_bl56_carbon_cmp_summary |>
   ) +
   coord_cartesian(ylim = c(45, 150)) +
   labs(
-    title = "Quabbin CFI Carbon Projection",
+    title = "Scenarios vs. 1956 Baseline",
     color = NULL
   ) +
   xlab("Year") +
