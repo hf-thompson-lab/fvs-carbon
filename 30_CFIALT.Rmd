@@ -1,0 +1,173 @@
+---
+title: "30_CFIALT"
+output: html_document
+---
+
+# Intro
+
+What would happen in CFI if we cut in 1990 at 25%, 50%, 75%, or 100%?
+(according to FVS)
+
+# Setup
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(targets)
+  library(tarchetypes)
+  library(tidyverse)
+  library(readxl)
+  library(terra)
+  library(tidyterra)
+  library(sf)
+  library(rnaturalearth)
+  library(measurements)
+  library(mlr3verse) # Machine Learning in R framework, larger universe
+  library(ggspatial) # annotation_scale, annotation_north_arrow
+  library(ggfx) # for fancy ggplot stuff like with_blur
+  library(patchwork) # for n-up ggplot
+})
+tar_source()
+```
+
+Preload targets results
+
+```{r, eval = FALSE}
+tar_load(fiadb)
+tar_load(species_crosswalk)
+tar_load(fvs_num_partitions)
+tar_load(fvs_partition)
+tar_load(fvs_randseed)
+tar_load(fvsne_states)
+tar_load(cfigro_bai_model)
+tar_load(cfigro_estab)
+tar_load(cfigro_none_growth)
+tar_load(cfigro_plot)
+
+mgmt_ids <- c("DFLT")
+for (mgmt_id in mgmt_ids) {
+  f = list.files(pattern = paste0("*_CFICOP_", mgmt_id, ".Rmd"))
+  normalizePath(f) |>
+    tar_objects_defined_in_rmd() |>
+    tar_load()
+}
+```
+
+# Harvest
+
+Given plots and CUTEFF, harvest all plots at that efficiency.
+
+```{r}
+cfialt_harvest <- function(plots, cuteff) {
+  plots |>
+    select(STAND_CN) |>
+    mutate(
+      YEAR = 1990,
+      DBH_MIN = 5,
+      DBH_MAX = 999,
+      PERCENT = cuteff,
+      SPCD = 0, # All species
+      TPA = 0, # ignored
+      BA = 0 # ignored
+    ) |>
+  # Arrange this for humans to be able to digest
+  arrange(YEAR, SPCD, DBH_MIN)
+}
+```
+
+# Run FVS
+
+```{r}
+timestep <- 10 # years; determined by FVSne variant
+fvsbin_dir <- "~/bin"  # TODO: put these in a config file
+fvs_variant <- "FVSne" # TODO: put these in a config file
+data_dir <- "data/fvs"
+title <- "CFIALT"
+
+for (cuteff in c(0, 0.25, 0.5, 0.75, 1)) {
+  mgmt_id <- sprintf("H%03d", round(cuteff * 100))
+  print(mgmt_id)
+  project_dir <- file.path(data_dir, paste0("FVS_", title, "_", mgmt_id))
+  if (!dir.exists(project_dir)) {
+    dir.create(project_dir)
+  }
+  
+  fvs_run(
+    fvsbin_dir = fvsbin_dir,
+    fvs_variant = fvs_variant,
+    project_dir = project_dir,
+    fiadb = NULL,
+    title = title,
+    mgmt_id = mgmt_id,
+    stands = cfigro_plot,
+    trees = cficop_dflt_trees,
+    regen = cficop_dflt_estab,
+    harvest = cfialt_harvest(cfigro_plot, cuteff)
+  )
+}
+```
+
+# Results
+
+```{r}
+data_dir <- "data/fvs"
+title <- "CFIALT"
+cfialt_carbon <- lapply(c(0, 0.25, 0.5, 0.75, 1), \(cuteff) {
+  mgmt_id <- sprintf("H%03d", round(cuteff * 100))
+  file_basename <- paste0("FVS_", title, "_", mgmt_id)
+  fvs_output_db <- file.path(
+    data_dir, 
+    file_basename,
+    paste0(file_basename, "_Output.db")
+  )
+  tibble(output_db = fvs_output_db) |>
+    fvs_read_output("FVS_Carbon") |>
+    mutate(cuteff = !!cuteff)
+}) |>
+  do.call(bind_rows, args = _)
+```
+
+```{r}
+cfialt_carbon |>
+  group_by(Year, cuteff) |>
+  summarise(value = mean(Aboveground_Total_Live), .groups = "drop") |>
+  ungroup() |>
+  mutate(name = ordered(
+    paste0(round(cuteff * 100), "%"),
+    levels = c("0%", "25%", "50%", "75%", "100%")
+  )) |>
+  ggplot(aes(Year, value, color = name)) +
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  ggtitle("CFI Modeled Harvest by Intensity") +
+  xlab("Year") +
+  ylab(bquote("Aboveground Live Carbon" ~ (`Mg C` ~ ha^-1))) +
+  scale_color_discrete(name = "Harvest Intensity")
+```
+## Delta
+
+```{r cfi_carbon_delta}
+cfialt_carbon |>
+  group_by(StandID, cuteff) |>
+  arrange(Year) |>
+  mutate(delta = (Aboveground_Total_Live - lag(Aboveground_Total_Live))/10) |>
+  ungroup() |>
+  filter(!is.na(delta)) |>
+  mutate(
+    name = ordered(
+      paste0(round(cuteff * 100), "%"),
+      levels = c("0%", "25%", "50%", "75%", "100%")
+    ),
+    group = interaction(Year, name, lex.order = TRUE)
+  ) |>
+  filter(Year != 1990) |>
+  ggplot(aes(Year, delta, fill = name, group = group)) +
+  geom_boxplot(outlier.size = 0.1) +
+  theme_bw() +
+  ggtitle("CFI Modeled Carbon Delta by Harvest Intensity") +
+  xlab("Year") +
+  ylab(bquote("Aboveground Live Carbon Delta" ~ (`Mg C` ~ ha^-1 ~ yr^-1))) +
+  scale_fill_discrete(name = "Harvest Intensity")
+```
+
+
